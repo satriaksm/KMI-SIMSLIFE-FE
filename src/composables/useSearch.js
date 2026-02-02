@@ -26,19 +26,19 @@ export function useSearch() {
     try {
       const data = await searchProducts(params);
       if (append) {
-        products.value.push(...(data.data ?? []));
+        products.value.push(...(data.data.products ?? []));
       } else {
-        products.value = data.data ?? [];
+        products.value = data.data.products ?? [];
       }
-      productsMeta.value = data.meta ?? {};
+      productsMeta.value = data.meta.products_meta ?? {};
 
       // Also hydrate jasa results if present
       if (append) {
-        jasas.value.push(...(data.jasas ?? []));
+        jasas.value.push(...(data.data.jasas ?? []));
       } else {
-        jasas.value = data.jasas ?? [];
+        jasas.value = data.data.jasas ?? [];
       }
-      jasasMeta.value = data.jasas_meta ?? {};
+      jasasMeta.value = data.meta.jasas_meta ?? {};
     } catch (err) {
       if (isDev) {
         console.error("Error fetching products:", err);

@@ -313,8 +313,7 @@ import { useToast } from "vue-toastification";
 import { getImageUrlJasa, getEventBannerUrl } from "@/libs/getImageUrl.js";
 import { usePublicEvents } from "@/composables/usePublicEvents";
 import { useRoute, useRouter } from "vue-router";
-import * as ProductService from "@/services/api/product";
-import { searchProducts, searchMerchants } from "@/services/api/search";
+import { useSearch } from "@/composables/useSearch";
 
 import TextField from "@/components/forms/TextField.vue";
 import Button from "@/components/common/Button.vue";
@@ -327,6 +326,7 @@ import jasaIcon from "@/assets/icons/Jasa.svg";
 import kulinerIcon from "@/assets/icons/Kuliner.svg";
 import tokoIcon from "@/assets/icons/Toko.svg";
 import merchantIcon from "@/assets/icons/merchant.svg";
+import { data } from "autoprefixer";
 
 // =========================
 // STATE
@@ -340,6 +340,19 @@ const router = useRouter();
 const myLatitude = ref(null);
 const myLongitude = ref(null);
 
+const {
+  products,
+  jasas,
+  merchants,
+  productsMeta,
+  jasasMeta,
+  merchantsMeta,
+  loadingProducts,
+  loadingMerchants,
+  fetchProducts,
+  fetchMerchants,
+} = useSearch();
+
 // If user is not authenticated, /api/profile/address will 401.
 // Cache that fact so we don't keep hitting the endpoint.
 const profileAddressUnauthorized = ref(false);
@@ -349,15 +362,10 @@ let profileCoordsPromise = null;
 
 const searchInputRef = ref(null);
 const searchQuery = ref("");
-const jasaList = ref([]);
-const productList = ref([]);
-const merchantList = ref([]);
+
 const categories = ref([]);
 const loadingCategories = ref(true);
 const selectedCategoryId = ref(null);
-const loadingJasa = ref(false);
-const loadingProducts = ref(false);
-const loadingMerchants = ref(false);
 const showAllCategories = ref(false);
 
 // Infinite scroll state (mirip SearchPage.vue)
@@ -775,44 +783,10 @@ function getJasaId(jasa) {
   return jasa?.jasa_id ?? jasa?.id;
 }
 
-// Filtered jasa list (hanya jasa yang layak tampil ke customer)
-const filteredJasaList = computed(() => {
-  // Jasa dari endpoint public search sudah semestinya "layak tampil".
-  // Jangan terlalu ketat filter client-side, karena beberapa payload tidak
-  // mengirim field `status` / `is_active` (contoh: hasil `/api/public/search`).
-  let result = (jasaList.value || []).filter((j) => {
-    const status = j?.status;
-    if (status === "draft" || status === "inactive") return false;
-    if (j?.is_active === false) return false;
-    return true;
-  });
+const filteredJasaList = computed(() => jasas.value || []);
 
-  // Filter by category
-  if (selectedCategoryId.value) {
-    result = result.filter(
-      (j) => j.jasa_category_id === selectedCategoryId.value,
-    );
-  }
-
-  return result || [];
-});
-
-const filteredProductList = computed(() => {
-  let result = productList.value || [];
-
-  // Filter by category (client-side fallback; server-side juga difetch dengan category_id)
-  if (selectedCategoryId.value) {
-    const cid = Number(selectedCategoryId.value);
-    result = result.filter((p) =>
-      Array.isArray(p?.categories)
-        ? p.categories.some((c) => Number(c?.id) === cid)
-        : false,
-    );
-  }
-
-  return result;
-});
-
+const filteredProductList = computed(() => products.value || []);
+const merchantList = computed(() => merchants.value || []);
 // Adapt jasa -> ProductCard shape (agar satu card bisa dipakai untuk jasa / product)
 const jasaToProductCard = (jasa) => {
   const fixed = Number(jasa?.fixed_price || 0);
@@ -866,9 +840,7 @@ const currentCardItems = computed(() => {
 
 const loadingItems = computed(() => {
   if (activeMode.value === "umkm") return loadingMerchants.value;
-  return activeMode.value === "jasa"
-    ? loadingJasa.value
-    : loadingProducts.value;
+  return loadingProducts.value;
 });
 
 const isEmpty = computed(() => {
@@ -1045,31 +1017,12 @@ async function loadMore() {
 }
 
 const fetchJasas = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingJasa.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
-      // explore jasa -> gunakan endpoint search supaya bisa nearest/price/date
+  await fetchProducts(
+    {
       q: undefined,
       segments: ["UMKM Jasa"],
       ...sortParams,
@@ -1077,71 +1030,31 @@ const fetchJasas = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
-    const meta = payload?.jasas_meta ?? {};
-    const items = Array.isArray(payload?.jasas) ? payload.jasas : [];
-    const mapped = items.map((j) => ({
-      ...j,
-      image: resolveJasaImage(j),
-    }));
+  const current = Number(jasasMeta.value?.current_page ?? 1);
+  const last = Number(jasasMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    if (append) {
-      jasaList.value.push(...mapped);
-    } else {
-      jasaList.value = mapped;
-    }
-
-    const current = Number(meta?.current_page ?? 1);
-    const last = Number(meta?.last_page ?? 1);
-    hasMore.value = current < last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data jasa:", e);
-    toast.error("Gagal memuat data layanan. Silakan coba lagi nanti.");
-    if (!append) {
-      jasaList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingJasa.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
 const fetchProductsByMode = async ({ append } = { append: false }) => {
   const segments = modeToSegments[activeMode.value];
   if (!segments) {
-    productList.value = [];
+    products.value = [];
     hasMore.value = false;
     return;
   }
 
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingProducts.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
+  await fetchProducts(
+    {
       q: undefined,
       segments,
       ...sortParams,
@@ -1149,81 +1062,39 @@ const fetchProductsByMode = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
-    const parsed = parseLaravelPaginator(payload);
+  const current = Number(productsMeta.value?.current_page ?? 1);
+  const last = Number(productsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    if (append) productList.value.push(...(parsed.items ?? []));
-    else productList.value = parsed.items ?? [];
-
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data produk:", e);
-    toast.error("Gagal memuat data produk. Silakan coba lagi nanti.");
-    if (!append) {
-      productList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingProducts.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
-const fetchMerchants = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingMerchants.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+const fetchMerchantsExplore = async ({ append } = { append: false }) => {
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForMerchants();
 
-    const sortParams = buildSortParamsForMerchants();
-    const res = await searchMerchants({
+  await fetchMerchants(
+    {
       q: undefined,
       ...sortParams,
       lat: hasMyCoordinates.value ? myLatitude.value : undefined,
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    });
+    },
+    append,
+  );
 
-    const parsed = parseLaravelPaginator(res);
-    if (append) {
-      merchantList.value.push(...(parsed.items ?? []));
-    } else {
-      merchantList.value = parsed.items ?? [];
-    }
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data merchant:", e);
-    toast.error("Gagal memuat data UMKM. Silakan coba lagi nanti.");
-    if (!append) {
-      merchantList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingMerchants.value = false;
-  }
+  const current = Number(merchantsMeta.value?.current_page ?? 1);
+  const last = Number(merchantsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
+
+  await ensureSentinelObserved();
 };
 
 watch(
@@ -1245,7 +1116,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1265,7 +1136,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1340,7 +1211,7 @@ onMounted(async () => {
   resetInfiniteScroll();
   currentPage.value = 1;
   if (activeMode.value === "umkm") {
-    await fetchMerchants();
+    await fetchMerchantsExplore();
   } else if (activeMode.value === "jasa") {
     await fetchJasas();
   } else {
