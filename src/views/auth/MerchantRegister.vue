@@ -131,6 +131,31 @@
                 v-model:lng="longitude"
                 :zoom="15"
               />
+
+              <!-- Bind map coords into vee-validate values (required by schema) -->
+              <Field
+                name="address.latitude"
+                :modelValue="latitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="latitude ?? ''" />
+              </Field>
+              <Field
+                name="address.longitude"
+                :modelValue="longitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="longitude ?? ''" />
+              </Field>
+
+              <ErrorMessage
+                name="address.latitude"
+                class="mt-1 text-xs text-danger-foreground"
+              />
+              <ErrorMessage
+                name="address.longitude"
+                class="text-xs text-danger-foreground"
+              />
             </div>
 
             <!-- Koordinat (nested di address.*) -->
@@ -192,7 +217,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Form } from "vee-validate";
+import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
 import {
   getProvinces,
@@ -392,6 +417,7 @@ onMounted(() => {
 
 // Submit pakai service
 const handleRegister = async (values) => {
+  console.log("Submitting merchant registration with values:", values);
   isLoading.value = true;
   errorMessage.value = "";
 
