@@ -281,16 +281,11 @@ const schema = yup.object({
     detail: yup.string().nullable(),
     latitude: yup
       .number()
-      .typeError("Latitude tidak valid")
+      .typeError("Tentukan lokasi UMKM Anda di peta terlebih dahulu.")
       .min(-90)
       .max(90)
-      .required("Latitude wajib diisi"),
-    longitude: yup
-      .number()
-      .typeError("Longitude tidak valid")
-      .min(-180)
-      .max(180)
-      .required("Longitude wajib diisi"),
+      .required("Tentukan lokasi UMKM Anda di peta terlebih dahulu."),
+    longitude: yup.number().min(-180).max(180).required(""),
   }),
 });
 

@@ -13,6 +13,9 @@ const route = useRoute();
 
 const isOpen = ref(false);
 const showLogoutModal = ref(false);
+const showMerchantSwitcher = ref(false);
+
+const allMerchants = computed(() => authStore.allMerchants);
 
 // ✅ Get merchantSlug dari route params (URL menggunakan slug)
 const currentMerchantSlug = computed(() => {
@@ -51,6 +54,25 @@ const userInitial = computed(() => {
 
 const showMerchantSelector = computed(() => merchantsCount.value > 1);
 
+const getMerchantInitial = (name) =>
+  name ? name.charAt(0).toUpperCase() : "?";
+
+const getMerchantStatusColor = (status) => {
+  if (status === "approved") return "bg-green-400";
+  if (status === "pending") return "bg-yellow-400";
+  return "bg-gray-400";
+};
+
+const switchMerchant = (slug) => {
+  if (slug === currentMerchantSlug.value) {
+    showMerchantSwitcher.value = false;
+    return;
+  }
+  authStore.setSelectedMerchantSlug(slug);
+  showMerchantSwitcher.value = false;
+  router.push(`/merchant-center/${slug}/dashboard`);
+};
+
 // ✅ Watch route changes untuk update active merchant
 watch(
   () => (route && route.params ? route.params : {}),
@@ -85,11 +107,11 @@ const menuItems = computed(() => {
       icon: "pi-chart-bar",
       route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
     },
-    // {
-    //   label: "Pesanan",
-    //   icon: "pi-shopping-bag",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    // },
+    {
+      label: "Pesanan",
+      icon: "pi-shopping-bag",
+      route: `/merchant-center/${currentMerchantSlug.value}/orders`,
+    },
 
     productOrServiceItem,
     // {
@@ -329,67 +351,159 @@ defineExpose({
         </button>
 
         <!-- ✅ Profile Card - Display current merchant based on route -->
-        <div
-          v-if="isOpen"
-          class="p-4 mt-2 text-white bg-linear-to-r from-merchant-primary to-merchant-primary/80 rounded-xl sm:block"
-        >
-          <div class="flex items-center gap-3">
-            <div
-              class="flex items-center justify-center w-10 h-10 text-lg font-bold rounded-full shrink-0 bg-white/20"
-            >
-              {{ userInitial }}
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <!-- ✅ Merchant Name dari route ID -->
-              <p class="text-sm font-semibold truncate" :title="merchantName">
-                {{ merchantName }}
-              </p>
-              <!-- ✅ Merchant Type dari route ID -->
-              <p class="text-xs truncate opacity-90" :title="merchantType">
-                {{ merchantType }}
-              </p>
-              <!-- Badge multiple merchants -->
-              <span
-                v-if="showMerchantSelector"
-                class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full inline-block mt-1"
-              >
-                {{ merchantsCount }} Merchant
-              </span>
-            </div>
-
-            <button
-              @click="
-                navigateTo(`/merchant-center/${currentMerchantSlug}/profile`)
-              "
-              class="flex items-center justify-center w-6 h-6 transition rounded-full shrink-0 hover:bg-white/20"
-              title="Pengaturan"
-            >
-              <i class="text-sm pi pi-ellipsis-v"></i>
-            </button>
-          </div>
-
-          <!-- ✅ Debug info (remove after testing) -->
+        <div v-if="isOpen" class="mt-2 overflow-hidden rounded-xl">
+          <!-- Merchant info header -->
           <div
-            v-if="false"
-            class="pt-2 mt-2 text-xs border-t opacity-75 border-white/20"
+            class="p-3 text-white bg-linear-to-r from-merchant-primary to-merchant-primary/80"
           >
-            <div>Route Merchant Slug: {{ currentMerchantSlug }}</div>
-            <div>Merchant Name: {{ merchantName }}</div>
-            <div>Merchant Type: {{ merchantType }}</div>
+            <div class="flex items-center gap-3">
+              <div
+                class="flex items-center justify-center w-10 h-10 text-lg font-bold rounded-full shrink-0 bg-white/20"
+              >
+                {{ userInitial }}
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold truncate" :title="merchantName">
+                  {{ merchantName }}
+                </p>
+                <p class="text-xs truncate opacity-90" :title="merchantType">
+                  {{ merchantType }}
+                </p>
+              </div>
+
+              <!-- Profile btn -->
+              <button
+                @click="
+                  navigateTo(`/merchant-center/${currentMerchantSlug}/profile`)
+                "
+                class="flex items-center justify-center transition rounded-full w-7 h-7 shrink-0 hover:bg-white/20"
+                title="Profil Merchant"
+              >
+                <i class="text-sm pi pi-user"></i>
+              </button>
+
+              <!-- Switcher toggle (only show if multiple merchants) -->
+              <button
+                v-if="showMerchantSelector"
+                @click="showMerchantSwitcher = !showMerchantSwitcher"
+                class="flex items-center justify-center transition rounded-full w-7 h-7 shrink-0 hover:bg-white/20"
+                :title="showMerchantSwitcher ? 'Tutup' : 'Ganti Merchant'"
+              >
+                <i
+                  :class="[
+                    'pi text-sm transition-transform duration-200',
+                    showMerchantSwitcher ? 'pi-chevron-up' : 'pi-chevron-down',
+                  ]"
+                ></i>
+              </button>
+            </div>
           </div>
+
+          <!-- Merchant switcher list -->
+          <transition
+            enter-active-class="transition-all duration-200"
+            enter-from-class="opacity-0 max-h-0"
+            enter-to-class="opacity-100 max-h-60"
+            leave-active-class="transition-all duration-200"
+            leave-from-class="opacity-100 max-h-60"
+            leave-to-class="opacity-0 max-h-0"
+          >
+            <div
+              v-if="showMerchantSwitcher"
+              class="overflow-y-auto bg-white border border-gray-200 max-h-60"
+            >
+              <p
+                class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1"
+              >
+                Pilih Merchant
+              </p>
+              <button
+                v-for="merchant in allMerchants"
+                :key="merchant.id"
+                @click="switchMerchant(merchant.slug)"
+                :class="[
+                  'w-full flex items-center gap-2.5 px-3 py-2 text-left transition hover:bg-gray-50',
+                  merchant.slug === currentMerchantSlug
+                    ? 'bg-merchant-primary/5'
+                    : '',
+                ]"
+              >
+                <!-- Avatar -->
+                <div
+                  :class="[
+                    'flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-sm font-bold text-white',
+                    merchant.slug === currentMerchantSlug
+                      ? 'bg-merchant-primary'
+                      : 'bg-gray-400',
+                  ]"
+                >
+                  {{ getMerchantInitial(merchant.name) }}
+                </div>
+
+                <div class="flex-1 min-w-0">
+                  <p
+                    :class="[
+                      'text-sm font-medium truncate',
+                      merchant.slug === currentMerchantSlug
+                        ? 'text-merchant-primary'
+                        : 'text-gray-800',
+                    ]"
+                  >
+                    {{ merchant.name }}
+                  </p>
+                  <p class="text-xs text-gray-500 truncate">
+                    {{ merchant.segmentation?.name || "UMKM" }}
+                  </p>
+                </div>
+
+                <!-- Status dot -->
+                <span
+                  :class="[
+                    'w-2 h-2 rounded-full shrink-0',
+                    getMerchantStatusColor(merchant.status),
+                  ]"
+                  :title="merchant.status"
+                ></span>
+
+                <!-- Active check -->
+                <i
+                  v-if="merchant.slug === currentMerchantSlug"
+                  class="text-xs pi pi-check text-merchant-primary shrink-0"
+                ></i>
+              </button>
+            </div>
+          </transition>
         </div>
 
         <!-- Collapsed State -->
-        <button
-          v-else
-          class="items-center justify-center hidden w-full p-3 transition rounded-lg sm:flex bg-merchant-primary/10 hover:bg-merchant-primary/20"
-          :title="`${merchantName} - ${merchantType}`"
-        >
-          <span class="text-lg font-bold text-merchant-primary">
-            {{ userInitial }}
-          </span>
-        </button>
+        <div v-else class="flex-col items-center hidden gap-1 sm:flex">
+          <button
+            @click="
+              navigateTo(`/merchant-center/${currentMerchantSlug}/profile`)
+            "
+            class="flex items-center justify-center w-full p-3 transition rounded-lg bg-merchant-primary/10 hover:bg-merchant-primary/20"
+            :title="`${merchantName} — Profil`"
+          >
+            <span class="text-lg font-bold text-merchant-primary">
+              {{ userInitial }}
+            </span>
+          </button>
+
+          <!-- Collapsed switcher: show dots if multiple merchants -->
+          <div v-if="showMerchantSelector" class="flex gap-1">
+            <span
+              v-for="m in allMerchants.slice(0, 4)"
+              :key="m.id"
+              :class="[
+                'w-1.5 h-1.5 rounded-full transition',
+                m.slug === currentMerchantSlug
+                  ? 'bg-merchant-primary'
+                  : 'bg-gray-300',
+              ]"
+            ></span>
+          </div>
+        </div>
       </div>
     </aside>
 

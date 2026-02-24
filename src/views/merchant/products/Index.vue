@@ -628,6 +628,12 @@ watch(currentPage, () => {
   loadProducts();
 });
 
+// Sinkronkan selectAll dengan realita seleksi (desktop ↔ mobile)
+watch(selectedProducts, (newVal) => {
+  selectAll.value =
+    products.value.length > 0 && newVal.length === products.value.length;
+});
+
 watch(perPage, (val, oldVal) => {
   if (val === oldVal) return;
 

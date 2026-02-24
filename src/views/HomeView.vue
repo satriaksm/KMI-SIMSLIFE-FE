@@ -1,5 +1,12 @@
 <script setup>
-import { ref, onMounted, nextTick, watch } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+} from "vue";
 import { Carousel, Slide } from "vue3-carousel";
 import "vue3-carousel/dist/carousel.css";
 
@@ -19,6 +26,8 @@ import WhiteWithText from "@/assets/icons/White-with-Text.png";
 
 import api from "@/libs/axios.js";
 import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
 import { Form } from "vee-validate";
 import { usePublicEvents } from "@/composables/usePublicEvents";
 import { useHomeStatistics } from "@/composables/useHomeStatistics";
@@ -26,6 +35,37 @@ import { getEventBannerUrl } from "@/libs/getImageUrl";
 
 const route = useRoute();
 const router = useRouter();
+
+const authStore = useAuthStore();
+const cartStore = useCartStore();
+
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isAdmin = computed(() => authStore.isAdmin);
+const cartCount = computed(() => cartStore.totalItems);
+
+// Mobile sticky search
+const mobileScrollY = ref(0);
+const mobileSearchQuery = ref("");
+const stickySearchFocused = ref(false);
+
+const showMobileStickySearch = computed(
+  () => mobileScrollY.value > 80 || stickySearchFocused.value,
+);
+
+function onMobileScroll() {
+  mobileScrollY.value = window.scrollY;
+}
+
+function submitMobileSearch() {
+  const q = (mobileSearchQuery.value || "").trim();
+  if (!q) return;
+  router.push({ path: "/search", query: { q } });
+  mobileSearchQuery.value = "";
+}
+
+function goToCart() {
+  router.push("/cart");
+}
 
 const searchInputRef = ref(null);
 
@@ -150,11 +190,68 @@ onMounted(async () => {
 
   // Load merchants
   await loadRecommendedMerchants();
+
+  window.addEventListener("scroll", onMobileScroll, { passive: true });
+  if (isAuthenticated.value && !isAdmin.value) {
+    cartStore.fetchCartCount();
+  }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", onMobileScroll);
 });
 </script>
 
 <template>
   <div class="relative app-container">
+    <!-- Mobile Sticky Search (slides in after hero search scrolls out) -->
+    <transition
+      enter-active-class="transition-all ease-out duration-250"
+      enter-from-class="-translate-y-full opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-full opacity-0"
+    >
+      <div
+        class="sticky top-0 z-50 bg-white border-b border-gray-200 sm:hidden"
+      >
+        <div
+          v-if="showMobileStickySearch"
+          class="flex items-center gap-2 px-3 py-3"
+          @focusin="stickySearchFocused = true"
+          @focusout="stickySearchFocused = false"
+        >
+          <!-- SEARCH INPUT -->
+          <form @submit.prevent="submitMobileSearch" class="flex-1">
+            <div class="relative">
+              <TextField
+                :modelValue="mobileSearchQuery"
+                @update:modelValue="(v) => (mobileSearchQuery = v)"
+                name="mobileSearch"
+                placeholder="Cari produk atau UMKM…"
+                variant="primary"
+              />
+            </div>
+          </form>
+          <button
+            v-if="!isAdmin"
+            @click="goToCart"
+            class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
+          >
+            <i class="text-lg pi pi-shopping-cart"></i>
+
+            <span
+              v-if="cartCount > 0"
+              class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+            >
+              {{ cartCount > 9 ? "9+" : cartCount }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </transition>
+
     <!-- Hero -->
     <section id="hero" class="relative">
       <div
@@ -406,6 +503,23 @@ onMounted(async () => {
         </div>
       </div>
     </section>
+
+    <!-- Floating Cart Button (Mobile only) -->
+    <button
+      v-if="isAuthenticated && !isAdmin && !showMobileStickySearch"
+      type="button"
+      @click="goToCart"
+      aria-label="Keranjang"
+      class="fixed z-40 flex items-center justify-center w-10 h-10 text-white transition-transform rounded-full shadow-lg sm:hidden top-3 right-3 bg-primary active:scale-95"
+    >
+      <i class="text-lg pi pi-shopping-cart" />
+      <span
+        v-if="cartCount > 0"
+        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger-foreground text-white text-[10px] font-bold flex items-center justify-center leading-none"
+      >
+        {{ cartCount > 99 ? "99+" : cartCount }}
+      </span>
+    </button>
 
     <!-- Footer -->
     <footer class="relative overflow-hidden text-white bg-primary">

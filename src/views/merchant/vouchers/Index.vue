@@ -478,6 +478,12 @@ watch(perPage, () => {
   currentPage.value = 1;
   loadVouchers();
 });
+
+// Sinkronkan selectAll dengan realita seleksi (desktop ↔ mobile)
+watch(selectedVouchers, (newVal) => {
+  selectAll.value =
+    vouchers.value.length > 0 && newVal.length === vouchers.value.length;
+});
 onBeforeRouteLeave(() => {
   selectedVouchers.value = [];
   selectAll.value = false;

@@ -1,23 +1,14 @@
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="
-          router.push(
-            merchantSlug
-              ? `/merchant-center/${merchantSlug}/profile`
-              : '/merchant-profile',
-          )
-        "
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="text-xl pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Edit Informasi Toko</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Edit Informasi Toko"
+      :backRoute="
+        merchantSlug
+          ? `/merchant-center/${merchantSlug}/profile`
+          : '/merchant-profile'
+      "
+    />
 
     <!-- Desktop Header with Breadcrumb -->
     <div class="hidden py-6 sm:block bg-gray-50">
@@ -731,6 +722,7 @@
 import { ref, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { onMounted, watch } from "vue";
 import { useMerchants } from "@/composables/useMerchants";
 import { useAuthStore } from "@/stores/auth";

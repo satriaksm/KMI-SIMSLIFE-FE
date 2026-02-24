@@ -15,7 +15,7 @@ const adminGuard = (to, from, next) => {
 
   if (!authStore.isAdmin) {
     toast.error("Anda tidak memiliki akses ke halaman admin");
-    next({ name: "Home" });
+    next({ name: "Beranda" });
     return;
   }
 
@@ -40,7 +40,7 @@ const routes = [
       {
         path: "",
         name: "Beranda",
-        component: () => import("@/views/customer/Home.vue"),
+        component: () => import("@/views/HomeView.vue"),
         meta: {
           title: "Marketplace UMKM Lokal Banyuanyar | SUMILIR",
           description:
@@ -50,7 +50,7 @@ const routes = [
       {
         path: "explore",
         name: "UMKM & Produk-Layanan Jasa",
-        component: () => import("@/views/customer/ExploreView.vue"),
+        component: () => import("@/views/ExploreView.vue"),
         meta: {
           title: "Semua Produk & Layanan | SUMILIR",
           description:
@@ -60,19 +60,19 @@ const routes = [
       {
         path: "products/:slug",
         name: "Product Detail",
-        component: () => import("@/views/customer/ProductDetailView.vue"),
+        component: () => import("@/views/ProductDetailView.vue"),
         meta: { title: "Product Detail | SUMILIR" },
       },
       {
         path: "merchant/:slug",
         name: "Merchant Detail",
-        component: () => import("@/views/customer/MerchantDetailView.vue"),
+        component: () => import("@/views/MerchantDetailView.vue"),
         meta: { title: "Detail Toko | SUMILIR" },
       },
       {
         path: "/map",
         name: "Peta UMKM",
-        component: () => import("@/views/customer/PetaUmkmView.vue"),
+        component: () => import("@/views/PetaUmkmView.vue"),
         meta: {
           title: "Peta UMKM Banyuanyar | SUMILIR",
           description:
@@ -88,7 +88,7 @@ const routes = [
       {
         path: "search:keyword?",
         name: "Search Page",
-        component: () => import("@/views/customer/SearchPageView.vue"),
+        component: () => import("@/views/SearchPageView.vue"),
         beforeEnter: (to, from, next) => {
           const paramKeyword =
             typeof to.params?.keyword === "string"
@@ -155,6 +155,41 @@ const routes = [
           title: "Keranjang Saya | SUMILIR",
         },
       },
+      {
+        path: "orders",
+        meta: {
+          requiresAuth: true,
+          roles: ["customer"],
+          denyRoles: ["admin"],
+        },
+        children: [
+          {
+            path: "",
+            name: "Pesanan Saya",
+            component: () => import("@/views/customer/orders/Index.vue"),
+            meta: {
+              title: "Pesanan Saya | SUMILIR",
+            },
+          },
+          {
+            path: "pending-payments",
+            name: "Menunggu Pembayaran",
+            component: () => import("@/views/customer/orders/Pending.vue"),
+            meta: {
+              title: "Menunggu Pembayaran | SUMILIR",
+            },
+          },
+          {
+            path: ":orderId",
+            name: "Detail Pesanan",
+            component: () => import("@/views/customer/orders/Detail.vue"),
+            meta: {
+              title: "Detail Pesanan | SUMILIR",
+            },
+          },
+        ],
+      },
+
       {
         path: "product-payment",
         name: "Pembayaran Produk",
@@ -597,14 +632,27 @@ const routes = [
       //   },
       // },
 
-      // {
-      //   path: "orders",
-      //   name: "Merchant - Orders",
-      //   component: () => import("@/views/merchant/orders/Index.vue"),
-      //   meta: {
-      //     title: "Orders",
-      //   },
-      // },
+      {
+        path: "orders",
+        children: [
+          {
+            path: "",
+            name: "Merchant - Orders",
+            component: () => import("@/views/merchant/orders/Index.vue"),
+            meta: {
+              title: "Orders",
+            },
+          },
+          {
+            path: ":orderId",
+            name: "Merchant - Order Detail",
+            component: () => import("@/views/merchant/orders/Detail.vue"),
+            meta: {
+              title: "Order Detail",
+            },
+          },
+        ],
+      },
 
       // ===========================
       // Profil UMKM

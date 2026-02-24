@@ -2,7 +2,7 @@
   <div class="relative z-0">
     <!-- SEARCH + FILTER (DESKTOP) -->
     <div
-      class="fixed z-40 justify-center hidden w-full p-3 -translate-x-1/2 sm:flex top-24 left-1/2"
+      class="fixed z-40 justify-center hidden w-full p-3 -translate-x-1/2 sm:flex sm:top-16 top-24 left-1/2"
     >
       <div class="flex items-center w-full max-w-2xl gap-3">
         <!-- SEARCH BAR -->

@@ -1,5 +1,52 @@
 <template>
   <div class="min-h-screen">
+    <!-- Mobile Sticky Search -->
+    <transition
+      enter-active-class="transition-all ease-out duration-250"
+      enter-from-class="-translate-y-full opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-full opacity-0"
+    >
+      <div
+        class="sticky top-0 z-50 bg-white border-b border-gray-200 sm:hidden"
+      >
+        <div
+          v-if="showMobileStickySearch"
+          class="flex items-center gap-2 px-3 py-3"
+          @focusin="stickySearchFocused = true"
+          @focusout="stickySearchFocused = false"
+        >
+          <!-- SEARCH INPUT -->
+          <form @submit.prevent="submitMobileSearch" class="flex-1">
+            <div class="relative">
+              <TextField
+                :modelValue="mobileSearchQuery"
+                @update:modelValue="(v) => (mobileSearchQuery = v)"
+                name="mobileSearch"
+                placeholder="Cari produk atau UMKM…"
+                variant="primary"
+              />
+            </div>
+          </form>
+          <button
+            v-if="!isAdmin"
+            @click="goToCart"
+            class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
+          >
+            <i class="text-lg pi pi-shopping-cart"></i>
+
+            <span
+              v-if="cartCount > 0"
+              class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+            >
+              {{ cartCount > 9 ? "9+" : cartCount }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </transition>
     <!-- HERO (banner + search bar) - disamakan dengan Home.vue -->
     <section id="hero" class="relative">
       <div
@@ -280,6 +327,23 @@
       </section>
     </div>
 
+    <!-- Floating Cart Button (Mobile only) -->
+    <button
+      v-if="isAuthenticated && !isAdmin && !showMobileStickySearch"
+      type="button"
+      @click="goToCart"
+      aria-label="Keranjang"
+      class="fixed z-40 flex items-center justify-center w-10 h-10 text-white transition-transform rounded-full shadow-lg sm:hidden top-3 right-3 bg-primary active:scale-95"
+    >
+      <i class="text-lg pi pi-shopping-cart" />
+      <span
+        v-if="cartCount > 0"
+        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger-foreground text-white text-[10px] font-bold flex items-center justify-center leading-none"
+      >
+        {{ cartCount > 99 ? "99+" : cartCount }}
+      </span>
+    </button>
+
     <!-- BACK TO TOP BUTTON -->
     <button
       v-show="showBackToTop"
@@ -314,6 +378,8 @@ import { getImageUrlJasa, getEventBannerUrl } from "@/libs/getImageUrl.js";
 import { usePublicEvents } from "@/composables/usePublicEvents";
 import { useRoute, useRouter } from "vue-router";
 import { useSearch } from "@/composables/useSearch";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
 
 import TextField from "@/components/forms/TextField.vue";
 import Button from "@/components/common/Button.vue";
@@ -335,6 +401,33 @@ const toast = useToast();
 
 const route = useRoute();
 const router = useRouter();
+
+const authStore = useAuthStore();
+const cartStore = useCartStore();
+
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isAdmin = computed(() => authStore.isAdmin);
+const cartCount = computed(() => cartStore.totalItems);
+
+// Mobile sticky search
+const mobileScrollY = ref(0);
+const mobileSearchQuery = ref("");
+const stickySearchFocused = ref(false);
+
+const showMobileStickySearch = computed(
+  () => mobileScrollY.value > 80 || stickySearchFocused.value,
+);
+
+function submitMobileSearch() {
+  const q = (mobileSearchQuery.value || "").trim();
+  if (!q) return;
+  router.push({ path: "/search", query: { q } });
+  mobileSearchQuery.value = "";
+}
+
+function goToCart() {
+  router.push("/cart");
+}
 
 // Nearest sorting needs user coordinates (reuse logic from SearchPage)
 const myLatitude = ref(null);
@@ -538,6 +631,7 @@ async function ensureMyCoordinates({ allowDevice } = { allowDevice: true }) {
 }
 
 function handleScroll() {
+  mobileScrollY.value = window.scrollY;
   showBackToTop.value = window.scrollY > 300;
 
   // Fallback infinite scroll (kalau IntersectionObserver tidak terpanggil)
@@ -1176,6 +1270,10 @@ onMounted(async () => {
   window.addEventListener("scroll", handleScroll, { passive: true });
   window.addEventListener("resize", updateViewportWidth, { passive: true });
   updateViewportWidth();
+
+  if (isAuthenticated.value && !isAdmin.value) {
+    cartStore.fetchCartCount();
+  }
 
   // fetch banner event (independen dari fetch data jasa)
   isLoadingBanner.value = true;

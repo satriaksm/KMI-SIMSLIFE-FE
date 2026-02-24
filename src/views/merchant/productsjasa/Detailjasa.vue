@@ -5,6 +5,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue"; // ✅ ADD
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
@@ -22,7 +23,7 @@ const authStore = useAuthStore();
 const currentMerchantSlug = computed(() => {
   return route.params && route.params.merchantSlug
     ? String(route.params.merchantSlug)
-    : authStore.merchantSlug ?? null;
+    : (authStore.merchantSlug ?? null);
 });
 
 // Some owner-view calls may still require merchantId
@@ -110,7 +111,7 @@ const totalAddOnOptions = computed(() => {
   if (!jasa.value?.addonGroups) return 0;
   return jasa.value.addonGroups.reduce(
     (total, group) => total + (group.options?.length || 0),
-    0
+    0,
   );
 });
 
@@ -120,7 +121,7 @@ const addOnPriceRange = computed(() => {
   }
 
   const prices = jasa.value.addonGroups.flatMap((group) =>
-    (group.options || []).map((opt) => opt.addon_price || 0)
+    (group.options || []).map((opt) => opt.addon_price || 0),
   );
   const nonZeroPrices = prices.filter((p) => p > 0);
 
@@ -207,7 +208,7 @@ const goBack = () => {
 
 const editProduct = () => {
   router.push(
-    `/merchant-center/${currentMerchantSlug.value}/jasas/${route.params.id}/edit`
+    `/merchant-center/${currentMerchantSlug.value}/jasas/${route.params.id}/edit`,
   );
 };
 
@@ -221,7 +222,7 @@ const loadDetail = async () => {
     const data = await fetchJasaDetail(
       productId,
       true,
-      currentMerchantId.value
+      currentMerchantId.value,
     );
     jasa.value = data;
 
@@ -270,17 +271,7 @@ const getSelectionTypeLabel = (group) => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white shadow-lg sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="router.back()"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Detail Jasa</h1>
-    </div>
+    <MerchantMobileHeader title="Detail Jasa" />
 
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 sm:block">
@@ -570,13 +561,13 @@ const getSelectionTypeLabel = (group) => {
               </span>
               <StatusLabel
                 :status="
-                  jasa?.is_active ?? jasa?.status === 'active'
+                  (jasa?.is_active ?? jasa?.status === 'active')
                     ? 'success'
                     : 'muted'
                 "
                 variant="general"
                 :label="
-                  jasa?.is_active ?? jasa?.status === 'active'
+                  (jasa?.is_active ?? jasa?.status === 'active')
                     ? 'Aktif'
                     : 'Tidak Aktif'
                 "
@@ -642,14 +633,25 @@ const getSelectionTypeLabel = (group) => {
             </div>
 
             <!-- Location Address (ambil dari jasa atau profil UMKM) -->
-            <div v-if="jasa.location_address || jasa.merchant?.address || jasa.merchant?.alamat">
+            <div
+              v-if="
+                jasa.location_address ||
+                jasa.merchant?.address ||
+                jasa.merchant?.alamat
+              "
+            >
               <div class="mb-3 border-t border-gray-100"></div>
               <div class="flex items-start justify-between gap-3">
                 <span class="shrink-0 text-sm text-gray-600"
                   >Alamat Tempat Layanan</span
                 >
                 <span class="text-sm font-medium text-right text-gray-900">
-                  {{ jasa.location_address || jasa.merchant?.address || jasa.merchant?.alamat || '-' }}
+                  {{
+                    jasa.location_address ||
+                    jasa.merchant?.address ||
+                    jasa.merchant?.alamat ||
+                    "-"
+                  }}
                 </span>
               </div>
             </div>

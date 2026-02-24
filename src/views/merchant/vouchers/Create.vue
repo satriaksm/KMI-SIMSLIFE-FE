@@ -5,6 +5,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth"; // ✅ ADD: Import auth store
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
@@ -177,18 +178,10 @@ const onSubmit = veeHandleSubmit(async () => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <!-- ✅ FIXED: Back button dengan dynamic route -->
-      <button
-        @click="router.push(`/merchant-center/${currentMerchantSlug}/vouchers`)"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Tambah Voucher</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Tambah Voucher"
+      :backRoute="`/merchant-center/${currentMerchantSlug}/vouchers`"
+    />
 
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block">
