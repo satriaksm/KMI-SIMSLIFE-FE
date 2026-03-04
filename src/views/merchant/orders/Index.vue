@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
@@ -11,10 +11,13 @@ import StatusLabel from "@/components/common/StatusLabel.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import MobilePagination from "@/components/common/MobilePagination.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { getMerchantOrders } from "@/services/api/order";
+import { useToast } from "vue-toastification";
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const emit = defineEmits(["toggle-sidebar"]);
 
@@ -25,161 +28,83 @@ const currentMerchantSlug = computed(() =>
 const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 
 // ========================
-// DUMMY DATA
+// ORDERS DATA (from API)
 // ========================
-const allOrders = ref([
-  {
-    id: "ORD-2001",
-    invoice: "INV/2026/02/001",
-    customer: { name: "Budi Santoso", phone: "081234567890" },
-    status: "pending_payment",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-24T08:30:00",
-    items: [
-      {
-        name: "Keripik Pisang Original",
-        qty: 2,
-        price: 15000,
-        subtotal: 30000,
-        image: null,
-      },
-      {
-        name: "Sambal Bawang Pedas",
-        qty: 1,
-        price: 18000,
-        subtotal: 18000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 48000, discount: 0, shipping: 10000, total: 58000 },
-    shipping_address: "Jl. Merdeka No. 12, Kec. Sukajadi, Bandung, 40161",
-    note: "Tolong dikemas rapi",
-  },
-  {
-    id: "ORD-2002",
-    invoice: "INV/2026/02/002",
-    customer: { name: "Siti Rahayu", phone: "089876543210" },
-    status: "processing",
-    payment_method: "QRIS",
-    created_at: "2026-02-23T14:15:00",
-    items: [
-      {
-        name: "Batik Tulis Motif Parang",
-        qty: 1,
-        price: 285000,
-        subtotal: 285000,
-        image: null,
-      },
-    ],
-    amounts: {
-      subtotal: 285000,
-      discount: 20000,
-      shipping: 15000,
-      total: 280000,
+const allOrders = ref([]);
+const ordersLoading = ref(false);
+
+function mapApiStatus(beStatus) {
+  switch (beStatus) {
+    case "pending":
+      return "pending_payment";
+    case "paid":
+    case "responsed":
+    case "delivered":
+      return "processing";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return beStatus;
+  }
+}
+
+function mapMerchantOrder(o) {
+  return {
+    id: o.id,
+    invoice: o.order_code || "-",
+    customer: {
+      name: o.user_name_snapshot || "Pelanggan",
+      phone: o.user_phone_snapshot || "-",
     },
-    shipping_address: "Jl. Raya Darmo No. 45, Surabaya, 60241",
-    note: "",
-  },
-  {
-    id: "ORD-2003",
-    invoice: "INV/2026/02/003",
-    customer: { name: "Ahmad Fauzan", phone: "082111222333" },
-    status: "processing",
-    payment_method: "COD",
-    created_at: "2026-02-23T10:00:00",
-    items: [
-      {
-        name: "Kopi Arabika Gayo 250gr",
-        qty: 3,
-        price: 55000,
-        subtotal: 165000,
-        image: null,
-      },
-      {
-        name: "Kopi Robusta Toraja 250gr",
-        qty: 2,
-        price: 45000,
-        subtotal: 90000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 255000, discount: 0, shipping: 12000, total: 267000 },
-    shipping_address: "Jl. Gatot Subroto No. 8, Jakarta Selatan, 12930",
-    note: "",
-  },
-  {
-    id: "ORD-2004",
-    invoice: "INV/2026/02/004",
-    customer: { name: "Dewi Kusuma", phone: "087765432100" },
-    status: "completed",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-20T16:45:00",
-    items: [
-      {
-        name: "Tempe Mendoan",
-        qty: 5,
-        price: 8000,
-        subtotal: 40000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 40000, discount: 5000, shipping: 8000, total: 43000 },
-    shipping_address: "Jl. Pemuda No. 22, Semarang, 50133",
-    note: "Kirim besok pagi",
-  },
-  {
-    id: "ORD-2005",
-    invoice: "INV/2026/02/005",
-    customer: { name: "Rizki Pratama", phone: "083344556677" },
-    status: "completed",
-    payment_method: "QRIS",
-    created_at: "2026-02-18T09:20:00",
-    items: [
-      {
-        name: "Rendang Daging Sapi 500gr",
-        qty: 2,
-        price: 95000,
-        subtotal: 190000,
-        image: null,
-      },
-      {
-        name: "Dendeng Balado 250gr",
-        qty: 1,
-        price: 65000,
-        subtotal: 65000,
-        image: null,
-      },
-    ],
+    status: mapApiStatus(o.status),
+    payment_method: o.paid_at ? "QRIS" : "COD",
+    created_at: o.created_at,
+    items: (o.items || []).map((it) => ({
+      name: it.product_name_snapshot || "Produk",
+      qty: it.quantity,
+      price: it.unit_price_snapshot,
+      subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
+      image: it.image_snapshot_path || null,
+    })),
     amounts: {
-      subtotal: 255000,
-      discount: 15000,
-      shipping: 18000,
-      total: 258000,
+      subtotal: Number(o.subtotal || 0),
+      discount: Number(o.discount_total || 0),
+      shipping: Number(o.delivery_fee_snapshot || 0),
+      total: Number(o.gross_amount || 0),
     },
-    shipping_address: "Jl. Nusantara Raya Blok B5, Depok, 16413",
+    shipping_address: [
+      o.address_detail_snapshot,
+      o.village_name_snapshot,
+      o.district_name_snapshot,
+      o.city_name_snapshot,
+      o.province_name_snapshot,
+    ]
+      .filter(Boolean)
+      .join(", "),
     note: "",
-  },
-  {
-    id: "ORD-2006",
-    invoice: "INV/2026/02/006",
-    customer: { name: "Maya Indah", phone: "081122334455" },
-    status: "cancelled",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-15T11:30:00",
-    items: [
-      {
-        name: "Tas Anyaman Rotan",
-        qty: 1,
-        price: 175000,
-        subtotal: 175000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 175000, discount: 0, shipping: 25000, total: 200000 },
-    shipping_address: "Jl. Sudirman No. 100, Yogyakarta, 55233",
-    note: "Customer batalkan sebelum proses",
-  },
-]);
+    _raw: o,
+  };
+}
+
+async function fetchOrders() {
+  if (!currentMerchantSlug.value) return;
+  ordersLoading.value = true;
+  try {
+    const { data: res } = await getMerchantOrders(currentMerchantSlug.value, {
+      per_page: 100,
+    });
+    const list = res?.data ?? res ?? [];
+    allOrders.value = (Array.isArray(list) ? list : []).map(mapMerchantOrder);
+  } catch (e) {
+    console.error("Gagal memuat pesanan merchant:", e);
+    toast.error("Gagal memuat pesanan");
+    allOrders.value = [];
+  } finally {
+    ordersLoading.value = false;
+  }
+}
 
 // ========================
 // FILTER STATE
@@ -392,6 +317,10 @@ function goToDetail(order) {
     `/merchant-center/${currentMerchantSlug.value}/orders/${order.id}`,
   );
 }
+
+onMounted(() => {
+  fetchOrders();
+});
 </script>
 
 <template>
@@ -500,7 +429,7 @@ function goToDetail(order) {
         <MerchantTable
           :items="paginatedOrders"
           :columns="tableColumns"
-          :loading="false"
+          :loading="ordersLoading"
           :showCheckbox="false"
           :currentPage="currentPage"
           :totalPages="totalPages"

@@ -1,13 +1,19 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import Button from "@/components/common/Button.vue";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
+import {
+  getMerchantOrderDetail,
+  updateOrderStatus,
+} from "@/services/api/order";
+import { useToast } from "vue-toastification";
 
 const router = useRouter();
 const route = useRoute();
+const toast = useToast();
 
 const emit = defineEmits(["toggle-sidebar"]);
 const breadcrumbItems = computed(() => [
@@ -24,190 +30,87 @@ const currentMerchantSlug = computed(() =>
 );
 
 // ========================
-// DUMMY DATA (same source as Index)
+// DATA (from API)
 // ========================
-const allOrders = [
-  {
-    id: "ORD-2001",
-    invoice: "INV/2026/02/001",
-    customer: {
-      name: "Budi Santoso",
-      phone: "081234567890",
-      email: "budi@email.com",
-    },
-    status: "pending_payment",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-24T08:30:00",
-    items: [
-      {
-        name: "Keripik Pisang Original",
-        qty: 2,
-        price: 15000,
-        subtotal: 30000,
-        image: null,
-      },
-      {
-        name: "Sambal Bawang Pedas",
-        qty: 1,
-        price: 18000,
-        subtotal: 18000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 48000, discount: 0, shipping: 10000, total: 58000 },
-    shipping_address: "Jl. Merdeka No. 12, Kec. Sukajadi, Bandung, 40161",
-    note: "Tolong dikemas rapi",
-  },
-  {
-    id: "ORD-2002",
-    invoice: "INV/2026/02/002",
-    customer: {
-      name: "Siti Rahayu",
-      phone: "089876543210",
-      email: "siti@email.com",
-    },
-    status: "processing",
-    payment_method: "QRIS",
-    created_at: "2026-02-23T14:15:00",
-    items: [
-      {
-        name: "Batik Tulis Motif Parang",
-        qty: 1,
-        price: 285000,
-        subtotal: 285000,
-        image: null,
-      },
-    ],
-    amounts: {
-      subtotal: 285000,
-      discount: 20000,
-      shipping: 15000,
-      total: 280000,
-    },
-    shipping_address: "Jl. Raya Darmo No. 45, Surabaya, 60241",
-    note: "",
-  },
-  {
-    id: "ORD-2003",
-    invoice: "INV/2026/02/003",
-    customer: {
-      name: "Ahmad Fauzan",
-      phone: "082111222333",
-      email: "ahmad@email.com",
-    },
-    status: "processing",
-    payment_method: "COD",
-    created_at: "2026-02-23T10:00:00",
-    items: [
-      {
-        name: "Kopi Arabika Gayo 250gr",
-        qty: 3,
-        price: 55000,
-        subtotal: 165000,
-        image: null,
-      },
-      {
-        name: "Kopi Robusta Toraja 250gr",
-        qty: 2,
-        price: 45000,
-        subtotal: 90000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 255000, discount: 0, shipping: 12000, total: 267000 },
-    shipping_address: "Jl. Gatot Subroto No. 8, Jakarta Selatan, 12930",
-    note: "",
-  },
-  {
-    id: "ORD-2004",
-    invoice: "INV/2026/02/004",
-    customer: {
-      name: "Dewi Kusuma",
-      phone: "087765432100",
-      email: "dewi@email.com",
-    },
-    status: "completed",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-20T16:45:00",
-    items: [
-      {
-        name: "Tempe Mendoan",
-        qty: 5,
-        price: 8000,
-        subtotal: 40000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 40000, discount: 5000, shipping: 8000, total: 43000 },
-    shipping_address: "Jl. Pemuda No. 22, Semarang, 50133",
-    note: "Kirim besok pagi",
-  },
-  {
-    id: "ORD-2005",
-    invoice: "INV/2026/02/005",
-    customer: {
-      name: "Rizki Pratama",
-      phone: "083344556677",
-      email: "rizki@email.com",
-    },
-    status: "completed",
-    payment_method: "QRIS",
-    created_at: "2026-02-18T09:20:00",
-    items: [
-      {
-        name: "Rendang Daging Sapi 500gr",
-        qty: 2,
-        price: 95000,
-        subtotal: 190000,
-        image: null,
-      },
-      {
-        name: "Dendeng Balado 250gr",
-        qty: 1,
-        price: 65000,
-        subtotal: 65000,
-        image: null,
-      },
-    ],
-    amounts: {
-      subtotal: 255000,
-      discount: 15000,
-      shipping: 18000,
-      total: 258000,
-    },
-    shipping_address: "Jl. Nusantara Raya Blok B5, Depok, 16413",
-    note: "",
-  },
-  {
-    id: "ORD-2006",
-    invoice: "INV/2026/02/006",
-    customer: {
-      name: "Maya Indah",
-      phone: "081122334455",
-      email: "maya@email.com",
-    },
-    status: "cancelled",
-    payment_method: "Transfer Bank",
-    created_at: "2026-02-15T11:30:00",
-    items: [
-      {
-        name: "Tas Anyaman Rotan",
-        qty: 1,
-        price: 175000,
-        subtotal: 175000,
-        image: null,
-      },
-    ],
-    amounts: { subtotal: 175000, discount: 0, shipping: 25000, total: 200000 },
-    shipping_address: "Jl. Sudirman No. 100, Yogyakarta, 55233",
-    note: "Customer batalkan sebelum proses",
-  },
-];
+const rawOrder = ref(null);
+const loading = ref(true);
+const actionLoading = ref(false);
+
+function mapApiStatus(beStatus) {
+  switch (beStatus) {
+    case "pending":
+      return "pending_payment";
+    case "paid":
+    case "responsed":
+    case "delivered":
+      return "processing";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return beStatus;
+  }
+}
 
 const order = computed(() => {
-  const id = route.params?.orderId;
-  return allOrders.find((o) => o.id === id) ?? null;
+  const o = rawOrder.value;
+  if (!o) return null;
+  return {
+    id: o.id,
+    invoice: o.order_code || "-",
+    customer: {
+      name: o.user_name_snapshot || "Pelanggan",
+      phone: o.user_phone_snapshot || "-",
+      email: o.user?.email || "",
+    },
+    status: mapApiStatus(o.status),
+    _rawStatus: o.status,
+    payment_method: o.paid_at ? "QRIS" : "COD",
+    created_at: o.created_at,
+    items: (o.items || []).map((it) => ({
+      name: it.product_name_snapshot || "Produk",
+      qty: it.quantity,
+      price: it.unit_price_snapshot,
+      subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
+      image: it.image_snapshot_path || null,
+    })),
+    amounts: {
+      subtotal: Number(o.subtotal || 0),
+      discount: Number(o.discount_total || 0),
+      shipping: Number(o.delivery_fee_snapshot || 0),
+      total: Number(o.gross_amount || 0),
+    },
+    shipping_address: [
+      o.address_detail_snapshot,
+      o.village_name_snapshot,
+      o.district_name_snapshot,
+      o.city_name_snapshot,
+      o.province_name_snapshot,
+    ]
+      .filter(Boolean)
+      .join(", "),
+    note: "",
+  };
 });
+
+async function fetchOrder() {
+  if (!currentMerchantSlug.value || !route.params?.orderId) return;
+  loading.value = true;
+  try {
+    const { data: res } = await getMerchantOrderDetail(
+      currentMerchantSlug.value,
+      route.params.orderId,
+    );
+    rawOrder.value = res?.data ?? res ?? null;
+  } catch (e) {
+    console.error("Gagal memuat detail pesanan:", e);
+    toast.error("Gagal memuat detail pesanan");
+    rawOrder.value = null;
+  } finally {
+    loading.value = false;
+  }
+}
 
 // ========================
 // STATUS CONFIG
@@ -256,9 +159,10 @@ const statusConfig = {
   },
 };
 
-const currentStatusConfig = computed(
-  () => statusConfig[order.value?.status] ?? statusConfig.pending_payment,
-);
+const currentStatusConfig = computed(() => {
+  const s = order.value?.status;
+  return statusConfig[s] ?? statusConfig.pending_payment;
+});
 
 // ========================
 // ORDER TIMELINE
@@ -286,15 +190,12 @@ const timeline = computed(() => {
       icon: "pi-check-circle",
     },
   ];
-  const order_idx = ["pending_payment", "processing", "completed"].indexOf(
-    status,
-  );
+  const statusOrder = ["pending_payment", "processing", "completed"];
+  const order_idx = statusOrder.indexOf(status);
   return steps.map((s, i) => ({
     ...s,
     done: i <= order_idx && status !== "cancelled",
-    active:
-      ["pending_payment", "processing", "completed"].indexOf(s.key) ===
-      order_idx,
+    active: statusOrder.indexOf(s.key) === order_idx,
   }));
 });
 
@@ -303,9 +204,74 @@ const timeline = computed(() => {
 // ========================
 const showConfirmModal = ref(false);
 
-function confirmAction() {
-  // TODO: connect to API
-  showConfirmModal.value = false;
+function getNextStatus() {
+  const rawStatus = rawOrder.value?.status;
+  // Map raw BE status to next action status
+  switch (rawStatus) {
+    case "pending":
+      return "responsed";
+    case "paid":
+      return "delivered";
+    case "responsed":
+      return "delivered";
+    case "delivered":
+      return "completed";
+    default:
+      return null;
+  }
+}
+
+const nextActionLabel = computed(() => {
+  const next = getNextStatus();
+  switch (next) {
+    case "responsed":
+      return "Terima & Proses Pesanan";
+    case "delivered":
+      return "Tandai Dikirim";
+    case "completed":
+      return "Tandai Selesai";
+    default:
+      return null;
+  }
+});
+
+async function confirmAction() {
+  const nextStatus = getNextStatus();
+  if (!nextStatus || !currentMerchantSlug.value || !rawOrder.value?.id) return;
+
+  actionLoading.value = true;
+  try {
+    await updateOrderStatus(
+      currentMerchantSlug.value,
+      rawOrder.value.id,
+      nextStatus,
+    );
+    toast.success("Status pesanan berhasil diperbarui");
+    showConfirmModal.value = false;
+    await fetchOrder();
+  } catch (e) {
+    toast.error(e.response?.data?.message || "Gagal memperbarui status");
+  } finally {
+    actionLoading.value = false;
+  }
+}
+
+async function handleCancel() {
+  if (!currentMerchantSlug.value || !rawOrder.value?.id) return;
+  actionLoading.value = true;
+  try {
+    await updateOrderStatus(
+      currentMerchantSlug.value,
+      rawOrder.value.id,
+      "cancelled",
+    );
+    toast.success("Pesanan berhasil dibatalkan");
+    await fetchOrder();
+  } catch (e) {
+    toast.error(e.response?.data?.message || "Gagal membatalkan pesanan");
+  } finally {
+    actionLoading.value = false;
+  }
 }
 
 // ========================
@@ -332,6 +298,10 @@ function formatTime(dateStr) {
 function goBack() {
   router.push(`/merchant-center/${currentMerchantSlug.value}/orders`);
 }
+
+onMounted(() => {
+  fetchOrder();
+});
 </script>
 
 <template>
@@ -365,7 +335,15 @@ function goBack() {
 
     <!-- Not found -->
     <div
-      v-if="!order"
+      v-if="loading"
+      class="flex flex-col items-center justify-center px-4 py-24"
+    >
+      <i class="text-2xl pi pi-spin pi-spinner text-merchant-primary"></i>
+      <p class="mt-2 text-sm text-gray-500">Memuat pesanan...</p>
+    </div>
+
+    <div
+      v-else-if="!order"
       class="flex flex-col items-center justify-center px-4 py-24"
     >
       <i class="mb-4 text-5xl text-gray-300 pi pi-inbox"></i>
@@ -596,17 +574,26 @@ function goBack() {
       <!-- ======================== -->
       <!-- ACTION BUTTON            -->
       <!-- ======================== -->
-      <div v-if="currentStatusConfig.nextAction" class="pb-6">
+      <div v-if="nextActionLabel" class="pb-6 space-y-2">
         <button
           type="button"
           @click="showConfirmModal = true"
-          :class="[
-            'w-full py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition active:scale-[0.98]',
-            currentStatusConfig.nextAction.color,
-          ]"
+          :disabled="actionLoading"
+          class="w-full py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition active:scale-[0.98] bg-merchant-primary disabled:opacity-50"
         >
-          <i :class="['pi', currentStatusConfig.nextAction.icon]"></i>
-          {{ currentStatusConfig.nextAction.label }}
+          <i class="pi pi-check-circle"></i>
+          {{ nextActionLabel }}
+        </button>
+        <button
+          v-if="
+            rawOrder?.status === 'pending' || rawOrder?.status === 'responsed'
+          "
+          type="button"
+          @click="handleCancel"
+          :disabled="actionLoading"
+          class="w-full py-3 text-sm font-semibold text-red-600 transition bg-red-50 rounded-2xl hover:bg-red-100 disabled:opacity-50"
+        >
+          Batalkan Pesanan
         </button>
       </div>
     </div>
@@ -639,7 +626,7 @@ function goBack() {
             </h3>
           </div>
           <p class="mb-6 text-sm text-gray-600">
-            Apakah Anda yakin ingin menandai pesanan ini sebagai selesai?
+            Apakah Anda yakin ingin mengubah status pesanan ini?
           </p>
           <div class="flex gap-3">
             <button
@@ -652,9 +639,10 @@ function goBack() {
             <button
               type="button"
               @click="confirmAction"
-              class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition"
+              :disabled="actionLoading"
+              class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition disabled:opacity-50"
             >
-              Ya, Konfirmasi
+              {{ actionLoading ? "Memproses..." : "Ya, Konfirmasi" }}
             </button>
           </div>
         </div>

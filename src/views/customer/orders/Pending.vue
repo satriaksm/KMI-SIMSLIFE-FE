@@ -39,13 +39,17 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import OrderCard from "@/components/customer/OrderCard.vue";
+import { getCustomerOrders } from "@/services/api/order";
+import { useToast } from "vue-toastification";
 
 const router = useRouter();
+const toast = useToast();
+const loading = ref(false);
 
 const pendingStatusProps = {
   variant: "payment",
@@ -55,31 +59,53 @@ const pendingStatusProps = {
   showIcon: true,
 };
 
-const orders = ref([
-  {
-    id: "ORD-1001",
-    storeName: "Toko 1",
-    dateLabel: "1 Mei 2025",
+const orders = ref([]);
+
+function formatDateLabel(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function mapOrder(o) {
+  return {
+    id: o.id,
+    storeName: o.merchant?.name || "Toko",
+    dateLabel: formatDateLabel(o.created_at),
     status: "pending_payment",
-    total: 39345,
-    items: [
-      {
-        title: "Keripik Pisang Manis",
-        qty: 1,
-        variant: "Original",
-        price: 21345,
-        imageUrl: null,
-      },
-      {
-        title: "Sambal Bawang Pedas",
-        qty: 1,
-        variant: "Botol 150ml",
-        price: 18000,
-        imageUrl: null,
-      },
-    ],
-  },
-]);
+    total: o.gross_amount,
+    items: (o.items || []).map((it) => ({
+      title: it.product_name_snapshot || "Produk",
+      qty: it.quantity,
+      variant: it.product_variant_snapshot || "",
+      price: it.unit_price_snapshot,
+      imageUrl: it.image_snapshot_path || null,
+    })),
+    _raw: o,
+  };
+}
+
+async function fetchPendingOrders() {
+  loading.value = true;
+  try {
+    const { data: res } = await getCustomerOrders({
+      status: "pending",
+      per_page: 100,
+    });
+    const list = res?.data ?? res ?? [];
+    orders.value = (Array.isArray(list) ? list : []).map(mapOrder);
+  } catch (e) {
+    console.error("Gagal memuat pesanan pending:", e);
+    toast.error("Gagal memuat pesanan");
+    orders.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
 
 function goBack() {
   router.back();
@@ -91,7 +117,20 @@ function openOrder(order) {
     .catch(() => router.push(`/orders/${order.id}`));
 }
 
-function pay(order) {}
+function pay(order) {
+  // Redirect to Midtrans payment if snap URL exists, otherwise go to detail
+  const snapUrl = order._raw?.midtrans?.redirect_url;
+  if (snapUrl) {
+    window.location.href = snapUrl;
+  } else {
+    toast.info("Silakan hubungi admin untuk melanjutkan pembayaran");
+    openOrder(order);
+  }
+}
+
+onMounted(() => {
+  fetchPendingOrders();
+});
 </script>
 
 <style scoped>

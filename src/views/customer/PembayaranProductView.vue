@@ -10,7 +10,6 @@
         class="p-4 bg-white border border-gray-200 rounded-xl"
       >
         <h2 class="mb-3 font-semibold text-gray-800">Data Pemesan</h2>
-
         <Form :validation-schema="schema">
           <div class="space-y-3">
             <TextField
@@ -20,7 +19,6 @@
               v-model="form.nama"
               required
             />
-
             <TextField
               name="tel"
               label="Nomor Telepon"
@@ -30,7 +28,6 @@
             />
           </div>
         </Form>
-
         <p class="mt-2 text-xs text-gray-500">
           Digunakan untuk keperluan konfirmasi pesanan
         </p>
@@ -39,7 +36,6 @@
       <!-- Detail Pesanan -->
       <section class="p-4 bg-white border border-gray-200 rounded-xl">
         <h2 class="mb-3 font-semibold text-gray-800">Detail Pesanan</h2>
-
         <div class="space-y-3">
           <div class="space-y-4">
             <div
@@ -48,42 +44,31 @@
               class="flex flex-col gap-3 p-4 bg-white border-b border-gray-200 last:border-none"
             >
               <div class="flex gap-3">
-                <!-- IMAGE -->
                 <div class="w-20 h-20 overflow-hidden bg-gray-100 rounded-lg">
                   <img :src="item.image" class="object-cover w-full h-full" />
                 </div>
-
-                <!-- INFO -->
                 <div class="flex-1 min-w-0 space-y-1">
                   <h3 class="text-sm font-semibold text-gray-900">
                     {{ item.name }}
                   </h3>
-
-                  <!-- VARIANT -->
                   <div
                     v-if="item.variant"
                     class="text-xs capitalize text-muted-foreground"
                   >
                     Varian: {{ item.variant }}
                   </div>
-
-                  <!-- PRICE + QTY -->
                   <div class="flex items-center justify-between mt-2">
-                    <span class="text-sm font-bold text-[#FFA30E]">
-                      Rp {{ formatIDR(item.price) }}
-                    </span>
-
-                    <span class="text-xs text-gray-600">
-                      x{{ item.quantity }}
-                    </span>
+                    <span class="text-sm font-bold text-[#FFA30E]"
+                      >Rp {{ formatIDR(item.price) }}</span
+                    >
+                    <span class="text-xs text-gray-600"
+                      >x{{ item.quantity }}</span
+                    >
                   </div>
                 </div>
               </div>
-
-              <!-- Addons jika ada -->
               <div v-if="item.addons?.length" class="space-y-1">
                 <div class="text-xs font-semibold text-gray-700">Tambahan:</div>
-                <!-- ✅ Tampilkan nama + harga per add-on -->
                 <div
                   v-for="addon in item.addons"
                   :key="addon.id || addon.label"
@@ -92,32 +77,24 @@
                   <div class="flex items-center gap-1">
                     + <span>{{ addon.name || addon.label }}</span>
                   </div>
-                  <span class=""> Rp {{ formatIDR(addon.price) }} </span>
+                  <span>Rp {{ formatIDR(addon.price) }}</span>
                 </div>
-                <!-- subtotal add-on per quantity -->
-                <!-- <p class="pt-1 text-xs text-gray-600">
-                  Total tambahan: Rp {{ formatIDR(getAddonTotal(item)) }}
-                </p> -->
               </div>
               <div
                 class="flex items-center justify-between gap-2 text-sm font-semibold text-black"
               >
-                <div class="flex items-center gap-1">
-                  <span>Total </span>
-                </div>
-                <span class="">
-                  Rp
+                <span>Total</span>
+                <span
+                  >Rp
                   {{
                     formatIDR(
                       (item.price + getAddonTotal(item)) * item.quantity,
                     )
-                  }}
-                </span>
+                  }}</span
+                >
               </div>
             </div>
           </div>
-
-          <!-- Catatan Produk -->
           <TextField
             name="catatanProduk"
             label="Catatan untuk pesanan ini (opsional)"
@@ -150,7 +127,6 @@
             />
             <span>Diantar</span>
           </label>
-
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -168,35 +144,28 @@
         v-if="form.metodePengiriman === 'delivery'"
         class="p-4 bg-white border border-gray-200 rounded-xl"
       >
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Alamat Pengiriman</h2>
-          <button
-            @click="showAlamatModal = true"
-            class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
-          >
-            {{ selectedAddress ? "Ganti Alamat" : "Pilih Alamat" }}
-          </button>
+        <h2 class="mb-3 font-semibold text-gray-800">Alamat Pengiriman</h2>
+        <div
+          v-if="addressesLoading"
+          class="py-4 text-sm text-center text-gray-500"
+        >
+          Memuat alamat...
         </div>
-
-        <div v-if="selectedAddress" class="space-y-3">
+        <div v-else-if="selectedAddress" class="space-y-3">
           <div class="flex items-start gap-2 text-sm">
             <i class="text-xl pi pi-map-marker text-primary"></i>
             <div class="flex-1">
-              <div class="font-semibold text-gray-800">
+              <div class="font-semibold text-gray-800 capitalize">
                 {{ selectedAddress.label }}
               </div>
               <p class="mt-1 leading-snug text-gray-600">
                 {{ selectedAddress.fullAddress }}
               </p>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ selectedAddress.penerima }} - {{ selectedAddress.telp }}
-              </p>
             </div>
           </div>
         </div>
-
         <div v-else class="py-4 text-sm text-center text-gray-500">
-          Belum ada alamat dipilih
+          Belum ada alamat tersimpan. Silakan tambahkan alamat di profil Anda.
         </div>
       </section>
 
@@ -208,16 +177,12 @@
         <h2 class="mb-3 font-semibold text-gray-800">Lokasi Toko</h2>
         <div class="flex items-start gap-2 text-sm">
           <i class="text-xl pi pi-map-marker text-merchant-primary"></i>
-
           <div class="flex-1">
             <div class="font-semibold text-gray-800">
               {{ order.store?.name || "Toko" }}
             </div>
             <p class="mt-1 leading-snug text-gray-600">
-              {{
-                // ✅ Prioritas: merchant_address dari API product detail
-                order.store?.address || "Alamat toko belum tersedia"
-              }}
+              {{ order.store?.address || "Alamat toko belum tersedia" }}
             </p>
           </div>
         </div>
@@ -249,22 +214,18 @@
             Batalkan
           </button>
         </div>
-
         <button
           class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
           @click="openPromo = true"
         >
-          Lihat promo lainnya
-          <span>→</span>
+          Lihat promo lainnya <span>&rarr;</span>
         </button>
       </section>
 
       <!-- Ringkasan Pembayaran -->
       <section class="p-4 bg-white border border-gray-200 rounded-xl">
         <h2 class="mb-3 font-semibold text-gray-800">Ringkasan Pembayaran</h2>
-
         <div class="space-y-3">
-          <!-- Metode Pembayaran -->
           <div>
             <div class="mb-2 text-sm text-gray-600">Metode Pembayaran</div>
             <div class="flex items-center gap-6 text-sm">
@@ -295,63 +256,57 @@
                 <span>QRIS</span>
               </label>
             </div>
-
-            <!-- Info message untuk delivery -->
             <p
               v-if="form.metodePengiriman === 'delivery'"
               class="flex items-start gap-1 mt-2 text-xs text-amber-600"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-4 h-4 flex-shrink-0 mt-0.5"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-8 8a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
-                  clip-rule="evenodd"
-                />
-              </svg>
+              <i class="mt-0.5 pi pi-info-circle"></i>
               <span>Untuk pengiriman, pembayaran wajib menggunakan QRIS</span>
             </p>
           </div>
-
-          <!-- Rincian Harga -->
           <div
             class="pt-3 space-y-2 text-sm text-gray-700 border-t border-gray-200"
           >
             <div class="flex justify-between">
-              <span>Subtotal Produk </span>
+              <span>Subtotal Produk</span>
               <span>Rp {{ formatIDR(amounts.product) }}</span>
             </div>
-
-            <div
-              v-if="form.metodePengiriman === 'delivery'"
-              class="flex justify-between text-xs"
-            >
-              <span>Biaya Pengiriman</span>
-              <span>Rp {{ formatIDR(amounts.ongkir) }}</span>
+            <div v-if="form.metodePengiriman === 'delivery'" class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span>Biaya Pengiriman</span>
+                <span v-if="shippingLoading" class="text-gray-400"
+                  >Menghitung...</span
+                >
+                <span v-else>Rp {{ formatIDR(amounts.ongkir) }}</span>
+              </div>
+              <div
+                v-if="shippingInfo && shippingInfo.distanceKm > 0"
+                class="text-[11px] text-gray-400"
+              >
+                Jarak {{ shippingInfo.distanceKm }} km
+              </div>
+              <div
+                v-if="shippingInfo && shippingInfo.note"
+                class="text-[11px] text-amber-500"
+              >
+                {{ shippingInfo.note }}
+              </div>
             </div>
-
             <div
               v-if="amounts.diskon > 0"
               class="flex justify-between text-green-600"
             >
-              <span>
-                Diskon
+              <span
+                >Diskon
                 <span
                   v-if="selectedPromo"
                   class="text-xs font-semibold text-amber-600"
-                >
-                  ({{ selectedPromo.code }})
-                </span>
-              </span>
+                  >({{ selectedPromo.code }})</span
+                ></span
+              >
               <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
             </div>
-
             <div class="my-2 border-t border-gray-300"></div>
-
             <div class="flex justify-between text-base font-bold">
               <span>Total Pembayaran</span>
               <span class="text-[#FFA30E]">Rp {{ formatIDR(total) }}</span>
@@ -361,7 +316,7 @@
       </section>
     </main>
 
-    <!-- Bottom bar (Total + Pesan button) -->
+    <!-- Bottom bar -->
     <footer
       class="fixed left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-lg bottom-16 sm:bottom-0"
     >
@@ -372,76 +327,18 @@
           <span>Total Pembayaran</span>
           <span class="text-[#FFA30E]">Rp {{ formatIDR(total) }}</span>
         </div>
-
         <button
           class="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white font-semibold bg-[#FFA30E] hover:bg-[#e5920d] transition disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="openWhatsapp"
-          :disabled="!isFormValid"
+          @click="handleCheckout"
+          :disabled="!isFormValid || isSubmitting"
         >
-          <span>Buat Pesanan</span>
+          <span v-if="isSubmitting">Memproses...</span>
+          <span v-else>Buat Pesanan</span>
         </button>
       </div>
     </footer>
 
-    <!-- Modal Pilih Alamat -->
-    <ResponsiveModal
-      :show="showAlamatModal"
-      @close="showAlamatModal = false"
-      title="Pilih Alamat Pengiriman"
-      subtitle="Pilih alamat untuk pengiriman produk"
-    >
-      <div class="space-y-3">
-        <button
-          v-for="addr in addresses"
-          :key="addr.id"
-          @click="selectAddress(addr)"
-          class="w-full p-4 text-left transition border rounded-lg"
-          :class="
-            selectedAddress?.id === addr.id
-              ? 'border-[#FFA30E] bg-orange-50'
-              : 'border-gray-200 hover:border-gray-300'
-          "
-        >
-          <div class="flex items-start gap-3">
-            <input
-              type="radio"
-              :checked="selectedAddress?.id === addr.id"
-              class="mt-1 w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-semibold text-gray-900">{{
-                  addr.label
-                }}</span>
-                <span
-                  v-if="addr.isDefault"
-                  class="px-2 py-0.5 text-xs font-medium bg-[#FFA30E] text-white rounded"
-                >
-                  Utama
-                </span>
-              </div>
-              <p class="text-sm leading-snug text-gray-600">
-                {{ addr.fullAddress }}
-              </p>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ addr.penerima }} - {{ addr.telp }}
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      <template #footer>
-        <button
-          @click="showAlamatModal = false"
-          class="w-full px-4 py-3 font-semibold text-gray-700 transition bg-gray-100 rounded-xl hover:bg-gray-200"
-        >
-          Tutup
-        </button>
-      </template>
-    </ResponsiveModal>
-
-    <!-- Modal Promo List (hanya jika sudah login) -->
+    <!-- Modal Promo List -->
     <ResponsiveModal
       v-if="!isGuest"
       :show="openPromo"
@@ -456,14 +353,12 @@
         >
           Memuat voucher...
         </div>
-
         <div
           v-else-if="!promos.length"
           class="py-6 text-sm text-center text-gray-500"
         >
           Tidak ada voucher tersedia
         </div>
-
         <div
           v-for="p in promos"
           :key="p.code"
@@ -479,7 +374,6 @@
               <div class="font-semibold text-gray-900">{{ p.name }}</div>
               <div class="text-xs text-gray-600">{{ p.desc }}</div>
             </div>
-
             <span
               class="text-xs px-2 py-0.5 rounded-full"
               :class="
@@ -495,20 +389,16 @@
               }}
             </span>
           </div>
-
           <div class="mt-1 text-xs text-gray-500">
             Min. pembelian: Rp {{ formatIDR(p.min_purchase) }}
           </div>
-
           <div
             v-if="p.type === 'percent' && p.max_discount"
             class="text-xs text-gray-500"
           >
             Maks. diskon: Rp {{ formatIDR(p.max_discount) }}
           </div>
-
           <div class="text-xs text-gray-500">Pemakaian: {{ p.usage }}</div>
-
           <button
             class="w-full py-2 mt-2 text-xs font-semibold transition rounded-lg"
             :disabled="p.is_expired || !isPromoEligible(p)"
@@ -523,7 +413,6 @@
           </button>
         </div>
       </div>
-
       <template #footer>
         <button
           @click="openPromo = false"
@@ -549,12 +438,15 @@ import * as yup from "yup";
 import { Form } from "vee-validate";
 import { useVouchers } from "@/composables/useVouchers";
 import { useToast } from "vue-toastification";
+import { checkoutProductFromCart } from "@/services/api/order";
+import { getMyAddress } from "@/services/api/address";
+import { calculateShippingCost } from "@/services/api/shipping";
+
 const {
   fetchVouchersByMerchant,
   vouchers,
   loading: voucherLoading,
 } = useVouchers();
-
 const toast = useToast();
 
 const schema = yup.object({
@@ -562,20 +454,17 @@ const schema = yup.object({
   tel: yup
     .string()
     .max(13, "No. Telepon maksimal 13 digit")
-    .matches(
-      /^08[0-9]{8,11}$/,
-      "Format nomor telepon tidak valid, harus diawali dengan 08, lebih dari 10 digit",
-    )
+    .matches(/^08[0-9]{8,11}$/, "Format nomor telepon tidak valid")
     .min(10, "No. Telepon minimal 10 digit"),
-
   metodePengiriman: yup.string().required(),
   catatanProduk: yup.string(),
-  catatanAlamat: yup.string(),
 });
 
 const auth = useAuthStore();
 const router = useRouter();
 const checkout = useCheckoutStore();
+const isSubmitting = ref(false);
+
 const checkoutItems = computed(() => {
   if (checkout.from === "cart") {
     return checkout.cartItems.map((item) => ({
@@ -591,8 +480,6 @@ const checkoutItems = computed(() => {
       variant: item.variant || null,
     }));
   }
-
-  // SINGLE PRODUCT MODE
   return [
     {
       id: checkout.productSlug,
@@ -605,40 +492,22 @@ const checkoutItems = computed(() => {
     },
   ];
 });
+
 const isGuest = computed(() => !auth.isAuthenticated);
-// Order view model (dari store)
+
 const order = computed(() => {
   if (checkout.from === "cart") {
-    return {
-      store: checkout.store,
-      items: checkout.cartItems,
-    };
+    return { store: checkout.store, items: checkout.cartItems };
   }
-
-  // single product
   return {
     slug: checkout.productSlug,
     title: checkout.productTitle,
-    image: checkout.productImage,
-    quantity: checkout.qty,
-    size: checkout.selectedSizeName || "",
-    variant: checkout.selectedVariantName || "",
-    addons: checkout.selectedAddons.map((a) => a.name),
     store: checkout.store,
   };
 });
 
-// Nominal dari store
-const amounts = ref({
-  product: 0, // akan diisi dari lineSubtotal
-  ongkir: 10000,
-  diskon: 0,
-});
+const amounts = ref({ product: 0, ongkir: 0, diskon: 0 });
 
-// ✅ total addon per item (bukan dikali qty)
-const addonUnitTotal = computed(() => Number(checkout.addonTotal || 0));
-// ✅ Total akhir: harga produk + ongkir - diskon
-// amounts.product disinkronkan dari checkout.totalPrice (lihat watch di bawah)
 const total = computed(() => {
   const product = Number(amounts.value.product || 0);
   const ongkir = Number(amounts.value.ongkir || 0);
@@ -646,7 +515,6 @@ const total = computed(() => {
   return Math.max(0, product + ongkir - diskon);
 });
 
-// sinkronisasi amounts.product
 watch(
   () => checkout.totalPrice,
   (v) => {
@@ -654,6 +522,7 @@ watch(
   },
   { immediate: true },
 );
+
 const getAddonTotal = (item) => {
   if (!item.addons || !item.addons.length) return 0;
   return item.addons.reduce((sum, a) => sum + Number(a.price || 0), 0);
@@ -661,152 +530,172 @@ const getAddonTotal = (item) => {
 
 const formatIDR = (v) => Number(v || 0).toLocaleString("id-ID");
 
-// Saat user mengubah size/variant/addon di halaman ini (gunakan handler Anda), panggil:
-// checkout.updateSelection({ sizeId, sizeName, variantId, variantName, unitPrice, stock });
-// checkout.setAddons(newAddonsArray);
-
-// Merchant phone
-const merchantPhone = ref(order.value.store.phone || "");
-function normalizePhone(raw) {
-  if (!raw) return "";
-  let p = String(raw)
-    .trim()
-    .replace(/[^\d+]/g, "")
-    .replace(/^\+/, "");
-  if (p.startsWith("08")) p = "628" + p.slice(2);
-  else if (p.startsWith("0")) p = "62" + p.slice(1);
-  return p;
-}
-
-// Tambah state alamat merchant dari product detail
-
-// Saat mounted, jika slug tersedia, fetch product untuk ambil merchant_address
-onMounted(async () => {
-  if (checkout.from === "cart") {
-    if (!checkout.store?.id || checkout.cartItems.length === 0) {
-      router.replace({ name: "Beranda" });
-    }
-  }
-
-  if (!isGuest.value && order.value.store?.slug) {
-    await fetchVouchersByMerchant(order.value.store.slug);
-  }
-});
-const promos = computed(() =>
-  vouchers.value.map((v) => ({
-    code: v.voucher_code,
-    name: v.voucher_name,
-    desc: v.voucher_description,
-    type: v.voucher_type, // percent | fixed
-    value: Number(v.value),
-    max_discount: Number(v.max_discount_amount || 0),
-    min_purchase: Number(v.min_purchase_amount || 0),
-    usage: v.usage,
-    is_expired: v.is_expired,
-  })),
-);
-
-// Form & promo (tetap)
 const form = ref({
   nama: "",
   tel: "",
   metodePengiriman: "pickup",
   catatanProduk: "",
-  catatanAlamat: "",
 });
 const pay = ref({ method: "COD" });
-
-// Promo state harus didefinisikan sebelum watcher (immediate)
 const selectedPromo = ref(null);
+
+const promos = computed(() =>
+  vouchers.value.map((v) => ({
+    code: v.voucher_code,
+    name: v.voucher_name,
+    desc: v.voucher_description,
+    type: v.voucher_type,
+    value: Number(v.value),
+    max_discount: Number(v.max_discount_amount || 0),
+    min_purchase: Number(v.min_purchase_amount || 0),
+    id: v.id,
+    usage: v.usage,
+    is_expired: v.is_expired,
+  })),
+);
+
+// Address
+const openPromo = ref(false);
+useBodyScrollLock(openPromo);
+const selectedAddress = ref(null);
+const addresses = ref([]);
+const addressesLoading = ref(false);
+const shippingLoading = ref(false);
+const shippingInfo = ref(null);
+
+async function loadAddresses() {
+  if (isGuest.value) return;
+  addressesLoading.value = true;
+  try {
+    const res = await getMyAddress();
+    // API returns a single address object, not an array
+    const addr = res?.data ?? res ?? null;
+    if (addr && addr.id) {
+      selectedAddress.value = {
+        id: addr.id,
+        label: addr.label || "Alamat",
+        fullAddress: [
+          addr.detail,
+          addr.village?.name,
+          addr.district?.name,
+          addr.city?.name,
+          addr.province?.name,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      };
+    } else {
+      selectedAddress.value = null;
+    }
+  } catch (e) {
+    console.error("Gagal memuat alamat:", e);
+    selectedAddress.value = null;
+  } finally {
+    addressesLoading.value = false;
+  }
+}
 
 watch(
   () => form.value.metodePengiriman,
-  (v) => {
-    amounts.value.ongkir = v === "pickup" ? 0 : 10000;
-    if (v === "delivery") {
-      pay.value.method = "QRIS";
-    } else if (v === "pickup") {
-      pay.value.method = "COD";
+  async (v) => {
+    if (v === "pickup") {
+      amounts.value.ongkir = 0;
+      shippingInfo.value = null;
+    } else {
+      // Will be recalculated by fetchShippingCost
+      await fetchShippingCost();
     }
+    pay.value.method = v === "delivery" ? "QRIS" : "COD";
   },
   { immediate: true },
 );
+
+async function fetchShippingCost() {
+  if (form.value.metodePengiriman !== "delivery") return;
+  if (!order.value.store?.id) return;
+  if (isGuest.value) return;
+
+  shippingLoading.value = true;
+  try {
+    const payload = { merchant_id: order.value.store.id };
+    if (selectedAddress.value?.id) {
+      payload.address_id = selectedAddress.value.id;
+    }
+    const { data } = await calculateShippingCost(payload);
+    const result = data?.data ?? data;
+    amounts.value.ongkir = Number(result?.delivery_fee ?? 0);
+    shippingInfo.value = {
+      distanceKm: result?.distance_km ?? 0,
+      baseCost: result?.base_cost ?? 0,
+      costPerKm: result?.cost_per_km ?? 0,
+      note: result?.note ?? null,
+    };
+  } catch (e) {
+    console.error("Gagal menghitung ongkir:", e);
+    amounts.value.ongkir = 0;
+    shippingInfo.value = null;
+  } finally {
+    shippingLoading.value = false;
+  }
+}
+
 watch(
   () => isGuest.value,
   (guest) => {
     if (guest) {
-      form.value.metodePengiriman = "pickup"; // 🔒 paksa pickup
-      pay.value.method = "COD"; // aman (atau COD kalau mau)
+      form.value.metodePengiriman = "pickup";
+      pay.value.method = "COD";
       amounts.value.ongkir = 0;
       clearPromo();
       return;
     }
-
-    if (order.value.store?.slug) {
+    if (order.value.store?.slug)
       fetchVouchersByMerchant(order.value.store.slug);
-    }
   },
   { immediate: true },
 );
+
 watch(
   () => amounts.value.product,
   () => {
     if (selectedPromo.value) {
       const discount = computeDiscount(selectedPromo.value);
-      if (discount <= 0) {
-        clearPromo();
-      } else {
-        amounts.value.diskon = discount;
-      }
+      if (discount <= 0) clearPromo();
+      else amounts.value.diskon = discount;
     }
   },
 );
 
 function isPromoEligible(promo) {
-  const subtotal = Number(amounts.value.product || 0);
-  return !promo?.is_expired && subtotal >= Number(promo?.min_purchase || 0);
+  return (
+    !promo?.is_expired &&
+    Number(amounts.value.product || 0) >= Number(promo?.min_purchase || 0)
+  );
 }
 
 function computeDiscount(promo) {
   const subtotal = amounts.value.product;
-
-  if (promo.is_expired) return 0;
-  if (subtotal < promo.min_purchase) return 0;
-
-  if (promo.type === "fixed") {
-    return Math.min(promo.value, subtotal);
-  }
-
+  if (promo.is_expired || subtotal < promo.min_purchase) return 0;
+  if (promo.type === "fixed") return Math.min(promo.value, subtotal);
   if (promo.type === "percent") {
-    let discount = Math.floor((promo.value / 100) * subtotal);
-
-    if (promo.max_discount && discount > promo.max_discount) {
-      discount = promo.max_discount;
-    }
-
-    return discount;
+    let d = Math.floor((promo.value / 100) * subtotal);
+    if (promo.max_discount && d > promo.max_discount) d = promo.max_discount;
+    return d;
   }
-
   return 0;
 }
 
 function usePromo(p) {
-  const discount = computeDiscount(p);
-
   if (p.is_expired) {
     toast.warning("Voucher sudah tidak berlaku");
     return;
   }
-
   if (amounts.value.product < p.min_purchase) {
-    toast.warning(
-      `Minimal pembelian Rp ${formatIDR(p.min_purchase)} untuk voucher ini`,
-    );
+    toast.warning(`Minimal pembelian Rp ${formatIDR(p.min_purchase)}`);
     return;
   }
-
   selectedPromo.value = p;
-  amounts.value.diskon = discount;
+  amounts.value.diskon = computeDiscount(p);
   openPromo.value = false;
 }
 
@@ -815,134 +704,82 @@ function clearPromo() {
   amounts.value.diskon = 0;
 }
 
-// Nama/telp dari auth
-const customerName = computed(() => auth.user?.name || form.value.nama || "");
-const customerPhone = computed(() =>
-  normalizePhone(auth.user?.phone || form.value.tel || ""),
-);
-
-// Validasi
-const showAlamatModal = ref(false);
-const openPromo = ref(false);
-useBodyScrollLock(showAlamatModal);
-useBodyScrollLock(openPromo);
-const selectedAddress = ref(null);
-const addresses = ref([
-  {
-    id: 1,
-    label: "Rumah",
-    penerima: "John Doe",
-    telp: "08123456789",
-    fullAddress:
-      "Jl. Cendrawasih No 5 Rt 1 Rw 1, Banyumanik, Semarang, Jawa Tengah 50268",
-    isDefault: true,
-  },
-]);
-if (!selectedAddress.value)
-  selectedAddress.value =
-    addresses.value.find((a) => a.isDefault) || addresses.value[0] || null;
 const isFormValid = computed(() => {
-  if (isGuest.value) {
-    if (!form.value.nama || !form.value.tel) return false;
-  }
-
-  if (form.value.metodePengiriman === "delivery" && !selectedAddress.value) {
+  if (isGuest.value && (!form.value.nama || !form.value.tel)) return false;
+  if (form.value.metodePengiriman === "delivery" && !selectedAddress.value)
     return false;
-  }
-
   return true;
 });
 
-// WhatsApp text: gunakan lineSubtotal untuk ringkasan harga
-const openWhatsapp = () => {
+// ========================
+// CHECKOUT VIA API
+// ========================
+const handleCheckout = async () => {
   if (!isFormValid.value) {
-    alert("Mohon lengkapi data pemesan dan pilih alamat (jika diantar)");
+    toast.warning(
+      "Mohon lengkapi data pemesan dan pilih alamat (jika diantar)",
+    );
+    return;
+  }
+  if (isGuest.value) {
+    toast.warning("Silakan login terlebih dahulu untuk membuat pesanan");
     return;
   }
 
-  let productDetails = "";
+  isSubmitting.value = true;
+  try {
+    const payload = {
+      cart_id: checkout.store?.cartId || null,
+      voucher_id: selectedPromo.value?.id || null,
+      delivery_type: form.value.metodePengiriman,
+    };
+    if (
+      form.value.metodePengiriman === "delivery" &&
+      selectedAddress.value?.id
+    ) {
+      payload.address_id = selectedAddress.value.id;
+    }
 
-  if (checkout.from === "cart") {
-    productDetails = checkout.cartItems
-      .map(
-        (i, idx) =>
-          `${idx + 1}. ${i.name}\n` +
-          (i.variant ? `Varian: ${i.variant}\n` : "") +
-          (i.size ? `Ukuran: ${i.size}\n` : "") +
-          `Jumlah: ${i.quantity}x\n` +
-          `Harga: Rp ${formatIDR(
-            (i.unitPrice + i.addonTotalPrice) * i.quantity,
-          )}`,
-      )
-      .join("\n\n");
-  } else {
-    productDetails = [
-      `Produk: ${order.value.title}`,
-      order.value.size ? `Ukuran: ${order.value.size}` : "",
-      order.value.variant ? `Varian: ${order.value.variant}` : "",
-      checkout.selectedAddons.length
-        ? `Tambahan: ${checkout.selectedAddons.map((a) => a.name).join(", ")}`
-        : "",
-      `Jumlah: ${checkout.qty}x`,
-      `Subtotal: Rp ${formatIDR(total.value)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    const { data } = await checkoutProductFromCart(payload);
+    const result = data?.data ?? data;
+    const snapUrl = result?.midtrans?.redirect_url;
+
+    toast.success("Pesanan berhasil dibuat!");
+    checkout.clear();
+
+    if (snapUrl && pay.value.method === "QRIS") {
+      window.location.href = snapUrl;
+    } else {
+      const orderId = result?.order?.id;
+      router.push(
+        orderId
+          ? { name: "Detail Pesanan", params: { orderId } }
+          : { name: "Pesanan Saya" },
+      );
+    }
+  } catch (error) {
+    console.error("Checkout error:", error);
+    toast.error(
+      error.response?.data?.message || "Gagal membuat pesanan. Coba lagi.",
+    );
+  } finally {
+    isSubmitting.value = false;
   }
-
-  const deliveryInfo =
-    form.value.metodePengiriman === "delivery"
-      ? [
-          "\n*PENGIRIMAN*",
-          "Metode: Diantar",
-          `Alamat: ${selectedAddress.value.fullAddress}`,
-          `Penerima: ${selectedAddress.value.penerima} (${selectedAddress.value.telp})`,
-          form.value.catatanAlamat
-            ? `Catatan Alamat: ${form.value.catatanAlamat}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : [
-          "\n*PENGIRIMAN*",
-          "Metode: Ambil Sendiri",
-          `Lokasi Toko: ${order.value.store.address}`,
-        ].join("\n");
-
-  const text = [
-    "*PESANAN BARU DARI SUMILIR*",
-    "\n*DATA PEMESAN*",
-    `Nama: ${customerName.value}`,
-    `Telp: ${customerPhone.value}`,
-    "\n*DETAIL PESANAN*",
-    productDetails,
-    form.value.catatanProduk ? `\nCatatan: ${form.value.catatanProduk}` : "",
-    deliveryInfo,
-    "\n*PEMBAYARAN*",
-    `Metode: ${pay.value.method}`,
-    "\n*RINCIAN HARGA*",
-    `Harga Produk: Rp ${formatIDR(amounts.value.product)}`,
-    form.value.metodePengiriman === "delivery"
-      ? `Ongkir: Rp ${formatIDR(amounts.value.ongkir)}`
-      : "",
-    amounts.value.diskon > 0
-      ? `Diskon (${selectedPromo.value?.code}): -Rp ${formatIDR(
-          amounts.value.diskon,
-        )}`
-      : "",
-    `*Total: Rp ${formatIDR(total.value)}*`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const phone = normalizePhone(
-    merchantPhone.value || order.value.store.phone || "",
-  );
-  const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
-  window.open(url, "_blank");
-  checkout.clear();
-  router.back();
 };
+
+onMounted(async () => {
+  if (checkout.from === "cart") {
+    if (!checkout.store?.id || checkout.cartItems.length === 0) {
+      router.replace({ name: "Beranda" });
+      return;
+    }
+  }
+  if (!isGuest.value) {
+    await loadAddresses();
+    if (order.value.store?.slug)
+      await fetchVouchersByMerchant(order.value.store.slug);
+  }
+});
 
 onBeforeRouteLeave(() => {
   checkout.clear();
@@ -950,7 +787,6 @@ onBeforeRouteLeave(() => {
 </script>
 
 <style scoped>
-/* Custom scrollbar untuk modal */
 ::-webkit-scrollbar {
   width: 6px;
 }

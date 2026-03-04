@@ -1,0 +1,67 @@
+import api from "@/libs/axios";
+
+// ========================
+// CUSTOMER
+// ========================
+
+/**
+ * Checkout product from cart -> create order + get Midtrans snap token
+ */
+export function checkoutProductFromCart(payload) {
+  return api.post("/api/orders/products/checkout", payload);
+}
+
+/**
+ * List customer orders (paginated)
+ * @param {Object} params - { status?, per_page?, page? }
+ */
+export function getCustomerOrders(params = {}) {
+  return api.get("/api/orders", { params });
+}
+
+/**
+ * Detail of a single order (customer)
+ */
+export function getCustomerOrderDetail(orderId) {
+  return api.get(`/api/orders/${orderId}`);
+}
+
+/**
+ * Cancel order (customer)
+ */
+export function cancelOrder(orderId) {
+  return api.post(`/api/orders/${orderId}/cancel`);
+}
+
+// ========================
+// MERCHANT
+// ========================
+
+/**
+ * List merchant orders (paginated)
+ * @param {string} merchantSlug
+ * @param {Object} params - { status?, per_page?, page? }
+ */
+export function getMerchantOrders(merchantSlug, params = {}) {
+  return api.get(`/api/merchant/${merchantSlug}/orders`, { params });
+}
+
+/**
+ * Detail of a single order (merchant)
+ */
+export function getMerchantOrderDetail(merchantSlug, orderId) {
+  return api.get(`/api/merchant/${merchantSlug}/orders/${orderId}`);
+}
+
+/**
+ * Update order status (merchant)
+ * @param {string} merchantSlug
+ * @param {number} orderId
+ * @param {string} status - responsed|delivered|completed|cancelled
+ */
+export function updateOrderStatus(merchantSlug, orderId, status) {
+  return api.post(
+    `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
+    { status },
+  );
+}

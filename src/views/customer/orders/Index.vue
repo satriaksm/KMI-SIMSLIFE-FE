@@ -200,7 +200,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
@@ -209,11 +209,14 @@ import TextField from "@/components/forms/TextField.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
+import { getCustomerOrders } from "@/services/api/order";
+import { useToast } from "vue-toastification";
 
 const router = useRouter();
+const toast = useToast();
 
 const query = ref("");
-const pending_payment_count = ref(2);
+const loading = ref(false);
 
 // ========================
 // FILTER STATE
@@ -354,98 +357,72 @@ function isDateInRange(dateLabel, range) {
 }
 
 // ========================
-// ORDERS DATA
+// ORDERS DATA (from API)
 // ========================
-const orders = ref([
-  {
-    id: "ORD-1002",
-    storeName: "Toko 2",
-    dateLabel: "1 Mei 2025",
-    status: "completed",
-    total: 21345,
-    items: [
-      {
-        title: "Vention Kabel Aux Audio Perpanjangan 3.5m",
-        qty: 1,
-        variant: "",
-        price: 21345,
-        imageUrl: null,
-      },
-    ],
-  },
-  {
-    id: "ORD-1003",
-    storeName: "Toko 3",
-    dateLabel: "1 Mei 2025",
-    status: "completed",
-    total: 86049,
-    items: [
-      {
-        title: "KAHF FACE WASH 100 ML",
-        qty: 1,
-        variant: "Acne Care",
-        price: 23049,
-        imageUrl: null,
-      },
-      {
-        title: "KAHF Moisturizer 30 ML",
-        qty: 1,
-        variant: "Oil & Acne",
-        price: 28000,
-        imageUrl: null,
-      },
-      {
-        title: "KAHF Sunscreen 35 ML",
-        qty: 1,
-        variant: "SPF 50",
-        price: 35000,
-        imageUrl: null,
-      },
-    ],
-  },
-  {
-    id: "ORD-1004",
-    storeName: "Belanja Murah",
-    dateLabel: "2 Mar 2025",
-    status: "completed",
-    total: 36150,
-    items: [
-      {
-        title: "KAHF face wash 100ml - acne care",
-        qty: 1,
-        variant: "Acne Care",
-        price: 24150,
-        imageUrl: null,
-      },
-      {
-        title: "Facial Tissue Premium",
-        qty: 2,
-        variant: "",
-        price: 12000,
-        imageUrl: null,
-      },
-    ],
-  },
-  {
-    id: "ORD-1005",
-    storeName: "Shop DIka",
-    dateLabel: "19 Jan 2025",
-    status: "completed",
-    total: 68100,
-    items: [
-      {
-        title: "Ugreen XLR Microphone to Aux 3.5mm",
-        qty: 1,
-        variant: "",
-        price: 68100,
-        imageUrl: null,
-      },
-    ],
-  },
-]);
+const orders = ref([]);
 
-const pendingPaymentCount = computed(() =>
-  Number(pending_payment_count.value || 0),
+function mapApiStatus(beStatus) {
+  switch (beStatus) {
+    case "pending":
+      return "pending_payment";
+    case "paid":
+    case "responsed":
+    case "delivered":
+      return "processing";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return beStatus;
+  }
+}
+
+function formatDateLabel(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function mapOrder(o) {
+  return {
+    id: o.id,
+    storeName: o.merchant?.name || "Toko",
+    dateLabel: formatDateLabel(o.created_at),
+    status: mapApiStatus(o.status),
+    total: o.gross_amount,
+    items: (o.items || []).map((it) => ({
+      title: it.product_name_snapshot || "Produk",
+      qty: it.quantity,
+      variant: it.product_variant_snapshot || "",
+      price: it.unit_price_snapshot,
+      imageUrl: it.image_snapshot_path || null,
+    })),
+    _raw: o,
+  };
+}
+
+async function fetchOrders() {
+  loading.value = true;
+  try {
+    const { data: res } = await getCustomerOrders({ per_page: 100 });
+    const list = res?.data ?? res ?? [];
+    orders.value = (Array.isArray(list) ? list : []).map(mapOrder);
+  } catch (e) {
+    console.error("Gagal memuat pesanan:", e);
+    toast.error("Gagal memuat pesanan");
+    orders.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+const pendingPaymentCount = computed(
+  () => orders.value.filter((o) => o.status === "pending_payment").length,
 );
 
 // ========================
@@ -505,6 +482,10 @@ function goToPendingPayment() {
     .push({ path: "/orders/pending-payments" })
     .catch(() => router.push("/orders/pending-payments"));
 }
+
+onMounted(() => {
+  fetchOrders();
+});
 </script>
 
 <style scoped>

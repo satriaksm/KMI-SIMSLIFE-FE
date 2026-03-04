@@ -315,6 +315,65 @@
             ></textarea>
           </div>
 
+          <!-- Informasi Pajak & Bank -->
+          <div class="pt-2">
+            <p
+              class="mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            >
+              Informasi Pajak &amp; Bank
+            </p>
+            <div class="space-y-4">
+              <div>
+                <label
+                  class="block mb-2 text-sm font-semibold text-merchant-primary"
+                  >NPWP</label
+                >
+                <input
+                  v-model="form.NPWP"
+                  type="text"
+                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  placeholder="Contoh: 12.345.678.9-012.345"
+                />
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-semibold text-merchant-primary"
+                  >Nama Bank</label
+                >
+                <input
+                  v-model="form.bank_name"
+                  type="text"
+                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  placeholder="Contoh: BCA, BRI, Mandiri"
+                />
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-semibold text-merchant-primary"
+                  >Nomor Rekening</label
+                >
+                <input
+                  v-model="form.bank_account_number"
+                  type="text"
+                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  placeholder="Contoh: 1234567890"
+                />
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-semibold text-merchant-primary"
+                  >Nama Pemilik Rekening</label
+                >
+                <input
+                  v-model="form.bank_account_name"
+                  type="text"
+                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  placeholder="Sesuai buku tabungan"
+                />
+              </div>
+            </div>
+          </div>
+
           <!-- Lokasi (Langsung di halaman, bukan modal) -->
           <div>
             <label
@@ -504,6 +563,65 @@
                 class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
                 placeholder="Ceritakan tentang toko Anda..."
               ></textarea>
+            </div>
+
+            <!-- Informasi Pajak & Bank - Full Width -->
+            <div class="md:col-span-2">
+              <p
+                class="mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Informasi Pajak &amp; Bank
+              </p>
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label
+                    class="block mb-2 text-base font-medium text-merchant-primary"
+                    >NPWP</label
+                  >
+                  <input
+                    v-model="form.NPWP"
+                    type="text"
+                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    placeholder="Contoh: 12.345.678.9-012.345"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block mb-2 text-base font-medium text-merchant-primary"
+                    >Nama Bank</label
+                  >
+                  <input
+                    v-model="form.bank_name"
+                    type="text"
+                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    placeholder="Contoh: BCA, BRI, Mandiri"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block mb-2 text-base font-medium text-merchant-primary"
+                    >Nomor Rekening</label
+                  >
+                  <input
+                    v-model="form.bank_account_number"
+                    type="text"
+                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    placeholder="Contoh: 1234567890"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="block mb-2 text-base font-medium text-merchant-primary"
+                    >Nama Pemilik Rekening</label
+                  >
+                  <input
+                    v-model="form.bank_account_name"
+                    type="text"
+                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    placeholder="Sesuai buku tabungan"
+                  />
+                </div>
+              </div>
             </div>
 
             <!-- Lokasi - Full Width -->
@@ -780,6 +898,10 @@ const form = ref({
   district_id: null,
   province_id: null,
   village_id: null,
+  NPWP: "",
+  bank_name: "",
+  bank_account_number: "",
+  bank_account_name: "",
   operationalHours: [
     { name: "Monday", hours: "[06:00 - 18:00]", isOpen: false },
     { name: "Tuesday", hours: "[06:00 - 18:00]", isOpen: false },
@@ -1003,6 +1125,11 @@ onMounted(async () => {
     }
     form.value.village_id = data?.primary_address?.village_id ?? null;
 
+    form.value.NPWP = data?.NPWP ?? "";
+    form.value.bank_name = data?.bank_name ?? "";
+    form.value.bank_account_number = data?.bank_account_number ?? "";
+    form.value.bank_account_name = data?.bank_account_name ?? "";
+
     form.value.logo =
       typeof data?.logo_url === "string" && data.logo_url.trim()
         ? data.logo_url
@@ -1149,6 +1276,12 @@ const handleSave = async () => {
     fd.append("name", form.value.name || "");
     fd.append("phone", form.value.contact || "");
     fd.append("description", form.value.description || "");
+
+    // Tax & bank info
+    fd.append("NPWP", form.value.NPWP || "");
+    fd.append("bank_name", form.value.bank_name || "");
+    fd.append("bank_account_number", form.value.bank_account_number || "");
+    fd.append("bank_account_name", form.value.bank_account_name || "");
 
     // Address - only append if value exists (don't send empty strings for integers)
     if (form.value.province_id) {

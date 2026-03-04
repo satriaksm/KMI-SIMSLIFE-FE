@@ -60,6 +60,7 @@
               label="Nama Usaha"
               placeholder="Masukkan nama usaha"
               class="sm:col-span-2"
+              required
             />
 
             <!-- Phone Number -->
@@ -68,6 +69,7 @@
               label="Nomor Telepon"
               placeholder="Contoh: 081234567890"
               class="sm:col-span-2"
+              required
             />
 
             <!-- Jenis Usaha (dari API /segmentations) -->
@@ -82,7 +84,23 @@
                 segmentations.map((s) => ({ value: s.id, label: s.name }))
               "
               class="sm:col-span-2"
+              required
             />
+
+            <TextField
+              name="NPWP"
+              label="NPWP (Opsional)"
+              placeholder="Contoh: 12.345.678.9-012.345"
+              class="sm:col-span-2"
+            />
+
+            <div class="sm:col-span-2">
+              <p
+                class="mt-3 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+              >
+                Alamat Usaha
+              </p>
+            </div>
 
             <!-- Wilayah (nested di address.*) -->
             <SelectField
@@ -92,6 +110,7 @@
               v-model="provinceId"
               :loading="provincesLoading"
               :options="provinces.map((p) => ({ value: p.id, label: p.name }))"
+              required
             />
 
             <SelectField
@@ -102,6 +121,7 @@
               :loading="citiesLoading"
               :disabled="!provinceId"
               :options="cities.map((r) => ({ value: r.id, label: r.name }))"
+              required
             />
 
             <SelectField
@@ -112,6 +132,7 @@
               :loading="districtsLoading"
               :disabled="!cityId"
               :options="districts.map((d) => ({ value: d.id, label: d.name }))"
+              required
             />
 
             <SelectField
@@ -122,6 +143,7 @@
               :loading="villagesLoading"
               :disabled="!districtId"
               :options="villages.map((v) => ({ value: v.id, label: v.name }))"
+              required
             />
 
             <!-- Pemetaan Lokasi -->
@@ -158,27 +180,39 @@
               />
             </div>
 
-            <!-- Koordinat (nested di address.*) -->
-            <!-- <TextField
-              name="address.latitude"
-              label="Latitude"
-              v-model="latitude"
-              :readonly="true"
-              placeholder="-6.200000"
-            />
-            <TextField
-              name="address.longitude"
-              label="Longitude"
-              v-model="longitude"
-              :readonly="true"
-              placeholder="106.816666"
-            /> -->
-
             <!-- Detail alamat (nested di address.detail) -->
             <TextField
               name="address.detail"
               label="Alamat Lengkap"
               placeholder="Nama jalan, RT/RW, patokan, dsb (opsional)"
+              class="sm:col-span-2"
+            />
+
+            <!-- Bank -->
+            <div class="sm:col-span-2">
+              <p
+                class="mt-3 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+              >
+                Bank (Opsional)
+              </p>
+            </div>
+
+            <TextField
+              name="bank_name"
+              label="Nama Bank"
+              placeholder="Contoh: BCA, BRI, Mandiri"
+            />
+
+            <TextField
+              name="bank_account_number"
+              label="Nomor Rekening"
+              placeholder="Contoh: 1234567890"
+            />
+
+            <TextField
+              name="bank_account_name"
+              label="Nama Pemilik Rekening"
+              placeholder="Sesuai buku tabungan"
               class="sm:col-span-2"
             />
 
@@ -261,6 +295,10 @@ const schema = yup.object({
     .typeError("Jenis usaha wajib dipilih")
     .required("Jenis usaha wajib dipilih"),
   description: yup.string().nullable(),
+  NPWP: yup.string().nullable(),
+  bank_name: yup.string().nullable(),
+  bank_account_number: yup.string().nullable(),
+  bank_account_name: yup.string().nullable(),
   address: yup.object({
     province_id: yup
       .number()
@@ -419,8 +457,12 @@ const handleRegister = async (values) => {
   try {
     const payload = {
       name: values.name,
-      phone: values.phone, // NEW
+      phone: values.phone,
       description: values.description,
+      NPWP: values.NPWP || null,
+      bank_name: values.bank_name || null,
+      bank_account_number: values.bank_account_number || null,
+      bank_account_name: values.bank_account_name || null,
       segmentation_id: Number(values.segmentation_id),
       address: {
         province_id: Number(values.address.province_id),
