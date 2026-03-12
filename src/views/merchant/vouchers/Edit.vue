@@ -81,7 +81,10 @@ const breadcrumbItems = computed(() => [
 // ============================================================
 const schema = yup.object({
   voucher_name: yup.string().required("Nama voucher wajib diisi"),
-  voucher_code: yup.string().required("Kode voucher wajib diisi"),
+  voucher_code: yup
+    .string()
+    .required("Kode voucher wajib diisi")
+    .matches(/^\S+$/, "Kode voucher tidak boleh mengandung spasi"),
   voucher_description: yup.string().required("Deskripsi wajib diisi"),
   voucher_type: yup.string().required(),
   value: yup.number().required().min(1),
@@ -347,7 +350,7 @@ const onSubmit = veeHandleSubmit(async () => {
           </div>
         </div>
       </div>
-      <Form @submit="onSubmit">
+      <form @submit.prevent="onSubmit">
         <!-- Info Dasar -->
         <div
           class="p-4 mb-2 space-y-3 bg-white sm:mb-4 sm:p-6 sm:rounded-xl sm:shadow-sm"
@@ -514,7 +517,7 @@ const onSubmit = veeHandleSubmit(async () => {
             {{ loading ? "Menyimpan..." : "Simpan Perubahan" }}
           </Button>
         </div>
-      </Form>
+      </form>
     </div>
   </div>
 </template>
