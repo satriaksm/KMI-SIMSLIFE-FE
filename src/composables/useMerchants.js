@@ -150,7 +150,7 @@ export function useMerchants() {
       }
 
       await merchantService.deleteMerchant(String(merchantSlug));
-      toast.success("Merchant berhasil dihapus!");
+      toast.success("UMKM berhasil dihapus!");
       merchant.value = null;
     } catch (error) {
       if (isDev) {
