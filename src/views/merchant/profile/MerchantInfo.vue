@@ -117,7 +117,6 @@ const handleDeleteMerchant = async () => {
   deletingMerchant.value = true;
   try {
     await deleteMerchant(merchantSlug.value);
-    toast.success("UMKM berhasil dihapus");
     showDeleteMerchantModal.value = false;
 
     // Refresh auth snapshot so the app no longer thinks a merchant exists
@@ -129,11 +128,7 @@ const handleDeleteMerchant = async () => {
 
     router.push("/profile");
   } catch (error) {
-    const msg =
-      error?.response?.data?.message ||
-      error?.response?.data?.error ||
-      "Gagal menghapus UMKM";
-    toast.error(msg);
+    // Error handling is done in the composable, so we can ignore it here
   } finally {
     deletingMerchant.value = false;
   }
