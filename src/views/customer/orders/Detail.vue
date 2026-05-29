@@ -356,6 +356,14 @@
           >
             {{ cancelling ? "Membatalkan..." : "Batalkan Pesanan" }}
           </button>
+          <button
+            v-if="order?.status === 'delivered'"
+            class="w-full py-3 mt-2 text-sm font-semibold text-white transition bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50"
+            :disabled="completing"
+            @click="handleComplete"
+          >
+            {{ completing ? "Memproses..." : "Pesanan Diterima (Selesai)" }}
+          </button>
         </div>
       </template>
     </div>
@@ -369,7 +377,7 @@ import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useToast } from "vue-toastification";
-import { getCustomerOrderDetail, cancelOrder } from "@/services/api/order";
+import { getCustomerOrderDetail, cancelOrder, completeOrder } from "@/services/api/order";
 import { createOrderInvoice, verifyOrderPayment } from "@/services/api/payment";
 import echo from "@/libs/echo";
 
@@ -392,6 +400,7 @@ const loading = ref(true);
 const rawOrder = ref(null);
 const cancelling = ref(false);
 const paying = ref(false);
+const completing = ref(false);
 let orderChannel = null;
 
 const trackLineStyle = computed(() => {
@@ -654,6 +663,20 @@ async function handleCancel() {
     toast.error(e.response?.data?.message || "Gagal membatalkan pesanan");
   } finally {
     cancelling.value = false;
+  }
+}
+
+async function handleComplete() {
+  if (completing.value) return;
+  completing.value = true;
+  try {
+    await completeOrder(orderId.value);
+    toast.success("Pesanan berhasil diselesaikan");
+    await fetchOrder();
+  } catch (e) {
+    toast.error(e.response?.data?.message || "Gagal menyelesaikan pesanan");
+  } finally {
+    completing.value = false;
   }
 }
 

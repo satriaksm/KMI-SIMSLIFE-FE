@@ -11,6 +11,7 @@ import {
 } from "@/services/api/order";
 import { useToast } from "vue-toastification";
 import echo from "@/libs/echo";
+import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -297,6 +298,14 @@ function getNextStatus() {
     case "responsed":
       return "delivered";
     case "delivered":
+      const isPickup = rawOrder.value?.delivery_type === 'pickup';
+      const isCOD = rawOrder.value?.payment_method === 'COD';
+      
+      // Untuk pesanan delivery non-COD, penjual tidak bisa menyelesaikan pesanan.
+      // Hanya pembeli yang bisa menyelesaikan via tombol "Pesanan Diterima".
+      if (!isPickup && !isCOD) {
+        return null;
+      }
       return "completed";
     default:
       return null;
@@ -826,53 +835,41 @@ function leaveOrderChannel(id) {
     <!-- ======================== -->
     <!-- CONFIRM MODAL            -->
     <!-- ======================== -->
-    <transition
-      enter-active-class="transition-opacity duration-200"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-opacity duration-200"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
+    <ResponsiveModal
+      v-model:show="showConfirmModal"
+      title="Konfirmasi Tindakan"
+      subtitle="Apakah Anda yakin ingin mengubah status pesanan ini?"
+      :showFooter="true"
     >
-      <div
-        v-if="showConfirmModal"
-        class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center bg-black/50"
-        @click.self="showConfirmModal = false"
-      >
-        <div class="w-full max-w-sm p-6 bg-white shadow-xl rounded-2xl">
-          <div class="flex items-center gap-3 mb-4">
-            <div
-              class="flex items-center justify-center w-10 h-10 rounded-full bg-merchant-primary/10"
-            >
-              <i class="pi pi-check-circle text-merchant-primary"></i>
-            </div>
-            <h3 class="text-base font-semibold text-gray-800">
-              Konfirmasi Tindakan
-            </h3>
-          </div>
-          <p class="mb-6 text-sm text-gray-600">
-            Apakah Anda yakin ingin mengubah status pesanan ini?
-          </p>
-          <div class="flex gap-3">
-            <button
-              type="button"
-              @click="showConfirmModal = false"
-              class="flex-1 py-2.5 text-sm font-semibold border border-gray-300 rounded-xl hover:bg-gray-50 transition"
-            >
-              Batal
-            </button>
-            <button
-              type="button"
-              @click="confirmAction"
-              :disabled="actionLoading"
-              class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition disabled:opacity-50"
-            >
-              {{ actionLoading ? "Memproses..." : "Ya, Konfirmasi" }}
-            </button>
-          </div>
+      <div class="flex items-center gap-4 py-2">
+        <div class="flex items-center justify-center w-12 h-12 rounded-full shrink-0 bg-merchant-primary/10">
+          <i class="text-xl pi pi-check-circle text-merchant-primary"></i>
         </div>
+        <p class="text-sm text-gray-600">
+          Tindakan ini akan memperbarui status pesanan dan dapat mengirimkan notifikasi ke pelanggan.
+        </p>
       </div>
-    </transition>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            @click="showConfirmModal = false"
+            class="flex-1 py-2.5 text-sm font-semibold border border-gray-300 rounded-xl hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            @click="confirmAction"
+            :disabled="actionLoading"
+            class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition disabled:opacity-50"
+          >
+            {{ actionLoading ? "Memproses..." : "Ya, Konfirmasi" }}
+          </button>
+        </div>
+      </template>
+    </ResponsiveModal>
   </div>
 </template>
 

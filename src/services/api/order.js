@@ -33,6 +33,13 @@ export function cancelOrder(orderId) {
   return api.post(`/api/orders/${orderId}/cancel`);
 }
 
+/**
+ * Complete order (customer)
+ */
+export function completeOrder(orderId) {
+  return api.post(`/api/orders/${orderId}/complete`);
+}
+
 // ========================
 // MERCHANT
 // ========================
