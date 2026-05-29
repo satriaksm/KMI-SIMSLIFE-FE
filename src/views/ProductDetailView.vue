@@ -1,5 +1,5 @@
 <template>
-  <div class="pb-16 bg-gray-50 sm:pb-4">
+  <div class="pb-16 bg-gray-50 sm:pb-20">
     <!-- Header dengan tombol close (Hidden - replaced by floating button) -->
     <div
       class="sticky top-0 z-50 hidden bg-white border-b border-gray-200 sm:hidden"
@@ -1218,6 +1218,7 @@ import { useToast } from "vue-toastification";
 import { useCartStore } from "@/stores/cart";
 import { useAuthStore } from "@/stores/auth";
 import { useCart } from "@/composables/useCart";
+import echo from "@/libs/echo";
 const { addToCart: addCart, loading: loadingCart, fetchCartCount } = useCart();
 const authStore = useAuthStore();
 const isAdmin = computed(() => authStore.isAdmin);
@@ -1376,6 +1377,7 @@ const isMouseDown = ref(false);
 const mouseStartX = ref(0);
 const mouseDeltaX = ref(0);
 const swipeThreshold = 50;
+let inventoryChannel = null;
 
 let abortController = null;
 
@@ -1887,6 +1889,60 @@ onMounted(async () => {
     await cartStore.fetchCartCount(true);
   }
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", handleScroll);
+});
+
+watch(
+  () => product.value?.id,
+  (next, prev) => {
+    if (prev) {
+      leaveInventoryChannel(prev);
+    }
+    if (next) {
+      subscribeInventoryChannel(next);
+    }
+  },
+);
+
+onUnmounted(() => {
+  if (product.value?.id) {
+    leaveInventoryChannel(product.value.id);
+  }
+});
+
+function subscribeInventoryChannel(productId) {
+  if (!productId) return;
+
+  inventoryChannel = echo.channel(`products.${productId}`);
+  inventoryChannel.listen(".inventory.stock.updated", (payload) => {
+    if (!payload || Number(payload.product_id) !== Number(productId)) {
+      return;
+    }
+
+    const variantId = Number(payload.variant_id);
+    const stockValue = Number(payload.stock ?? 0);
+    const idx = stockCombinations.value.findIndex(
+      (c) => Number(c.product_variant_id) === variantId,
+    );
+
+    if (idx >= 0) {
+      stockCombinations.value[idx] = {
+        ...stockCombinations.value[idx],
+        stock: stockValue,
+      };
+    }
+
+    validateQuantity();
+  });
+}
+
+function leaveInventoryChannel(productId) {
+  if (!productId) return;
+  echo.leave(`products.${productId}`);
+  inventoryChannel = null;
+}
 watch(product, (p) => {
   if (!p) return;
 
@@ -2046,11 +2102,13 @@ function buyNow() {
   const productVariantId = matchedCombo.product_variant_id;
 
   checkout.setFromProductDetail({
+    productId: product.value?.id ?? null,
     slug: product.value?.slug,
     title: product.value?.name,
     image: selectedImage.value || productImages.value?.[0] || "",
     store: {
       id: store.id ?? null,
+      merchantId: store.id ?? null,
       slug: store.slug ?? null,
       name: store.name ?? "",
       address: merchantAddress,

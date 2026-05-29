@@ -39,17 +39,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import OrderCard from "@/components/customer/OrderCard.vue";
 import { getCustomerOrders } from "@/services/api/order";
+import { createOrderInvoice } from "@/services/api/payment";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/auth";
+import echo from "@/libs/echo";
 
 const router = useRouter();
 const toast = useToast();
 const loading = ref(false);
+const authStore = useAuthStore();
+const userId = computed(() => authStore.user?.id);
+let ordersChannel = null;
 
 const pendingStatusProps = {
   variant: "payment",
@@ -71,6 +77,13 @@ function formatDateLabel(dateStr) {
   });
 }
 
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+}
+
 function mapOrder(o) {
   return {
     id: o.id,
@@ -79,11 +92,16 @@ function mapOrder(o) {
     status: "pending_payment",
     total: o.gross_amount,
     items: (o.items || []).map((it) => ({
+      id: it.id,
       title: it.product_name_snapshot || "Produk",
       qty: it.quantity,
       variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
       price: it.unit_price_snapshot,
-      imageUrl: it.image_snapshot_path || null,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
     _raw: o,
   };
@@ -97,7 +115,17 @@ async function fetchPendingOrders() {
       per_page: 100,
     });
     const list = res?.data ?? res ?? [];
-    orders.value = (Array.isArray(list) ? list : []).map(mapOrder);
+    const transferOnlyList = (Array.isArray(list) ? list : []).filter(o => {
+      // Exclude COD orders (they don't need payment)
+      if (o.payment_method === 'COD') return false;
+      
+      if (o.payment && o.payment.expired_at) {
+        const expireTime = new Date(o.payment.expired_at).getTime();
+        if (new Date().getTime() > expireTime) return false;
+      }
+      return true;
+    });
+    orders.value = transferOnlyList.map(mapOrder);
   } catch (e) {
     console.error("Gagal memuat pesanan pending:", e);
     toast.error("Gagal memuat pesanan");
@@ -117,20 +145,67 @@ function openOrder(order) {
     .catch(() => router.push(`/orders/${order.id}`));
 }
 
-function pay(order) {
-  // Redirect to Midtrans payment if snap URL exists, otherwise go to detail
-  const snapUrl = order._raw?.midtrans?.redirect_url;
-  if (snapUrl) {
-    window.location.href = snapUrl;
-  } else {
-    toast.info("Silakan hubungi admin untuk melanjutkan pembayaran");
-    openOrder(order);
+async function pay(order) {
+  try {
+    const { data } = await createOrderInvoice(order.id);
+    const payload = data?.data ?? data;
+    const invoiceUrl = payload?.invoice_url;
+
+    if (!invoiceUrl) {
+      toast.warning("Invoice belum tersedia. Coba lagi sebentar.");
+      openOrder(order);
+      return;
+    }
+
+    window.location.href = invoiceUrl;
+  } catch (e) {
+    console.error("Gagal membuat invoice:", e);
+    toast.error(
+      e?.response?.data?.message ||
+        "Gagal membuka pembayaran. Silakan coba lagi.",
+    );
   }
 }
 
 onMounted(() => {
   fetchPendingOrders();
+  subscribeOrdersChannel();
 });
+
+onUnmounted(() => {
+  leaveOrdersChannel(userId.value);
+});
+
+watch(userId, (next, prev) => {
+  if (prev) {
+    leaveOrdersChannel(prev);
+  }
+  if (next) {
+    subscribeOrdersChannel();
+  }
+});
+
+function subscribeOrdersChannel() {
+  if (!userId.value) return;
+
+  ordersChannel = echo.private(`users.${userId.value}.orders`);
+  ordersChannel
+    .listen(".order.created", () => {
+      fetchPendingOrders();
+    })
+    .listen(".order.status.updated", () => {
+      fetchPendingOrders();
+    })
+    .listen(".payment.status.updated", () => {
+      fetchPendingOrders();
+    });
+}
+
+function leaveOrdersChannel(id) {
+  if (!id) return;
+  echo.leave(`users.${id}.orders`);
+  ordersChannel = null;
+}
 </script>
 
 <style scoped>

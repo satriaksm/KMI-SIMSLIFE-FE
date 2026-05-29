@@ -5,7 +5,7 @@ import api from "@/libs/axios";
 // ========================
 
 /**
- * Checkout product from cart -> create order + get Midtrans snap token
+ * Checkout product from cart -> create order + Xendit invoice metadata
  */
 export function checkoutProductFromCart(payload) {
   return api.post("/api/orders/products/checkout", payload);

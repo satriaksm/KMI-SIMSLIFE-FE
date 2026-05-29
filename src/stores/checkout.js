@@ -14,6 +14,7 @@ export const useCheckoutStore = defineStore("checkout", {
      * =============== SINGLE PRODUCT MODE =================
      * ===================================================== */
     productSlug: null,
+    productId: null,
     productTitle: null,
     productImage: null,
 
@@ -58,6 +59,8 @@ export const useCheckoutStore = defineStore("checkout", {
      * ===================================================== */
     store: {
       id: null,
+      merchantId: null,
+      cartId: null,
       slug: null,
       name: null,
       address: null,
@@ -107,11 +110,14 @@ export const useCheckoutStore = defineStore("checkout", {
       this.from = "product";
 
       this.productSlug = payload.slug ?? null;
+      this.productId = payload.productId ?? null;
       this.productTitle = payload.title ?? null;
       this.productImage = payload.image ?? null;
 
       this.store = {
         id: payload.store?.id ?? null,
+        merchantId: payload.store?.merchantId ?? payload.store?.id ?? null,
+        cartId: payload.store?.cartId ?? null,
         slug: payload.store?.slug ?? null,
         name: payload.store?.name ?? null,
         address: payload.store?.address ?? null,
@@ -136,8 +142,9 @@ export const useCheckoutStore = defineStore("checkout", {
 
       const addons = Array.isArray(payload.addons) ? payload.addons : [];
       this.selectedAddons = addons.map((a) => ({
-        id: a.addon_id,
-        name: a.name,
+        id: a.addon_id ?? a.id ?? null,
+        groupId: a.addon_group_id ?? a.group_id ?? null,
+        name: a.name ?? "",
         price: Number(a.price || 0),
       }));
 
@@ -157,7 +164,9 @@ export const useCheckoutStore = defineStore("checkout", {
       this.from = "cart";
 
       this.store = {
-        id: payload.store?.id ?? null,
+        id: payload.store?.merchantId ?? null,
+        merchantId: payload.store?.merchantId ?? null,
+        cartId: payload.store?.cartId ?? null,
         slug: payload.store?.slug ?? null,
         name: payload.store?.name ?? null,
         address: payload.store?.address ?? null,
@@ -175,7 +184,7 @@ export const useCheckoutStore = defineStore("checkout", {
         size: item.size ?? "",
         addons: Array.isArray(item.addons)
           ? item.addons.map((a) => ({
-              name: a.label,
+              name: a.name ?? a.label ?? "",
               price: Number(a.price || 0),
             }))
           : [],
@@ -183,6 +192,7 @@ export const useCheckoutStore = defineStore("checkout", {
 
       // reset single product state
       this.productSlug = null;
+      this.productId = null;
       this.productTitle = null;
       this.productImage = null;
       this.qty = 1;
@@ -228,8 +238,9 @@ export const useCheckoutStore = defineStore("checkout", {
     setAddons(addons) {
       const list = Array.isArray(addons) ? addons : [];
       this.selectedAddons = list.map((a) => ({
-        id: a.id,
-        name: a.name,
+        id: a.id ?? a.addon_id ?? null,
+        groupId: a.groupId ?? a.addon_group_id ?? a.group_id ?? null,
+        name: a.name ?? a.label ?? "",
         price: Number(a.price || 0),
       }));
       this.addonTotal = this.selectedAddons.reduce(
@@ -250,11 +261,14 @@ export const useCheckoutStore = defineStore("checkout", {
       this.cartItems = [];
 
       this.productSlug = null;
+      this.productId = null;
       this.productTitle = null;
       this.productImage = null;
 
       this.store = {
         id: null,
+        merchantId: null,
+        cartId: null,
         slug: null,
         name: null,
         address: null,

@@ -28,6 +28,7 @@
     "playwright": "^1.58.1",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
+    "pusher-js": "^8.4.0",
     "vee-validate": "^4.15.1",
     "vue": "^3.5.22",
     "vue-multiselect": "^3.4.0",
@@ -35,6 +36,9 @@
     "vue-toastification": "2.0.0-rc.5",
     "vue3-apexcharts": "^1.10.0",
     "vue3-carousel": "^0.17.0",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1",
     "workbox-window": "^7.3.0",
     "yup": "^1.7.1"
   },

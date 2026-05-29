@@ -1376,7 +1376,10 @@ const checkoutFromCart = (storeId) => {
 
   checkoutStore.setFromCart({
     store: {
-      id: store.id,
+      id: store.merchantId ?? null,
+      merchantId: store.merchantId ?? null,
+      cartId: store.cartId ?? store.id ?? null,
+      slug: store.slug ?? null,
       name: store.name,
       address: store.address,
       phone: store.phone,

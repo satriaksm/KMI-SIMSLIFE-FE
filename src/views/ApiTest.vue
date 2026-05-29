@@ -16,10 +16,7 @@ onMounted(async () => {
     //   "/api/products/kopi-arabica-premium-8xha9",
     //   {}
     // );
-    const response = await api.get(
-      `/api/public/merchants/one-more-light-oMwnA/products`,
-      {}
-    );
+    const response = await api.get(`/api/banks`, {});
     // const response = await api.get("/api/public/search-merchants", {
     //   params: {
     //     q: "a",

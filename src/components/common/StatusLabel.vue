@@ -71,6 +71,7 @@ const statusConfigs = {
     pending: { label: "Menunggu", class: "bg-warning-background text-warning-foreground", icon: "pi-clock" },
     processing: { label: "Diproses", class: "bg-blue-100 text-blue-700", icon: "pi-sync" },
     ready: { label: "Siap Diambil", class: "bg-purple-100 text-purple-700", icon: "pi-check" },
+    shipped: { label: "Sedang Diantar", class: "bg-amber-100 text-amber-700", icon: "pi-truck" },
     completed: { label: "Selesai", class: "bg-success-background text-success-foreground", icon: "pi-check-circle" },
     cancelled: { label: "Dibatalkan", class: "bg-danger-background text-danger-foreground", icon: "pi-times-circle" },
     refunded: { label: "Refund", class: "bg-gray-100 text-gray-700", icon: "pi-replay" },

@@ -3,6 +3,15 @@
     <MobileHeader title="Rincian Pesananmu" @back="goBack" variant="primary" />
 
     <div class="px-4 py-2 mx-auto space-y-2 max-w-7xl sm:py-4 sm:space-y-4">
+      <!-- Verifying payment banner -->
+      <div
+        v-if="verifying"
+        class="flex items-center gap-3 p-4 text-sm font-medium text-blue-800 bg-blue-50 border border-blue-200 rounded-2xl"
+      >
+        <i class="pi pi-spin pi-spinner text-blue-600 text-lg shrink-0"></i>
+        <span>Mengkonfirmasi pembayaran Anda... Mohon tunggu sebentar.</span>
+      </div>
+
       <!-- Loading -->
       <div v-if="loading" class="py-16 text-center">
         <i class="text-2xl pi pi-spin pi-spinner text-primary"></i>
@@ -21,8 +30,37 @@
       </div>
 
       <template v-else>
+        <!-- Cancelled banner -->
+        <div v-if="order.status === 'cancelled'" class="flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-2xl mb-4">
+          <i class="text-xl text-red-500 pi pi-times-circle shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Pesanan Dibatalkan</p>
+            <p v-if="order.meta.note" class="text-xs text-red-500 mt-0.5">
+              {{ order.meta.note }}
+            </p>
+          </div>
+        </div>
+
         <!-- Status header -->
-        <div class="p-4 bg-white border border-gray-200 rounded-2xl">
+        <div v-if="order.status !== 'cancelled'" class="p-4 bg-white border border-gray-200 rounded-2xl">
+          <!-- Countdown konfirmasi UMKM -->
+          <div
+            v-if="confirmCountdownText && (order.status === 'paid' || (order.status === 'pending' && order.meta.payment_method === 'COD'))"
+            class="mb-4 p-3 rounded-xl"
+            :class="isConfirmExpired ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'"
+          >
+            <div v-if="isConfirmExpired" class="flex items-center gap-2">
+              <i class="pi pi-clock text-red-500"></i>
+              <span class="text-sm font-semibold text-red-700">Batas waktu konfirmasi UMKM habis. Pesanan akan dibatalkan.</span>
+            </div>
+            <div v-else class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-clock text-amber-600"></i>
+                <span class="text-xs text-amber-700">Menunggu konfirmasi UMKM</span>
+              </div>
+              <span class="text-sm font-bold text-amber-700 font-mono">{{ confirmCountdownText }}</span>
+            </div>
+          </div>
           <!-- Tracking row -->
           <div class="relative flex items-start">
             <!-- Background track -->
@@ -39,7 +77,7 @@
             <div
               v-for="s in order.tracking"
               :key="s.key"
-              class="relative z-10 flex flex-col items-center flex-1 gap-2"
+              class="relative z-0 flex flex-col items-center flex-1 gap-2"
             >
               <div
                 class="flex items-center justify-center text-sm border rounded-full w-9 h-9"
@@ -69,41 +107,76 @@
         <!-- Pickup & delivery -->
         <div class="p-4 bg-white border border-gray-200 rounded-2xl">
           <div class="space-y-4">
-            <div class="flex items-start gap-3">
-              <div
-                class="w-2 h-2 mt-1 rounded-full bg-danger-foreground shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="text-xs text-muted-foreground">Diambil dari</div>
-                <div class="text-sm font-extrabold text-black truncate">
-                  {{ order.pickup.place }}
+            <template v-if="order.meta.delivery_type === 'pickup'">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" />
+                  <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+                  </svg>
                 </div>
-                <div class="text-sm text-muted-foreground">
-                  {{ order.pickup.address }}
+                <div class="flex-1 min-w-0 mt-1">
+                  <div class="text-xs text-muted-foreground">Ambil langsung dari</div>
+                  <div class="text-sm font-extrabold text-black truncate">
+                    {{ order.pickup.place }}
+                  </div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ order.pickup.address }}
+                  </div>
+                  <div class="mt-2" v-if="order.pickup.phone">
+                    <a
+                      :href="`https://wa.me/${order.pickup.phone.replace(/^0/, '62')}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                    >
+                      <i class="pi pi-whatsapp" />
+                      Hubungi UMKM
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
+            <template v-else>
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" />
+                  <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0 mt-1">
+                  <div class="text-xs text-muted-foreground">Diambil dari</div>
+                  <div class="text-sm font-extrabold text-black truncate">
+                    {{ order.pickup.place }}
+                  </div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ order.pickup.address }}
+                  </div>
+                  <div class="mt-2" v-if="order.pickup.phone">
+                    <a
+                      :href="`https://wa.me/${order.pickup.phone.replace(/^0/, '62')}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                    >
+                      <i class="pi pi-whatsapp" />
+                      Hubungi UMKM
+                    </a>
+                  </div>
+                </div>
+              </div>
 
-            <div class="flex items-start gap-3">
-              <div
-                class="w-2 h-2 mt-1 rounded-full bg-success-foreground shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="text-xs text-muted-foreground">Diantar ke</div>
-                <div class="text-sm text-muted-foreground">
-                  {{ order.dropoff.address }}
-                </div>
-                <div class="mt-2">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-2 text-sm font-bold text-primary"
-                  >
-                    <i class="pi pi-image" />
-                    Bukti Pengiriman
-                  </button>
+              <div class="flex items-start gap-3 mt-4">
+                <div class="w-2 h-2 mt-1 rounded-full bg-success-foreground shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs text-muted-foreground">Diantar ke</div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ order.dropoff.address }}
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
 
@@ -128,14 +201,18 @@
                   :alt="it.title"
                   class="object-cover w-full h-full"
                   loading="lazy"
+                  crossorigin="use-credentials"
                 />
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-bold leading-tight text-black">
-                  <span :class="it.tag ? '' : ''">{{ it.title }}</span>
+                  <span>{{ it.title }}</span>
                 </div>
-                <div v-if="it.note" class="mt-1 text-xs text-muted-foreground">
-                  {{ it.note }}
+                <div v-if="it.variant" class="mt-1 text-xs text-muted-foreground">
+                  {{ it.variant }}
+                </div>
+                <div v-if="it.addons && it.addons.length" class="mt-0.5 text-xs text-muted-foreground">
+                  <span class="text-primary">+</span> {{ it.addons.map(a => a.name).join(', ') }}
                 </div>
                 <div class="mt-1 text-xs text-muted-foreground">
                   {{ it.qty }} x
@@ -165,7 +242,7 @@
                 </div>
               </div>
 
-              <div class="flex items-center justify-between text-xs">
+              <div v-if="order.amounts.discount > 0" class="flex items-center justify-between text-xs">
                 <div class="text-muted-foreground">Voucher Diskon</div>
                 <div class="text-muted-foreground">
                   -Rp {{ formatIDR(order.amounts.discount) }}
@@ -176,6 +253,13 @@
                 <div class="text-muted-foreground">Biaya Pengiriman</div>
                 <div class="text-muted-foreground">
                   Rp {{ formatIDR(order.amounts.delivery_fee) }}
+                </div>
+              </div>
+
+              <div v-if="order.amounts.platform_fee > 0" class="flex items-center justify-between text-xs">
+                <div class="text-muted-foreground">Biaya Layanan/Admin</div>
+                <div class="text-muted-foreground">
+                  Rp {{ formatIDR(order.amounts.platform_fee) }}
                 </div>
               </div>
 
@@ -239,13 +323,33 @@
                 {{ order.meta.payment_method }}
               </div>
             </div>
+
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-xs text-muted-foreground">Metode Pengiriman</div>
+              <div class="text-xs font-semibold text-black">
+                {{ order.meta.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)' }}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="py-3 mx-auto max-w-7xl">
-          <Button block @click="orderAgain">Pesan lagi</Button>
+        <div v-if="order.status !== 'cancelled'" class="py-3 mx-auto max-w-7xl">
+          <div v-if="order?.status === 'pending' && isPaymentExpired" class="mb-3 text-center text-sm font-semibold text-red-600 bg-red-50 py-2 rounded-xl">
+            Waktu pembayaran telah habis.
+          </div>
+          <div v-else-if="order?.status === 'pending' && countdownText" class="mb-3 text-center text-sm font-medium text-amber-700 bg-amber-50 py-2 rounded-xl">
+            Sisa waktu pembayaran: <span class="font-bold">{{ countdownText }}</span>
+          </div>
           <button
-            v-if="order?.status === 'pending' || order?.status === 'responsed'"
+            v-if="order?.status === 'pending' && order?.meta?.payment_method !== 'COD'"
+            class="w-full py-3 mb-2 text-sm font-semibold text-white transition rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50"
+            :disabled="paying || isPaymentExpired"
+            @click="handlePayNow"
+          >
+            {{ paying ? "Mengarahkan..." : "Bayar Sekarang" }}
+          </button>
+          <button
+            v-if="order?.status === 'pending' && order?.payment_method?.toUpperCase() === 'COD'"
             class="w-full py-3 mt-2 text-sm font-semibold text-red-600 transition bg-red-50 rounded-xl hover:bg-red-100 disabled:opacity-50"
             :disabled="cancelling"
             @click="handleCancel"
@@ -259,13 +363,25 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useToast } from "vue-toastification";
 import { getCustomerOrderDetail, cancelOrder } from "@/services/api/order";
+import { createOrderInvoice, verifyOrderPayment } from "@/services/api/payment";
+import echo from "@/libs/echo";
+
+// Countdown timer for payment
+const countdownText = ref("");
+const isPaymentExpired = ref(false);
+let timer = null;
+
+// Countdown timer for UMKM confirmation
+const confirmCountdownText = ref("");
+const isConfirmExpired = ref(false);
+let confirmTimer = null;
 
 const route = useRoute();
 const router = useRouter();
@@ -275,6 +391,8 @@ const orderId = computed(() => String(route.params.orderId || ""));
 const loading = ref(true);
 const rawOrder = ref(null);
 const cancelling = ref(false);
+const paying = ref(false);
+let orderChannel = null;
 
 const trackLineStyle = computed(() => {
   if (!order.value?.tracking) return {};
@@ -299,8 +417,11 @@ const order = computed(() => {
   if (!o) return null;
 
   const status = o.status;
+  const isCOD = o.payment_method === 'COD';
+
+  // Untuk COD, skip step "Pembayaran Diterima" (langsung done)
   const trackingMap = {
-    pending: [true, false, false, false, false],
+    pending: isCOD ? [true, true, false, false, false] : [true, false, false, false, false],
     paid: [true, true, false, false, false],
     responsed: [true, true, true, false, false],
     delivered: [true, true, true, true, false],
@@ -308,6 +429,7 @@ const order = computed(() => {
     cancelled: [false, false, false, false, false],
   };
   const dones = trackingMap[status] || [false, false, false, false, false];
+  const merchantAddressObj = o.merchant?.primary_address || o.merchant?.primaryAddress;
 
   return {
     id: o.id,
@@ -334,16 +456,26 @@ const order = computed(() => {
       },
       {
         key: "shipped",
-        icon: "pi-truck",
+        icon: o.delivery_type === "pickup" ? "pi-map-marker" : "pi-truck",
         done: dones[3],
-        label: "Sedang\nDiantar",
+        label: o.delivery_type === "pickup" ? "Siap\nDiambil" : "Sedang\nDiantar",
       },
       { key: "home", icon: "pi-home", done: dones[4], label: "Selesai" },
     ],
 
     pickup: {
       place: o.merchant?.name || "Toko",
-      address: o.merchant?.address || "Alamat toko",
+      address: merchantAddressObj 
+        ? [
+            merchantAddressObj.detail,
+            merchantAddressObj.village?.name,
+            merchantAddressObj.district?.name,
+            merchantAddressObj.city?.name,
+            merchantAddressObj.province?.name
+          ].filter(Boolean).join(", ")
+        : "Alamat toko belum diatur",
+      phone: o.merchant?.phone || null,
+      logoUrl: o.merchant?.logo_url || o.merchant?.logoUrl || null,
     },
 
     dropoff: {
@@ -361,26 +493,33 @@ const order = computed(() => {
     },
 
     items: (o.items || []).map((it) => ({
+      id: it.id,
       title: it.product_name_snapshot || "Produk",
       qty: it.quantity,
-      note: it.product_variant_snapshot || "",
+      variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
       price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
       originalPrice: null,
-      imageUrl: it.image_snapshot_path || null,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
 
     amounts: {
       subtotal: Number(o.subtotal || 0),
       discount: Number(o.discount_total || 0),
       delivery_fee: Number(o.delivery_fee_snapshot || 0),
+      platform_fee: Number(o.platform_fee || 0),
       total: Number(o.gross_amount || 0),
     },
 
     meta: {
-      note: null,
+      note: o.notes || null,
       order_code: o.order_code || "-",
       ordered_at: formatDateTime(o.created_at),
-      payment_method: o.paid_at ? "QRIS" : "COD",
+      payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
+      delivery_type: o.delivery_type || 'delivery',
     },
   };
 });
@@ -399,11 +538,20 @@ function formatDateTime(dateStr) {
   );
 }
 
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+}
+
 async function fetchOrder() {
   loading.value = true;
   try {
     const { data: res } = await getCustomerOrderDetail(orderId.value);
     rawOrder.value = res?.data ?? res ?? null;
+    startCountdown();
+    startConfirmCountdown();
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
     toast.error("Gagal memuat detail pesanan");
@@ -411,6 +559,88 @@ async function fetchOrder() {
   } finally {
     loading.value = false;
   }
+}
+
+function startCountdown() {
+  if (timer) clearInterval(timer);
+  const payment = rawOrder.value?.payment;
+  // If no payment object or already paid or expired_at is missing, stop
+  if (!payment || payment.status === 'PAID' || !payment.expired_at) {
+    isPaymentExpired.value = false;
+    countdownText.value = "";
+    return;
+  }
+
+  const expireTime = new Date(payment.expired_at).getTime();
+
+  timer = setInterval(() => {
+    const now = new Date().getTime();
+    const distance = expireTime - now;
+
+    if (distance < 0) {
+      clearInterval(timer);
+      isPaymentExpired.value = true;
+      countdownText.value = "00:00:00";
+    } else {
+      isPaymentExpired.value = false;
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      countdownText.value = 
+        String(hours).padStart(2, '0') + ":" + 
+        String(minutes).padStart(2, '0') + ":" + 
+        String(seconds).padStart(2, '0');
+    }
+  }, 1000);
+}
+
+/**
+ * Countdown: batas waktu UMKM konfirmasi pesanan.
+ */
+function startConfirmCountdown() {
+  if (confirmTimer) clearInterval(confirmTimer);
+
+  const deadline = rawOrder.value?.confirm_deadline;
+  const status = rawOrder.value?.status;
+
+  // Hanya tampilkan jika menunggu konfirmasi UMKM
+  if (!deadline || !['pending', 'paid'].includes(status)) {
+    confirmCountdownText.value = "";
+    isConfirmExpired.value = false;
+    return;
+  }
+
+  // Transfer pending (belum bayar) — jangan tampilkan
+  if (status === 'pending' && rawOrder.value?.payment_method !== 'COD') {
+    confirmCountdownText.value = "";
+    isConfirmExpired.value = false;
+    return;
+  }
+
+  const expireTime = new Date(deadline).getTime();
+
+  const tick = () => {
+    const now = new Date().getTime();
+    const distance = expireTime - now;
+
+    if (distance < 0) {
+      clearInterval(confirmTimer);
+      isConfirmExpired.value = true;
+      confirmCountdownText.value = "00:00:00";
+    } else {
+      isConfirmExpired.value = false;
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      confirmCountdownText.value =
+        String(hours).padStart(2, '0') + ":" +
+        String(minutes).padStart(2, '0') + ":" +
+        String(seconds).padStart(2, '0');
+    }
+  };
+
+  tick();
+  confirmTimer = setInterval(tick, 1000);
 }
 
 async function handleCancel() {
@@ -424,6 +654,30 @@ async function handleCancel() {
     toast.error(e.response?.data?.message || "Gagal membatalkan pesanan");
   } finally {
     cancelling.value = false;
+  }
+}
+
+async function handlePayNow() {
+  if (paying.value) return;
+  paying.value = true;
+  try {
+    const { data } = await createOrderInvoice(orderId.value);
+    const payload = data?.data ?? data;
+    const invoiceUrl = payload?.invoice_url;
+
+    if (!invoiceUrl) {
+      toast.warning("Invoice belum tersedia. Coba lagi sebentar.");
+      return;
+    }
+
+    window.location.href = invoiceUrl;
+  } catch (e) {
+    toast.error(
+      e?.response?.data?.message ||
+        "Gagal membuka pembayaran. Silakan coba lagi.",
+    );
+  } finally {
+    paying.value = false;
   }
 }
 
@@ -452,5 +706,98 @@ function goBack() {
 
 onMounted(() => {
   fetchOrder();
+  subscribeOrderChannel();
+
+  // Deteksi redirect balik dari Xendit
+  const paymentStatus = route.query?.payment;
+  if (paymentStatus === "success") {
+    verifyPaymentFromXendit();
+  } else if (paymentStatus === "failed") {
+    toast.error("Pembayaran gagal. Silakan coba lagi.");
+  }
 });
+
+/**
+ * Panggil BE untuk verifikasi pembayaran langsung ke Xendit API.
+ * Retry sampai maksimal 5x dengan jeda 3 detik.
+ */
+const verifying = ref(false);
+async function verifyPaymentFromXendit(retryCount = 0) {
+  const MAX_RETRY = 5;
+  const RETRY_DELAY_MS = 3000;
+
+  if (verifying.value) return;
+  verifying.value = true;
+
+  try {
+    const { data: res } = await verifyOrderPayment(orderId.value);
+    const result = res?.data ?? res;
+
+    if (result?.already_paid || result?.order_status === "paid") {
+      toast.success("Pembayaran berhasil! Menunggu konfirmasi dari penjual.");
+      await fetchOrder();
+      return;
+    }
+
+    // Belum paid — retry jika masih ada kesempatan
+    if (retryCount < MAX_RETRY) {
+      toast.info(`Mengkonfirmasi pembayaran... (${retryCount + 1}/${MAX_RETRY})`);
+      setTimeout(() => {
+        verifying.value = false;
+        verifyPaymentFromXendit(retryCount + 1);
+      }, RETRY_DELAY_MS);
+    } else {
+      toast.warning(
+        "Pembayaran belum terkonfirmasi. Mohon tunggu beberapa saat atau cek kembali di halaman pesanan."
+      );
+    }
+  } catch (e) {
+    if (retryCount < MAX_RETRY) {
+      setTimeout(() => {
+        verifying.value = false;
+        verifyPaymentFromXendit(retryCount + 1);
+      }, RETRY_DELAY_MS);
+    } else {
+      toast.error("Gagal memverifikasi pembayaran. Hubungi penjual jika sudah bayar.");
+    }
+  } finally {
+    if (retryCount >= MAX_RETRY || verifying.value) {
+      verifying.value = false;
+    }
+  }
+}
+
+onUnmounted(() => {
+  leaveOrderChannel(orderId.value);
+  if (timer) clearInterval(timer);
+  if (confirmTimer) clearInterval(confirmTimer);
+});
+
+watch(orderId, (next, prev) => {
+  if (prev) {
+    leaveOrderChannel(prev);
+  }
+  if (next) {
+    subscribeOrderChannel();
+  }
+});
+
+function subscribeOrderChannel() {
+  if (!orderId.value) return;
+
+  orderChannel = echo.private(`orders.${orderId.value}`);
+  orderChannel
+    .listen(".order.status.updated", () => {
+      fetchOrder();
+    })
+    .listen(".payment.status.updated", () => {
+      fetchOrder();
+    });
+}
+
+function leaveOrderChannel(id) {
+  if (!id) return;
+  echo.leave(`orders.${id}`);
+  orderChannel = null;
+}
 </script>

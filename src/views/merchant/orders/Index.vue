@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
@@ -13,6 +13,7 @@ import MobilePagination from "@/components/common/MobilePagination.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { getMerchantOrders } from "@/services/api/order";
 import { useToast } from "vue-toastification";
+import echo from "@/libs/echo";
 
 const router = useRouter();
 const route = useRoute();
@@ -24,6 +25,10 @@ const emit = defineEmits(["toggle-sidebar"]);
 const currentMerchantSlug = computed(() =>
   route.params?.merchantSlug ? String(route.params.merchantSlug) : null,
 );
+const currentMerchantId = computed(() => {
+  if (!currentMerchantSlug.value) return null;
+  return authStore.getMerchantBySlug(currentMerchantSlug.value)?.id ?? null;
+});
 
 const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 
@@ -32,15 +37,19 @@ const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 // ========================
 const allOrders = ref([]);
 const ordersLoading = ref(false);
+let ordersChannel = null;
 
-function mapApiStatus(beStatus) {
+function mapApiStatus(beStatus, o) {
   switch (beStatus) {
-    case "pending":
-      return "pending_payment";
     case "paid":
+      return "waiting_review"; // sudah bayar, tunggu konfirmasi UMKM
+    case "pending":
+      if (o.payment_method === 'COD') return "waiting_review"; // COD langsung tunggu konfirmasi
+      return beStatus;
     case "responsed":
-    case "delivered":
       return "processing";
+    case "delivered":
+      return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
       return "completed";
     case "cancelled":
@@ -48,6 +57,13 @@ function mapApiStatus(beStatus) {
     default:
       return beStatus;
   }
+}
+
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
 }
 
 function mapMerchantOrder(o) {
@@ -58,15 +74,22 @@ function mapMerchantOrder(o) {
       name: o.user_name_snapshot || "Pelanggan",
       phone: o.user_phone_snapshot || "-",
     },
-    status: mapApiStatus(o.status),
-    payment_method: o.paid_at ? "QRIS" : "COD",
+    status: mapApiStatus(o.status, o),
+    payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
+    delivery_type: o.delivery_type || 'delivery',
     created_at: o.created_at,
     items: (o.items || []).map((it) => ({
+      id: it.id,
       name: it.product_name_snapshot || "Produk",
+      variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
       qty: it.quantity,
       price: it.unit_price_snapshot,
       subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      image: it.image_snapshot_path || null,
+      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
     amounts: {
       subtotal: Number(o.subtotal || 0),
@@ -119,7 +142,7 @@ useBodyScrollLock(showFilterModal);
 
 const tabs = [
   { key: "all", label: "Semua" },
-  { key: "pending_payment", label: "Menunggu Bayar" },
+  { key: "waiting_review", label: "Konfirmasi" },
   { key: "processing", label: "Diproses" },
   { key: "completed", label: "Selesai" },
   { key: "cancelled", label: "Dibatalkan" },
@@ -136,7 +159,11 @@ const dateOptions = [
 const tabCounts = computed(() => {
   const counts = { all: allOrders.value.length };
   allOrders.value.forEach((o) => {
-    counts[o.status] = (counts[o.status] || 0) + 1;
+    let statusKey = o.status;
+    if (["ready", "shipped"].includes(statusKey)) {
+      statusKey = "processing";
+    }
+    counts[statusKey] = (counts[statusKey] || 0) + 1;
   });
   return counts;
 });
@@ -179,7 +206,11 @@ function isDateInRange(dateStr, range) {
 const filteredOrders = computed(() => {
   let result = allOrders.value;
   if (activeTab.value !== "all") {
-    result = result.filter((o) => o.status === activeTab.value);
+    if (activeTab.value === "processing") {
+      result = result.filter((o) => ["processing", "ready", "shipped"].includes(o.status));
+    } else {
+      result = result.filter((o) => o.status === activeTab.value);
+    }
   }
   const q = query.value.trim().toLowerCase();
   if (q) {
@@ -251,6 +282,7 @@ const tableColumns = [
   { key: "created_at", label: "Tanggal" },
   { key: "amounts.total", label: "Total" },
   { key: "payment_method", label: "Pembayaran" },
+  { key: "delivery_type", label: "Pengiriman" },
   { key: "status", label: "Status" },
   { key: "actions", label: "" },
 ];
@@ -277,16 +309,28 @@ function formatTime(dateStr) {
 }
 function statusProps(status) {
   const map = {
-    pending_payment: {
+    waiting_review: {
       variant: "payment",
       status: "pending",
-      label: "Menunggu Bayar",
+      label: "Perlu Konfirmasi",
       size: "sm",
       showIcon: true,
     },
     processing: {
       variant: "order",
       status: "processing",
+      size: "sm",
+      showIcon: true,
+    },
+    ready: {
+      variant: "order",
+      status: "ready",
+      size: "sm",
+      showIcon: true,
+    },
+    shipped: {
+      variant: "order",
+      status: "shipped",
       size: "sm",
       showIcon: true,
     },
@@ -320,7 +364,43 @@ function goToDetail(order) {
 
 onMounted(() => {
   fetchOrders();
+  subscribeOrdersChannel();
 });
+
+onUnmounted(() => {
+  leaveOrdersChannel(currentMerchantId.value);
+});
+
+watch(currentMerchantId, (next, prev) => {
+  if (prev) {
+    leaveOrdersChannel(prev);
+  }
+  if (next) {
+    subscribeOrdersChannel();
+  }
+});
+
+function subscribeOrdersChannel() {
+  if (!currentMerchantId.value) return;
+
+  ordersChannel = echo.private(`merchants.${currentMerchantId.value}.orders`);
+  ordersChannel
+    .listen(".order.created", () => {
+      fetchOrders();
+    })
+    .listen(".order.status.updated", () => {
+      fetchOrders();
+    })
+    .listen(".payment.status.updated", () => {
+      fetchOrders();
+    });
+}
+
+function leaveOrdersChannel(id) {
+  if (!id) return;
+  echo.leave(`merchants.${id}.orders`);
+  ordersChannel = null;
+}
 </script>
 
 <template>
@@ -466,6 +546,12 @@ onMounted(() => {
                   +{{ item.items.length - 1 }} lainnya
                 </span>
               </div>
+              <div v-if="item.items[0].variant" class="text-xs text-gray-400 truncate">
+                {{ item.items[0].variant }}
+              </div>
+              <div v-if="item.items[0].addons && item.items[0].addons.length" class="text-xs text-gray-400 truncate">
+                + {{ item.items[0].addons.map(a => a.name).join(', ') }}
+              </div>
               <div class="text-xs text-gray-400">
                 {{ item.items.reduce((s, it) => s + it.qty, 0) }} item
               </div>
@@ -491,6 +577,12 @@ onMounted(() => {
 
           <template #cell-payment_method="{ item }">
             <div class="text-sm text-gray-600">{{ item.payment_method }}</div>
+          </template>
+
+          <template #cell-delivery_type="{ item }">
+            <div class="text-sm text-gray-600">
+              {{ item.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}
+            </div>
           </template>
 
           <template #cell-status="{ item }">
@@ -546,19 +638,31 @@ onMounted(() => {
             </div>
             <div class="flex items-center gap-2">
               <i class="text-xs text-gray-400 pi pi-box shrink-0"></i>
-              <span class="text-sm text-gray-600 truncate">
-                {{ order.items[0].name }}
-                <span v-if="order.items.length > 1" class="text-gray-400">
-                  +{{ order.items.length - 1 }} lainnya
+              <div class="flex-1 min-w-0">
+                <span class="text-sm text-gray-600 truncate block">
+                  {{ order.items[0].name }}
+                  <span v-if="order.items.length > 1" class="text-gray-400">
+                    +{{ order.items.length - 1 }} lainnya
+                  </span>
                 </span>
-              </span>
+                <span v-if="order.items[0].variant" class="text-xs text-gray-400 truncate block">
+                  {{ order.items[0].variant }}
+                </span>
+                <span v-if="order.items[0].addons && order.items[0].addons.length" class="text-xs text-gray-400 truncate block">
+                  + {{ order.items[0].addons.map(a => a.name).join(', ') }}
+                </span>
+              </div>
             </div>
             <div class="flex items-center justify-between pt-1">
-              <div class="flex items-center gap-1.5">
-                <i class="text-xs text-gray-400 pi pi-credit-card"></i>
-                <span class="text-xs text-gray-500">{{
-                  order.payment_method
-                }}</span>
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1">
+                  <i class="text-[10px] text-gray-400 pi pi-credit-card"></i>
+                  <span class="text-xs text-gray-500">{{ order.payment_method }}</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <i class="text-[10px] text-gray-400 pi pi-shopping-bag"></i>
+                  <span class="text-xs text-gray-500">{{ order.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}</span>
+                </div>
               </div>
               <span class="text-sm font-bold text-gray-800">
                 Rp {{ formatIDR(order.amounts.total) }}

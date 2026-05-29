@@ -10,7 +10,8 @@ import { useAuthStore } from "@/stores/auth";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import EventCard from "@/components/Card/EventCard.vue";
 import PromoCard from "@/components/Card/PromoCard.vue";
-import 'leaflet/dist/leaflet.css'
+import "leaflet/dist/leaflet.css";
+import { registerSW } from "virtual:pwa-register";
 
 // Minimal waktu splash (ms)
 const MIN_SPLASH_MS = Number(import.meta.env.VITE_SPLASH_MIN_MS || 1000);
@@ -34,6 +35,10 @@ app.component("ProductCard", ProductCard);
 app.component("EventCard", EventCard);
 app.component("PromoCard", PromoCard);
 
+registerSW({
+  immediate: true,
+});
+
 // ✅ Auth initialization moved to App.vue (synchronous from localStorage)
 // Removed async initAuth() to prevent race condition that clears user on page refresh
 // The initializeFromStorage() call in App.vue handles session restoration
@@ -42,16 +47,19 @@ app.component("PromoCard", PromoCard);
 app.mount("#app");
 
 // Wait for router to be ready before hiding splash
-router.isReady().then(() => {
-  const isDesktop = window.matchMedia("(min-width: 640px)").matches;
+router
+  .isReady()
+  .then(() => {
+    const isDesktop = window.matchMedia("(min-width: 640px)").matches;
 
-  if (isDesktop) {
+    if (isDesktop) {
+      hideSplash();
+    } else {
+      const minTimePromise = new Promise((r) => setTimeout(r, MIN_SPLASH_MS));
+      minTimePromise.finally(() => nextTick().then(hideSplash));
+    }
+  })
+  .catch((err) => {
+    console.error("[App] Router failed to initialize:", err);
     hideSplash();
-  } else {
-    const minTimePromise = new Promise((r) => setTimeout(r, MIN_SPLASH_MS));
-    minTimePromise.finally(() => nextTick().then(hideSplash));
-  }
-}).catch((err) => {
-  console.error("[App] Router failed to initialize:", err);
-  hideSplash();
-});
+  });

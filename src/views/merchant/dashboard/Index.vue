@@ -2,15 +2,21 @@
 import { useRoute } from "vue-router";
 import { onMounted, ref, computed, nextTick } from "vue";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
+import Button from "@/components/common/Button.vue";
 import api from "@/libs/axios";
 import Chart from "chart.js/auto";
+import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
 
 const isDev = import.meta.env.DEV;
 const route = useRoute();
 const emit = defineEmits(["toggle-sidebar"]);
 const loading = ref(true);
+const withdrawing = ref(false);
+const showPayoutModal = ref(false);
 const authStore = useAuthStore();
+const toast = useToast();
 
 // ======================
 // STATE
@@ -45,6 +51,9 @@ const breadcrumbItems = computed(() => [
   },
 ]);
 const dashboardStats = ref([]);
+const orderStats = ref(null);
+const walletStats = ref(null);
+
 const statusChart = ref(null);
 const categoryChart = ref(null);
 const STATUS_COLORS = [
@@ -153,6 +162,9 @@ const fetchDashboard = async () => {
 
     const data = response?.data?.data || {};
     const voucherStats = data.voucher_stats || {};
+    
+    orderStats.value = data.order_stats || null;
+    walletStats.value = data.wallet || null;
 
     const label = catalogLabel.value;
     const catalogIcon = isJasaMerchant.value ? "pi pi-briefcase" : "pi pi-box";
@@ -271,6 +283,31 @@ const fetchDashboard = async () => {
   }
 };
 
+const requestPayout = () => {
+  if (!walletStats.value?.balance_withdrawable || walletStats.value.balance_withdrawable < 10000) {
+    toast.error("Saldo yang dapat ditarik minimal Rp 10.000");
+    return;
+  }
+  showPayoutModal.value = true;
+};
+
+const confirmPayout = async () => {
+  try {
+    withdrawing.value = true;
+    const response = await api.post(`/api/merchant/${currentMerchantSlug.value}/payouts`, {
+      amount: walletStats.value.balance_withdrawable
+    });
+    toast.success("Penarikan berhasil diajukan");
+    showPayoutModal.value = false;
+    // Refresh stats
+    await fetchDashboard();
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Gagal mengajukan penarikan");
+  } finally {
+    withdrawing.value = false;
+  }
+};
+
 // ======================
 // LIFECYCLE
 // ======================
@@ -316,9 +353,53 @@ onMounted(fetchDashboard);
 
     <div v-else>
       <!-- ======================
+         PESANAN & KEUANGAN
+      ====================== -->
+      <div class="px-4 mt-2 sm:px-6 sm:mt-6" v-if="orderStats && walletStats">
+        <h2 class="mb-3 text-sm font-semibold text-gray-900">Pesanan & Keuangan</h2>
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div class="flex items-center justify-center w-10 h-10 mb-2 rounded-xl bg-orange-100 text-orange-600">
+              <i class="pi pi-clock"></i>
+            </div>
+            <p class="text-xs text-muted-foreground">Menunggu Konfirmasi</p>
+            <p class="text-xl font-bold text-gray-900">{{ orderStats.pending }}</p>
+          </div>
+          <div class="p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div class="flex items-center justify-center w-10 h-10 mb-2 rounded-xl bg-blue-100 text-blue-600">
+              <i class="pi pi-shopping-bag"></i>
+            </div>
+            <p class="text-xs text-muted-foreground">Pesanan Hari Ini</p>
+            <p class="text-xl font-bold text-gray-900">{{ orderStats.today }}</p>
+          </div>
+          <div class="flex flex-col justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div>
+              <div class="flex items-center justify-center w-10 h-10 mb-2 rounded-xl bg-green-100 text-green-600">
+                <i class="pi pi-wallet"></i>
+              </div>
+              <p class="text-xs text-muted-foreground">Saldo Dapat Ditarik</p>
+              <p class="text-lg font-bold text-gray-900">{{ new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(walletStats.balance_withdrawable) }}</p>
+              <div v-if="walletStats.balance_held > 0" class="mt-1 text-[10px] text-gray-500">
+                Tertahan (24j): {{ new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(walletStats.balance_held) }}
+              </div>
+            </div>
+            <button 
+              @click="requestPayout" 
+              :disabled="withdrawing || walletStats.balance_withdrawable < 10000"
+              class="w-full mt-3 py-1.5 px-3 text-xs font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-colors"
+            >
+              <i v-if="withdrawing" class="pi pi-spinner animate-spin"></i>
+              <span v-else>Tarik Saldo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================
          PRIMARY STATS
     ====================== -->
-      <div class="px-4 mt-2 sm:px-6 sm:mt-6">
+      <div class="px-4 mt-4 sm:px-6 sm:mt-6">
+        <h2 class="mb-3 text-sm font-semibold text-gray-900">Katalog & Produk</h2>
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <div
             v-for="(stat, i) in primaryStats"
@@ -340,7 +421,8 @@ onMounted(fetchDashboard);
       <!-- ======================
          SECONDARY STATS (SCROLL)
     ====================== -->
-      <div class="px-4 mt-4 sm:px-6">
+      <div class="px-4 mt-6 sm:px-6">
+        <h2 class="mb-3 text-sm font-semibold text-gray-900">Voucher & Stok Lainnya</h2>
         <div class="flex gap-3 pb-2 overflow-x-auto scrollbar-hide">
           <div
             v-for="(stat, i) in secondaryStats"
@@ -384,6 +466,50 @@ onMounted(fetchDashboard);
         </div>
       </div>
     </div>
+
+    <!-- Modal Konfirmasi Penarikan -->
+    <ResponsiveModal
+      v-model:show="showPayoutModal"
+      title="Tarik Saldo"
+      @close="showPayoutModal = false"
+    >
+      <div class="p-4 space-y-4">
+        <div class="p-4 rounded-xl bg-green-50 border border-green-100 flex flex-col items-center justify-center">
+          <p class="text-sm text-green-800 mb-1">Nominal Penarikan</p>
+          <p class="text-2xl font-bold text-green-900">
+            {{ new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(walletStats?.balance_withdrawable || 0) }}
+          </p>
+        </div>
+        <div class="px-4 py-3 mt-4 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl">
+          <p class="font-medium">Informasi Penarikan:</p>
+          <ul class="mt-1 ml-4 list-disc space-y-0.5 opacity-90">
+            <li>Biaya admin + VAT (Rp 4.440) akan dipotong dari nominal di atas.</li>
+            <li>Dana yang diterima di bank adalah nominal di atas dikurangi Rp 4.440.</li>
+            <li>Minimal nominal penarikan adalah Rp 14.440.</li>
+          </ul>
+        </div>
+        <p class="text-sm text-gray-600 text-center mt-4">
+          Dana akan ditransfer ke rekening bank yang terdaftar di profil toko Anda. Proses ini mungkin memakan waktu beberapa saat.
+        </p>
+        <div class="flex gap-3 mt-6">
+          <Button
+            variant="muted-outline"
+            @click="showPayoutModal = false"
+            customClass="flex-1"
+          >
+            Batal
+          </Button>
+          <Button
+            variant="primary"
+            @click="confirmPayout"
+            :loading="withdrawing"
+            customClass="flex-1 bg-green-600 hover:bg-green-700 text-white"
+          >
+            Tarik Sekarang
+          </Button>
+        </div>
+      </div>
+    </ResponsiveModal>
   </div>
 </template>
 

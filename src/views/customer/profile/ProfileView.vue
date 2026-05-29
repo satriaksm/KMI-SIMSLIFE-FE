@@ -11,6 +11,12 @@ import { useAuthStore } from "@/stores/auth";
 import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import {
+  getSubscriptionState,
+  subscribePushNotifications,
+  supportsPushNotifications,
+  unsubscribePushNotifications,
+} from "@/services/api/push";
 
 // =========================
 // STATE & REFS
@@ -22,6 +28,9 @@ const authStore = useAuthStore();
 
 const merchantsLoading = ref(false);
 const isLoggingOut = ref(false);
+const pushLoading = ref(false);
+const pushEnabled = ref(false);
+const pushPermission = ref("default");
 
 const imgLoaded = ref(!!userStore.user?.profile_picture);
 const imgError = ref(false);
@@ -63,6 +72,32 @@ const hasAddress = computed(() => {
 const canDeleteAccount = computed(() => {
   return !deletingAccount.value && !!String(deletePassword.value || "").trim();
 });
+
+const pushSupported = computed(() => supportsPushNotifications());
+
+const pushStatusMessage = computed(() => {
+  if (!pushSupported.value) {
+    return "Notifikasi PWA hanya bisa digunakan di HTTPS atau localhost yang aman.";
+  }
+
+  if (pushPermission.value === "denied") {
+    return "Izin notifikasi diblokir di browser. Aktifkan dari pengaturan browser untuk menerima notifikasi.";
+  }
+
+  if (pushEnabled.value) {
+    return "Notifikasi PWA aktif di device ini.";
+  }
+
+  return "Aktifkan notifikasi agar Anda menerima email dan push notification saat status UMKM berubah.";
+});
+
+const pushButtonLabel = computed(() =>
+  pushEnabled.value ? "Matikan Notifikasi PWA" : "Aktifkan Notifikasi PWA",
+);
+
+const canTogglePush = computed(
+  () => pushSupported.value && pushPermission.value !== "denied",
+);
 
 const openDeleteAccountModal = () => {
   deletePassword.value = "";
@@ -146,6 +181,41 @@ const handleDeleteAccount = async () => {
   showDeleteAccountModal.value = false;
   router.push("/auth/login");
 };
+
+const refreshPushStatus = async () => {
+  const state = await getSubscriptionState();
+  pushPermission.value = state.permission;
+  pushEnabled.value = state.enabled;
+};
+
+const togglePushNotifications = async () => {
+  if (!pushSupported.value) {
+    toast.error("Browser ini tidak mendukung notifikasi PWA.");
+    return;
+  }
+
+  pushLoading.value = true;
+
+  try {
+    if (pushEnabled.value) {
+      await unsubscribePushNotifications();
+      toast.success("Notifikasi PWA dimatikan.");
+    } else {
+      await subscribePushNotifications();
+      toast.success("Notifikasi PWA diaktifkan.");
+    }
+
+    await refreshPushStatus();
+  } catch (error) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Gagal mengubah status notifikasi.";
+    toast.error(msg);
+  } finally {
+    pushLoading.value = false;
+  }
+};
 // =========================
 // LIFECYCLE
 // =========================
@@ -156,6 +226,12 @@ onMounted(async () => {
     await userStore.fetchProfile();
   } catch {
     // ignore: error state is handled elsewhere / via UI
+  }
+
+  try {
+    await refreshPushStatus();
+  } catch {
+    // ignore: push state is optional
   }
 
   // Admin tidak perlu memuat data merchant di halaman profil.
@@ -381,6 +457,34 @@ onMounted(async () => {
                 </svg>
               </button>
 
+              <div
+                v-if="pushSupported && pushPermission !== 'denied'"
+                class="flex items-center justify-between w-full p-5 transition-all bg-gray-50 rounded-xl hover:bg-gray-100 group hover:shadow-md"
+              >
+                <div class="flex items-center gap-4">
+                  <div class="p-3 transition-colors bg-white rounded-lg group-hover:bg-primary/10">
+                    <svg class="w-6 h-6 text-gray-500 transition-colors group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.157V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.157c0 .538-.214 1.055-.595 1.438L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span class="font-semibold text-gray-700 group-hover:text-gray-900">Notifikasi Perangkat</span>
+                    <p class="text-xs text-gray-500 mt-0.5">Aktifkan untuk menerima notifikasi pesanan di layar ini</p>
+                  </div>
+                </div>
+                <button
+                  @click="togglePushNotifications"
+                  :disabled="pushLoading"
+                  class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 focus:outline-none"
+                  :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
+                >
+                  <span
+                    class="inline-block w-4 h-4 transition-transform transform bg-white rounded-full"
+                    :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
+                  />
+                </button>
+              </div>
+
               <!-- Accordion for merchant access -->
               <div
                 v-if="authStore.isAdmin"
@@ -510,7 +614,7 @@ onMounted(async () => {
                       />
                     </svg>
                     <span class="flex-1 font-medium text-gray-700"
-                      >Buka Toko Baru</span
+                      >Buka UMKM Baru</span
                     >
                   </button>
                 </div>
@@ -725,6 +829,34 @@ onMounted(async () => {
                 />
               </svg>
             </button>
+
+            <div
+              v-if="pushSupported && pushPermission !== 'denied'"
+              class="flex items-center justify-between w-full p-4 transition-colors bg-gray-50 rounded-xl hover:bg-gray-100 group"
+            >
+              <div class="flex items-center gap-4">
+                <div class="p-2 transition-colors bg-white rounded-lg group-hover:bg-primary/10">
+                  <svg class="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.157V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.157c0 .538-.214 1.055-.595 1.438L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                  </svg>
+                </div>
+                <div>
+                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Notifikasi Perangkat</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">Terima notifikasi PWA</p>
+                </div>
+              </div>
+              <button
+                @click="togglePushNotifications"
+                :disabled="pushLoading"
+                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 focus:outline-none"
+                :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
+              >
+                <span
+                  class="inline-block w-4 h-4 transition-transform transform bg-white rounded-full"
+                  :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
+            </div>
 
             <!-- Accordion for merchant access (mobile) -->
             <div

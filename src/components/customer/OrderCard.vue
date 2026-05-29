@@ -12,8 +12,12 @@
         <div class="text-sm font-bold text-black truncate">
           {{ order.storeName }}
         </div>
-        <div class="text-xs truncate text-muted-foreground">
-          {{ order.dateLabel }}
+        <div class="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <span>{{ order.dateLabel }}</span>
+          <span class="inline-block w-1 h-1 rounded-full bg-gray-300"></span>
+          <span class="font-medium text-primary">
+            {{ order.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}
+          </span>
         </div>
       </div>
 
@@ -39,13 +43,17 @@
               :alt="it.title"
               class="object-cover w-full h-full"
               loading="lazy"
+              crossorigin="use-credentials"
             />
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-black truncate">
               {{ it.title }}
             </div>
-            <div class="text-xs text-muted-foreground">{{ it.variant }}</div>
+            <div v-if="it.variant" class="text-xs text-muted-foreground">{{ it.variant }}</div>
+            <div v-if="it.addons && it.addons.length" class="text-xs text-muted-foreground">
+              <span class="text-primary">+</span> {{ it.addons.map(a => a.name).join(', ') }}
+            </div>
             <div class="text-xs text-muted-foreground">{{ it.qty }}x</div>
           </div>
           <div class="flex items-center text-xs text-muted-foreground">
@@ -133,6 +141,22 @@ const resolvedStatusProps = computed(() => {
     return {
       variant: "order",
       status: "cancelled",
+      size: "sm",
+      showIcon: true,
+    };
+  }
+  if (raw === "ready") {
+    return {
+      variant: "order",
+      status: "ready",
+      size: "sm",
+      showIcon: true,
+    };
+  }
+  if (raw === "shipped") {
+    return {
+      variant: "order",
+      status: "shipped",
       size: "sm",
       showIcon: true,
     };

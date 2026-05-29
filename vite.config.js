@@ -16,6 +16,13 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: "autoUpdate",
         devOptions: { enabled: mode === "development" },
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw.js",
+        injectManifest: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        },
+        includeAssets: ["icon192.png", "icon512.png"],
         manifest: {
           name: "Sumilir",
           short_name: "Sumilir",
@@ -23,8 +30,8 @@ export default defineConfig(({ mode }) => {
           theme_color: "#ff9800",
           background_color: "#ffffff",
           display: "standalone",
-          start_url: "/", // ✅ Root
-          scope: "/", // ✅ Root
+          start_url: "/",
+          scope: "/",
           icons: [
             {
               src: "/icon192.png",
@@ -35,34 +42,6 @@ export default defineConfig(({ mode }) => {
               src: "/icon512.png",
               sizes: "512x512",
               type: "image/png",
-            },
-          ],
-        },
-        workbox: {
-          cleanupOutdatedCaches: true,
-          navigateFallback: "/index.html", // ✅ Root
-          navigateFallbackDenylist: [/^\/api\//], // ✅ Exclude /api/
-          runtimeCaching: [
-            {
-              urlPattern: ({ request, sameOrigin }) =>
-                sameOrigin &&
-                ["style", "script", "image", "font"].includes(
-                  request.destination
-                ),
-              handler: "StaleWhileRevalidate",
-              options: { cacheName: "assets-cache-v1" },
-            },
-            {
-              urlPattern: new RegExp(
-                `^${apiBase.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}/.*`
-              ),
-              handler: "NetworkFirst",
-              method: "GET",
-              options: {
-                cacheName: "api-cache-v1",
-                cacheableResponse: { statuses: [0, 200] },
-                expiration: { maxEntries: 200, maxAgeSeconds: 3600 },
-              },
             },
           ],
         },

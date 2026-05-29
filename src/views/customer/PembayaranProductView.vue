@@ -227,41 +227,44 @@
         <h2 class="mb-3 font-semibold text-gray-800">Ringkasan Pembayaran</h2>
         <div class="space-y-3">
           <div>
-            <div class="mb-2 text-sm text-gray-600">Metode Pembayaran</div>
-            <div class="flex items-center gap-6 text-sm">
-              <label
-                class="flex items-center gap-2"
-                :class="
-                  form.metodePengiriman === 'delivery'
-                    ? 'cursor-not-allowed opacity-50'
-                    : 'cursor-pointer'
-                "
-              >
-                <input
-                  type="radio"
-                  value="COD"
-                  v-model="pay.method"
-                  :disabled="form.metodePengiriman === 'delivery'"
-                  class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E] disabled:cursor-not-allowed"
-                />
-                <span>COD (Cash)</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="QRIS"
-                  v-model="pay.method"
-                  class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-                />
-                <span>QRIS</span>
-              </label>
+            <div class="mb-2 text-sm font-bold text-gray-800">Metode Pembayaran</div>
+            <div class="space-y-4">
+              <div v-for="group in groupedPaymentMethods" :key="group.type">
+                <div class="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">{{ group.title }}</div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label
+                    v-for="method in group.items"
+                    :key="method.id"
+                    class="flex items-start gap-3 p-3 transition-colors border rounded-xl"
+                    :class="[
+                      pay.method === method.id ? 'border-[#FFA30E] bg-orange-50' : 'border-gray-200 cursor-pointer hover:bg-gray-50',
+                      (method.id === 'COD' && form.metodePengiriman === 'delivery') ? 'opacity-50 cursor-not-allowed' : ''
+                    ]"
+                  >
+                    <input
+                      type="radio"
+                      :value="method.id"
+                      v-model="pay.method"
+                      :disabled="method.id === 'COD' && form.metodePengiriman === 'delivery'"
+                      class="mt-1 w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E] disabled:cursor-not-allowed"
+                    />
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                        <i :class="['pi', method.icon, 'text-gray-600']"></i>
+                        {{ method.name }}
+                      </div>
+                      <div class="mt-1 text-[11px] text-gray-500">{{ method.description }}</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
             <p
               v-if="form.metodePengiriman === 'delivery'"
-              class="flex items-start gap-1 mt-2 text-xs text-amber-600"
+              class="flex items-start gap-1 mt-3 text-xs text-amber-600"
             >
               <i class="mt-0.5 pi pi-info-circle"></i>
-              <span>Untuk pengiriman, pembayaran wajib menggunakan QRIS</span>
+              <span>Untuk pengiriman, pembayaran wajib menggunakan non-tunai</span>
             </p>
           </div>
           <div
@@ -305,6 +308,13 @@
                 ></span
               >
               <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
+            </div>
+            <div
+              v-if="platformFee > 0"
+              class="flex justify-between text-xs"
+            >
+              <span>Biaya Layanan/Admin</span>
+              <span>Rp {{ formatIDR(platformFee) }}</span>
             </div>
             <div class="my-2 border-t border-gray-300"></div>
             <div class="flex justify-between text-base font-bold">
@@ -441,6 +451,7 @@ import { useToast } from "vue-toastification";
 import { checkoutProductFromCart } from "@/services/api/order";
 import { getMyAddress } from "@/services/api/address";
 import { calculateShippingCost } from "@/services/api/shipping";
+import { fetchCart as fetchCartApi, addToCart as addToCartApi } from "@/services/api/cart";
 
 const {
   fetchVouchersByMerchant,
@@ -508,11 +519,66 @@ const order = computed(() => {
 
 const amounts = ref({ product: 0, ongkir: 0, diskon: 0 });
 
-const total = computed(() => {
+const paymentMethodsList = [
+  { id: 'COD', name: 'Bayar di Tempat (COD)', type: 'cod', feeType: 'fixed', feeValue: 0, icon: 'pi-money-bill', description: 'Hanya untuk ambil sendiri' },
+  { id: 'QRIS', name: 'QRIS (Gopay, OVO, Dana, dll)', type: 'qris', feeType: 'percent', feeValue: 0.007, icon: 'pi-qrcode', description: 'Biaya admin 0.7%' },
+  { id: 'BCA', name: 'BCA Virtual Account', type: 'va', feeType: 'fixed', feeValue: 4440, icon: 'pi-building', description: 'Biaya admin Rp 4.440' },
+  { id: 'BNI', name: 'BNI Virtual Account', type: 'va', feeType: 'fixed', feeValue: 4440, icon: 'pi-building', description: 'Biaya admin Rp 4.440' },
+  { id: 'BRI', name: 'BRI Virtual Account', type: 'va', feeType: 'fixed', feeValue: 4440, icon: 'pi-building', description: 'Biaya admin Rp 4.440' },
+  { id: 'MANDIRI', name: 'Mandiri Virtual Account', type: 'va', feeType: 'fixed', feeValue: 4440, icon: 'pi-building', description: 'Biaya admin Rp 4.440' },
+  { id: 'SHOPEEPAY', name: 'ShopeePay', type: 'ewallet', feeType: 'percent', feeValue: 0.02, icon: 'pi-wallet', description: 'Biaya admin 2%' },
+  { id: 'OVO', name: 'OVO', type: 'ewallet', feeType: 'percent', feeValue: 0.015, icon: 'pi-wallet', description: 'Biaya admin 1.5%' },
+  { id: 'DANA', name: 'DANA', type: 'ewallet', feeType: 'percent', feeValue: 0.015, icon: 'pi-wallet', description: 'Biaya admin 1.5%' },
+  { id: 'ALFAMART', name: 'Alfamart / Alfamidi', type: 'retail', feeType: 'fixed', feeValue: 5550, icon: 'pi-shopping-bag', description: 'Biaya admin Rp 5.550' },
+];
+
+const groupedPaymentMethods = computed(() => {
+  const groups = [
+    { title: 'Rekomendasi Utama', type: 'recommended', items: [] },
+    { title: 'Transfer Bank (Virtual Account)', type: 'va', items: [] },
+    { title: 'E-Wallet', type: 'ewallet', items: [] },
+    { title: 'Gerai Retail', type: 'retail', items: [] },
+    { title: 'Bayar Tunai', type: 'cod', items: [] },
+  ];
+  
+  paymentMethodsList.forEach(m => {
+    if (m.id === 'QRIS') {
+      groups.find(g => g.type === 'recommended').items.push(m);
+    } else if (m.type === 'va') {
+      groups.find(g => g.type === 'va').items.push(m);
+    } else if (m.type === 'ewallet') {
+      groups.find(g => g.type === 'ewallet').items.push(m);
+    } else if (m.type === 'retail') {
+      groups.find(g => g.type === 'retail').items.push(m);
+    } else if (m.type === 'cod') {
+      groups.find(g => g.type === 'cod').items.push(m);
+    }
+  });
+  
+  return groups.filter(g => g.items.length > 0);
+});
+
+const baseGross = computed(() => {
   const product = Number(amounts.value.product || 0);
   const ongkir = Number(amounts.value.ongkir || 0);
   const diskon = Number(amounts.value.diskon || 0);
   return Math.max(0, product + ongkir - diskon);
+});
+
+const platformFee = computed(() => {
+  const method = paymentMethodsList.find(m => m.id === pay.value.method);
+  if (!method || method.id === 'COD') return 0;
+  
+  if (method.feeType === 'fixed') {
+    return method.feeValue;
+  } else if (method.feeType === 'percent') {
+    return Math.ceil(baseGross.value * method.feeValue);
+  }
+  return 0;
+});
+
+const total = computed(() => {
+  return baseGross.value + platformFee.value;
 });
 
 watch(
@@ -562,6 +628,130 @@ const addresses = ref([]);
 const addressesLoading = ref(false);
 const shippingLoading = ref(false);
 const shippingInfo = ref(null);
+const productModeCartId = ref(null);
+
+function toPositiveInt(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.trunc(n);
+}
+
+function applyCartContext(cart) {
+  const cartId = toPositiveInt(cart?.cart_id ?? cart?.id);
+  const merchantId = toPositiveInt(cart?.merchant?.id ?? cart?.merchant_id);
+  const slug = cart?.merchant?.slug ?? cart?.slug ?? checkout.store?.slug ?? null;
+  const name = cart?.merchant?.name ?? checkout.store?.name ?? null;
+
+  if (merchantId) {
+    checkout.store.id = merchantId;
+    checkout.store.merchantId = merchantId;
+  }
+  if (cartId) {
+    checkout.store.cartId = cartId;
+  }
+  if (slug) {
+    checkout.store.slug = slug;
+  }
+  if (name) {
+    checkout.store.name = name;
+  }
+
+  return {
+    cartId,
+    merchantId,
+    slug,
+  };
+}
+
+async function resolveCartContextFromServer() {
+  try {
+    const { data: res } = await fetchCartApi();
+    const carts = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res)
+        ? res
+        : [];
+
+    if (!carts.length) return null;
+
+    const currentCartId = toPositiveInt(checkout.store?.cartId);
+    const currentMerchantId = toPositiveInt(
+      checkout.store?.merchantId ?? checkout.store?.id,
+    );
+    const currentSlug = String(checkout.store?.slug ?? "").trim();
+
+    const target = carts.find((cart) => {
+      const cartId = toPositiveInt(cart?.cart_id ?? cart?.id);
+      const merchantId = toPositiveInt(cart?.merchant?.id ?? cart?.merchant_id);
+      const slug = String(cart?.merchant?.slug ?? cart?.slug ?? "").trim();
+
+      if (currentCartId && cartId === currentCartId) return true;
+      if (currentMerchantId && merchantId === currentMerchantId) return true;
+      if (currentSlug && slug === currentSlug) return true;
+      return false;
+    });
+
+    if (!target) return null;
+    return applyCartContext(target);
+  } catch (e) {
+    console.error("Gagal sinkron cart context:", e);
+    return null;
+  }
+}
+
+async function ensureCartIdForCheckout() {
+  const existingCartId = toPositiveInt(checkout.store?.cartId);
+
+  if (checkout.from === "cart") {
+    if (existingCartId) return existingCartId;
+    const resolved = await resolveCartContextFromServer();
+    return toPositiveInt(resolved?.cartId);
+  }
+
+  if (checkout.from === "product") {
+    if (existingCartId) {
+      productModeCartId.value = existingCartId;
+      return existingCartId;
+    }
+
+    if (productModeCartId.value) {
+      return productModeCartId.value;
+    }
+
+    const productId = toPositiveInt(checkout.productId);
+    if (!productId) {
+      toast.error("Produk checkout tidak valid. Silakan ulangi dari halaman produk.");
+      return null;
+    }
+
+    const payload = {
+      product_id: productId,
+      quantity: Math.max(1, toPositiveInt(checkout.qty) ?? 1),
+      variant_id: toPositiveInt(checkout.selectedVariantId),
+      addons: (checkout.selectedAddons || [])
+        .map((addon) => ({
+          group_id: toPositiveInt(addon.groupId),
+          addon_id: toPositiveInt(addon.id),
+        }))
+        .filter((addon) => addon.addon_id),
+    };
+
+    await addToCartApi(payload);
+
+    const resolved = await resolveCartContextFromServer();
+    const resolvedCartId = toPositiveInt(resolved?.cartId);
+
+    if (!resolvedCartId) {
+      toast.error("Gagal menemukan keranjang untuk checkout. Silakan coba lagi.");
+      return null;
+    }
+
+    productModeCartId.value = resolvedCartId;
+    return resolvedCartId;
+  }
+
+  return existingCartId;
+}
 
 async function loadAddresses() {
   if (isGuest.value) return;
@@ -612,12 +802,15 @@ watch(
 
 async function fetchShippingCost() {
   if (form.value.metodePengiriman !== "delivery") return;
-  if (!order.value.store?.id) return;
+  const merchantId = toPositiveInt(
+    order.value.store?.merchantId ?? order.value.store?.id,
+  );
+  if (!merchantId) return;
   if (isGuest.value) return;
 
   shippingLoading.value = true;
   try {
-    const payload = { merchant_id: order.value.store.id };
+    const payload = { merchant_id: merchantId };
     if (selectedAddress.value?.id) {
       payload.address_id = selectedAddress.value.id;
     }
@@ -662,6 +855,15 @@ watch(
       const discount = computeDiscount(selectedPromo.value);
       if (discount <= 0) clearPromo();
       else amounts.value.diskon = discount;
+    }
+  },
+);
+
+watch(
+  () => selectedAddress.value?.id,
+  async () => {
+    if (form.value.metodePengiriman === "delivery") {
+      await fetchShippingCost();
     }
   },
 );
@@ -728,10 +930,18 @@ const handleCheckout = async () => {
 
   isSubmitting.value = true;
   try {
+    const cartId = await ensureCartIdForCheckout();
+    if (!cartId) {
+      toast.error("Keranjang tidak valid. Silakan ulangi dari keranjang atau halaman produk.");
+      return;
+    }
+
     const payload = {
-      cart_id: checkout.store?.cartId || null,
+      cart_id: cartId,
       voucher_id: selectedPromo.value?.id || null,
       delivery_type: form.value.metodePengiriman,
+      payment_method: pay.value.method,
+      notes: form.value.catatanProduk,
     };
     if (
       form.value.metodePengiriman === "delivery" &&
@@ -742,21 +952,23 @@ const handleCheckout = async () => {
 
     const { data } = await checkoutProductFromCart(payload);
     const result = data?.data ?? data;
-    const snapUrl = result?.midtrans?.redirect_url;
+    const invoiceUrl = result?.xendit?.invoice_url;
+    const orderId = result?.order?.id;
 
     toast.success("Pesanan berhasil dibuat!");
     checkout.clear();
 
-    if (snapUrl && pay.value.method === "QRIS") {
-      window.location.href = snapUrl;
+    if (invoiceUrl && pay.value.method !== "COD") {
+      // Xendit akan redirect balik ke app setelah bayar (via success_redirect_url)
+      window.location.href = invoiceUrl;
     } else {
-      const orderId = result?.order?.id;
       router.push(
         orderId
           ? { name: "Detail Pesanan", params: { orderId } }
           : { name: "Pesanan Saya" },
       );
     }
+
   } catch (error) {
     console.error("Checkout error:", error);
     toast.error(
@@ -769,11 +981,27 @@ const handleCheckout = async () => {
 
 onMounted(async () => {
   if (checkout.from === "cart") {
-    if (!checkout.store?.id || checkout.cartItems.length === 0) {
+    if (checkout.cartItems.length === 0) {
+      router.replace({ name: "Beranda" });
+      return;
+    }
+
+    const cartId = await ensureCartIdForCheckout();
+    if (!cartId) {
+      toast.error("Checkout tidak valid. Silakan pilih ulang item dari keranjang.");
+      router.replace({ name: "Keranjang" });
+      return;
+    }
+  }
+
+  if (checkout.from === "product") {
+    if (!toPositiveInt(checkout.productId)) {
+      toast.error("Produk checkout tidak valid. Silakan ulang dari halaman produk.");
       router.replace({ name: "Beranda" });
       return;
     }
   }
+
   if (!isGuest.value) {
     await loadAddresses();
     if (order.value.store?.slug)

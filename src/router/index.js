@@ -440,6 +440,14 @@ const routes = [
         component: () => import("@/views/admin/reports/Detail.vue"),
         meta: { title: "Report Detail | Admin SUMILIR" },
       },
+
+      // SETTINGS
+      {
+        path: "settings",
+        name: "Admin - Settings",
+        component: () => import("@/views/admin/settings/Index.vue"),
+        meta: { title: "Platform Settings | Admin SUMILIR" },
+      },
     ],
   },
 

@@ -336,15 +336,14 @@
                 />
               </div>
               <div>
-                <label
-                  class="block mb-2 text-sm font-semibold text-merchant-primary"
-                  >Nama Bank</label
-                >
-                <input
-                  v-model="form.bank_name"
-                  type="text"
-                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-                  placeholder="Contoh: BCA, BRI, Mandiri"
+                <SelectField
+                  name="bank_code"
+                  label="Nama Bank"
+                  v-model="form.bank_code"
+                  :loading="banksLoading"
+                  :disabled="banksLoading"
+                  :options="banks.map((bank) => ({ value: bank.code, label: bank.name }))"
+                  emptyText="Data bank tidak tersedia"
                 />
               </div>
               <div>
@@ -586,15 +585,14 @@
                   />
                 </div>
                 <div>
-                  <label
-                    class="block mb-2 text-base font-medium text-merchant-primary"
-                    >Nama Bank</label
-                  >
-                  <input
-                    v-model="form.bank_name"
-                    type="text"
-                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-                    placeholder="Contoh: BCA, BRI, Mandiri"
+                  <SelectField
+                    name="bank_code"
+                    label="Nama Bank"
+                    v-model="form.bank_code"
+                    :loading="banksLoading"
+                    :disabled="banksLoading"
+                    :options="banks.map((bank) => ({ value: bank.code, label: bank.name }))"
+                    emptyText="Data bank tidak tersedia"
                   />
                 </div>
                 <div>
@@ -850,6 +848,7 @@ import {
   getDistricts,
   getVillages,
 } from "@/services/api/location";
+import { fetchBanks } from "@/services/api/bank";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
@@ -899,7 +898,7 @@ const form = ref({
   province_id: null,
   village_id: null,
   NPWP: "",
-  bank_name: "",
+  bank_code: "",
   bank_account_number: "",
   bank_account_name: "",
   operationalHours: [
@@ -950,11 +949,25 @@ const provincesLoading = ref(false);
 const citiesLoading = ref(false);
 const districtsLoading = ref(false);
 const villagesLoading = ref(false);
+const banksLoading = ref(false);
 
 const provinces = ref([]);
 const cities = ref([]);
 const districts = ref([]);
 const villages = ref([]);
+const banks = ref([]);
+
+async function loadBanks() {
+  banksLoading.value = true;
+  try {
+    banks.value = await fetchBanks();
+  } catch (e) {
+    console.error("Gagal memuat daftar bank:", e);
+    banks.value = [];
+  } finally {
+    banksLoading.value = false;
+  }
+}
 
 watch(
   () => form.value.province_id,
@@ -1087,6 +1100,7 @@ const DAYS = [
 ];
 
 onMounted(async () => {
+  loadBanks();
   isLoading.value = true;
   await loadProvinces();
 
@@ -1126,7 +1140,7 @@ onMounted(async () => {
     form.value.village_id = data?.primary_address?.village_id ?? null;
 
     form.value.NPWP = data?.NPWP ?? "";
-    form.value.bank_name = data?.bank_name ?? "";
+    form.value.bank_code = data?.bank_code ?? "";
     form.value.bank_account_number = data?.bank_account_number ?? "";
     form.value.bank_account_name = data?.bank_account_name ?? "";
 
@@ -1279,7 +1293,7 @@ const handleSave = async () => {
 
     // Tax & bank info
     fd.append("NPWP", form.value.NPWP || "");
-    fd.append("bank_name", form.value.bank_name || "");
+    fd.append("bank_code", form.value.bank_code || "");
     fd.append("bank_account_number", form.value.bank_account_number || "");
     fd.append("bank_account_name", form.value.bank_account_name || "");
 

@@ -117,7 +117,6 @@ const handleDeleteMerchant = async () => {
   deletingMerchant.value = true;
   try {
     await deleteMerchant(merchantSlug.value);
-    toast.success("UMKM berhasil dihapus");
     showDeleteMerchantModal.value = false;
 
     // Refresh auth snapshot so the app no longer thinks a merchant exists
@@ -129,11 +128,7 @@ const handleDeleteMerchant = async () => {
 
     router.push("/profile");
   } catch (error) {
-    const msg =
-      error?.response?.data?.message ||
-      error?.response?.data?.error ||
-      "Gagal menghapus UMKM";
-    toast.error(msg);
+    //
   } finally {
     deletingMerchant.value = false;
   }
@@ -210,6 +205,10 @@ onMounted(async () => {
         typeof data?.banner_url === "string" && data.banner_url.trim()
           ? data.banner_url
           : "",
+      NPWP: data.NPWP || "",
+      bank_code: data.bank_code || "",
+      bank_account_number: data.bank_account_number || "",
+      bank_account_name: data.bank_account_name || "",
     };
 
     const hours = data.operational_hours ?? {};
@@ -545,6 +544,39 @@ const goToEdit = () => {
                   class="ml-3 text-sm font-medium text-gray-700 sm:text-base"
                   >{{ day.hours }}</span
                 >
+              </div>
+            </div>
+          </div>
+
+          <!-- Informasi Pajak & Bank -->
+          <div class="pt-4">
+            <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
+              Informasi Pajak & Bank
+            </h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label class="block mb-2 text-sm font-medium text-merchant-primary">NPWP</label>
+                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
+                  {{ merchantInfo.NPWP || '-' }}
+                </div>
+              </div>
+              <div>
+                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nama Bank</label>
+                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
+                  {{ merchantInfo.bank_code || '-' }}
+                </div>
+              </div>
+              <div>
+                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nomor Rekening</label>
+                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
+                  {{ merchantInfo.bank_account_number || '-' }}
+                </div>
+              </div>
+              <div>
+                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nama Pemilik Rekening</label>
+                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
+                  {{ merchantInfo.bank_account_name || '-' }}
+                </div>
               </div>
             </div>
           </div>

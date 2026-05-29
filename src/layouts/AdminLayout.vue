@@ -39,6 +39,11 @@ const menuItems = computed(() => [
     icon: "pi-exclamation-triangle",
     route: "/admin/reports",
   },
+  {
+    label: "Settings",
+    icon: "pi-cog",
+    route: "/admin/settings",
+  },
 ]);
 
 // User info computed

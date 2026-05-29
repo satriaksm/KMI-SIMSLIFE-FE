@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import Button from "@/components/common/Button.vue";
@@ -10,6 +10,7 @@ import {
   updateOrderStatus,
 } from "@/services/api/order";
 import { useToast } from "vue-toastification";
+import echo from "@/libs/echo";
 
 const router = useRouter();
 const route = useRoute();
@@ -35,15 +36,24 @@ const currentMerchantSlug = computed(() =>
 const rawOrder = ref(null);
 const loading = ref(true);
 const actionLoading = ref(false);
+let orderChannel = null;
 
-function mapApiStatus(beStatus) {
+// Countdown untuk deadline konfirmasi UMKM
+const confirmCountdownText = ref("");
+const isConfirmExpired = ref(false);
+let confirmTimer = null;
+
+function mapApiStatus(beStatus, o) {
   switch (beStatus) {
-    case "pending":
-      return "pending_payment";
     case "paid":
+      return "waiting_review"; // sudah bayar, menunggu konfirmasi UMKM
+    case "pending":
+      if (o.payment_method === 'COD') return "waiting_review";
+      return beStatus;
     case "responsed":
-    case "delivered":
       return "processing";
+    case "delivered":
+      return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
       return "completed";
     case "cancelled":
@@ -63,22 +73,30 @@ const order = computed(() => {
       name: o.user_name_snapshot || "Pelanggan",
       phone: o.user_phone_snapshot || "-",
       email: o.user?.email || "",
+      profile_picture: o.user?.profile_picture || null,
     },
-    status: mapApiStatus(o.status),
+    status: mapApiStatus(o.status, o),
     _rawStatus: o.status,
-    payment_method: o.paid_at ? "QRIS" : "COD",
+    payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
     created_at: o.created_at,
     items: (o.items || []).map((it) => ({
+      id: it.id,
       name: it.product_name_snapshot || "Produk",
+      variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
       qty: it.quantity,
       price: it.unit_price_snapshot,
       subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      image: it.image_snapshot_path || null,
+      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
     amounts: {
       subtotal: Number(o.subtotal || 0),
       discount: Number(o.discount_total || 0),
       shipping: Number(o.delivery_fee_snapshot || 0),
+      platform_fee: Number(o.platform_fee || 0),
       total: Number(o.gross_amount || 0),
     },
     shipping_address: [
@@ -90,9 +108,21 @@ const order = computed(() => {
     ]
       .filter(Boolean)
       .join(", "),
-    note: "",
+    buyer_lat: o.latitude_snapshot,
+    buyer_lng: o.longitude_snapshot,
+    merchant_lat: o.merchant?.primary_address?.latitude,
+    merchant_lng: o.merchant?.primary_address?.longitude,
+    delivery_type: o.delivery_type,
+    note: o.notes || "",
   };
 });
+
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+}
 
 async function fetchOrder() {
   if (!currentMerchantSlug.value || !route.params?.orderId) return;
@@ -103,6 +133,7 @@ async function fetchOrder() {
       route.params.orderId,
     );
     rawOrder.value = res?.data ?? res ?? null;
+    startConfirmCountdown();
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
     toast.error("Gagal memuat detail pesanan");
@@ -116,15 +147,19 @@ async function fetchOrder() {
 // STATUS CONFIG
 // ========================
 const statusConfig = {
-  pending_payment: {
+  waiting_review: {
     props: {
       variant: "payment",
       status: "pending",
-      label: "Menunggu Bayar",
+      label: "Perlu Konfirmasi",
       size: "sm",
       showIcon: true,
     },
-    nextAction: null,
+    nextAction: {
+      label: "Terima Pesanan",
+      icon: "pi-check-circle",
+      color: "bg-merchant-primary",
+    },
   },
   processing: {
     props: {
@@ -170,27 +205,41 @@ const currentStatusConfig = computed(() => {
 const timeline = computed(() => {
   if (!order.value) return [];
   const status = order.value.status;
+  const isPickup = order.value.delivery_type === "pickup";
+
   const steps = [
     {
-      key: "pending_payment",
-      label: "Pesanan Diterima",
-      desc: "Menunggu pembayaran customer",
-      icon: "pi-shopping-bag",
+      key: "waiting_review",
+      label: "Menunggu Konfirmasi",
+      desc: "Pembayaran diterima",
+      icon: "pi-credit-card",
     },
     {
       key: "processing",
       label: "Sedang Diproses",
-      desc: "Pesanan sedang disiapkan",
+      desc: "Pesanan disiapkan",
       icon: "pi-sync",
+    },
+    {
+      key: isPickup ? "ready" : "shipped",
+      label: isPickup ? "Siap Diambil" : "Sedang Diantar",
+      desc: isPickup ? "Siap diambil di toko" : "Pesanan dikirim",
+      icon: isPickup ? "pi-map-marker" : "pi-truck",
     },
     {
       key: "completed",
       label: "Pesanan Selesai",
-      desc: "Pesanan telah diterima",
+      desc: isPickup ? "Pesanan diambil" : "Pesanan diterima",
       icon: "pi-check-circle",
     },
   ];
-  const statusOrder = ["pending_payment", "processing", "completed"];
+
+  const statusOrder = [
+    "waiting_review",
+    "processing",
+    isPickup ? "ready" : "shipped",
+    "completed",
+  ];
   const order_idx = statusOrder.indexOf(status);
   return steps.map((s, i) => ({
     ...s,
@@ -200,18 +249,51 @@ const timeline = computed(() => {
 });
 
 // ========================
+// DISTANCE & ROUTE
+// ========================
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
+const distanceKm = computed(() => {
+  if (!order.value?.buyer_lat || !order.value?.buyer_lng || !order.value?.merchant_lat || !order.value?.merchant_lng) return null;
+  const R = 6371; // Radius of the earth in km
+  const dLat = deg2rad(order.value.buyer_lat - order.value.merchant_lat);
+  const dLon = deg2rad(order.value.buyer_lng - order.value.merchant_lng);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(order.value.merchant_lat)) * Math.cos(deg2rad(order.value.buyer_lat)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; 
+  return d.toFixed(1);
+});
+
+const gmapsRouteUrl = computed(() => {
+  if (!order.value?.buyer_lat || !order.value?.buyer_lng || !order.value?.merchant_lat || !order.value?.merchant_lng) return null;
+  return `https://www.google.com/maps/dir/?api=1&origin=${order.value.merchant_lat},${order.value.merchant_lng}&destination=${order.value.buyer_lat},${order.value.buyer_lng}`;
+});
+
+const waLink = computed(() => {
+  if (!order.value?.customer?.phone) return "#";
+  let phone = order.value.customer.phone.replace(/\D/g, "");
+  if (phone.startsWith("0")) phone = "62" + phone.slice(1);
+  return `https://wa.me/${phone}`;
+});
+
+// ========================
 // CONFIRM STATUS MODAL
 // ========================
 const showConfirmModal = ref(false);
 
 function getNextStatus() {
   const rawStatus = rawOrder.value?.status;
-  // Map raw BE status to next action status
   switch (rawStatus) {
-    case "pending":
-      return "responsed";
     case "paid":
-      return "delivered";
+      return "responsed"; // UMKM terima pesanan yang sudah dibayar
+    case "pending":
+      // COD order — UMKM bisa langsung terima
+      if (rawOrder.value?.payment_method === 'COD') return "responsed";
+      return null; // Transfer pending = belum bayar
     case "responsed":
       return "delivered";
     case "delivered":
@@ -223,17 +305,76 @@ function getNextStatus() {
 
 const nextActionLabel = computed(() => {
   const next = getNextStatus();
+  const isPickup = order.value?.delivery_type === "pickup";
   switch (next) {
     case "responsed":
       return "Terima & Proses Pesanan";
     case "delivered":
-      return "Tandai Dikirim";
+      return isPickup ? "Tandai Siap Diambil" : "Tandai Dikirim";
     case "completed":
-      return "Tandai Selesai";
+      return isPickup ? "Tandai Selesai / Sudah Diambil" : "Tandai Selesai";
     default:
       return null;
   }
 });
+
+// Apakah bisa dibatalkan oleh UMKM
+const canCancel = computed(() => {
+  const s = rawOrder.value?.status;
+  return s === "paid" || s === "responsed" || (s === "pending" && rawOrder.value?.payment_method === 'COD');
+});
+
+// ========================
+// COUNTDOWN TIMER KONFIRMASI
+// ========================
+function startConfirmCountdown() {
+  if (confirmTimer) clearInterval(confirmTimer);
+
+  const deadline = rawOrder.value?.confirm_deadline;
+  const status = rawOrder.value?.status;
+
+  // Hanya tampilkan countdown jika status masih menunggu konfirmasi
+  if (!deadline || !['pending', 'paid'].includes(status)) {
+    confirmCountdownText.value = "";
+    isConfirmExpired.value = false;
+    return;
+  }
+
+  // COD pending: tampilkan
+  // Transfer paid: tampilkan
+  // Transfer pending (belum bayar): jangan tampilkan
+  if (status === 'pending' && rawOrder.value?.payment_method !== 'COD') {
+    confirmCountdownText.value = "";
+    isConfirmExpired.value = false;
+    return;
+  }
+
+  const expireTime = new Date(deadline).getTime();
+
+  const tick = () => {
+    const now = new Date().getTime();
+    const distance = expireTime - now;
+
+    if (distance < 0) {
+      clearInterval(confirmTimer);
+      isConfirmExpired.value = true;
+      confirmCountdownText.value = "00:00:00";
+    } else {
+      isConfirmExpired.value = false;
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      confirmCountdownText.value =
+        String(hours).padStart(2, '0') + ":" +
+        String(minutes).padStart(2, '0') + ":" +
+        String(seconds).padStart(2, '0');
+    }
+  };
+
+  tick();
+  confirmTimer = setInterval(tick, 1000);
+}
+
 
 async function confirmAction() {
   const nextStatus = getNextStatus();
@@ -301,7 +442,45 @@ function goBack() {
 
 onMounted(() => {
   fetchOrder();
+  subscribeOrderChannel();
 });
+
+onUnmounted(() => {
+  leaveOrderChannel(route.params?.orderId);
+  if (confirmTimer) clearInterval(confirmTimer);
+});
+
+watch(
+  () => route.params?.orderId,
+  (next, prev) => {
+    if (prev) {
+      leaveOrderChannel(prev);
+    }
+    if (next) {
+      subscribeOrderChannel();
+    }
+  },
+);
+
+function subscribeOrderChannel() {
+  const id = route.params?.orderId;
+  if (!id) return;
+
+  orderChannel = echo.private(`orders.${id}`);
+  orderChannel
+    .listen(".order.status.updated", () => {
+      fetchOrder();
+    })
+    .listen(".payment.status.updated", () => {
+      fetchOrder();
+    });
+}
+
+function leaveOrderChannel(id) {
+  if (!id) return;
+  echo.leave(`orders.${id}`);
+  orderChannel = null;
+}
 </script>
 
 <template>
@@ -420,6 +599,29 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- Countdown konfirmasi UMKM -->
+      <div
+        v-if="confirmCountdownText && order.status === 'waiting_review'"
+        class="p-4 bg-white shadow-sm rounded-2xl"
+      >
+        <div v-if="isConfirmExpired" class="flex items-center gap-3">
+          <i class="text-xl text-red-500 pi pi-clock shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Batas waktu konfirmasi habis</p>
+            <p class="text-xs text-red-500 mt-0.5">Pesanan akan otomatis dibatalkan.</p>
+          </div>
+        </div>
+        <div v-else class="flex items-center gap-3">
+          <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 shrink-0">
+            <i class="text-lg pi pi-clock text-amber-600"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-xs text-gray-500">Batas waktu konfirmasi pesanan</p>
+            <p class="text-lg font-bold text-amber-700 font-mono">{{ confirmCountdownText }}</p>
+          </div>
+        </div>
+      </div>
+
       <!-- ======================== -->
       <!-- ORDER INFO               -->
       <!-- ======================== -->
@@ -433,10 +635,6 @@ onMounted(() => {
           <div>
             <p class="text-xs text-gray-400">No. Pesanan</p>
             <p class="font-medium text-gray-800">{{ order.invoice }}</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400">ID Pesanan</p>
-            <p class="font-medium text-gray-800">{{ order.id }}</p>
           </div>
           <div>
             <p class="text-xs text-gray-400">Tanggal</p>
@@ -454,6 +652,12 @@ onMounted(() => {
             <p class="text-xs text-gray-400">Metode Pembayaran</p>
             <p class="font-medium text-gray-800">{{ order.payment_method }}</p>
           </div>
+          <div>
+            <p class="text-xs text-gray-400">Metode Pengiriman</p>
+            <p class="font-medium text-gray-800">
+              {{ order.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)' }}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -467,31 +671,40 @@ onMounted(() => {
           Data Pelanggan
         </h2>
         <div class="flex items-center gap-3">
-          <div
-            class="flex items-center justify-center w-10 h-10 rounded-full bg-merchant-primary/10 shrink-0"
-          >
-            <span class="text-sm font-bold text-merchant-primary">
-              {{ order.customer.name.charAt(0).toUpperCase() }}
-            </span>
+          <div class="w-10 h-10 overflow-hidden bg-gray-100 rounded-full shrink-0 flex items-center justify-center border border-gray-200">
+            <img v-if="order.customer.profile_picture" :src="order.customer.profile_picture" class="object-cover w-full h-full" alt="Customer avatar" />
+            <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+            </svg>
           </div>
           <div>
             <p class="text-sm font-semibold text-gray-800">
               {{ order.customer.name }}
             </p>
-            <p class="text-xs text-gray-500">{{ order.customer.phone }}</p>
-            <p v-if="order.customer.email" class="text-xs text-gray-500">
+            <a :href="waLink" target="_blank" class="text-xs text-merchant-primary underline flex items-center gap-1 mt-0.5">
+              <i class="pi pi-whatsapp"></i> {{ order.customer.phone }}
+            </a>
+            <p v-if="order.customer.email" class="text-xs text-gray-500 mt-0.5">
               {{ order.customer.email }}
             </p>
           </div>
         </div>
 
-        <div v-if="order.shipping_address" class="pt-1">
+        <div v-if="order.shipping_address && order.delivery_type === 'delivery'" class="pt-1">
           <p class="mb-1 text-xs text-gray-400">Alamat Pengiriman</p>
           <div class="flex items-start gap-2">
             <i
               class="pi pi-map-marker text-xs text-gray-400 mt-0.5 shrink-0"
             ></i>
-            <p class="text-sm text-gray-700">{{ order.shipping_address }}</p>
+            <div class="flex-1">
+              <p class="text-sm text-gray-700">{{ order.shipping_address }}</p>
+              <div v-if="distanceKm && gmapsRouteUrl" class="mt-2 flex items-center gap-3">
+                <span class="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded-md">{{ distanceKm }} km</span>
+                <a :href="gmapsRouteUrl" target="_blank" class="text-xs font-semibold text-white bg-blue-500 px-3 py-1 rounded-md hover:bg-blue-600 transition flex items-center gap-1">
+                  <i class="pi pi-map"></i> Rute Gmaps
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -528,12 +741,19 @@ onMounted(() => {
                 :src="item.image"
                 :alt="item.name"
                 class="object-cover w-full h-full"
+                crossorigin="use-credentials"
               />
               <i v-else class="text-xl text-gray-300 pi pi-box"></i>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-800 truncate">
                 {{ item.name }}
+              </p>
+              <p v-if="item.variant" class="text-xs text-gray-500 mt-0.5">
+                {{ item.variant }}
+              </p>
+              <p v-if="item.addons && item.addons.length" class="text-xs text-gray-500 mt-0.5">
+                <span class="text-merchant-primary">+</span> {{ item.addons.map(a => a.name).join(', ') }}
               </p>
               <p class="text-xs text-gray-500 mt-0.5">
                 {{ item.qty }}x × Rp {{ formatIDR(item.price) }}
@@ -563,6 +783,13 @@ onMounted(() => {
             <span>Rp {{ formatIDR(order.amounts.shipping) }}</span>
           </div>
           <div
+            v-if="order.amounts.platform_fee > 0"
+            class="flex justify-between text-sm text-gray-600"
+          >
+            <span>Biaya Layanan/Admin</span>
+            <span>Rp {{ formatIDR(order.amounts.platform_fee) }}</span>
+          </div>
+          <div
             class="flex justify-between pt-2 text-base font-bold text-gray-800 border-t border-gray-100"
           >
             <span>Total</span>
@@ -585,15 +812,13 @@ onMounted(() => {
           {{ nextActionLabel }}
         </button>
         <button
-          v-if="
-            rawOrder?.status === 'pending' || rawOrder?.status === 'responsed'
-          "
+          v-if="canCancel"
           type="button"
           @click="handleCancel"
           :disabled="actionLoading"
           class="w-full py-3 text-sm font-semibold text-red-600 transition bg-red-50 rounded-2xl hover:bg-red-100 disabled:opacity-50"
         >
-          Batalkan Pesanan
+          Tolak / Batalkan Pesanan
         </button>
       </div>
     </div>

@@ -200,7 +200,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
@@ -211,9 +211,14 @@ import SelectField from "@/components/forms/SelectField.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { getCustomerOrders } from "@/services/api/order";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/auth";
+import echo from "@/libs/echo";
 
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+const userId = computed(() => authStore.user?.id);
+let ordersChannel = null;
 
 const query = ref("");
 const loading = ref(false);
@@ -361,14 +366,22 @@ function isDateInRange(dateLabel, range) {
 // ========================
 const orders = ref([]);
 
-function mapApiStatus(beStatus) {
+function mapApiStatus(beStatus, o) {
   switch (beStatus) {
     case "pending":
+      // Check if expired
+      if (o.payment && o.payment.expired_at) {
+        const expireTime = new Date(o.payment.expired_at).getTime();
+        if (new Date().getTime() > expireTime) return "cancelled";
+      }
+      // COD orders don't need payment → they are "processing" (waiting UMKM confirm)
+      if (o.payment_method === 'COD') return "processing";
       return "pending_payment";
     case "paid":
     case "responsed":
-    case "delivered":
       return "processing";
+    case "delivered":
+      return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
       return "completed";
     case "cancelled":
@@ -388,19 +401,32 @@ function formatDateLabel(dateStr) {
   });
 }
 
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+}
+
 function mapOrder(o) {
   return {
     id: o.id,
     storeName: o.merchant?.name || "Toko",
     dateLabel: formatDateLabel(o.created_at),
-    status: mapApiStatus(o.status),
+    status: mapApiStatus(o.status, o),
     total: o.gross_amount,
+    delivery_type: o.delivery_type || "delivery",
     items: (o.items || []).map((it) => ({
+      id: it.id,
       title: it.product_name_snapshot || "Produk",
       qty: it.quantity,
       variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
       price: it.unit_price_snapshot,
-      imageUrl: it.image_snapshot_path || null,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
     _raw: o,
   };
@@ -485,7 +511,43 @@ function goToPendingPayment() {
 
 onMounted(() => {
   fetchOrders();
+  subscribeOrdersChannel();
 });
+
+onUnmounted(() => {
+  leaveOrdersChannel(userId.value);
+});
+
+watch(userId, (next, prev) => {
+  if (prev) {
+    leaveOrdersChannel(prev);
+  }
+  if (next) {
+    subscribeOrdersChannel();
+  }
+});
+
+function subscribeOrdersChannel() {
+  if (!userId.value) return;
+
+  ordersChannel = echo.private(`users.${userId.value}.orders`);
+  ordersChannel
+    .listen(".order.created", () => {
+      fetchOrders();
+    })
+    .listen(".order.status.updated", () => {
+      fetchOrders();
+    })
+    .listen(".payment.status.updated", () => {
+      fetchOrders();
+    });
+}
+
+function leaveOrdersChannel(id) {
+  if (!id) return;
+  echo.leave(`users.${id}.orders`);
+  ordersChannel = null;
+}
 </script>
 
 <style scoped>
