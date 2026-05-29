@@ -99,30 +99,23 @@
         {{ selectedStatus === '' ? 'Anda belum pernah membuat laporan' : 'Tidak ada laporan dengan status ini' }}
       </p>
     </div>
-
-    <!-- Report Detail Modal -->
-    <ReportDetailModal
-      v-if="selectedReport"
-      :report="selectedReport"
-      @close="selectedReport = null"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { Flag, ChevronRight } from 'lucide-vue-next';
 import { useToast } from 'vue-toastification';
 import api from '@/libs/axios';
-import ReportDetailModal from '@/components/ReportDetailModal.vue';
 
 const toast = useToast();
+const router = useRouter();
 
 // State
 const reports = ref([]);
 const isLoading = ref(true);
 const selectedStatus = ref('');
-const selectedReport = ref(null);
 
 const statusFilters = [
   { value: '', label: 'Semua' },
@@ -153,7 +146,7 @@ const fetchReports = async () => {
 };
 
 const viewReportDetail = (report) => {
-  selectedReport.value = report;
+  router.push({ name: 'Report Detail', params: { id: report.id } });
 };
 
 const getStatusBadgeClass = (status) => {

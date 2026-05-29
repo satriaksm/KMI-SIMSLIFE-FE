@@ -6,6 +6,7 @@ import { useToast } from 'vue-toastification';
 import UserAvatar from '@/components/common/UserAvatar.vue';
 import MerchantCard from '@/components/Card/MerchantCard.vue';
 import { getCommunityImageUrl } from '@/libs/getImageUrl';
+import ReportButton from '@/components/ReportButton.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -69,11 +70,20 @@ const formatDate = (dateStr) => {
                 custom-class="ring-4 ring-white shadow-md bg-white"
               />
               <div class="flex-1 text-center sm:text-left mb-2">
-                <h1 class="text-3xl font-bold text-gray-900">{{ user.name }}</h1>
-                <p class="text-gray-500 flex items-center justify-center sm:justify-start gap-2 mt-1">
-                  <i class="pi pi-calendar text-sm"></i>
-                  Bergabung sejak {{ formatDate(user.created_at) }}
-                </p>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h1 class="text-3xl font-bold text-gray-900">{{ user.name }}</h1>
+                    <p class="text-gray-500 flex items-center justify-center sm:justify-start gap-2 mt-1">
+                      <i class="pi pi-calendar text-sm"></i>
+                      Bergabung sejak {{ formatDate(user.created_at) }}
+                    </p>
+                  </div>
+                  <ReportButton
+                    reportable-type="user"
+                    :reportable-id="user.id"
+                    :reportable-name="user.name"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -173,6 +183,7 @@ const formatDate = (dateStr) => {
         </div>
       </template>
     </div>
+
   </div>
 </template>
 

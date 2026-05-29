@@ -281,6 +281,16 @@ const routes = [
           title: "Laporan Saya | SUMILIR",
         },
       },
+      {
+        path: "reports/:id",
+        name: "Report Detail",
+        component: () => import("@/views/reports/UserReportDetail.vue"),
+        meta: {
+          requiresAuth: true,
+          denyRoles: ["admin"],
+          title: "Detail Laporan | SUMILIR",
+        },
+      },
     ],
   },
 

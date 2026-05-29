@@ -31,8 +31,42 @@ const activeFilters = ref({
   status: "",
 });
 
-const isAnyModalOpen = computed(() => showExportModal.value);
+// Status change modal
+const showStatusModal = ref(false);
+const selectedAdmin = ref(null);
+const newAdminStatus = ref('');
+const statusChangeLoading = ref(false);
+
+const isAnyModalOpen = computed(() => showExportModal.value || showStatusModal.value);
 useBodyScrollLock(isAnyModalOpen);
+
+const adminStatusOptions = [
+  { value: 'active', label: 'Aktif', color: 'text-green-700 bg-green-50 border-green-200' },
+  { value: 'suspended', label: 'Dibekukan', color: 'text-red-700 bg-red-50 border-red-200' },
+  { value: 'inactive', label: 'Tidak Aktif', color: 'text-gray-700 bg-gray-50 border-gray-200' },
+];
+
+const openAdminStatusModal = (admin) => {
+  selectedAdmin.value = admin;
+  newAdminStatus.value = admin.status;
+  showStatusModal.value = true;
+};
+
+const confirmAdminStatusChange = async () => {
+  if (!selectedAdmin.value || !newAdminStatus.value) return;
+  statusChangeLoading.value = true;
+  try {
+    await api.patch(`/api/admin/users/${selectedAdmin.value.id}/status`, { status: newAdminStatus.value });
+    toast.success(`Status admin berhasil diubah`);
+    showStatusModal.value = false;
+    selectedAdmin.value = null;
+    loadAdmins();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Gagal mengubah status');
+  } finally {
+    statusChangeLoading.value = false;
+  }
+};
 
 const tableColumns = [
   { key: "photo", label: "Foto", sortable: false },
@@ -266,9 +300,20 @@ watch(searchQuery, () => {
         </template>
 
         <template #cell-actions="{ item }">
-          <Button @click.stop="goToDetail(item)" variant="muted-outline" size="sm">
-            <i class="pi pi-eye"></i>
-          </Button>
+          <div class="flex items-center gap-2">
+            <Button @click.stop="goToDetail(item)" variant="muted-outline" size="sm">
+              <i class="pi pi-eye"></i>
+            </Button>
+            <Button
+              @click.stop="openAdminStatusModal(item)"
+              variant="muted-outline"
+              size="sm"
+              class="!border-blue-400 !text-blue-600 hover:!bg-blue-50"
+              title="Ubah Status"
+            >
+              <i class="pi pi-pencil"></i>
+            </Button>
+          </div>
         </template>
       </AdminTable>
     </div>
@@ -371,6 +416,61 @@ watch(searchQuery, () => {
           <i class="pi pi-download mr-2"></i>
           <span>Download Laporan PDF</span>
         </Button>
+      </div>
+    </ResponsiveModal>
+
+    <!-- Admin Status Change Modal -->
+    <ResponsiveModal
+      :show="showStatusModal"
+      @close="showStatusModal = false"
+      title="Ubah Status Admin"
+      :subtitle="selectedAdmin ? `${selectedAdmin.name} · ${selectedAdmin.email}` : ''"
+    >
+      <div class="space-y-4" v-if="selectedAdmin">
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <i class="pi pi-shield text-gray-500"></i>
+          <div>
+            <p class="text-xs text-gray-500">Status saat ini</p>
+            <StatusLabel :status="selectedAdmin.status" variant="user" size="sm" />
+          </div>
+        </div>
+
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-3">Pilih status baru:</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              v-for="opt in adminStatusOptions"
+              :key="opt.value"
+              @click="newAdminStatus = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                newAdminStatus === opt.value
+                  ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              ]"
+            >
+              <i :class="['pi', newAdminStatus === opt.value ? 'pi-check-circle' : 'pi-circle', 'text-sm']"></i>
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button
+            @click="showStatusModal = false"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmAdminStatusChange"
+            :disabled="statusChangeLoading || newAdminStatus === selectedAdmin.status"
+            class="flex-1 px-4 py-2 bg-merchant-primary text-white rounded-lg text-sm font-medium hover:bg-merchant-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <i v-if="statusChangeLoading" class="pi pi-spin pi-spinner text-sm"></i>
+            {{ statusChangeLoading ? 'Menyimpan...' : 'Simpan Perubahan' }}
+          </button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>

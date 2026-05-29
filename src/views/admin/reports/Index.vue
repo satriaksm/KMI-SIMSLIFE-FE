@@ -120,6 +120,12 @@ const goToDetail = (report) => {
   router.push({ name: "Admin - Report Detail", params: { id: report.id } });
 };
 
+const goToReporter = (report) => {
+  if (report.reporter?.id) {
+    router.push({ name: 'Admin - Customer Detail', params: { id: report.reporter.id } });
+  }
+};
+
 const goToPage = (page) => { currentPage.value = page; loadReports(); };
 const nextPage = () => { if (currentPage.value < (pagination.value?.last_page || 1)) { currentPage.value += 1; loadReports(); } };
 const prevPage = () => { if (currentPage.value > 1) { currentPage.value -= 1; loadReports(); } };
@@ -269,6 +275,16 @@ onMounted(() => {
           <template #cell-no="{ item }">
             <span class="text-sm font-mono text-gray-500">
               Report #{{ item.id }}
+            </span>
+          </template>
+
+          <template #cell-reporter.name="{ item }">
+            <span 
+              class="text-sm font-medium text-gray-800 cursor-pointer hover:text-primary transition-colors hover:underline"
+              @click.stop="goToReporter(item)"
+              title="Lihat profil pelapor"
+            >
+              {{ item.reporter?.name || '-' }}
             </span>
           </template>
 

@@ -6,16 +6,6 @@
     Deny from all
 </FilesMatch>
 
-<IfModule mod_mime.c>
-    AddType application/manifest+json .json
-</IfModule>
-
-<FilesMatch "^manifest\.json$">
-    Order allow,deny
-    Allow from all
-    Require all granted
-</FilesMatch>
-
 # Force fresh fetch for SPA shell and Service Worker entry files.
 # This prevents stale PWA behavior from intercepting backend verification URLs.
 <IfModule mod_headers.c>

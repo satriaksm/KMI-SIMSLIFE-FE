@@ -64,8 +64,43 @@ const getRoleIcon = computed(() => {
   return "pi-users";
 });
 
-const isAnyModalOpen = computed(() => showExportModal.value);
+// Status change modal state
+const showStatusModal = ref(false);
+const selectedUser = ref(null);
+const newStatus = ref('');
+const statusChangeLoading = ref(false);
+
+const isAnyModalOpen = computed(() => showExportModal.value || showStatusModal.value);
 useBodyScrollLock(isAnyModalOpen);
+
+const statusChangeOptions = [
+  { value: 'active', label: 'Aktif', color: 'text-green-700 bg-green-50 border-green-200' },
+  { value: 'suspended', label: 'Dibekukan', color: 'text-red-700 bg-red-50 border-red-200' },
+  { value: 'inactive', label: 'Tidak Aktif', color: 'text-gray-700 bg-gray-50 border-gray-200' },
+  { value: 'watchlist', label: 'Watchlist', color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+];
+
+const openStatusModal = (user) => {
+  selectedUser.value = user;
+  newStatus.value = user.status;
+  showStatusModal.value = true;
+};
+
+const confirmStatusChange = async () => {
+  if (!selectedUser.value || !newStatus.value) return;
+  statusChangeLoading.value = true;
+  try {
+    await api.patch(`/api/admin/users/${selectedUser.value.id}/status`, { status: newStatus.value });
+    toast.success(`Status pengguna berhasil diubah menjadi ${newStatus.value}`);
+    showStatusModal.value = false;
+    selectedUser.value = null;
+    loadUsers();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Gagal mengubah status');
+  } finally {
+    statusChangeLoading.value = false;
+  }
+};
 
 const tableColumns = [
   { key: "photo", label: "Foto", sortable: false },
@@ -92,6 +127,12 @@ const tableActions = [
     label: "Lihat Detail",
     handler: (user) => goToDetail(user),
     class: "hover:bg-muted-foreground/20 text-muted-foreground",
+  },
+  {
+    icon: "pi-pencil",
+    label: "Ubah Status",
+    handler: (user) => openStatusModal(user),
+    class: "hover:bg-blue-100 text-blue-600",
   },
 ];
 
@@ -567,6 +608,70 @@ watch(searchQuery, () => {
           <i class="pi pi-download mr-2"></i>
           <span>Download Laporan PDF</span>
         </Button>
+      </div>
+    </ResponsiveModal>
+
+    <!-- Status Change Modal -->
+    <ResponsiveModal
+      :show="showStatusModal"
+      @close="showStatusModal = false"
+      title="Ubah Status Pengguna"
+      :subtitle="selectedUser ? `${selectedUser.name} · ${selectedUser.email}` : ''"
+    >
+      <div class="space-y-4" v-if="selectedUser">
+        <!-- Current Status Info -->
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <i class="pi pi-user text-gray-500"></i>
+          <div>
+            <p class="text-xs text-gray-500">Status saat ini</p>
+            <StatusLabel :status="selectedUser.status" variant="user" size="sm" />
+          </div>
+        </div>
+
+        <!-- Status Options -->
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-3">Pilih status baru:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="opt in statusChangeOptions"
+              :key="opt.value"
+              @click="newStatus = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                newStatus === opt.value
+                  ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              ]"
+            >
+              <i :class="['pi', newStatus === opt.value ? 'pi-check-circle' : 'pi-circle', 'text-sm']"></i>
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Warning for suspend -->
+        <div v-if="newStatus === 'suspended'" class="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <i class="pi pi-exclamation-triangle text-red-500 text-sm mt-0.5"></i>
+          <p class="text-xs text-red-700">Pengguna yang dibekukan akan langsung logout dan tidak bisa login kembali sampai statusnya diubah.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3 pt-2">
+          <button
+            @click="showStatusModal = false"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmStatusChange"
+            :disabled="statusChangeLoading || newStatus === selectedUser.status"
+            class="flex-1 px-4 py-2 bg-merchant-primary text-white rounded-lg text-sm font-medium hover:bg-merchant-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <i v-if="statusChangeLoading" class="pi pi-spin pi-spinner text-sm"></i>
+            {{ statusChangeLoading ? 'Menyimpan...' : 'Simpan Perubahan' }}
+          </button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>
