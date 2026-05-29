@@ -200,6 +200,7 @@
             <SelectField
               name="bank_code"
               label="Nama Bank"
+              v-model="bankCode"
               placeholder="Pilih Nama Bank"
               :loading="banksLoading"
               :disabled="banksLoading"
@@ -290,6 +291,7 @@ const longitude = ref(null);
 const segmentations = ref([]);
 const segmentationId = ref("");
 const banks = ref([]);
+const bankCode = ref("");
 
 // Validation Schema (pakai objek address)
 const schema = yup.object({

@@ -20,6 +20,11 @@ const urlBase64ToUint8Array = (base64String) => {
   return outputArray;
 };
 
+const getPushSubscriptionStatus = async () => {
+  const response = await api.get("/api/push-subscriptions/status");
+  return response.data?.data ?? response.data ?? { audiences: [] };
+};
+
 const getPublicKey = async () => {
   const response = await api.get("/api/push/public-key");
   const publicKey = response.data?.publicKey;
@@ -94,8 +99,10 @@ const subscribe = async () => {
 
   const existing = await registration.pushManager.getSubscription();
 
+  const syncPayload = (subscription) => subscription.toJSON();
+
   if (existing) {
-    await api.post("/api/push-subscriptions", existing.toJSON());
+    await api.post("/api/push-subscriptions", syncPayload(existing));
     return existing;
   }
 
@@ -117,8 +124,24 @@ const subscribe = async () => {
     throw error;
   }
 
-  await api.post("/api/push-subscriptions", subscription.toJSON());
+  await api.post("/api/push-subscriptions", syncPayload(subscription));
   return subscription;
+};
+
+/** Sinkronkan endpoint browser ke user yang sedang login (setelah ganti akun). */
+const syncPushSubscriptionForCurrentUser = async () => {
+  if (!isSupported() || Notification.permission !== "granted") {
+    return false;
+  }
+
+  const subscription = await getCurrentSubscription();
+  if (!subscription) {
+    return false;
+  }
+
+  await api.post("/api/push-subscriptions", subscription.toJSON());
+
+  return true;
 };
 
 const unsubscribe = async () => {
@@ -145,8 +168,10 @@ const unsubscribe = async () => {
 };
 
 export {
+  getPushSubscriptionStatus,
   getSubscriptionState,
   isSupported as supportsPushNotifications,
   subscribe as subscribePushNotifications,
+  syncPushSubscriptionForCurrentUser,
   unsubscribe as unsubscribePushNotifications,
 };

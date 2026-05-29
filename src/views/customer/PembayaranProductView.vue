@@ -700,22 +700,29 @@ async function resolveCartContextFromServer() {
 }
 
 async function ensureCartIdForCheckout() {
-  const existingCartId = toPositiveInt(checkout.store?.cartId);
+  const preferredCartId =
+    toPositiveInt(productModeCartId.value) ??
+    toPositiveInt(checkout.store?.cartId);
 
   if (checkout.from === "cart") {
-    if (existingCartId) return existingCartId;
     const resolved = await resolveCartContextFromServer();
-    return toPositiveInt(resolved?.cartId);
+    const cartId = toPositiveInt(resolved?.cartId);
+    if (!cartId) {
+      checkout.store.cartId = null;
+    }
+    return cartId;
   }
 
   if (checkout.from === "product") {
-    if (existingCartId) {
-      productModeCartId.value = existingCartId;
-      return existingCartId;
-    }
-
-    if (productModeCartId.value) {
-      return productModeCartId.value;
+    if (preferredCartId) {
+      const resolved = await resolveCartContextFromServer();
+      const cartId = toPositiveInt(resolved?.cartId);
+      if (cartId) {
+        productModeCartId.value = cartId;
+        return cartId;
+      }
+      checkout.store.cartId = null;
+      productModeCartId.value = null;
     }
 
     const productId = toPositiveInt(checkout.productId);
@@ -971,9 +978,19 @@ const handleCheckout = async () => {
 
   } catch (error) {
     console.error("Checkout error:", error);
-    toast.error(
-      error.response?.data?.message || "Gagal membuat pesanan. Coba lagi.",
-    );
+    const data = error.response?.data;
+    const cartError = data?.errors?.cart_id?.[0];
+    const message =
+      cartError ||
+      data?.message ||
+      "Gagal membuat pesanan. Coba lagi.";
+
+    if (cartError) {
+      checkout.store.cartId = null;
+      productModeCartId.value = null;
+    }
+
+    toast.error(message);
   } finally {
     isSubmitting.value = false;
   }

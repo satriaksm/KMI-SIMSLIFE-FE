@@ -85,10 +85,13 @@ const pushStatusMessage = computed(() => {
   }
 
   if (pushEnabled.value) {
-    return "Notifikasi PWA aktif di device ini.";
+    if (myMerchants.value.length > 0) {
+      return "Aktif: pembelian Anda & pesanan masuk ke UMKM Anda (otomatis sesuai peran).";
+    }
+    return "Aktif: notifikasi pesanan dan pembayaran Anda sebagai pembeli.";
   }
 
-  return "Aktifkan notifikasi agar Anda menerima email dan push notification saat status UMKM berubah.";
+  return "Pesanan masuk UMKM hanya ke pemilik toko. Pembeli biasa tidak menerima notif tersebut.";
 });
 
 const pushButtonLabel = computed(() =>
@@ -216,6 +219,7 @@ const togglePushNotifications = async () => {
     pushLoading.value = false;
   }
 };
+
 // =========================
 // LIFECYCLE
 // =========================
@@ -468,8 +472,8 @@ onMounted(async () => {
                     </svg>
                   </div>
                   <div>
-                    <span class="font-semibold text-gray-700 group-hover:text-gray-900">Notifikasi Perangkat</span>
-                    <p class="text-xs text-gray-500 mt-0.5">Aktifkan untuk menerima notifikasi pesanan di layar ini</p>
+                    <span class="font-semibold text-gray-700 group-hover:text-gray-900">Notifikasi PWA</span>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ pushStatusMessage }}</p>
                   </div>
                 </div>
                 <button
@@ -841,8 +845,8 @@ onMounted(async () => {
                   </svg>
                 </div>
                 <div>
-                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Notifikasi Perangkat</span>
-                  <p class="text-[10px] text-gray-500 mt-0.5">Terima notifikasi PWA</p>
+                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Notifikasi PWA</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">{{ pushStatusMessage }}</p>
                 </div>
               </div>
               <button

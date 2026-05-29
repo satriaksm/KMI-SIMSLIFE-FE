@@ -450,57 +450,92 @@
           </div>
 
           <!-- Jam Operasional -->
-          <div>
-            <h3 class="mb-3 text-base font-bold text-merchant-primary">
+          <div class="pt-4">
+            <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
-            <div class="space-y-2.5">
+            <div class="space-y-3">
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
-                class="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+                class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
-                <div class="flex items-center flex-1 gap-3">
-                  <span
-                    class="px-3 py-1.5 bg-merchant-primary text-white rounded-full text-xs font-semibold min-w-[85px] text-center"
-                  >
-                    {{ day.name }}
-                  </span>
-
-                  <div class="flex-1">
+                <!-- Header row -->
+                <div class="flex items-center justify-between p-4">
+                  <div class="flex items-center gap-4">
                     <span
-                      v-if="day.isOpen"
-                      class="text-sm font-medium text-gray-700"
+                      class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
+                      :class="
+                        day.isOpen
+                          ? 'bg-merchant-primary text-white'
+                          : 'bg-gray-200 text-gray-500'
+                      "
                     >
-                      {{ day.hours }}
+                      {{ day.name }}
                     </span>
-                    <span v-else class="text-sm font-medium text-red-500">
-                      Tutup
-                    </span>
+                    <div>
+                      <span
+                        v-if="day.isOpen"
+                        class="text-base font-medium text-gray-700"
+                      >
+                        {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
+                      </span>
+                      <span v-else class="text-base font-medium text-gray-400">
+                        Tutup
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <button
-                    v-if="day.isOpen"
-                    @click="handleEditHours(index)"
-                    class="text-xs font-semibold text-merchant-primary hover:underline"
-                  >
-                    Edit
-                  </button>
 
                   <label
-                    class="relative inline-flex items-center cursor-pointer"
+                    class="relative inline-flex items-center cursor-pointer shrink-0"
                   >
                     <input
                       type="checkbox"
                       v-model="day.isOpen"
                       class="sr-only peer"
+                      @change="onDayToggle(index)"
                     />
                     <div
-                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
+                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
                     ></div>
                   </label>
+                </div>
+
+                <!-- Inline time inputs (shown when open) -->
+                <div v-if="day.isOpen" class="px-4 pb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Buka</label
+                      >
+                      <input
+                        type="time"
+                        :value="day.open || '06:00'"
+                        @input="
+                          day.open = $event.target.value;
+                          updateDayHours(index);
+                        "
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                      />
+                    </div>
+                    <span class="mt-6 text-sm text-gray-400">—</span>
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Tutup</label
+                      >
+                      <input
+                        type="time"
+                        :value="day.close || '18:00'"
+                        @input="
+                          day.close = $event.target.value;
+                          updateDayHours(index);
+                        "
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -715,48 +750,89 @@
             <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
-            <div class="space-y-4">
+            <div class="space-y-3">
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
-                class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center bg-gray-50 rounded-xl"
+                class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
-                <span
-                  class="px-4 py-2 bg-merchant-primary text-white rounded-full text-sm font-medium min-w-[120px] text-center shrink-0"
-                >
-                  {{ day.name }}
-                </span>
+                <!-- Header row -->
+                <div class="flex items-center justify-between p-4">
+                  <div class="flex items-center gap-4">
+                    <span
+                      class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
+                      :class="
+                        day.isOpen
+                          ? 'bg-merchant-primary text-white'
+                          : 'bg-gray-200 text-gray-500'
+                      "
+                    >
+                      {{ day.name }}
+                    </span>
+                    <div>
+                      <span
+                        v-if="day.isOpen"
+                        class="text-base font-medium text-gray-700"
+                      >
+                        {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
+                      </span>
+                      <span v-else class="text-base font-medium text-gray-400">
+                        Tutup
+                      </span>
+                    </div>
+                  </div>
 
-                <span class="text-base font-medium text-gray-700 grow">
-                  {{ day.hours }}
-                </span>
+                  <label
+                    class="relative inline-flex items-center cursor-pointer shrink-0"
+                  >
+                    <input
+                      type="checkbox"
+                      v-model="day.isOpen"
+                      class="sr-only peer"
+                      @change="onDayToggle(index)"
+                    />
+                    <div
+                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
+                    ></div>
+                  </label>
+                </div>
 
-                <button
-                  v-if="day.isOpen"
-                  @click="handleEditHours(index)"
-                  class="text-base font-medium shrink-0 text-merchant-primary hover:underline"
-                >
-                  Edit
-                </button>
-                <span
-                  v-else
-                  class="text-base font-medium text-red-500 shrink-0"
-                >
-                  Tutup
-                </span>
-
-                <label
-                  class="relative inline-flex items-center cursor-pointer shrink-0"
-                >
-                  <input
-                    type="checkbox"
-                    v-model="day.isOpen"
-                    class="sr-only peer"
-                  />
-                  <div
-                    class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
-                  ></div>
-                </label>
+                <!-- Inline time inputs (shown when open) -->
+                <div v-if="day.isOpen" class="px-4 pb-4">
+                  <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Buka</label
+                      >
+                      <input
+                        type="time"
+                        :value="day.open || '06:00'"
+                        @input="
+                          day.open = $event.target.value;
+                          updateDayHours(index);
+                        "
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                      />
+                    </div>
+                    <span class="mt-6 text-sm text-gray-400">—</span>
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Tutup</label
+                      >
+                      <input
+                        type="time"
+                        :value="day.close || '18:00'"
+                        @input="
+                          day.close = $event.target.value;
+                          updateDayHours(index);
+                        "
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -776,39 +852,6 @@
           <button
             @click="handleSave"
             class="w-full py-3 text-sm font-semibold text-center text-white transition-opacity bg-merchant-primary rounded-xl hover:opacity-90"
-          >
-            Simpan
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- modal jam -->
-    <div
-      v-if="showHoursModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-    >
-      <div class="w-full max-w-sm p-4 bg-white rounded-xl">
-        <h3 class="mb-4 font-bold">Atur Jam Operasional</h3>
-
-        <div class="flex gap-3">
-          <input
-            type="time"
-            v-model="tempOpen"
-            class="w-full p-2 border rounded"
-          />
-          <input
-            type="time"
-            v-model="tempClose"
-            class="w-full p-2 border rounded"
-          />
-        </div>
-
-        <div class="flex justify-end gap-2 mt-4">
-          <button @click="showHoursModal = false">Batal</button>
-          <button
-            @click="saveHours"
-            class="px-4 py-2 text-white rounded bg-merchant-primary"
           >
             Simpan
           </button>
@@ -938,12 +981,6 @@ const onLogoImgError = () => {
   form.value.logo = "";
   form.value.logoFile = null;
 };
-
-const showHoursModal = ref(false);
-const editingDayIndex = ref(null);
-
-const tempOpen = ref("06:00");
-const tempClose = ref("18:00");
 
 const provincesLoading = ref(false);
 const citiesLoading = ref(false);
@@ -1229,29 +1266,32 @@ const handleUploadLogo = () => {
   logoInput.value.click();
 };
 
-const handleEditHours = (index) => {
+const onDayToggle = (index) => {
   const day = form.value.operationalHours[index];
+  if (!day) return;
 
-  editingDayIndex.value = index;
-  tempOpen.value = day.open || "06:00";
-  tempClose.value = day.close || "18:00";
-
-  showHoursModal.value = true;
-
-  if (isDev) {
-    console.log("Edit hours for day:", index);
+  if (day.isOpen) {
+    day.open = day.open || "06:00";
+    day.close = day.close || "18:00";
+    day.hours = `[${day.open} - ${day.close}]`;
+  } else {
+    day.open = null;
+    day.close = null;
+    day.hours = "Tutup";
   }
 };
 
-const saveHours = () => {
-  const day = form.value.operationalHours[editingDayIndex.value];
+const updateDayHours = (index) => {
+  const day = form.value.operationalHours[index];
+  if (!day) return;
 
-  day.open = tempOpen.value;
-  day.close = tempClose.value;
-  day.hours = `[${tempOpen.value} - ${tempClose.value}]`;
+  const open = day.open || "06:00";
+  const close = day.close || "18:00";
+
+  day.open = open;
+  day.close = close;
   day.isOpen = true;
-
-  showHoursModal.value = false;
+  day.hours = `[${open} - ${close}]`;
 };
 
 const buildOperationalHoursPayload = () => {
