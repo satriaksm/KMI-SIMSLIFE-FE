@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, inject } from "vue"; 
+import { ref, computed, onMounted, watch, inject } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useMerchants } from "@/composables/useMerchants";
@@ -19,7 +19,7 @@ const toast = useToast();
 
 const { merchants, loading, pagination, fetchMerchants } = useMerchants();
 
-const registerExportModal = inject('registerExportModal', null);
+const registerExportModal = inject("registerExportModal", null);
 
 // State
 const searchQuery = ref("");
@@ -31,7 +31,7 @@ const showFilterModal = ref(false);
 const showExportModal = ref(false);
 const showApproveModal = ref(false);
 const showRejectModal = ref(false);
-const exportLoading = ref(false); 
+const exportLoading = ref(false);
 
 // Selected merchant for approval/rejection
 const selectedMerchant = ref(null);
@@ -54,15 +54,15 @@ const isAnyModalOpen = computed(
     showFilterModal.value ||
     showExportModal.value ||
     showApproveModal.value ||
-    showRejectModal.value
+    showRejectModal.value,
 );
 useBodyScrollLock(isAnyModalOpen);
 
 // Table config
 const tableColumns = [
   { key: "logo", label: "Logo", sortable: false },
-  { key: "name", label: "Merchant", sortable: true },
-  { key: "owner", label: "Owner", sortable: false },
+  { key: "name", label: "UMKM", sortable: true },
+  { key: "owner", label: "Pemilik", sortable: false },
   { key: "segmentation", label: "Segmentasi", sortable: false },
   { key: "products_count", label: "Produk", sortable: true },
   { key: "status", label: "Status", sortable: true },
@@ -73,10 +73,10 @@ const tableColumns = [
 const totalPages = computed(() => pagination.value?.last_page ?? 1);
 const totalItems = computed(() => pagination.value?.total ?? 0);
 const currentPageFromApi = computed(
-  () => pagination.value?.current_page ?? currentPage.value
+  () => pagination.value?.current_page ?? currentPage.value,
 );
 const perPageFromApi = computed(
-  () => pagination.value?.per_page ?? perPage.value
+  () => pagination.value?.per_page ?? perPage.value,
 );
 
 const paginationInfo = computed(() => {
@@ -86,7 +86,7 @@ const paginationInfo = computed(() => {
       : (currentPageFromApi.value - 1) * perPageFromApi.value + 1;
   const end = Math.min(
     currentPageFromApi.value * perPageFromApi.value,
-    totalItems.value
+    totalItems.value,
   );
   return {
     start,
@@ -147,7 +147,7 @@ const openFilterModal = () => {
 const closeFilterModal = () => (showFilterModal.value = false);
 
 const openExportModal = () => {
-  console.log('openExportModal called in merchants/Index.vue');
+  console.log("openExportModal called in merchants/Index.vue");
   showExportModal.value = true;
 };
 const closeExportModal = () => (showExportModal.value = false);
@@ -182,17 +182,17 @@ const approveMerchant = async () => {
   processingAction.value = true;
   try {
     await api.patch(
-      `/api/admin/merchants/${selectedMerchant.value.id}/approve`
+      `/api/admin/merchants/${selectedMerchant.value.id}/approve`,
     );
 
-    toast.success(`Merchant "${selectedMerchant.value.name}" berhasil di-approve`);
+    toast.success(
+      `Merchant "${selectedMerchant.value.name}" berhasil di-approve`,
+    );
     closeApproveModal();
     loadMerchants();
   } catch (error) {
     console.error("Failed to approve merchant:", error);
-    toast.error(
-      error.response?.data?.message || "Gagal approve merchant"
-    );
+    toast.error(error.response?.data?.message || "Gagal approve merchant");
   } finally {
     processingAction.value = false;
   }
@@ -213,7 +213,7 @@ const rejectMerchant = async () => {
       `/api/admin/merchants/${selectedMerchant.value.id}/reject`,
       {
         rejection_reason: rejectionReason.value,
-      }
+      },
     );
 
     toast.success(`Merchant "${selectedMerchant.value.name}" berhasil ditolak`);
@@ -221,9 +221,7 @@ const rejectMerchant = async () => {
     loadMerchants();
   } catch (error) {
     console.error("Failed to reject merchant:", error);
-    toast.error(
-      error.response?.data?.message || "Gagal reject merchant"
-    );
+    toast.error(error.response?.data?.message || "Gagal reject merchant");
   } finally {
     processingAction.value = false;
   }
@@ -268,7 +266,10 @@ const exportPDF = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `merchants-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    link.setAttribute(
+      "download",
+      `merchants-report-${new Date().toISOString().split("T")[0]}.pdf`,
+    );
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -307,13 +308,13 @@ watch(currentPage, () => loadMerchants());
 // Register callback on mount
 onMounted(() => {
   loadMerchants();
-  
+
   // Register the export modal function with parent
-  if (registerExportModal && typeof registerExportModal === 'function') {
-    console.log('Registering export modal callback for merchants');
+  if (registerExportModal && typeof registerExportModal === "function") {
+    console.log("Registering export modal callback for merchants");
     registerExportModal(openExportModal);
   } else {
-    console.warn('registerExportModal not provided by parent');
+    console.warn("registerExportModal not provided by parent");
   }
 });
 </script>
@@ -321,8 +322,8 @@ onMounted(() => {
 <template>
   <div class="p-4 sm:p-6">
     <!-- Search & Toolbar -->
-    <div class="space-y-2 sm:space-y-4 mb-4 bg-white">
-      <div class="sm:flex sm:items-center sm:gap-4 pb-1">
+    <div class="mb-4 space-y-2 bg-white sm:space-y-4">
+      <div class="pb-1 sm:flex sm:items-center sm:gap-4">
         <div class="flex-1 mb-2 sm:mb-0">
           <TextField
             name="search"
@@ -344,7 +345,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -352,10 +353,10 @@ onMounted(() => {
       </div>
 
       <!-- Mobile toolbar -->
-      <div class="flex sm:hidden flex-row justify-between items-center px-3 rounded-lg gap-4 pb-1">
-        <div class="text-xs text-muted-foreground">
-          Total: {{ totalItems }}
-        </div>
+      <div
+        class="flex flex-row items-center justify-between gap-4 px-3 pb-1 rounded-lg sm:hidden"
+      >
+        <div class="text-xs text-muted-foreground">Total: {{ totalItems }}</div>
 
         <Button
           @click="openFilterModal"
@@ -367,7 +368,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -393,16 +394,27 @@ onMounted(() => {
       >
         <template #cell-logo="{ item }">
           <div class="flex items-center justify-center">
-            <div v-if="item.logo_path" class="w-10 h-10 rounded-full overflow-hidden">
-              <img 
-                :src="getMerchantLogoUrl(item)" 
-                :alt="item.name" 
-                class="w-full h-full object-cover"
-                @error="(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold text-sm'>${item.name?.charAt(0)?.toUpperCase()}</span>`; }"
+            <div
+              v-if="item.logo_path"
+              class="w-10 h-10 overflow-hidden rounded-full"
+            >
+              <img
+                :src="getMerchantLogoUrl(item)"
+                :alt="item.name"
+                class="object-cover w-full h-full"
+                @error="
+                  (e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<span class='text-sm font-semibold text-merchant-primary'>${item.name?.charAt(0)?.toUpperCase()}</span>`;
+                  }
+                "
               />
             </div>
-            <div v-else class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center">
-              <span class="text-merchant-primary font-semibold text-sm">
+            <div
+              v-else
+              class="flex items-center justify-center w-10 h-10 rounded-full bg-merchant-primary/10"
+            >
+              <span class="text-sm font-semibold text-merchant-primary">
                 {{ item.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
@@ -411,14 +423,17 @@ onMounted(() => {
 
         <template #cell-owner="{ item }">
           <div>
-            <p class="font-medium text-sm">{{ item.user?.name || "-" }}</p>
+            <p class="text-sm font-medium">{{ item.user?.name || "-" }}</p>
             <p class="text-xs text-gray-500">{{ item.user?.email || "-" }}</p>
           </div>
         </template>
 
         <template #cell-segmentation="{ item }">
           <StatusLabel
-            :status="item.segmentation?.code || item.segmentation?.name?.toLowerCase().replace(/\s/g, '_')"
+            :status="
+              item.segmentation?.code ||
+              item.segmentation?.name?.toLowerCase().replace(/\s/g, '_')
+            "
             variant="segmentation"
             size="sm"
           />
@@ -429,11 +444,7 @@ onMounted(() => {
         </template>
 
         <template #cell-status="{ item }">
-          <StatusLabel
-            :status="item.status"
-            variant="merchant"
-            size="sm"
-          />
+          <StatusLabel :status="item.status" variant="merchant" size="sm" />
         </template>
 
         <!-- Actions cell dengan conditional buttons -->
@@ -478,14 +489,14 @@ onMounted(() => {
     <!-- Mobile List -->
     <div class="sm:hidden">
       <div v-if="loading" class="flex justify-center py-12">
-        <i class="pi pi-spin pi-spinner text-4xl text-merchant-primary"></i>
+        <i class="text-4xl pi pi-spin pi-spinner text-merchant-primary"></i>
       </div>
 
       <div
         v-else-if="!merchants || merchants.length === 0"
-        class="text-center py-12"
+        class="py-12 text-center"
       >
-        <i class="pi pi-building text-6xl text-gray-300 mb-4"></i>
+        <i class="mb-4 text-6xl text-gray-300 pi pi-building"></i>
         <p class="text-gray-500">Tidak ada merchant</p>
       </div>
 
@@ -494,41 +505,59 @@ onMounted(() => {
           v-for="m in merchants"
           :key="m.id"
           @click="goToDetail(m)"
-          class="bg-white rounded-lg shadow-sm p-4 active:bg-gray-50 transition"
+          class="p-4 transition bg-white rounded-lg shadow-sm active:bg-gray-50"
         >
           <div class="flex items-start gap-3 mb-3">
-            <div v-if="m.logo_path" class="w-12 h-12 rounded-full overflow-hidden shrink-0">
-              <img 
-                :src="getMerchantLogoUrl(m)" 
-                :alt="m.name" 
-                class="w-full h-full object-cover"
-                @error="(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = `<div class='w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0'><span class='text-merchant-primary font-semibold'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`; }"
+            <div
+              v-if="m.logo_path"
+              class="w-12 h-12 overflow-hidden rounded-full shrink-0"
+            >
+              <img
+                :src="getMerchantLogoUrl(m)"
+                :alt="m.name"
+                class="object-cover w-full h-full"
+                @error="
+                  (e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<div class='flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0'><span class='font-semibold text-merchant-primary'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`;
+                  }
+                "
               />
             </div>
-            <div v-else class="w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0">
-              <span class="text-merchant-primary font-semibold">
+            <div
+              v-else
+              class="flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0"
+            >
+              <span class="font-semibold text-merchant-primary">
                 {{ m.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
 
             <div class="flex-1 min-w-0">
               <p class="font-semibold text-gray-900 truncate">{{ m.name }}</p>
-              <p class="text-sm text-gray-600 truncate">Owner: {{ m.user?.name || "-" }}</p>
-              <p class="text-xs text-gray-500 truncate">{{ m.user?.email || "-" }}</p>
+              <p class="text-sm text-gray-600 truncate">
+                Owner: {{ m.user?.name || "-" }}
+              </p>
+              <p class="text-xs text-gray-500 truncate">
+                {{ m.user?.email || "-" }}
+              </p>
             </div>
 
             <StatusLabel :status="m.status" variant="merchant" size="sm" />
           </div>
 
-          <div class="flex items-center justify-between text-xs border-t pt-2">
+          <div class="flex items-center justify-between pt-2 text-xs border-t">
             <StatusLabel
-              :status="m.segmentation?.code || m.segmentation?.name?.toLowerCase().replace(/\s/g, '_')"
+              :status="
+                m.segmentation?.code ||
+                m.segmentation?.name?.toLowerCase().replace(/\s/g, '_')
+              "
               :label="m.segmentation?.name"
               variant="segmentation"
               size="sm"
             />
             <span class="text-gray-600">
-              <i class="pi pi-box mr-1"></i>
+              <i class="mr-1 pi pi-box"></i>
               {{ m.products_count || 0 }} Produk
             </span>
           </div>
@@ -536,7 +565,7 @@ onMounted(() => {
           <!-- ✅ NEW: Mobile action buttons for pending -->
           <div
             v-if="m.status === 'pending'"
-            class="flex gap-2 mt-3 pt-3 border-t"
+            class="flex gap-2 pt-3 mt-3 border-t"
             @click.stop
           >
             <Button
@@ -545,7 +574,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-green-500 !text-green-600"
             >
-              <i class="pi pi-check mr-1"></i>
+              <i class="mr-1 pi pi-check"></i>
               Approve
             </Button>
             <Button
@@ -554,7 +583,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-red-500 !text-red-600"
             >
-              <i class="pi pi-times mr-1"></i>
+              <i class="mr-1 pi pi-times"></i>
               Reject
             </Button>
           </div>
@@ -598,7 +627,7 @@ onMounted(() => {
       </div>
 
       <template #footer>
-        <div class="flex gap-3 justify-end">
+        <div class="flex justify-end gap-3">
           <Button @click="resetFilters" variant="secondary">Reset</Button>
           <Button @click="applyFilters" variant="merchant">Terapkan</Button>
         </div>
@@ -613,12 +642,14 @@ onMounted(() => {
       subtitle="Unduh laporan data merchants dalam format PDF"
     >
       <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="p-4 border border-blue-200 rounded-lg bg-blue-50">
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
-              <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
-              <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
+              <p class="mb-1 text-sm font-medium text-blue-900">
+                Laporan akan mencakup:
+              </p>
+              <ul class="space-y-1 text-xs text-blue-800 list-disc list-inside">
                 <li>Data lengkap merchants (Nama, Owner, Email, Phone)</li>
                 <li>Segmentasi dan status merchants</li>
                 <li>Jumlah produk yang dimiliki</li>
@@ -633,10 +664,10 @@ onMounted(() => {
           @click="exportPDF"
           variant="merchant"
           size="lg"
-          custom-class="w-full justify-center"
+          custom-class="justify-center w-full"
           :loading="exportLoading"
         >
-          <i class="pi pi-download mr-2"></i>
+          <i class="mr-2 pi pi-download"></i>
           <span>Download Laporan PDF</span>
         </Button>
       </div>
@@ -649,9 +680,9 @@ onMounted(() => {
       title="Approve Merchant"
       subtitle="Apakah Anda yakin ingin meng-approve merchant ini?"
     >
-      <div class="text-center py-4">
-        <i class="pi pi-check-circle text-green-500 text-4xl mb-4"></i>
-        <p class="text-gray-800 font-semibold mb-2">
+      <div class="py-4 text-center">
+        <i class="mb-4 text-4xl text-green-500 pi pi-check-circle"></i>
+        <p class="mb-2 font-semibold text-gray-800">
           Merchant "{{ selectedMerchant?.name }}" akan di-approve
         </p>
         <p class="text-sm text-gray-500">
@@ -659,8 +690,14 @@ onMounted(() => {
         </p>
       </div>
 
-      <div class="flex gap-3 justify-center">
-        <Button @click="closeApproveModal" variant="secondary" size="lg" custom-class="w-full max-w-[150px]">
+      <div class="flex justify-center gap-3">
+        <Button
+          @click="closeApproveModal"
+          variant="secondary"
+          size="lg"
+          custom-class="w-full max-w-[150px]"
+          :disabled="processingAction"
+        >
           Batal
         </Button>
         <Button
@@ -668,6 +705,7 @@ onMounted(() => {
           variant="merchant"
           size="lg"
           custom-class="w-full max-w-[150px]"
+          :disabled="processingAction"
           :loading="processingAction"
         >
           Setujui
@@ -685,19 +723,25 @@ onMounted(() => {
       <div class="space-y-4">
         <textarea
           v-model="rejectionReason"
-          class="w-full p-3 border rounded-md focus:ring-1 focus:ring-primary focus:outline-none resize-none"
+          class="w-full p-3 border rounded-md resize-none focus:ring-1 focus:ring-primary focus:outline-none"
           rows="3"
           placeholder="Masukkan alasan penolakan di sini..."
         ></textarea>
       </div>
 
       <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button @click="closeRejectModal" variant="secondary">Batal</Button>
+        <div class="flex justify-end gap-3">
+          <Button
+            @click="closeRejectModal"
+            variant="secondary"
+            :disabled="processingAction"
+            >Batal</Button
+          >
           <Button
             @click="rejectMerchant"
             variant="merchant"
-            :disabled="!rejectionReason.trim()"
+            :disabled="!rejectionReason.trim() || processingAction"
+            :loading="processingAction"
           >
             Tolak Merchant
           </Button>

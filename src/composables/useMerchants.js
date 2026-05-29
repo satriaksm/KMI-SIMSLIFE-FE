@@ -176,7 +176,7 @@ export function useMerchants() {
       if (isDev) {
         console.error("[useMerchants] Public fetch failed:", error);
       }
-      toast.error("Gagal memuat data merchant publik");
+      toast.error("Gagal memuat data UMKM publik");
       merchants.value = [];
     } finally {
       loading.value = false;

@@ -128,7 +128,7 @@ const handleDeleteMerchant = async () => {
 
     router.push("/profile");
   } catch (error) {
-    //
+    // Error handling is done in the composable, so we can ignore it here
   } finally {
     deletingMerchant.value = false;
   }
@@ -555,27 +555,47 @@ const goToEdit = () => {
             </h3>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label class="block mb-2 text-sm font-medium text-merchant-primary">NPWP</label>
-                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
-                  {{ merchantInfo.NPWP || '-' }}
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >NPWP</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.NPWP || "-" }}
                 </div>
               </div>
               <div>
-                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nama Bank</label>
-                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
-                  {{ merchantInfo.bank_code || '-' }}
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nama Bank</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_code || "-" }}
                 </div>
               </div>
               <div>
-                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nomor Rekening</label>
-                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
-                  {{ merchantInfo.bank_account_number || '-' }}
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nomor Rekening</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_account_number || "-" }}
                 </div>
               </div>
               <div>
-                <label class="block mb-2 text-sm font-medium text-merchant-primary">Nama Pemilik Rekening</label>
-                <div class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base">
-                  {{ merchantInfo.bank_account_name || '-' }}
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nama Pemilik Rekening</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_account_name || "-" }}
                 </div>
               </div>
             </div>
