@@ -675,45 +675,64 @@ const submitForm = async (values) => {
     fd.set("location_address", formData.value.location_address || "");
     fd.set("operating_times", formData.value.operating_times || "");
 
+    // === DEBUG: Pastikan title ada di FormData ===
+    const titleToSend = values?.title ?? formData.value.title ?? "";
+    fd.set("title", titleToSend);
+    fd.set("description", values?.description ?? formData.value.description ?? "");
+
     console.log("[Editjasa] Submitting:", {
+      title: titleToSend,
       service_type_booking: formData.value.service_type_booking,
       cara_pemesanan: fd.get("cara_pemesanan"),
     });
 
-    // Ensure integer prices
-    fd.set("fixed_price", parseInt(values.fixed_price) || 0);
-    fd.set("base_price", parseInt(values.base_price) || 0);
+    // Ensure integer prices from formData (not from vee-validate values slot)
+    fd.set("fixed_price", parseInt(formData.value.fixed_price) || 0);
+    fd.set("base_price", parseInt(formData.value.base_price) || 0);
 
-    // Add new images if any
-    if (newImageFiles.value && newImageFiles.value.length) {
-      const fileError = validateSelectedImages(newImageFiles.value);
-      if (fileError) {
-        toast.error(fileError);
-        return;
-      }
+    // === UPLOAD GAMBAR: hanya images[] berisi File object (maks 10) ===
+    const filesToUpload = (newImageFiles.value || [])
+      .filter((file) => file instanceof File)
+      .slice(0, 10);
 
-      newImageFiles.value.forEach((file) => fd.append("images[]", file));
-    }
+    console.log('existingImages:', existingImages.value);
+    console.log('selectedImages (newImageFiles):', newImageFiles.value);
 
-    // Add images to remove (if backend supports it)
+    filesToUpload.forEach((file) => {
+      fd.append('images[]', file);
+    });
+
+    // Add images to remove (ID array, bukan images[])
     if (imagesToRemove.value.length) {
-      fd.append("remove_images", JSON.stringify(imagesToRemove.value));
+      fd.append('remove_images', JSON.stringify(imagesToRemove.value));
     }
 
     // Set cover image id if selected
     if (currentCoverId.value) {
-      fd.append("cover_image_id", currentCoverId.value);
+      fd.append('cover_image_id', String(currentCoverId.value));
+    }
+
+    // Debug: log all FormData entries
+    console.log("[Editjasa] FormData entries:");
+    for (const [key, value] of fd.entries()) {
+      console.log(`  FORMDEBUG ${key}:`, typeof value === "object" ? `File(${value.name})` : value);
     }
 
     console.log("Submitting jasa with FormData", {
       status: formData.value.status,
-      new_images_count: newImageFiles.value.length,
+      new_images_count: filesToUpload.length,
+      existing_images_count: existingImages.value.length,
       images_to_remove: imagesToRemove.value.length,
     });
 
     // Use POST with _method spoofing for multipart compatibility
     // Biarkan axios yang set header multipart/form-data + boundary secara otomatis
-    const { data } = await api.post(`/api/jasa/${currentJasaId.value}`, fd);
+    const { data } = await api.post(`/api/jasa/${currentJasaId.value}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).catch((err) => {
+      console.error("[Editjasa] API Error:", err.response?.status, err.response?.data);
+      throw err;
+    });
 
     toast.success("Jasa berhasil diperbarui!");
 
@@ -737,9 +756,22 @@ const submitForm = async (values) => {
       `/merchant-center/${currentMerchantSlug.value}/jasas?t=${Date.now()}`
     );
   } catch (error) {
+    // Detailed error logging
     console.error("Error updating jasa:", error);
-    const msg = error.response?.data?.message || "Gagal memperbarui jasa";
-    toast.error(msg);
+    console.error("Error status:", error.response?.status);
+    console.error("Error data:", error.response?.data);
+    console.error("Error headers:", error.response?.headers);
+    const errors = error.response?.data?.errors;
+    if (errors) {
+      console.error("Validation errors:", errors);
+      Object.entries(errors).forEach(([field, messages]) => {
+        messages.forEach((msg) => {
+          toast.error(`${field}: ${msg}`);
+        });
+      });
+    }
+    const msg = error.response?.data?.message || error.response?.data?.error || "Gagal memperbarui jasa";
+    if (!errors) toast.error(msg);
   } finally {
     loading.value = false;
   }
@@ -794,10 +826,9 @@ onMounted(async () => {
           :validationSchema="validationSchema"
           :initialValues="formData"
           @submit="submitForm"
-          v-slot="{ handleSubmit, values, setFieldValue }"
+          v-slot="{ errors }"
         >
           <form
-            @submit.prevent="handleSubmit(submitForm)"
             class="p-6 space-y-6"
           >
             <!-- 1. KLASIFIKASI LAYANAN -->
@@ -924,7 +955,7 @@ onMounted(async () => {
                             field.onChange(newValue);
                             formData.fixed_price = newValue;
                             // Auto-clear base_price jika fixed_price diisi
-                            if (newValue > 0 && values?.base_price > 0) {
+                            if (newValue > 0 && Number(formData.base_price || 0) > 0) {
                               setFieldValue('base_price', 0);
                               formData.base_price = 0;
                             }
@@ -934,7 +965,7 @@ onMounted(async () => {
                         type="text"
                         placeholder="0"
                         class="w-full py-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        :disabled="Number(values?.base_price || 0) > 0"
+                        :disabled="Number(formData.base_price || 0) > 0"
                       />
                     </div>
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
@@ -944,7 +975,7 @@ onMounted(async () => {
                       v-else
                       class="mt-1 text-sm"
                       :class="
-                        Number(values?.base_price || 0) > 0
+                        Number(formData.base_price || 0) > 0
                           ? 'text-gray-400'
                           : 'text-gray-600'
                       "
@@ -973,7 +1004,7 @@ onMounted(async () => {
                             field.onChange(newValue);
                             formData.base_price = newValue;
                             // Auto-clear fixed_price jika base_price diisi
-                            if (newValue > 0 && values?.fixed_price > 0) {
+                            if (newValue > 0 && Number(formData.fixed_price || 0) > 0) {
                               setFieldValue('fixed_price', 0);
                               formData.fixed_price = 0;
                             }
@@ -983,7 +1014,7 @@ onMounted(async () => {
                         type="text"
                         placeholder="0"
                         class="w-full py-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        :disabled="Number(values?.fixed_price || 0) > 0"
+                        :disabled="Number(formData.fixed_price || 0) > 0"
                       />
                     </div>
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
@@ -993,7 +1024,7 @@ onMounted(async () => {
                       v-else
                       class="mt-1 text-sm"
                       :class="
-                        Number(values?.fixed_price || 0) > 0
+                        Number(formData.fixed_price || 0) > 0
                           ? 'text-gray-400'
                           : 'text-gray-600'
                       "
@@ -1037,7 +1068,7 @@ onMounted(async () => {
                       class="relative"
                     >
                       <img
-                        :src="getImageUrl(image.url || image.src_url || image.id)"
+                        :src="getImageUrl(image.url || image.src_url || image.id || image.path)"
                         alt="preview"
                         class="object-cover w-full border border-gray-200 rounded h-28 bg-gray-50"
                         @error="(e) => (e.target.style.display = 'none')"
@@ -1486,7 +1517,7 @@ onMounted(async () => {
                     variant="primary"
                     @click="
                       formData.status = 'published';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2"
                   >
@@ -1501,7 +1532,7 @@ onMounted(async () => {
                     variant="muted-outline"
                     @click="
                       formData.status = 'archived';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2 text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
                   >
@@ -1516,7 +1547,7 @@ onMounted(async () => {
                     variant="primary"
                     @click="
                       formData.status = 'published';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2"
                   >
@@ -1539,11 +1570,12 @@ onMounted(async () => {
                 Kembali
               </Button>
               <Button
-                type="submit"
+                type="button"
                 variant="primary"
                 :disabled="loading"
                 :loading="loading"
                 class="flex-1"
+                @click="submitForm(formData)"
               >
                 <i class="mr-2 pi pi-check"></i>
                 {{ loading ? "Menyimpan..." : "Simpan Perubahan" }}

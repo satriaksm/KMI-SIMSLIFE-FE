@@ -170,9 +170,9 @@ onMounted(() => {
               <!-- Service Image -->
               <div class="w-14 h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                 <img
-                  :src="consultation.jasa?.cover_img?.url || consultation.jasa?.cover_img?.src_url || '/placeholder-service.png'"
+                  :src="consultation.jasa?.cover_img?.url || consultation.jasa?.cover_img?.src_url || '/placeholder.png'"
                   class="object-cover w-full h-full"
-                  @error="(e) => (e.target.src = '/placeholder-service.png')"
+                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
                 />
               </div>
 

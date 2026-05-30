@@ -642,7 +642,7 @@ const getServiceImage = (order) => {
   if (order?.jasa?.cover_img) return order.jasa.cover_img;
   if (order?.jasa?.images?.[0]?.image_url) return order.jasa.images[0].image_url;
   if (order?.jasa?.images?.[0]?.url) return order.jasa.images[0].url;
-  return '/placeholder-service.png';
+  return '/placeholder.png';
 };
 
 const openDetailModal = (order) => {
@@ -781,7 +781,7 @@ onMounted(() => {
                 <img
                   :src="getServiceImage(order)"
                   class="object-cover w-full h-full"
-                  @error="(e) => (e.target.src = '/placeholder-service.png')"
+                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
                 />
               </div>
               <div class="flex-1 min-w-0">
@@ -940,9 +940,9 @@ onMounted(() => {
             <div class="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
               <div class="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden">
                 <img
-                  :src="selectedOrder.service_image || '/placeholder-service.png'"
+                  :src="selectedOrder.service_image || '/placeholder.png'"
                   class="object-cover w-full h-full"
-                  @error="(e) => (e.target.src = '/placeholder-service.png')"
+                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
                 />
               </div>
               <div>

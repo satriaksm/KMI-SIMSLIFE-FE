@@ -230,34 +230,31 @@ const confirmCompleted = async (order) => {
   }
 
   try {
-    console.log('Confirming order:', {
+    console.log('[Confirm] Memulai konfirmasi pesanan:', {
       id: order.id,
       status: order.status,
-      hasEvidences: getCompletionEvidences(order).length > 0
     });
 
     const { data } = await api.post(`/api/service-orders/${order.id}/confirm`);
 
-    console.log('Confirm response:', data);
+    console.log('[Confirm] Response received:', data);
 
-    // Check response with multiple formats
-    const isSuccess =
-      data?.success === true ||
-      data?.status === true ||
-      data?.status === 'success';
+    // ApiResponse::success returns { message, data } — NOT { success, data }
+    // Backend line 211: ApiResponse::success($order->fresh(...), 'Pesanan berhasil dikonfirmasi selesai...')
+    // data = { message: "...", data: { order_with_evidences } }
+    // axios receives it as: axios response.data = { message: "...", data: { ... } }
+    // FE receives: data = axios response.data = { message: "...", data: { ... } }
+    const responseMessage = data?.message || 'Pesanan berhasil dikonfirmasi selesai! Terima kasih!';
 
-    if (isSuccess) {
-      toast.success(data?.message || 'Pesanan berhasil dikonfirmasi selesai!');
-      fetchOrders(activeFilter.value);
-    } else {
-      console.error('Confirm error response:', data);
-      toast.error(data?.message || 'Gagal mengkonfirmasi pesanan');
-    }
+    toast.success(responseMessage);
+
+    // Refresh daftar pesanan untuk memperbarui status
+    await fetchOrders(activeFilter.value);
   } catch (error) {
-    console.error('Gagal mengkonfirmasi pesanan:', error);
-    console.error('Confirm error response:', error.response?.data);
+    console.error('[Confirm] Error:', error.response?.data || error);
     toast.error(
       error.response?.data?.message ||
+      (error.response?.data?.errors ? error.response.data.errors[0] : null) ||
       'Gagal mengkonfirmasi pesanan'
     );
   }
@@ -381,7 +378,7 @@ const getServiceImage = (order) => {
   if (order?.jasa?.images?.[0]?.image_url) return order.jasa.images[0].image_url;
   if (order?.jasa?.images?.[0]?.url) return order.jasa.images[0].url;
   // Return placeholder
-  return '/placeholder-service.png';
+  return '/placeholder.png';
 };
 
 // Normalize status for display
@@ -536,7 +533,7 @@ onMounted(async () => {
                   <img
                     :src="getServiceImage(order)"
                     class="object-cover w-full h-full"
-                    @error="(e) => (e.target.src = '/placeholder-service.png')"
+                    @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
                   />
                 </div>
                 <div class="flex-1 min-w-0">
@@ -739,13 +736,13 @@ onMounted(async () => {
                   >
                     <img
                       v-if="media.file_type === 'image'"
-                      :src="media.file_url || getMediaUrl(media.file_path) || '/placeholder.png'"
+                      :src="media.file_url ? getMediaUrlFromMedia(media) : '/placeholder.png'"
                       class="review-media-img"
                       @error="(e) => e.target.style.display = 'none'"
                     />
                     <video
                       v-else-if="media.file_type === 'video'"
-                      :src="media.file_url || getMediaUrl(media.file_path)"
+                      :src="getMediaUrlFromMedia(media)"
                       controls
                       class="review-media-video"
                     />

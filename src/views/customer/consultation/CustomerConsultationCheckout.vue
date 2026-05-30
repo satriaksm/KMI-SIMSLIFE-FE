@@ -171,29 +171,32 @@ const submitCheckout = async () => {
     // For online and di_tempat_umkm, don't send customer_address
     // Backend will handle it based on service_type
 
+    console.log('[Checkout] Mengirim request book consultation...');
+
     const { data } = await api.post(
       `/api/service-consultations/${consultationId.value}/book`,
       payload
     );
 
-    if (data.success) {
-      toast.success('Booking berhasil diajukan!');
+    console.log('[Checkout] Response received:', data);
 
-      // Open WhatsApp if URL is available
-      if (data.data?.whatsapp_url) {
-        window.open(data.data.whatsapp_url, '_blank');
-      }
+    // ApiResponse::success returns { message, data } — NOT { success, data }
+    // Check data.data for order info
+    const responseData = data?.data ?? data;
+    const orderId = responseData?.service_order?.id;
 
-      // Redirect to order detail page
-      const orderId = data.data?.service_order?.id;
-      if (orderId) {
-        router.push(`/pembayaran-jasa?order_id=${orderId}`);
-      } else {
-        router.push('/pembayaran-jasa');
-      }
+    toast.success(data?.message || 'Pesanan konsultasi berhasil dibuat!');
+
+    // Open WhatsApp if URL is available
+    if (responseData?.whatsapp_url) {
+      window.open(responseData.whatsapp_url, '_blank');
     }
+
+    // Redirect to Service History — NOT pembayaran-jasa
+    // Konsultasi langsung jadi pesanan COD/manual, tidak perlu halaman pembayaran
+    router.push('/service-history');
   } catch (error) {
-    console.error('Checkout error:', error);
+    console.error('[Checkout] Error:', error.response?.data || error);
     toast.error(error.response?.data?.message || 'Gagal membuat pesanan');
   } finally {
     submitting.value = false;
@@ -236,7 +239,7 @@ onMounted(fetchConsultation);
         <div class="flex items-start gap-3">
           <div class="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
             <img
-              :src="consultation.jasa?.cover_img?.url || '/placeholder-service.png'"
+              :src="consultation.jasa?.cover_img?.url || '/placeholder.png'"
               class="object-cover w-full h-full"
             />
           </div>

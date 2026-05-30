@@ -142,6 +142,12 @@ const jasaCategories = categoriesLevel1;
 const jasaSubcategories = categoriesLevel2;
 const formKey = ref(0);
 
+// Submit state flags — prevent restore after submit
+const isSubmitting = ref(false);
+const isSubmittedSuccessfully = ref(false);
+const queryParamsCleared = ref(false); // Track if URL query params were cleared
+const SUBMIT_SUCCESS_KEY = computed(() => `jasa-create-submitted-${currentMerchantSlug.value || "default"}`);
+
 const FORM_DRAFT_KEY = computed(() => `jasa-create-draft-${currentMerchantSlug.value || "default"}`);
 
 const formData = ref({
@@ -166,8 +172,9 @@ const validationSchema = yup.object({
   title: yup.string().required("Nama layanan wajib diisi")
     .min(5, "Nama layanan minimal 5 karakter")
     .max(70, "Nama layanan maksimal 70 karakter"),
-  description: yup.string().required("Deskripsi layanan wajib diisi")
-    .min(50, "Deskripsi minimal 50 karakter")
+  description: yup.string()
+    .required("Deskripsi layanan wajib diisi")
+    .min(10, "Minimal 10 karakter")
     .max(1000, "Deskripsi maksimal 1000 karakter"),
   jasa_category_id: yup.mixed().transform((value) => (value === "" || value === null ? null : Number(value))).nullable(),
   jasa_subcategory_id: yup.mixed().transform((value) => (value === "" || value === null ? null : Number(value))).nullable(),
@@ -269,13 +276,31 @@ const handleCategoryChange = async (value) => {
   await loadSubcategories(value);
 };
 
-// Auto-save form
+// Auto-save form — skip if submitting (prevents race condition with clearFormDraft)
 watch(formData, (newData) => {
+  if (isSubmitting.value || isSubmittedSuccessfully.value) return;
   try { localStorage.setItem(FORM_DRAFT_KEY.value, JSON.stringify(newData)); }
   catch (error) { console.error("Failed to save form draft:", error); }
 }, { deep: true });
 
 const restoreFormDraft = () => {
+  // 🚫 Skip ALL restore if:
+  // 1. Just submitted successfully — flag or sessionStorage
+  if (isSubmittedSuccessfully.value) {
+    isSubmittedSuccessfully.value = false;
+    console.log('[Createjasa] Skip restore: just submitted successfully (flag)');
+    return;
+  }
+  if (sessionStorage.getItem('jasa-create-just-submitted')) {
+    sessionStorage.removeItem('jasa-create-just-submitted');
+    console.log('[Createjasa] Skip restore: just submitted successfully (session)');
+    return;
+  }
+  // 2. URL has query params — this means URL is carrying form data, which is wrong.
+  if (Object.keys(route.query).length > 0 && !queryParamsCleared.value) {
+    console.log('[Createjasa] Skip restore: URL has query params', route.query);
+    return;
+  }
   try {
     const saved = localStorage.getItem(FORM_DRAFT_KEY.value);
     if (saved) {
@@ -333,13 +358,31 @@ const removeSelectedImage = (index) => {
   buildImagePreviews(imageFiles.value);
 };
 
-const submitForm = async (values) => {
-  console.log("[Createjasa] submitForm called", { values, formData: formData.value });
-  if (!currentMerchantSlug.value) { toast.error("Merchant slug tidak ditemukan"); return; }
-  if (!currentMerchantId.value) { toast.error("Merchant ID tidak ditemukan"); return; }
-  if (!authStore.isAuthenticated) { toast.error("Silakan login terlebih dahulu."); router.push("/login"); return; }
+const submitForm = async () => {
+  console.log('=== SUBMIT START ===');
+  console.log('1. currentMerchantSlug:', currentMerchantSlug.value);
+  console.log('2. currentMerchantId:', currentMerchantId.value);
+  console.log('3. isAuthenticated:', authStore.isAuthenticated);
+  console.log('4. service_type_booking:', formData.value.service_type_booking);
+  console.log('5. operating_times:', formData.value.operating_times);
+  console.log('6. fixed_price:', formData.value.fixed_price);
+  console.log('7. base_price:', formData.value.base_price);
+
+  if (!currentMerchantSlug.value) {
+    console.log('❌ Gagal: Merchant slug tidak ditemukan');
+    toast.error("Merchant slug tidak ditemukan"); return;
+  }
+  if (!currentMerchantId.value) {
+    console.log('❌ Gagal: Merchant ID tidak ditemukan');
+    toast.error("Merchant ID tidak ditemukan"); return;
+  }
+  if (!authStore.isAuthenticated) {
+    console.log('❌ Gagal: Belum login');
+    toast.error("Silakan login terlebih dahulu."); router.push("/login"); return;
+  }
 
   if (formData.value.service_type_booking === 'booking' && !formData.value.operating_times?.trim()) {
+    console.log('❌ Gagal: Booking tanpa jam layanan');
     toast.error("Jam layanan wajib diisi untuk Booking");
     return;
   }
@@ -347,16 +390,20 @@ const submitForm = async (values) => {
   // IMPORTANT: Use ?? instead of || to handle 0 values (0 is falsy)
   const fixedPrice = Number(formData.value.fixed_price ?? 0);
   const basePrice = Number(formData.value.base_price ?? 0);
-  console.log("[Createjasa] Prices:", { fixedPrice, basePrice });
+  console.log("[Createjasa] Prices parsed:", { fixedPrice, basePrice });
   if (!fixedPrice && !basePrice) {
+    console.log('❌ Gagal: Tidak ada harga diisi');
     toast.error("Pilih salah satu: Harga Tetap atau Harga Mulai Dari");
     return;
   }
   if (fixedPrice && basePrice) {
+    console.log('❌ Gagal: Kedua harga terisi');
     toast.error("Jangan isi keduanya sekaligus");
     return;
   }
+  console.log('✅ Semua validasi awal PASSED');
 
+  isSubmitting.value = true;
   loading.value = true;
   try {
     const fd = new FormData();
@@ -371,8 +418,8 @@ const submitForm = async (values) => {
     fd.set("price", String(fixedPrice > 0 ? fixedPrice : basePrice));
     fd.set("service_type", formData.value.service_type || "di_tempat_umkm");
     fd.set("service_type_booking", formData.value.service_type_booking || "booking");
-    // Send cara_pemesanan to backend for proper validation
-    fd.set("cara_pemesanan", formData.value.service_type_booking === 'keranjang' ? 'langsung_pesan' : formData.value.service_type_booking);
+    // Send cara_pemesanan — value harus sama persis dengan backend rule: in:keranjang,booking,konsultasi
+    fd.set("cara_pemesanan", formData.value.service_type_booking || "keranjang");
     fd.set("booking_type", formData.value.service_type_booking || "booking");
     fd.set("location_address", formData.value.location_address || "");
     // Operating times: send as JSON array for booking, empty for others
@@ -402,48 +449,81 @@ const submitForm = async (values) => {
       fd.set("jasa_subcategory_id", String(formData.value.jasa_subcategory_id));
     }
 
-    console.log("[Createjasa] FormData ready, sending...");
-
-    // Add images
-    if (imageFiles.value && imageFiles.value.length) {
-      if (imageFiles.value.length > MAX_IMAGE_COUNT) {
-        toast.error(`Maksimal ${MAX_IMAGE_COUNT} gambar`);
-        loading.value = false;
-        return;
-      }
-      imageFiles.value.forEach((file) => {
-        fd.append("images", file);
-      });
+    // Debug: log all FormData entries
+    console.log("[Createjasa] FormData entries:");
+    for (let [key, value] of fd.entries()) {
+      console.log(`  ${key}:`, typeof value === "object" ? value.name : value);
     }
 
-    const { data } = await api.post(`/api/merchants/${currentMerchantSlug.value}/jasas`, fd, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    console.log("[Createjasa] FormData ready, sending...");
+    console.log("[Createjasa] API endpoint:", `/api/merchants/${currentMerchantSlug.value}/jasas`);
+
+    // === UPLOAD GAMBAR: hanya images[] berisi File object ===
+    const filesToUpload = (imageFiles.value || [])
+      .filter((file) => file instanceof File)
+      .slice(0, 10);
+
+    console.log('selectedImages (imageFiles):', imageFiles.value);
+
+    filesToUpload.forEach((file) => {
+      fd.append('images[]', file);
     });
-    console.log("[Createjasa] Success:", data);
-    toast.success("Jasa berhasil disimpan");
+
+    // Debug: log semua FormData entries
+    for (const [key, value] of fd.entries()) {
+      console.log('FORMDATA:', key, value instanceof File ? `File(${value.name})` : value);
+    }
+
+    const { data: response } = await api.post(
+      `/api/merchants/${currentMerchantSlug.value}/jasas`,
+      fd
+    );
+    console.log('Response create jasa:', response);
+
+    // ✅ Mark as submitted BEFORE clearing anything
+    isSubmittedSuccessfully.value = true;
+    sessionStorage.setItem('jasa-create-just-submitted', '1');
+
+    // Clear draft
     clearFormDraft();
+
+    const createdJasa = response?.data;
+    const message = response?.message || "Jasa berhasil disimpan";
+    toast.success(message);
     router.push(`/merchant-center/${currentMerchantSlug.value}/jasas`);
   } catch (error) {
-    console.error("[Createjasa] Error creating jasa:", error);
-    console.error("[Createjasa] Error response:", error.response?.data);
+    console.error('Error create jasa:', error.response?.data || error);
+    isSubmitting.value = false;
 
     // Show Laravel validation errors
     const errors = error.response?.data?.errors;
-    if (errors) {
+    if (errors && Object.keys(errors).length > 0) {
       Object.entries(errors).forEach(([field, messages]) => {
         messages.forEach((msg) => {
           toast.error(`${field}: ${msg}`);
         });
       });
+    } else if (error.response?.data?.message) {
+      toast.error(error.response.data.message);
     } else {
-      toast.error(error.response?.data?.message || "Gagal menyimpan layanan jasa");
+      toast.error("Gagal menyimpan layanan jasa. Silakan coba lagi.");
     }
   } finally {
+    isSubmitting.value = false;
     loading.value = false;
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  // ✅ Clear query params immediately on mount — URL should never carry form data for create page
+  if (Object.keys(route.query).length > 0) {
+    console.log('[Createjasa] Clearing query params on mount:', route.query);
+    queryParamsCleared.value = true;
+    await router.replace({ path: route.path, query: {} });
+  } else {
+    queryParamsCleared.value = true;
+  }
+
   loadCategories();
   loadMerchantProfileAddress();
   restoreFormDraft();
@@ -451,6 +531,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   imagePreviews.value.forEach((url) => { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } });
+  // NOTE: Do NOT clear sessionStorage flag here — it needs to persist so restoreFormDraft()
+  // skips on the next visit (e.g. if user presses back, or if component re-mounts).
+  // The flag is cleared at the START of restoreFormDraft() instead.
 });
 </script>
 
@@ -466,8 +549,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <Form :key="formKey" :validation-schema="validationSchema" @submit="submitForm" :initial-values="formData" v-slot="{ handleSubmit }">
-        <form @submit.prevent="handleSubmit(submitForm)" class="space-y-5">
+      <Form :key="formKey" :validation-schema="validationSchema" :initial-values="formData">
+        <form @submit.prevent="submitForm" class="space-y-5">
 
           <!-- Section 1: Info Dasar -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
@@ -494,10 +577,10 @@ onBeforeUnmount(() => {
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                <label for="description" class="block text-sm font-semibold text-slate-700 mb-1.5">
                   Deskripsi Layanan <span class="text-red-500">*</span>
                 </label>
-                <textarea v-model="formData.description" placeholder="Jelaskan detail layanan Anda secara lengkap..." class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" rows="4"></textarea>
+                <textarea id="description" name="description" v-model="formData.description" placeholder="Jelaskan detail layanan Anda secara lengkap..." class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" rows="4"></textarea>
                 <div class="flex items-center justify-between mt-1.5">
                   <p class="text-xs text-slate-500">Minimal 50, maksimal 1000 karakter</p>
                   <span :class="formData.description?.length < 50 ? 'text-amber-500' : formData.description?.length > 1000 ? 'text-red-500' : 'text-emerald-500'" class="text-xs font-semibold">
@@ -520,12 +603,14 @@ onBeforeUnmount(() => {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <!-- Fixed Price -->
               <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                <label for="fixed_price" class="block text-sm font-semibold text-slate-700 mb-1.5">
                   Harga Tetap <span class="text-red-500">*</span>
                 </label>
                 <div class="relative">
                   <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Rp</span>
                   <input
+                    id="fixed_price"
+                    name="fixed_price"
                     v-model.number="formData.fixed_price"
                     @input="() => { if(formData.fixed_price > 0) formData.base_price = 0; }"
                     type="number"
@@ -540,12 +625,14 @@ onBeforeUnmount(() => {
 
               <!-- Base Price -->
               <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                <label for="base_price" class="block text-sm font-semibold text-slate-700 mb-1.5">
                   Harga Mulai Dari <span class="text-red-500">*</span>
                 </label>
                 <div class="relative">
                   <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Rp</span>
                   <input
+                    id="base_price"
+                    name="base_price"
                     v-model.number="formData.base_price"
                     @input="() => { if(formData.base_price > 0) formData.fixed_price = 0; }"
                     type="number"
@@ -588,7 +675,7 @@ onBeforeUnmount(() => {
                 <p class="text-xs text-slate-400">atau drag & drop file di sini</p>
               </div>
             </div>
-            <input type="file" ref="imageInputRef" accept="image/jpeg,image/jpg,image/png,image/webp" multiple class="hidden" @change="handleImageChange" />
+            <input id="images" type="file" ref="imageInputRef" accept="image/jpeg,image/jpg,image/png,image/webp" multiple class="hidden" @change="handleImageChange" />
 
             <!-- Image Preview Grid -->
             <div v-if="imageFiles.length" class="mt-4 grid grid-cols-3 sm:grid-cols-5 gap-3">
@@ -701,8 +788,8 @@ onBeforeUnmount(() => {
 
               <!-- Area Layanan -->
               <div v-if="formData.service_type === 'ke_rumah_pelanggan'">
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Area Layanan</label>
-                <input v-model="formData.service_area" type="text" placeholder="Contoh: Kota Semarang, radius 10km" class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition" />
+                <label for="service_area" class="block text-sm font-semibold text-slate-700 mb-1.5">Area Layanan</label>
+                <input id="service_area" name="service_area" v-model="formData.service_area" type="text" placeholder="Contoh: Kota Semarang, radius 10km" class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition" />
                 <p class="mt-1 text-xs text-slate-400">Customer akan diminta alamat lengkap saat booking</p>
               </div>
 
@@ -797,7 +884,7 @@ onBeforeUnmount(() => {
             <Button type="button" variant="muted-outline" @click="router.back()" class="flex-1 py-3">
               <i class="mr-2 pi pi-arrow-left"></i>Batal
             </Button>
-            <Button type="submit" variant="primary" :disabled="loading" :loading="loading" class="flex-1 py-3">
+            <Button type="button" variant="primary" :disabled="loading" :loading="loading" class="flex-1 py-3" @click="submitForm()">
               <i class="mr-2 pi pi-check"></i>{{ loading ? "Menyimpan..." : "Simpan Jasa" }}
             </Button>
           </div>

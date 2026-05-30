@@ -2,7 +2,7 @@
 // =======================
 // 1. IMPORTS
 // =======================
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onActivated, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
@@ -236,6 +236,15 @@ onMounted(async () => {
   // Jika merchantId sudah ada saat mount, langsung load jasa.
   // Kalau belum (mis. store belum siap), watcher currentMerchantId akan memanggil loadJasas.
   if (currentMerchantId.value) await loadJasas();
+});
+
+// ✅ ALSO: Reload when returning to this page (e.g., after editing a jasa)
+// This ensures updated data shows immediately without cache staleness
+onActivated(async () => {
+  console.log("[Indexjasa] Component re-activated (returning from edit/create)");
+  // Always reload when coming back to ensure latest data
+  // Add cache-busting with timestamp comparison
+  await loadJasas();
 });
 
 // 🔁 Tambahan: jika merchantId berubah (atau baru ter-set), reload jasa

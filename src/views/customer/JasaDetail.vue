@@ -756,11 +756,13 @@ const initActiveTime = () => {
 // ----- gambar jasa -----
 const resolveJasaAssetSrc = (img) => {
   if (!img) return "";
-  // Prioritas: API URL terlebih dahulu (sama seperti produk)
-  if (img.id) return getImageUrl(img.id);
+  // Priority: API URL first (sama seperti produk)
   if (img.src_url) return getImageUrl(img.src_url);
   if (img.url) return getImageUrl(img.url);
-  if (img.image_url) return img.image_url;
+  if (img.image_url) return getImageUrl(img.image_url);
+  if (img.image_path) return getImageUrl(img.image_path);
+  if (img.path) return getImageUrl(img.path);
+  if (img.id) return getImageUrl(img.id);
   return "";
 };
 
@@ -1019,10 +1021,13 @@ onMounted(async () => {
     }
 
     const { data } = response;
-    const payload = data?.data ?? data;
-    console.log("[JasaDetail] Jasa data:", payload);
+    const rawPayload = data?.data ?? data;
+    console.log("[JasaDetail] Jasa data:", rawPayload);
+
+    // Normalize image URLs so getImageUrl resolves them correctly
+    const payload = normalizeJasaImagePayload(rawPayload);
     jasa.value = payload;
-    
+
     // Set selectedDate ke hari pertama yang tersedia
     if (payload?.operating_days) {
       const operatingDays = payload.operating_days.split(',').map(d => parseInt(d.trim()));
@@ -1036,7 +1041,7 @@ onMounted(async () => {
         }
       }
     }
-    
+
     // Set active time ke waktu pertama yang tersedia
     initActiveTime();
   } catch (e) {
@@ -1046,12 +1051,48 @@ onMounted(async () => {
   }
 });
 
+/**
+ * Normalize jasa image payload — ensures cover_img and images have full URLs.
+ * Backend already provides public URLs; this ensures getImageUrl resolves correctly.
+ */
+function normalizeJasaImagePayload(jasaData) {
+  if (!jasaData || typeof jasaData !== "object") return jasaData;
+  const normalized = { ...jasaData };
+
+  if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      : "";
+    normalized.cover_img = {
+      id: normalized.cover_img.id ?? null,
+      url: srcUrl,
+      src_url: srcUrl,
+    };
+  }
+
+  if (Array.isArray(normalized.images)) {
+    normalized.images = normalized.images.map((img) => {
+      if (!img || typeof img !== "object") return img;
+      const srcUrl = img.src_url || img.url || img.image_path || img.id
+        ? getImageUrl(img.src_url || img.url || img.image_path || String(img.id))
+        : "";
+      return { id: img.id ?? null, url: srcUrl, src_url: srcUrl, is_cover: img.is_cover ?? false };
+    });
+  }
+
+  if (normalized.image) {
+    normalized.image = getImageUrl(normalized.image);
+  }
+
+  return normalized;
+}
+
 
 function onImgError(e, type) {
-  if (type === 'header') {
-    e.target.src = fallbackHeader
-  } else if (type === 'logo') {
-    e.target.src = fallbackLogo
+  switch (type) {
+    case 'header': e.target.src = fallbackHeader; break;
+    case 'logo': e.target.src = fallbackLogo; break;
+    case 'gallery': e.target.src = fallbackHeader; break;
   }
 }
 </script>

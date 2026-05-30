@@ -200,9 +200,10 @@ const submitReview = async () => {
     }
     formData.append('is_anonymous', reviewForm.value.is_anonymous ? '1' : '0');
 
-    // Add media files (use 'media' instead of 'media[]')
+    // Add media files — key must be 'media' not 'media[]' to match backend validation
+    // Backend: 'media' => 'nullable|array|max:5'
     for (const file of selectedFiles.value) {
-      formData.append('media[]', file);
+      formData.append('media', file);
     }
 
     // Determine endpoint based on type
@@ -228,43 +229,31 @@ const submitReview = async () => {
 
     const { data } = await api.post(endpoint, formData, config);
 
-    if (data.success || data.message === 'success') {
-      toast.success("Review berhasil dikirim!");
-      alreadyReviewed.value = true;
-      existingReview.value = data.data || {};
-      // Redirect back to service history
-      router.push("/service-history");
-    }
+    console.log("[UniversalReview] Response received:", data);
+
+    // ApiResponse::success returns { message, data } — NOT { success }
+    // data = axios response.data = { message: "...", data: { review, order } }
+    toast.success(data?.message || 'Review berhasil dikirim!');
+    alreadyReviewed.value = true;
+    existingReview.value = data?.data?.review || data?.data || {};
+    // Redirect back to service history
+    router.push("/service-history");
   } catch (error) {
-    console.error("[UniversalReview] Failed to submit review:", error);
-    console.error("[UniversalReview] Error response:", error.response);
+    console.log("[UniversalReview] Response received:", error.response?.data || error);
 
     // Check for 409 Conflict (already reviewed)
-    if (error.response?.status === 409) {
-      toast.info('Pesanan ini sudah diberi review');
+    if (error.response?.status === 409 || (error.response?.data?.message || '').includes('sudah') && (error.response?.data?.message || '').includes('review')) {
+      toast.info('Pesanan ini sudah diberi review sebelumnya');
       alreadyReviewed.value = true;
-      // Redirect after a brief moment
-      setTimeout(() => {
-        router.push('/service-history');
-      }, 1500);
+      setTimeout(() => router.push('/service-history'), 1500);
       return;
     }
 
+    // For other errors, log and show toast
     const message =
       error.response?.data?.message ||
-      error.response?.data?.error ||
-      'Gagal mengirim review';
-
-    // Also check message content
-    if (message.includes('sudah') && message.includes('review')) {
-      toast.info('Pesanan ini sudah diberi review');
-      alreadyReviewed.value = true;
-      setTimeout(() => {
-        router.push('/service-history');
-      }, 1500);
-      return;
-    }
-
+      'Gagal mengirim review. Silakan coba lagi.';
+    console.error("[UniversalReview] Error:", message);
     toast.error(message);
   } finally {
     submitting.value = false;

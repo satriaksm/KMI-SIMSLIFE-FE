@@ -375,9 +375,9 @@ onMounted(fetchConsultation);
         <div class="max-w-2xl mx-auto flex items-center gap-2">
           <div class="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
             <img
-              :src="consultation.jasa?.cover_img?.url || '/placeholder-service.png'"
+              :src="consultation.jasa?.cover_img?.url || '/placeholder.png'"
               class="object-cover w-full h-full"
-              @error="(e) => (e.target.src = '/placeholder-service.png')"
+              @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
             />
           </div>
           <div class="flex-1 min-w-0">

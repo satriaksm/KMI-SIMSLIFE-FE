@@ -241,8 +241,8 @@ const rejectOffer = async () => {
     const { data } = await api.post(
       `/api/service-consultations/${consultationId.value}/respond`,
       {
-        response: 'tidak_bisa_dikerjakan',
-        merchant_note: 'Pelanggan menolak penawaran ini',
+        response: 'reject',
+        customer_note: 'Pelanggan menolak penawaran ini',
       }
     );
     if (data.success) {
@@ -425,9 +425,9 @@ onMounted(async () => {
         <div class="max-w-2xl mx-auto flex items-center gap-2">
           <div class="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
             <img
-              :src="service?.cover_img?.url || service?.cover_img?.src_url || '/placeholder-service.png'"
+              :src="service?.cover_img?.url || service?.cover_img?.src_url || '/placeholder.png'"
               class="object-cover w-full h-full"
-              @error="(e) => (e.target.src = '/placeholder-service.png')"
+              @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
             />
           </div>
           <div class="flex-1 min-w-0">
@@ -594,7 +594,7 @@ onMounted(async () => {
               <div class="flex items-start gap-3">
                 <div class="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                   <img
-                    :src="service?.cover_img?.url || service?.cover_img?.src_url || '/placeholder-service.png'"
+                    :src="service?.cover_img?.url || service?.cover_img?.src_url || '/placeholder.png'"
                     class="object-cover w-full h-full"
                   />
                 </div>

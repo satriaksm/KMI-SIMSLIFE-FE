@@ -92,13 +92,37 @@ const formattedPrice = computed(() => {
   return `Rp ${minFormatted} - Rp ${maxFormatted}`;
 });
 
-// Get image URL
+// Get image URL — supports both products (cover_image) and jasa (cover_img)
 const productImageUrl = computed(() => {
   if (imageError.value) return null;
 
-  if (props.product.cover_image) {
-    return props.product.cover_image.src_url || props.product.cover_image;
+  const item = props.product;
+
+  // Priority 1: cover_image (products)
+  if (item.cover_image) {
+    if (typeof item.cover_image === "object") {
+      return item.cover_image.src_url || item.cover_image.url || item.cover_image.id || null;
+    }
+    return item.cover_image;
   }
+
+  // Priority 2: cover_img (jasa) — getImageUrl handles full URLs too
+  if (item.cover_img) {
+    if (typeof item.cover_img === "object") {
+      return item.cover_img.src_url || item.cover_img.url || item.cover_img.id || null;
+    }
+    return item.cover_img;
+  }
+
+  // Priority 3: images array first item (jasa/products fallback)
+  if (item.images && item.images.length > 0) {
+    const first = item.images[0];
+    if (typeof first === "object") {
+      return first.src_url || first.url || first.id || null;
+    }
+    return first;
+  }
+
   return null;
 });
 

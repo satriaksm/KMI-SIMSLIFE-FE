@@ -15,21 +15,22 @@ const resolveApiImageUrl = (imageIdOrPath) => {
         const parsedUrl = new URL(path);
         const pathname = parsedUrl.pathname || "";
 
+        // If already /api/images/{id}, return as-is
         if (pathname.startsWith("/api/images/")) {
           return path;
         }
 
+        // If full URL points to /storage/ (public files), use it directly
+        // This handles: http://localhost:8000/storage/jasa/1/photo.jpg
+        // Stored files should be served directly via /storage/ path
         if (pathname.includes("/storage/")) {
-          const [, storagePathRaw = ""] = pathname.split("/storage/");
-          const storagePath = decodeURIComponent(storagePathRaw);
-          if (storagePath) {
-            return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
-          }
+          return path;
         }
       } catch {
         return path;
       }
 
+      // Other http URLs — return as-is
       return path;
     }
 
@@ -38,22 +39,18 @@ const resolveApiImageUrl = (imageIdOrPath) => {
     if (path.startsWith("/api/images/")) {
       return `${backendBase}${path}`;
     }
-    if (path.startsWith("api/images/")) {
-      return `${backendBase}/${path}`;
-    }
 
     if (path.startsWith("/storage/")) {
-      const storagePath = path.replace(/^\/storage\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+      // Serve directly: /storage/xxx -> full URL
+      return `${backendBase}/storage/${path.replace(/^\/storage\//, "")}`;
     }
+
     if (path.startsWith("storage/")) {
-      const storagePath = path.replace(/^storage\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+      return `${backendBase}/storage/${path.replace(/^storage\//, "")}`;
     }
 
     if (path.startsWith("/jasa/")) {
-      const jasaPath = path.replace(/^\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(jasaPath)}`;
+      return `${apiBase}/api/images/${encodeURIComponent(path.replace(/^\//, ""))}`;
     }
 
     if (path.startsWith("jasa/")) {
@@ -65,6 +62,7 @@ const resolveApiImageUrl = (imageIdOrPath) => {
     }
   }
 
+  // Numeric ID → proxy through /api/images/{id}
   return `${apiBase}/api/images/${encodeURIComponent(imageIdOrPath)}`;
 };
 
