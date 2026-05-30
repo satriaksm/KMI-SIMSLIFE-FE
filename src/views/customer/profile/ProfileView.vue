@@ -77,21 +77,18 @@ const pushSupported = computed(() => supportsPushNotifications());
 
 const pushStatusMessage = computed(() => {
   if (!pushSupported.value) {
-    return "Notifikasi PWA hanya bisa digunakan di HTTPS atau localhost yang aman.";
+    return "Browser Anda tidak mendukung fitur notifikasi ini.";
   }
 
   if (pushPermission.value === "denied") {
-    return "Izin notifikasi diblokir di browser. Aktifkan dari pengaturan browser untuk menerima notifikasi.";
+    return "Izin notifikasi diblokir. Silakan aktifkan dari pengaturan browser Anda.";
   }
 
   if (pushEnabled.value) {
-    if (myMerchants.value.length > 0) {
-      return "Aktif: pembelian Anda & pesanan masuk ke UMKM Anda (otomatis sesuai peran).";
-    }
-    return "Aktif: notifikasi pesanan dan pembayaran Anda sebagai pembeli.";
+    return "Aktif: Anda akan menerima pemberitahuan pesanan secara langsung.";
   }
 
-  return "Pesanan masuk UMKM hanya ke pemilik toko. Pembeli biasa tidak menerima notif tersebut.";
+  return "Aktifkan agar perangkat Anda dapat menerima notifikasi pesanan secara langsung.";
 });
 
 const pushButtonLabel = computed(() =>
@@ -463,23 +460,23 @@ onMounted(async () => {
 
               <div
                 v-if="pushSupported && pushPermission !== 'denied'"
-                class="flex items-center justify-between w-full p-5 transition-all bg-gray-50 rounded-xl hover:bg-gray-100 group hover:shadow-md"
+                class="flex items-center justify-between w-full p-5 transition-all bg-gray-50 rounded-xl hover:bg-gray-100 group hover:shadow-md gap-4"
               >
-                <div class="flex items-center gap-4">
-                  <div class="p-3 transition-colors bg-white rounded-lg group-hover:bg-primary/10">
+                <div class="flex items-center gap-4 flex-1 min-w-0">
+                  <div class="p-3 transition-colors bg-white rounded-lg group-hover:bg-primary/10 shrink-0">
                     <svg class="w-6 h-6 text-gray-500 transition-colors group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.157V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.157c0 .538-.214 1.055-.595 1.438L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
                     </svg>
                   </div>
-                  <div>
-                    <span class="font-semibold text-gray-700 group-hover:text-gray-900">Notifikasi PWA</span>
-                    <p class="text-xs text-gray-500 mt-0.5">{{ pushStatusMessage }}</p>
+                  <div class="flex-1 min-w-0 pr-2">
+                    <span class="font-semibold text-gray-700 group-hover:text-gray-900 block truncate">Notifikasi PWA</span>
+                    <p class="text-xs text-gray-500 mt-0.5 leading-snug">{{ pushStatusMessage }}</p>
                   </div>
                 </div>
                 <button
                   @click="togglePushNotifications"
                   :disabled="pushLoading"
-                  class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 focus:outline-none"
+                  class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none"
                   :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
                 >
                   <span
@@ -836,23 +833,23 @@ onMounted(async () => {
 
             <div
               v-if="pushSupported && pushPermission !== 'denied'"
-              class="flex items-center justify-between w-full p-4 transition-colors bg-gray-50 rounded-xl hover:bg-gray-100 group"
+              class="flex items-center justify-between w-full p-4 transition-colors bg-gray-50 rounded-xl hover:bg-gray-100 group gap-3"
             >
-              <div class="flex items-center gap-4">
-                <div class="p-2 transition-colors bg-white rounded-lg group-hover:bg-primary/10">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="p-2 transition-colors bg-white rounded-lg group-hover:bg-primary/10 shrink-0">
                   <svg class="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.157V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.157c0 .538-.214 1.055-.595 1.438L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
                   </svg>
                 </div>
-                <div>
-                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Notifikasi PWA</span>
-                  <p class="text-[10px] text-gray-500 mt-0.5">{{ pushStatusMessage }}</p>
+                <div class="flex-1 min-w-0 pr-1">
+                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900 block truncate">Notifikasi PWA</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5 leading-tight">{{ pushStatusMessage }}</p>
                 </div>
               </div>
               <button
                 @click="togglePushNotifications"
                 :disabled="pushLoading"
-                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 focus:outline-none"
+                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none"
                 :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
               >
                 <span

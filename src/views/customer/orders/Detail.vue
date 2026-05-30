@@ -12,11 +12,59 @@
         <span>Mengkonfirmasi pembayaran Anda... Mohon tunggu sebentar.</span>
       </div>
 
-      <!-- Loading -->
-      <div v-if="loading" class="py-16 text-center">
-        <i class="text-2xl pi pi-spin pi-spinner text-primary"></i>
-        <p class="mt-2 text-sm text-muted-foreground">Memuat pesanan...</p>
-      </div>
+      <!-- Loading Skeleton -->
+      <template v-if="loading">
+        <div class="space-y-3">
+          <!-- Status card skeleton -->
+          <div class="p-4 bg-white border border-gray-200 rounded-2xl animate-pulse">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 bg-gray-200 rounded-full"></div>
+              <div class="flex-1 space-y-2">
+                <div class="w-1/2 h-4 bg-gray-200 rounded"></div>
+                <div class="w-1/3 h-3 bg-gray-200 rounded"></div>
+              </div>
+              <div class="w-20 h-6 bg-gray-200 rounded-full"></div>
+            </div>
+            <!-- Timeline skeleton -->
+            <div class="flex items-center gap-2">
+              <div v-for="n in 4" :key="'tl-'+n" class="flex items-center flex-1">
+                <div class="w-6 h-6 bg-gray-200 rounded-full shrink-0"></div>
+                <div v-if="n < 4" class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Items skeleton -->
+          <div class="p-4 bg-white border border-gray-200 rounded-2xl animate-pulse">
+            <div class="w-24 h-4 mb-4 bg-gray-200 rounded"></div>
+            <div v-for="n in 2" :key="'item-'+n" class="flex items-start gap-3 mb-3">
+              <div class="w-14 h-14 bg-gray-200 rounded-xl shrink-0"></div>
+              <div class="flex-1 space-y-2">
+                <div class="w-3/4 h-4 bg-gray-200 rounded"></div>
+                <div class="w-1/2 h-3 bg-gray-200 rounded"></div>
+                <div class="w-1/4 h-3 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Payment summary skeleton -->
+          <div class="p-4 bg-white border border-gray-200 rounded-2xl animate-pulse">
+            <div class="w-32 h-4 mb-4 bg-gray-200 rounded"></div>
+            <div class="space-y-2">
+              <div class="flex justify-between">
+                <div class="w-20 h-3 bg-gray-200 rounded"></div>
+                <div class="w-16 h-3 bg-gray-200 rounded"></div>
+              </div>
+              <div class="flex justify-between">
+                <div class="w-24 h-3 bg-gray-200 rounded"></div>
+                <div class="w-16 h-3 bg-gray-200 rounded"></div>
+              </div>
+              <div class="flex justify-between pt-2 border-t border-gray-100">
+                <div class="w-16 h-4 bg-gray-200 rounded"></div>
+                <div class="w-24 h-4 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <!-- Not found -->
       <div v-else-if="!order" class="py-16 text-center">

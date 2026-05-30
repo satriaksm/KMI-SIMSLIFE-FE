@@ -662,6 +662,15 @@ const routes = [
         ],
       },
 
+      {
+        path: "reports",
+        name: "Merchant - Reports",
+        component: () => import("@/views/merchant/reports/Index.vue"),
+        meta: {
+          title: "Laporan UMKM | SUMILIR",
+        },
+      },
+
       // ===========================
       // Profil UMKM
       // ===========================

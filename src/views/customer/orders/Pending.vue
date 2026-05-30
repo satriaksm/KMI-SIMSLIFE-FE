@@ -7,33 +7,65 @@
     />
 
     <div class="px-4 py-4 mx-auto space-y-4 max-w-7xl">
-      <!-- Order list -->
-      <div class="grid grid-cols-1 gap-4">
-        <OrderCard
-          v-for="order in orders"
-          :key="order.id"
-          :order="order"
-          :status-props="pendingStatusProps"
-          @click="openOrder"
-        >
-          <template #action="{ order: o }">
-            <Button variant="primary" size="sm" @click.stop="pay(o)">
-              Bayar
-            </Button>
-          </template>
-        </OrderCard>
-      </div>
-
-      <!-- Empty -->
-      <div
-        v-if="orders.length === 0"
-        class="p-8 text-center bg-white border border-gray-200 rounded-2xl"
-      >
-        <div class="text-lg font-bold text-black">Pesanan tidak ditemukan</div>
-        <div class="mt-1 text-sm text-muted-foreground">
-          Coba ubah kata kunci pencarian.
+      <!-- Loading Skeleton -->
+      <template v-if="loading">
+        <div class="grid grid-cols-1 gap-4">
+          <div
+            v-for="n in 3"
+            :key="'skel-' + n"
+            class="p-4 bg-white border border-gray-200 rounded-2xl animate-pulse"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 bg-gray-200 rounded-full"></div>
+                <div class="w-24 h-4 bg-gray-200 rounded"></div>
+              </div>
+              <div class="w-28 h-5 bg-amber-100 rounded-full"></div>
+            </div>
+            <div class="flex items-start gap-3">
+              <div class="w-14 h-14 bg-gray-200 rounded-xl shrink-0"></div>
+              <div class="flex-1 space-y-2">
+                <div class="w-3/4 h-4 bg-gray-200 rounded"></div>
+                <div class="w-1/2 h-3 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-3 mt-3 border-t border-gray-100">
+              <div class="w-28 h-4 bg-gray-200 rounded"></div>
+              <div class="w-16 h-8 bg-gray-200 rounded-xl"></div>
+            </div>
+          </div>
         </div>
-      </div>
+      </template>
+
+      <template v-else>
+        <!-- Order list -->
+        <div class="grid grid-cols-1 gap-4">
+          <OrderCard
+            v-for="order in orders"
+            :key="order.id"
+            :order="order"
+            :status-props="pendingStatusProps"
+            @click="openOrder"
+          >
+            <template #action="{ order: o }">
+              <Button variant="primary" size="sm" @click.stop="pay(o)">
+                Bayar
+              </Button>
+            </template>
+          </OrderCard>
+        </div>
+
+        <!-- Empty -->
+        <div
+          v-if="orders.length === 0"
+          class="p-8 text-center bg-white border border-gray-200 rounded-2xl"
+        >
+          <div class="text-lg font-bold text-black">Pesanan tidak ditemukan</div>
+          <div class="mt-1 text-sm text-muted-foreground">
+            Coba ubah kata kunci pencarian.
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>

@@ -112,6 +112,11 @@ const menuItems = computed(() => {
       icon: "pi-shopping-bag",
       route: `/merchant-center/${currentMerchantSlug.value}/orders`,
     },
+    {
+      label: "Laporan",
+      icon: "pi-file",
+      route: `/merchant-center/${currentMerchantSlug.value}/reports`,
+    },
 
     productOrServiceItem,
     // {

@@ -14,6 +14,7 @@ import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { getMerchantOrders } from "@/services/api/order";
 import { useToast } from "vue-toastification";
 import echo from "@/libs/echo";
+import api from "@/libs/axios";
 
 const router = useRouter();
 const route = useRoute();
@@ -29,6 +30,14 @@ const currentMerchantId = computed(() => {
   if (!currentMerchantSlug.value) return null;
   return authStore.getMerchantBySlug(currentMerchantSlug.value)?.id ?? null;
 });
+const currentMerchantName = computed(() => {
+  const merchant = authStore.getMerchantBySlug(currentMerchantSlug.value);
+  return merchant?.name || "UMKM";
+});
+
+const formatIDR = (value) => {
+  return Number(value || 0).toLocaleString('id-ID');
+};
 
 const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 
@@ -115,11 +124,31 @@ async function fetchOrders() {
   if (!currentMerchantSlug.value) return;
   ordersLoading.value = true;
   try {
-    const { data: res } = await getMerchantOrders(currentMerchantSlug.value, {
-      per_page: 100,
-    });
+    const params = {
+      q: query.value,
+      status: activeTab.value !== 'all' ? activeTab.value : undefined,
+      start_date: filters.value.start_date,
+      end_date: filters.value.end_date,
+      sort_by: filters.value.sort_by,
+      page: currentPage.value,
+      per_page: perPage.value
+    };
+
+    const { data: res } = await getMerchantOrders(currentMerchantSlug.value, params);
     const list = res?.data ?? res ?? [];
     allOrders.value = (Array.isArray(list) ? list : []).map(mapMerchantOrder);
+
+    const meta = res?.meta?.pagination || res?.pagination || {};
+    totalPages.value = meta.last_page || 1;
+    currentPage.value = meta.current_page || 1;
+    perPage.value = meta.per_page || 10;
+    
+    paginationInfo.value = {
+      start: (currentPage.value - 1) * perPage.value + (allOrders.value.length ? 1 : 0),
+      end: (currentPage.value - 1) * perPage.value + allOrders.value.length,
+      total: meta.total || allOrders.value.length,
+      per_page: perPage.value
+    };
   } catch (e) {
     console.error("Gagal memuat pesanan merchant:", e);
     toast.error("Gagal memuat pesanan");
@@ -135,8 +164,17 @@ async function fetchOrders() {
 const query = ref("");
 const activeTab = ref("all");
 const showFilterModal = ref(false);
-const tempDate = ref("");
-const selectedDate = ref("");
+
+const filters = ref({
+  start_date: "",
+  end_date: "",
+  sort_by: "newest"
+});
+
+const sortOptions = [
+  { value: "newest", label: "Terbaru" },
+  { value: "oldest", label: "Terlama" },
+];
 
 useBodyScrollLock(showFilterModal);
 
@@ -148,129 +186,63 @@ const tabs = [
   { key: "cancelled", label: "Dibatalkan" },
 ];
 
-const dateOptions = [
-  { value: "today", label: "Hari Ini" },
-  { value: "this_week", label: "Minggu Ini" },
-  { value: "this_month", label: "Bulan Ini" },
-  { value: "last_3_months", label: "3 Bulan Terakhir" },
-  { value: "this_year", label: "Tahun Ini" },
-];
-
 const tabCounts = computed(() => {
-  const counts = { all: allOrders.value.length };
-  allOrders.value.forEach((o) => {
-    let statusKey = o.status;
-    if (["ready", "shipped"].includes(statusKey)) {
-      statusKey = "processing";
-    }
-    counts[statusKey] = (counts[statusKey] || 0) + 1;
-  });
+  const counts = { all: paginationInfo.value.total }; // Approximation since we only have current query total. Real counts would require separate API calls, but we can rely on total for activeTab. Let's just use empty counts for now to avoid confusion with pagination.
   return counts;
 });
 
-// ========================
-// DATE HELPER
-// ========================
-function isDateInRange(dateStr, range) {
-  const orderDate = new Date(dateStr);
-  if (isNaN(orderDate.getTime())) return true;
-  const now = new Date();
-  const startOfDay = (d) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const today = startOfDay(now);
-  if (range === "today") return orderDate >= today;
-  if (range === "this_week") {
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - now.getDay());
-    return orderDate >= startOfWeek;
-  }
-  if (range === "this_month") {
-    return (
-      orderDate.getMonth() === now.getMonth() &&
-      orderDate.getFullYear() === now.getFullYear()
-    );
-  }
-  if (range === "last_3_months") {
-    const threeMonthsAgo = new Date(today);
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    return orderDate >= threeMonthsAgo;
-  }
-  if (range === "this_year")
-    return orderDate.getFullYear() === now.getFullYear();
-  return true;
-}
-
-// ========================
-// FILTERED ORDERS
-// ========================
-const filteredOrders = computed(() => {
-  let result = allOrders.value;
-  if (activeTab.value !== "all") {
-    if (activeTab.value === "processing") {
-      result = result.filter((o) => ["processing", "ready", "shipped"].includes(o.status));
-    } else {
-      result = result.filter((o) => o.status === activeTab.value);
-    }
-  }
-  const q = query.value.trim().toLowerCase();
-  if (q) {
-    result = result.filter((o) => {
-      const itemText = o.items.map((it) => it.name).join(" ");
-      return `${o.invoice} ${o.customer.name} ${itemText}`
-        .toLowerCase()
-        .includes(q);
-    });
-  }
-  if (selectedDate.value) {
-    result = result.filter((o) =>
-      isDateInRange(o.created_at, selectedDate.value),
-    );
-  }
-  return result;
-});
-
-const activeFilterCount = computed(() => (selectedDate.value ? 1 : 0));
-
 function openFilterModal() {
-  tempDate.value = selectedDate.value;
   showFilterModal.value = true;
 }
+
 function applyFilters() {
-  selectedDate.value = tempDate.value;
+  currentPage.value = 1;
+  fetchOrders();
   showFilterModal.value = false;
 }
+
 function resetFilters() {
-  selectedDate.value = "";
-  tempDate.value = "";
+  filters.value = {
+    start_date: "",
+    end_date: "",
+    sort_by: "newest"
+  };
+  currentPage.value = 1;
+  fetchOrders();
   showFilterModal.value = false;
 }
 
 // ========================
-// PAGINATION (client-side)
+// PAGINATION
 // ========================
 const currentPage = ref(1);
-const perPage = 10;
-
-const paginatedOrders = computed(() => {
-  const start = (currentPage.value - 1) * perPage;
-  return filteredOrders.value.slice(start, start + perPage);
+const totalPages = ref(1);
+const perPage = ref(10);
+const paginationInfo = ref({
+  start: 0,
+  end: 0,
+  total: 0,
+  per_page: 10
 });
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredOrders.value.length / perPage)),
-);
-const paginationInfo = computed(() => ({
-  start:
-    filteredOrders.value.length === 0
-      ? 0
-      : (currentPage.value - 1) * perPage + 1,
-  end: Math.min(currentPage.value * perPage, filteredOrders.value.length),
-  total: filteredOrders.value.length,
-  per_page: perPage,
-}));
 
-watch(filteredOrders, () => {
+watch(activeTab, () => {
   currentPage.value = 1;
+  fetchOrders();
 });
+
+let searchTimeout;
+watch(query, () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1;
+    fetchOrders();
+  }, 500);
+});
+
+const handlePageChange = (page) => {
+  currentPage.value = page;
+  fetchOrders();
+};
 
 // ========================
 // TABLE COLUMNS
@@ -290,9 +262,7 @@ const tableColumns = [
 // ========================
 // HELPERS
 // ========================
-function formatIDR(value) {
-  return new Intl.NumberFormat("id-ID").format(Number(value || 0));
-}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return "-";
@@ -405,30 +375,46 @@ function leaveOrdersChannel(id) {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
+    <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-4 bg-white border-b border-gray-100 sm:static sm:px-6"
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
     >
       <div class="flex items-center gap-3">
         <button
           @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-gray-100 sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
         >
-          <i class="text-gray-500 pi pi-bars"></i>
+          <i class="pi pi-bars text-muted-foreground"></i>
         </button>
         <div>
-          <Breadcrumb
-            :items="breadcrumbItems"
-            :merchantId="currentMerchantSlug"
-          />
-          <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Kelola & proses pesanan masuk.
-          </p>
+          <!-- ✅ Desktop: Show breadcrumb -->
+          <div class="hidden sm:block">
+            <Breadcrumb
+              :items="breadcrumbItems"
+              :merchantId="currentMerchantSlug"
+            />
+            <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Kelola pesanan masuk {{ currentMerchantName }}
+            </p>
+          </div>
+
+          <!-- ✅ Mobile: Show simple title -->
+          <div class="sm:hidden">
+            <h1 class="text-base font-semibold text-merchant-primary">
+              Pesanan Masuk
+            </h1>
+            <p class="text-xs text-muted-foreground">
+              {{ currentMerchantName }}
+            </p>
+          </div>
         </div>
+      </div>
+
+      <div class="flex gap-2 sm:gap-3 items-center">
       </div>
     </div>
 
-    <div class="h-20 sm:h-0"></div>
+    <div class="h-24 sm:h-0"></div>
 
     <div class="px-4 py-2 space-y-4 sm:px-6 sm:py-6">
       <!-- STATUS TABS -->
@@ -480,34 +466,18 @@ function leaveOrdersChannel(id) {
         >
           <i class="text-gray-500 pi pi-sliders-h"></i>
           <span
-            v-if="activeFilterCount > 0"
+            v-if="filters.start_date || filters.end_date || filters.sort_by !== 'newest'"
             class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
           >
-            {{ activeFilterCount }}
+            !
           </span>
         </button>
-      </div>
-
-      <!-- Active filter chip -->
-      <div v-if="selectedDate" class="flex flex-wrap gap-2">
-        <span
-          class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-white rounded-full bg-merchant-primary"
-        >
-          {{ dateOptions.find((d) => d.value === selectedDate)?.label }}
-          <button
-            type="button"
-            @click="selectedDate = ''"
-            class="hover:opacity-75"
-          >
-            <i class="pi pi-times text-[9px]"></i>
-          </button>
-        </span>
       </div>
 
       <!-- DESKTOP TABLE -->
       <div class="hidden sm:block">
         <MerchantTable
-          :items="paginatedOrders"
+          :items="allOrders"
           :columns="tableColumns"
           :loading="ordersLoading"
           :showCheckbox="false"
@@ -516,9 +486,7 @@ function leaveOrdersChannel(id) {
           :paginationInfo="paginationInfo"
           emptyMessage="Tidak ada pesanan masuk"
           @row-click="goToDetail"
-          @page-change="(p) => (currentPage = p)"
-          @next-page="currentPage++"
-          @prev-page="currentPage--"
+          @page-change="handlePageChange"
         >
           <template #cell-invoice="{ item }">
             <div>
@@ -598,24 +566,54 @@ function leaveOrdersChannel(id) {
       </div>
 
       <!-- MOBILE CARD LIST -->
-      <div class="space-y-3 sm:hidden">
+      <div class="sm:hidden space-y-3">
         <div
-          v-if="paginatedOrders.length === 0"
-          class="flex flex-col items-center justify-center py-16 bg-white rounded-xl"
+          v-if="ordersLoading"
+          v-for="i in 3"
+          :key="i"
+          class="p-4 bg-white border border-gray-100 shadow-sm rounded-2xl animate-pulse"
         >
-          <i class="mb-3 text-4xl text-gray-300 pi pi-inbox"></i>
-          <p class="text-sm text-gray-400">Tidak ada pesanan masuk</p>
+          <div class="flex items-center justify-between mb-3">
+            <div class="w-24 h-4 bg-gray-200 rounded"></div>
+            <div class="w-16 h-5 bg-gray-200 rounded-full"></div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-gray-200 rounded-lg"></div>
+            <div class="flex-1 space-y-2">
+              <div class="w-3/4 h-3 bg-gray-200 rounded"></div>
+              <div class="w-1/2 h-3 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+          <div
+            class="flex items-center justify-between pt-3 mt-3 border-t border-gray-100"
+          >
+            <div class="w-16 h-3 bg-gray-200 rounded"></div>
+            <div class="w-20 h-4 bg-gray-200 rounded"></div>
+          </div>
         </div>
 
-        <button
-          v-for="order in paginatedOrders"
+        <div
+          v-else-if="!allOrders.length"
+          class="p-10 text-center bg-white border border-gray-100 shadow-sm rounded-2xl"
+        >
+          <div
+            class="flex items-center justify-center w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full"
+          >
+            <i class="pi pi-inbox text-gray-400"></i>
+          </div>
+          <p class="text-sm font-medium text-gray-900">Tidak ada pesanan</p>
+          <p class="text-xs text-gray-500 mt-1">Coba sesuaikan filter pencarian.</p>
+        </div>
+
+        <div
+          v-else
+          v-for="order in allOrders"
           :key="order.id"
-          type="button"
-          class="w-full text-left bg-white rounded-2xl border border-gray-200 overflow-hidden active:scale-[0.99] transition"
+          class="p-4 bg-white border border-gray-100 shadow-sm cursor-pointer rounded-2xl active:bg-gray-50"
           @click="goToDetail(order)"
         >
           <div
-            class="flex items-center justify-between px-4 py-3 border-b border-gray-100"
+            class="flex items-center justify-between mb-3"
           >
             <div class="min-w-0">
               <p class="text-sm font-semibold text-gray-800 truncate">
@@ -629,7 +627,7 @@ function leaveOrdersChannel(id) {
             <StatusLabel v-bind="statusProps(order.status)" />
           </div>
 
-          <div class="px-4 py-3 space-y-2">
+          <div class="space-y-2">
             <div class="flex items-center gap-2">
               <i class="text-xs text-gray-400 pi pi-user shrink-0"></i>
               <span class="text-sm text-gray-700">{{
@@ -669,52 +667,111 @@ function leaveOrdersChannel(id) {
               </span>
             </div>
           </div>
-        </button>
-
-        <MobilePagination
-          v-if="totalPages > 1"
-          :currentPage="currentPage"
-          :totalPages="totalPages"
-          :paginationInfo="paginationInfo"
-          @next-page="currentPage++"
-          @prev-page="currentPage--"
-        />
+        </div>
       </div>
+
+      <!-- Mobile Pagination -->
+      <MobilePagination
+        v-if="allOrders.length > 0"
+        :currentPage="currentPage"
+        :totalPages="totalPages"
+        class="sm:hidden"
+        @page-change="handlePageChange"
+      />
     </div>
 
-    <!-- FILTER MODAL -->
+    <!-- Modals -->
     <ResponsiveModal
       v-model:show="showFilterModal"
-      title="Filter Pesanan"
+      title="Filter & Urutkan Pesanan"
       show-footer
       @close="showFilterModal = false"
     >
-      <div class="space-y-4">
-        <SelectField
-          name="filter_date"
-          variant="merchant"
-          v-model="tempDate"
-          label="Rentang Waktu"
-          :options="dateOptions"
-          placeholder="Semua tanggal"
-        />
+      <div class="space-y-6">
+        <!-- ===== FILTER SECTION ===== -->
+        <div class="space-y-4">
+          <h3
+            class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase"
+          >
+            <i class="pi pi-filter text-merchant-primary"></i>
+            Filter Data
+          </h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <TextField
+              name="start_date"
+              type="date"
+              label="Mulai"
+              v-model="filters.start_date"
+              variant="merchant"
+            />
+            <TextField
+              name="end_date"
+              type="date"
+              label="Sampai"
+              v-model="filters.end_date"
+              variant="merchant"
+            />
+          </div>
+        </div>
+
+        <!-- ===== SORT SECTION ===== -->
+        <div class="pt-6 space-y-4 border-t border-muted-foreground/30">
+          <h3
+            class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase"
+          >
+            <i class="pi pi-sort-alt text-merchant-primary"></i>
+            Urutkan Berdasarkan
+          </h3>
+
+          <!-- Sort by Date -->
+          <div>
+            <label class="block mb-2 text-sm font-semibold text-gray-700">
+              <i class="mr-1 text-xs pi pi-calendar"></i>
+              Waktu Pembuatan
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                @click="filters.sort_by = 'newest'"
+                type="button"
+                class="px-4 py-3 text-sm font-medium transition border-2 rounded-lg"
+                :class="
+                  filters.sort_by === 'newest'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
+                "
+              >
+                <i class="mr-1 text-xs pi pi-sort-amount-down-alt"></i>
+                Terbaru
+              </button>
+              <button
+                @click="filters.sort_by = 'oldest'"
+                type="button"
+                class="px-4 py-3 text-sm font-medium transition border-2 rounded-lg"
+                :class="
+                  filters.sort_by === 'oldest'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300'
+                "
+              >
+                <i class="mr-1 text-xs pi pi-sort-amount-up"></i>
+                Terlama
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
       <template #footer>
         <div class="flex gap-3">
-          <button
-            type="button"
-            @click="resetFilters"
-            class="flex-1 py-2.5 text-sm font-semibold border border-gray-300 rounded-xl hover:bg-gray-50 transition"
-          >
+          <Button @click="resetFilters" variant="muted-outline" block>
+            <i class="mr-2 pi pi-refresh"></i>
             Reset
-          </button>
-          <button
-            type="button"
-            @click="applyFilters"
-            class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition"
-          >
+          </Button>
+          <Button @click="applyFilters" block variant="merchant">
+            <i class="mr-2 pi pi-check"></i>
             Terapkan
-          </button>
+          </Button>
         </div>
       </template>
     </ResponsiveModal>
