@@ -2,7 +2,10 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
+import MerchantPageHeader from "@/components/merchant/MerchantPageHeader.vue";
 import api from "@/libs/axios";
+
+const emit = defineEmits(["toggle-sidebar"]);
 
 // Toast notification
 const toast = useToast();
@@ -542,6 +545,38 @@ const formatPhone = (phone) => {
   return phone.replace(/^0/, "62");
 };
 
+const getImageUrl = (image) => {
+  if (!image) return '/images/default-service.png';
+
+  const imageValue = String(image).trim();
+
+  if (imageValue.startsWith('http://') || imageValue.startsWith('https://')) {
+    return imageValue;
+  }
+
+  if (imageValue.startsWith('/storage/')) {
+    return `http://localhost:8000${imageValue}`;
+  }
+
+  if (imageValue.startsWith('storage/')) {
+    return `http://localhost:8000/${imageValue}`;
+  }
+
+  if (imageValue.startsWith('/api/images/')) {
+    return `http://localhost:8000${imageValue}`;
+  }
+
+  if (imageValue.startsWith('api/images/')) {
+    return `http://localhost:8000/${imageValue}`;
+  }
+
+  if (imageValue.startsWith('/')) {
+    return `http://localhost:8000${imageValue}`;
+  }
+
+  return `http://localhost:8000/storage/${imageValue}`;
+};
+
 // Get review comment (handle different possible field names)
 const getReviewComment = (order) => {
   return (
@@ -634,15 +669,24 @@ const getStatusLabel = (status) => {
 
 // Get service image URL
 const getServiceImage = (order) => {
-  if (order?.service_image) return order.service_image;
-  if (order?.jasa?.cover_img?.url) return order.jasa.cover_img.url;
-  if (order?.jasa?.cover_img?.src_url) return order.jasa.cover_img.src_url;
-  if (order?.jasa?.image_url) return order.jasa.image_url;
-  if (order?.jasa?.image) return order.jasa.image;
-  if (order?.jasa?.cover_img) return order.jasa.cover_img;
-  if (order?.jasa?.images?.[0]?.image_url) return order.jasa.images[0].image_url;
-  if (order?.jasa?.images?.[0]?.url) return order.jasa.images[0].url;
-  return '/placeholder.png';
+  const source =
+    order?.service_image ||
+    order?.image ||
+    order?.jasa?.image ||
+    order?.jasa?.cover_img?.url ||
+    order?.jasa?.cover_img?.src_url ||
+    order?.jasa?.image_url ||
+    order?.jasa?.images?.[0]?.image_url ||
+    order?.jasa?.images?.[0]?.url ||
+    order?.service?.image ||
+    order?.service?.cover_img?.url ||
+    order?.service?.cover_img?.src_url ||
+    order?.service?.image_url ||
+    order?.service?.images?.[0]?.image_url ||
+    order?.service?.images?.[0]?.url ||
+    '';
+
+  return getImageUrl(source);
 };
 
 const openDetailModal = (order) => {
@@ -697,35 +741,24 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-gray-50 pb-20">
-    <!-- Header -->
-    <header
-      class="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3"
-    >
-      <div class="max-w-4xl mx-auto">
-        <div class="flex items-center gap-3">
-          <button
-            @click="router.back()"
-            class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition"
-          >
-            <i class="pi pi-arrow-left"></i>
-          </button>
-          <div>
-            <h1 class="text-lg font-bold text-gray-900">History Layanan Jasa</h1>
-            <p class="text-xs text-gray-500">Pesanan masuk dari pelanggan</p>
-          </div>
-        </div>
-      </div>
-    </header>
+    <MerchantPageHeader
+      title="History Layanan Jasa"
+      subtitle="Pesanan masuk dari pelanggan"
+      :show-menu-button="true"
+      :show-back-button="true"
+      :back-to="`/merchant-center/${merchantSlug}/dashboard`"
+      @toggle-sidebar="emit('toggle-sidebar')"
+    />
 
     <!-- Main Content -->
-    <main class="max-w-4xl mx-auto px-4 py-4">
+    <main class="merchant-page-content">
       <!-- Filter Tabs -->
-      <div class="bg-white rounded-2xl p-2 mb-4 flex gap-2 overflow-x-auto">
+      <div class="tabs-container bg-white rounded-2xl p-2 mb-4">
         <button
           v-for="filter in filters"
           :key="filter.key"
           @click="changeFilter(filter.key)"
-          class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition whitespace-nowrap"
+          class="tab-button px-4 py-2.5 rounded-xl text-sm font-medium transition whitespace-nowrap"
           :class="
             activeFilter === filter.key
               ? 'bg-merchant-primary text-white shadow-md'
@@ -755,11 +788,11 @@ onMounted(() => {
       </div>
 
       <!-- Orders List -->
-      <div v-else class="space-y-4">
+      <div v-else class="order-list space-y-4">
         <div
           v-for="order in orders"
           :key="order.id"
-          class="rounded-2xl border bg-white shadow-sm overflow-hidden"
+          class="order-card rounded-2xl border bg-white shadow-sm overflow-hidden"
         >
           <!-- Header -->
           <div class="p-4 border-b border-gray-100">
@@ -780,8 +813,8 @@ onMounted(() => {
               <div class="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                 <img
                   :src="getServiceImage(order)"
-                  class="object-cover w-full h-full"
-                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
+                  class="service-image"
+                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/images/default-service.png'; } }"
                 />
               </div>
               <div class="flex-1 min-w-0">
@@ -940,9 +973,9 @@ onMounted(() => {
             <div class="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
               <div class="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden">
                 <img
-                  :src="selectedOrder.service_image || '/placeholder.png'"
-                  class="object-cover w-full h-full"
-                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
+                  :src="getImageUrl(selectedOrder.service_image || selectedOrder.image || selectedOrder.jasa?.image || selectedOrder.jasa?.cover_img?.url || selectedOrder.jasa?.cover_img?.src_url)"
+                  class="service-image"
+                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/images/default-service.png'; } }"
                 />
               </div>
               <div>
@@ -1339,6 +1372,57 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.merchant-page-content {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 24px 24px;
+  box-sizing: border-box;
+}
+
+.tabs-container {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  padding: 0;
+  margin: 0 0 24px 0;
+  box-sizing: border-box;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-button {
+  flex: 1 1 0;
+  min-width: 120px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.order-list {
+  width: 100%;
+}
+
+.order-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.service-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .merchant-page-content {
+    padding: 0 16px 16px;
+  }
+
+  .tab-button {
+    min-width: 112px;
+    height: 48px;
+  }
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

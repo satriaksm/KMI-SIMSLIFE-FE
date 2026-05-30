@@ -20,6 +20,7 @@ import BulkActionBar from "@/components/common/BulkActionBar.vue";
 import { useJasa } from "@/composables/useJasa"; // ✅ GANTI: import useJasa
 import { useCategories } from "@/composables/useCategories";
 import { getImageUrl } from "@/libs/getImageUrl.js";
+import MerchantPageHeader from "@/components/merchant/MerchantPageHeader.vue";
 import api from "@/libs/axios";
 
 const router = useRouter();
@@ -867,31 +868,16 @@ const getPrimaryImageSrc = (jasaItem) => {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-6 bg-white border-b border-gray-100 sm:static sm:px-6 sm:mb-6"
-    >
-      <div class="flex items-center gap-3">
-        <button
-          @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 rounded-full sm:hidden hover:bg-gray-100"
-        >
-          <i class="pi pi-bars"></i>
-        </button>
-        <div>
-          <h1 class="text-base font-semibold text-merchant-primary sm:text-3xl sm:font-bold">Daftar Layanan Jasa</h1>
-          <p class="mt-1 text-xs sm:text-sm text-gray-600">
-            <i class="mr-1 pi pi-shop"></i>
-            {{ currentMerchantName }}
-          </p>
-        </div>
-      </div>
-    </div>
+    <MerchantPageHeader
+      title="Daftar Layanan Jasa"
+      :subtitle="currentMerchantName"
+      :show-menu-button="true"
+      :show-back-button="false"
+      :back-to="currentMerchantSlug ? `/merchant-center/${currentMerchantSlug}/dashboard` : '/merchant-center'"
+      @toggle-sidebar="emit('toggle-sidebar')"
+    />
 
-    <!-- Spacer for fixed mobile header -->
-    <div class="h-24 sm:h-0"></div>
-
-    <div class="px-4 sm:px-6">
+    <div class="merchant-page-content">
       <!-- Loading State -->
     <div v-if="loading" class="flex items-center justify-center py-20">
       <div
@@ -1224,3 +1210,18 @@ const getPrimaryImageSrc = (jasaItem) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.merchant-page-content {
+  width: 100%;
+  max-width: none;
+  padding: 0 24px 24px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .merchant-page-content {
+    padding: 0 16px 16px;
+  }
+}
+</style>
