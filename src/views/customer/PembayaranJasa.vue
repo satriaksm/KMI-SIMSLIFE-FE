@@ -2,10 +2,11 @@
   <div class="min-h-screen pb-32 bg-gradient-to-b from-gray-50 via-white to-gray-100 sm:pb-28">
 
     <!-- Mobile Layout (default) -->
-    <div class="max-w-lg mx-auto lg:hidden">
-      <!-- AppBar -->
-      <header class="sticky top-0 z-20 px-4 py-3 text-white shadow-md bg-gradient-to-r from-merchant-primary to-merchant-primary/90">
-        <div class="flex items-center max-w-screen-sm gap-3 mx-auto">
+    <div class="lg:hidden">
+
+      <!-- AppBar — full width header -->
+      <header class="sticky top-0 z-20 w-full px-4 py-3 text-white shadow-md bg-gradient-to-r from-merchant-primary to-merchant-primary/90">
+        <div class="flex items-center gap-3">
           <button type="button" class="flex items-center justify-center text-white transition rounded-full shadow-sm w-9 h-9 bg-white/15 hover:bg-white/25 backdrop-blur-sm" @click="goBack" aria-label="Kembali">
             <i class="text-sm pi pi-arrow-left"></i>
           </button>
@@ -16,6 +17,7 @@
         </div>
       </header>
 
+      <!-- Content area — max-w container di dalam -->
       <main class="px-4 mt-4">
         <div class="max-w-screen-sm mx-auto space-y-4">
         <!-- Data Pemesan -->
@@ -103,52 +105,90 @@
           ></textarea>
         </section>
 
-        <!-- Detail Alamat -->
+        <!-- Detail Alamat — hanya tampil untuk layanan yang butuh alamat (on_site / ke_rumah_pelanggan) -->
         <section
+          v-if="isHomeService"
           class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
         >
-          <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center justify-between mb-3">
             <div>
               <h2
                 class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
               >
                 <i class="pi pi-map-marker text-merchant-primary"></i>
-                Alamat Layanan Jasa
+                Alamat Layanan
               </h2>
-              <p
-                v-if="isOnlineService"
-                class="mt-0.5 text-[11px] text-gray-500"
-              >
-                Layanan ini dilakukan sepenuhnya secara online, jadi alamat
-                tidak wajib diisi.
+              <p class="mt-0.5 text-[11px] text-gray-500">
+                Wajib diisi — layanan dikerjakan di lokasi Anda.
               </p>
             </div>
           </div>
-          <div
-            class="flex items-start justify-between gap-2 mt-1 text-sm text-gray-800"
-          >
-            <div class="flex items-start flex-1 gap-2">
-              <span class="mt-0.5">
-                <i class="text-gray-500 pi pi-map-marker"></i>
-              </span>
-              <p class="leading-snug break-words">{{ form.alamat }}</p>
-            </div>
+
+          <!-- Textarea alamat -->
+          <textarea
+            v-model="form.alamat"
+            rows="3"
+            placeholder="Ketik alamat lengkap layanan di sini..."
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary resize-none"
+          ></textarea>
+
+          <!-- Tombol ambil lokasi + koordinat -->
+          <div class="flex items-center gap-2 mt-2">
             <button
-              v-if="isHomeService"
               type="button"
-              class="ml-3 text-[11px] px-3 py-1 rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 whitespace-nowrap"
+              class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="locatingDevice"
               @click="requestDeviceLocation"
             >
-              {{ locatingDevice ? 'Mengambil lokasi...' : 'Pakai lokasi device' }}
+              <i :class="locatingDevice ? 'pi pi-spin pi-spinner' : 'pi pi-map-marker'" class="text-[10px]"></i>
+              {{ locatingDevice ? 'Mengambil lokasi...' : 'Ambil Lokasi Saat Ini' }}
             </button>
+            <span v-if="locatingError" class="text-[11px] text-red-500">{{ locatingError }}</span>
           </div>
-          <p
-            v-if="isHomeService && deviceCoordinates"
-            class="mt-2 text-[11px] text-gray-500"
-          >
-            Koordinat terdeteksi: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}
+          <p v-if="deviceCoordinates" class="mt-1.5 text-[11px] text-gray-500">
+            <i class="pi pi-globe mr-0.5"></i>
+            Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}
           </p>
+        </section>
+
+        <!-- Alamat read-only untuk layanan online -->
+        <section
+          v-else-if="isOnlineService"
+          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <h2
+              class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
+            >
+              <i class="pi pi-map-marker text-merchant-primary"></i>
+              Alamat Layanan
+            </h2>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Online</span>
+          </div>
+          <div class="flex items-start gap-2 text-sm text-gray-800">
+            <span class="mt-0.5 text-gray-500"><i class="pi pi-globe"></i></span>
+            <p class="leading-snug break-words">Layanan dilakukan secara online</p>
+          </div>
+        </section>
+
+        <!-- Alamat read-only untuk layanan di tempat UMKM -->
+        <section
+          v-else-if="isAtMerchantLocation"
+          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <h2
+              class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
+            >
+              <i class="pi pi-map-marker text-merchant-primary"></i>
+              Alamat Layanan
+            </h2>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Di Tempat UMKM</span>
+          </div>
+          <div class="flex items-start gap-2 text-sm text-gray-800">
+            <span class="mt-0.5 text-gray-500"><i class="pi pi-map-marker"></i></span>
+            <p class="leading-snug break-words">{{ form.alamat || 'Tidak ada alamat' }}</p>
+          </div>
         </section>
 
         <!-- Promo -->
@@ -359,21 +399,51 @@
                   </div>
                 </div>
 
-                <!-- Alamat Layanan -->
-                <div class="col-span-2">
+                <!-- Alamat Layanan — hanya untuk on_site / ke_rumah_pelanggan -->
+                <div v-if="isHomeService" class="col-span-2">
                   <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
                     <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
                     Alamat Layanan
-                    <span v-if="isOnlineService" class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Online</span>
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Wajib Diisi</span>
+                  </h3>
+                  <div class="mb-2">
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">Alamat Lengkap</label>
+                    <textarea v-model="form.alamat" rows="3" placeholder="Ketik alamat lengkap layanan di sini..." class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"></textarea>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50" :disabled="locatingDevice" @click="requestDeviceLocation">
+                      <i :class="locatingDevice ? 'pi pi-spin pi-spinner' : 'pi pi-map-marker'" class="text-[10px]"></i>
+                      {{ locatingDevice ? 'Mengambil lokasi...' : 'Ambil Lokasi Saat Ini' }}
+                    </button>
+                    <span v-if="locatingError" class="text-xs text-red-500">{{ locatingError }}</span>
+                  </div>
+                  <p v-if="deviceCoordinates" class="text-xs text-gray-500 mt-1.5">Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}</p>
+                </div>
+
+                <!-- Alamat read-only untuk layanan online -->
+                <div v-else-if="isOnlineService" class="col-span-2">
+                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
+                    Alamat Layanan
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Online</span>
+                  </h3>
+                  <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
+                    <span class="text-purple-400"><i class="pi pi-globe"></i></span>
+                    <p class="flex-1 text-sm text-purple-700">Layanan dilakukan secara online</p>
+                  </div>
+                </div>
+
+                <!-- Alamat read-only untuk di tempat UMKM -->
+                <div v-else-if="isAtMerchantLocation" class="col-span-2">
+                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
+                    Alamat Layanan
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Di Tempat UMKM</span>
                   </h3>
                   <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <span class="text-gray-400"><i class="pi pi-map-marker"></i></span>
                     <p class="flex-1 text-sm text-gray-700">{{ form.alamat || 'Tidak ada alamat' }}</p>
-                    <button v-if="serviceType === 'on_site'" type="button" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition" :disabled="locatingDevice" @click="requestDeviceLocation">
-                      <i class="pi pi-map-marker mr-1"></i>{{ locatingDevice ? 'Mengambil...' : 'Pakai lokasi' }}
-                    </button>
                   </div>
-                  <p v-if="deviceCoordinates" class="text-xs text-gray-500 mt-1.5 ml-1">Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}</p>
                 </div>
 
                 <!-- Promo & Pembayaran -->
@@ -461,6 +531,14 @@
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Waktu</span>
                       <span class="text-gray-800">{{ form.waktu || '—' }}</span>
+                    </div>
+                    <div v-if="isOnlineService" class="flex justify-between text-sm">
+                      <span class="text-gray-500">Alamat</span>
+                      <span class="text-purple-600 font-medium">Online</span>
+                    </div>
+                    <div v-else-if="isHomeService" class="flex justify-between text-sm">
+                      <span class="text-gray-500">Alamat</span>
+                      <span class="text-gray-800 text-right max-w-[55%] line-clamp-2">{{ form.alamat || '-' }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Pembayaran</span>
@@ -608,12 +686,14 @@ const router = useRouter();
 const order = {
   jasaSlug: route.query.jasa_slug || "",
   merchantSlug: route.query.merchant_slug || "",
+  merchantName: route.query.merchant_name || "",
   title: route.query.title || "Nama Jasa",
   image: route.query.image || "",
   price: Number(route.query.price || 0),
   tglISO: route.query.tgl || "",
   waktu: route.query.waktu || "",
   priceType: route.query.price_type || "",
+  serviceType: route.query.service_type || "",
   paymentMethods: (route.query.payment_methods || "")
     .split(",")
     .map((m) => m.trim())
@@ -624,14 +704,52 @@ const goBack = () => {
   router.back();
 };
 
+// ===== localStorage helpers =====
+const LOCAL_BOOKINGS_KEY = "customer_service_bookings";
+
+function saveLocalBooking(booking) {
+  try {
+    const raw = localStorage.getItem(LOCAL_BOOKINGS_KEY);
+    const existing = raw ? JSON.parse(raw) : [];
+    const filtered = existing.filter((b) => String(b.id) !== String(booking.id));
+    filtered.unshift(booking);
+    localStorage.setItem(LOCAL_BOOKINGS_KEY, JSON.stringify(filtered.slice(0, 50)));
+  } catch (e) {
+    console.error("[PembayaranJasa] saveLocalBooking error:", e);
+  }
+}
+
+function getLocalBookings() {
+  try {
+    const raw = localStorage.getItem(LOCAL_BOOKINGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Jenis layanan jasa (online / di lokasi penyedia / ke lokasi pelanggan)
 const serviceType = ref(route.query.service_type || null);
+
+// Mekanisme pemesanan: booking (dengan jadwal) atau keranjang (tanpa jadwal)
+const mekanismePemesanan = ref(
+  route.query.mekanisme_pemesanan ||
+  route.query.booking_type ||
+  route.query.order_type ||
+  'booking'
+);
+
+// Helper: apakah ini checkout tanpa jadwal (keranjang)?
+const isKeranjangCheckout = computed(() => {
+  const m = String(mekanismePemesanan.value || '').toLowerCase();
+  return ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
+});
 
 // ===== Form =====
 const form = ref({
   nama: "",
   tel: "",
-  alamat: route.query.alamat || "",
+  alamat: String(serviceType.value || "").toLowerCase().includes("online") ? "Online" : (route.query.alamat || ""),
   catatan: route.query.catatan || "",
   tanggalISO: order.tglISO,
   tanggalLabel: fmtTanggal(order.tglISO),
@@ -684,7 +802,13 @@ const clearNotification = () => {
 
 const isOnlineService = computed(() => serviceType.value === "online");
 const isAtMerchantLocation = computed(() => serviceType.value === "di_tempat_umkm" || serviceType.value === "at_location");
-const isHomeService = computed(() => serviceType.value === "ke_rumah_pelanggan" || serviceType.value === "on_site");
+const isHomeService = computed(() => {
+  const type = String(serviceType.value || '').toLowerCase();
+  return ['ke_rumah_pelanggan', 'on_site', 'rumah_pelanggan', 'home_service', 'customer_location', 'tempat_pelanggan'].some((kw) => type.includes(kw));
+});
+
+// Alamat wajib untuk layanan ke lokasi pelanggan
+const isCustomerAddressRequired = computed(() => isHomeService.value);
 
 // Alamat tidak wajib untuk layanan online dan di tempat UMKM
 const addressRequired = computed(() => !isOnlineService.value && !isAtMerchantLocation.value);
@@ -844,6 +968,7 @@ const showDetails = ref(false);
 const authStore = useAuthStore();
 const userStore = useUserStore();
 const locatingDevice = ref(false);
+const locatingError = ref("");
 const deviceCoordinates = ref(null);
 
 // Modal pilihan alamat (legacy, dipertahankan agar kompatibel)
@@ -912,12 +1037,12 @@ async function reverseGeocode(lat, lng) {
 
 async function requestDeviceLocation() {
   if (!navigator.geolocation) {
-    errorMessage.value =
-      "Perangkat/browser tidak mendukung GPS. Silakan isi alamat manual.";
+    locatingError.value = "Perangkat tidak mendukung pengambilan lokasi otomatis. Silakan isi alamat secara manual.";
     return;
   }
 
   locatingDevice.value = true;
+  locatingError.value = "";
   clearNotification();
 
   try {
@@ -941,16 +1066,22 @@ async function requestDeviceLocation() {
     const address = await reverseGeocode(latitude, longitude);
     if (address) {
       form.value.alamat = address;
-      successMessage.value = "Lokasi device berhasil digunakan.";
+      successMessage.value = "Lokasi berhasil terdeteksi dan alamat terisi otomatis.";
     } else {
       form.value.alamat = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-      successMessage.value =
-        "Koordinat ditemukan, tetapi alamat detail tidak tersedia.";
+      successMessage.value = "Koordinat ditemukan. Silakan lengkapi alamat secara manual.";
     }
   } catch (error) {
     console.error("[PembayaranJasa] Gagal mengambil lokasi device", error);
-    errorMessage.value =
-      "Izin lokasi ditolak atau gagal mengambil GPS. Aktifkan lokasi lalu coba lagi.";
+    if (error.code === 1) {
+      locatingError.value = "Izin lokasi ditolak. Silakan isi alamat secara manual.";
+    } else if (error.code === 2) {
+      locatingError.value = "Lokasi tidak tersedia. Silakan isi alamat secara manual.";
+    } else if (error.code === 3) {
+      locatingError.value = " Waktu habis. Silakan coba lagi atau isi alamat manual.";
+    } else {
+      locatingError.value = "Gagal mengambil lokasi. Silakan isi alamat secara manual.";
+    }
   } finally {
     locatingDevice.value = false;
   }
@@ -986,6 +1117,9 @@ function useProfileContact() {
     "Data pemesan berhasil diisi dari profil. Kamu masih bisa mengubahnya jika perlu.";
 }
 
+// Simpan merchant address yang diambil dari API
+const merchantAddress = ref("");
+
 // Ambil info jasa (WhatsApp link, merchant info, service type) saat halaman dibuka
 onMounted(async () => {
   if (order.merchantSlug) {
@@ -998,10 +1132,7 @@ onMounted(async () => {
     const { data } = await api.get(`/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`);
     const payload = data?.data ?? data;
 
-    // Prioritas sumber nomor WhatsApp penjual:
-    // 1) Link khusus di jasa (whatsapp_link)
-    // 2) Nomor WhatsApp/telepon di profil UMKM (merchant.whatsapp atau merchant.phone)
-    // 3) Fallback: kosong (tampilkan error di sendToChat)
+    // Prioritas sumber nomor WhatsApp penjual
     const rawWhatsapp =
       payload?.whatsapp_link ||
       payload?.merchant?.whatsapp ||
@@ -1009,17 +1140,24 @@ onMounted(async () => {
       "";
     jasaWhatsappLink.value = rawWhatsapp;
 
+    // Simpan merchant address untuk digunakan di localBooking
+    const fetchedMerchantAddr = resolveMerchantAddress(
+      payload?.merchant,
+      payload?.location_address,
+    );
+    if (fetchedMerchantAddr) {
+      merchantAddress.value = fetchedMerchantAddr;
+    }
+
+    // Isi merchant_name dari payload jika belum ada
+    if (!order.merchantName && payload?.merchant?.name) {
+      order.merchantName = payload.merchant.name;
+    }
+
     // Otomatis isi alamat berdasarkan service_type
-    // - at_location: gunakan alamat UMKM (prioritas location_address, lalu profil merchant)
-    // - on_site: alamat diisi customer (kosongkan default)
-    // - online: tidak perlu alamat
     if (payload?.service_type === 'at_location') {
-      form.value.alamat = resolveMerchantAddress(
-        payload?.merchant,
-        payload?.location_address,
-      );
+      form.value.alamat = fetchedMerchantAddr;
     } else if (payload?.service_type === 'on_site') {
-      // Untuk layanan ke lokasi customer, alamat berasal dari device customer
       form.value.alamat = '';
     }
 
@@ -1117,18 +1255,60 @@ const sendToChat = async () => {
     return;
   }
 
-  if (serviceType.value === "on_site" && !form.value.alamat) {
-    errorMessage.value =
-      "Untuk layanan ke alamat pelanggan, izinkan lokasi device atau isi alamat terlebih dahulu.";
+  if (isCustomerAddressRequired.value && !String(form.value.alamat || '').trim()) {
+    errorMessage.value = "Alamat layanan wajib diisi terlebih dahulu.";
     return;
   }
 
-  // Notif awal: pastikan form sudah terisi benar
-  if (!isFormValid.value) {
-    errorMessage.value =
-      "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
+  // Validasi jadwal untuk booking (non-keranjang)
+  if (!isKeranjangCheckout.value && !isFormValid.value) {
+    errorMessage.value = "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
     return;
   }
+
+  // Skip jadwal validation untuk keranjang checkout
+  if (isKeranjangCheckout.value && !form.value.nama) {
+    errorMessage.value = "Mohon lengkapi data pemesan terlebih dahulu.";
+    return;
+  }
+
+  // ===== Helpers untuk API payload =====
+  // Format booking_time ke H:i (backend requirement: "14:00", bukan "14.00" atau "14.00 WIB")
+  const formatBookingTimeForApi = (time) => {
+    if (!time) return null;
+    return String(time)
+      .replace(/\s*WIB\s*$/gi, "")
+      .replace(".", ":")
+      .trim();
+  };
+
+  // Map payment_method UI label → backend enum
+  const paymentMethodMap = {
+    "COD": "cod",
+    "QRIS": "qris",
+    "Bayar di Tempat": "cash",
+    "cash": "cash",
+    "cod": "cod",
+    "qris": "qris",
+  };
+
+  // Map payment_method backend → UI display label
+  const paymentMethodDisplayMap = {
+    "cash": "Bayar di Tempat",
+    "cod": "COD",
+    "qris": "QRIS",
+    "manual_transfer": "Transfer Manual",
+  };
+
+  const getBackendPaymentMethod = (uiMethod) => {
+    if (!uiMethod) return "cash";
+    return paymentMethodMap[uiMethod] || "cash";
+  };
+
+  const getPaymentMethodDisplayLabel = (backendMethod) => {
+    if (!backendMethod) return "Bayar di Tempat";
+    return paymentMethodDisplayMap[backendMethod] || backendMethod;
+  };
 
   submitting.value = true;
 
@@ -1163,28 +1343,62 @@ const sendToChat = async () => {
 
     const orderPayload = {
       jasa_id: jasaId,
+      service_name: order.title,
+      service_type: serviceType.value,
       customer_name: form.value.nama,
       customer_phone: form.value.tel,
       customer_address: cleanValue(form.value.alamat),
-      booking_date: cleanValue(form.value.tanggalISO),
-      booking_time: cleanValue(form.value.waktu),
+      // Keranjang/checkout tanpa jadwal: jangan kirim booking_date/booking_time
+      booking_date: isKeranjangCheckout.value ? null : cleanValue(form.value.tanggalISO),
+      booking_time: isKeranjangCheckout.value ? null : formatBookingTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
-      payment_method: pay.method,
-      // Include total_price from computed total
+      booking_type: isKeranjangCheckout.value ? 'keranjang' : 'booking',
+      payment_method: getBackendPaymentMethod(pay.method),
       total_price: total.value || order.price || 0,
+      latitude: deviceCoordinates.value?.latitude ?? null,
+      longitude: deviceCoordinates.value?.longitude ?? null,
+      merchant_name: order.merchantSlug || '',
+      merchant_slug: order.merchantSlug || '',
+      service_image: order.image || '',
     };
 
     console.log("[PembayaranJasa] Creating order with payload:", orderPayload);
-    console.log("[PembayaranJasa] Service price:", order.price);
-    console.log("[PembayaranJasa] Total price:", total.value);
     const { data: orderData } = await api.post("/api/service-orders", orderPayload).catch((err) => {
       console.error("[PembayaranJasa] Order API error:", err.response?.data);
       throw err;
     });
     console.log("[PembayaranJasa] Order response:", orderData);
 
-    if (orderData?.success && orderData?.data?.id) {
-      orderId = orderData.data.id;
+    // ApiResponse::success returns { message, data: { id, ... } }
+    // Handle both { success: true, data: { id } } and { message, data: { id } }
+    const createdOrder = orderData?.data;
+    if (createdOrder?.id) {
+      orderId = createdOrder.id;
+
+      // Simpan ke localStorage sebagai backup (agar muncul di history meskipun API pending/bermasalah)
+      const localBooking = {
+        id: orderId,
+        service_name: order.title,
+        service_type: serviceType.value || order.serviceType || 'on_site',
+        booking_type: 'booking',
+        merchant_name: order.merchantName || createdOrder?.merchant_name || order.merchantSlug || '',
+        merchant_slug: order.merchantSlug || createdOrder?.merchant_slug || '',
+        merchant_address: merchantAddress.value || '',
+        customer_name: form.value.nama,
+        customer_phone: form.value.tel,
+        customer_address: form.value.alamat || '',
+        booking_date: form.value.tanggalISO || order.tglISO || null,
+        booking_time: form.value.waktu || null,
+        booking_note: form.value.catatan || '',
+        payment_method: pay.method || 'COD',
+        total_price: total.value || order.price || 0,
+        latitude: deviceCoordinates.value?.latitude ?? null,
+        longitude: deviceCoordinates.value?.longitude ?? null,
+        service_image: order.image || '',
+        status: 'menunggu_konfirmasi_merchant',
+        created_at: new Date().toISOString(),
+      };
+      saveLocalBooking(localBooking);
 
       // 2. Dapatkan WhatsApp redirect URL dari backend
       try {
@@ -1208,6 +1422,32 @@ const sendToChat = async () => {
       console.error("Status:", err.response.status, "Data:", err.response.data);
       errorMessage.value = err.response.data?.message || "Gagal membuat pesanan. Silakan coba lagi.";
     }
+    // Tetap simpan ke localStorage sebagai fallback agar muncul di history
+    const fallbackBooking = {
+      id: "local_" + Date.now(),
+      service_name: order.title,
+      service_type: serviceType.value || order.serviceType || "on_site",
+      booking_type: "booking",
+      merchant_name: order.merchantName || order.merchantSlug || "",
+      merchant_slug: order.merchantSlug || "",
+      merchant_address: merchantAddress.value || "",
+      customer_name: form.value.nama,
+      customer_phone: form.value.tel,
+      customer_address: form.value.alamat || "",
+      booking_date: form.value.tanggalISO || order.tglISO || null,
+      booking_time: form.value.waktu || null,
+      booking_note: form.value.catatan || "",
+      payment_method: pay.method || "COD",
+      total_price: total.value || order.price || 0,
+      latitude: deviceCoordinates.value?.latitude ?? null,
+      longitude: deviceCoordinates.value?.longitude ?? null,
+      service_image: order.image || "",
+      status: "menunggu_konfirmasi_merchant",
+      created_at: new Date().toISOString(),
+      is_local: true,
+    };
+    saveLocalBooking(fallbackBooking);
+    orderId = fallbackBooking.id;
   } finally {
     submitting.value = false;
   }
@@ -1240,15 +1480,20 @@ const sendToChat = async () => {
     order_id: orderId || "pending",
     jasa_id: route.query.jasa_id || "",
     merchant_slug: order.merchantSlug || "",
+    merchant_name: order.merchantName || "",
+    merchant_address: merchantAddress.value || "",
     jasa_title: order.title,
+    service_type: serviceType.value || order.serviceType || "on_site",
+    booking_type: "booking",
     nama: form.value.nama,
     tel: form.value.tel,
-    alamat: form.value.alamat,
+    alamat: form.value.alamat || "",
     tanggal: form.value.tanggalISO || order.tglISO,
     waktu: form.value.waktu,
-    payment_method: pay.method,
+    payment_method: pay.method || "Bayar di Tempat",
     total: total.value || order.price,
     catatan: form.value.catatan || "",
+    service_image: order.image || "",
   });
 
   if (order.jasaSlug) {

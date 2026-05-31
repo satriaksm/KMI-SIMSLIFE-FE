@@ -13,10 +13,12 @@ const authStore = useAuthStore();
 const searchBarRef = ref(null);
 const searchInputRef = ref(null);
 const searchToggleRef = ref(null);
+const profileMenuRef = ref(null);
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const user = computed(() => authStore.user);
 const isAdmin = computed(() => authStore.isAdmin);
+const showProfileMenu = ref(false);
 
 const baseMenus = [
   {
@@ -58,6 +60,12 @@ const baseMenus = [
       <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
     </svg>`,
   },
+  {
+    key: "service-history",
+    label: "History Layanan Jasa",
+    to: isAuthenticated.value ? "/service-history" : "/login",
+    icon: `<i class="pi pi-clock text-lg leading-none"></i>`,
+  },
 
   {
     key: "profile",
@@ -65,14 +73,6 @@ const baseMenus = [
     to: isAuthenticated.value ? "/profile" : "/login",
     icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
       <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-    </svg>`,
-  },
-  {
-    key: "service-history",
-    label: "History Layanan",
-    to: isAuthenticated.value ? "/service-history" : "/login",
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>`,
   },
 ];
@@ -98,12 +98,10 @@ function isMenuActive(m) {
   if (m.key === "profile") {
     return (
       route.path.startsWith("/profile") ||
+      route.path.startsWith("/my-order") ||
+      route.path.startsWith("/service-history") ||
       (!isAuthenticated.value && route.path === "/login")
     );
-  }
-  // Service history aktif jika route dimulai dengan /service-history
-  if (m.key === "service-history") {
-    return route.path.startsWith("/service-history");
   }
   // Komunitas aktif jika route dimulai dengan /community
   if (m.key === "komunitas") {
@@ -121,34 +119,78 @@ function onMenuClick(m, e) {
     activeKey.value = m.key;
   } else {
     activeKey.value = null;
+    showProfileMenu.value = false;
   }
 }
 function goToLogin() {
   router.push({ name: "Login" }).catch(() => router.push("/login"));
 }
+function toggleProfileMenu() {
+  if (!isAuthenticated.value) {
+    goToLogin();
+    return;
+  }
+
+  showProfileMenu.value = !showProfileMenu.value;
+}
+
+function closeProfileMenu() {
+  showProfileMenu.value = false;
+}
+
+function goToProfileMenu(path) {
+  showProfileMenu.value = false;
+  router.push(path);
+}
+
+function getMobileProfileTarget() {
+  return isAuthenticated.value ? "/profile" : "/login";
+}
+
+function getMobileHistoryTarget() {
+  return isAuthenticated.value ? "/service-history" : "/login";
+}
+
+function isMobileProfileActive() {
+  return route.path.startsWith("/profile") || (!isAuthenticated.value && route.path === "/login");
+}
+
+function isMobileHistoryActive() {
+  return route.path.startsWith("/service-history");
+}
+
+async function handleLogout() {
+  showProfileMenu.value = false;
+  await authStore.logout();
+  router.push("/login");
+}
+
 const showSearch = ref(false);
 const searchQuery = ref("");
 
 const onDocumentPointerDown = (event) => {
-  if (!showSearch.value) return;
-
   const target = event?.target;
   const panelEl = searchBarRef.value;
   const toggleEl = searchToggleRef.value;
+  const profileEl = profileMenuRef.value;
 
-  // Click inside search panel
-  if (panelEl && target && panelEl.contains(target)) return;
+  const clickedInsideSearch = panelEl && target && panelEl.contains(target);
+  const clickedSearchToggle = toggleEl && target && toggleEl.contains(target);
+  const clickedInsideProfile = profileEl && target && profileEl.contains(target);
 
-  // Click on the search toggle button
-  if (toggleEl && target && toggleEl.contains(target)) return;
+  if (showSearch.value && !clickedInsideSearch && !clickedSearchToggle) {
+    showSearch.value = false;
+  }
 
-  showSearch.value = false;
+  if (showProfileMenu.value && !clickedInsideProfile) {
+    showProfileMenu.value = false;
+  }
 };
 
 watch(
-  () => showSearch.value,
-  (open) => {
-    if (open) {
+  () => [showSearch.value, showProfileMenu.value],
+  ([searchOpen, profileOpen]) => {
+    if (searchOpen || profileOpen) {
       // Use pointerdown so it closes immediately on outside click
       document.addEventListener("pointerdown", onDocumentPointerDown, true);
     } else {
@@ -225,7 +267,7 @@ watch(
           >
             <li
               v-for="m in menus
-                .filter((menu) => menu.key !== 'profile')
+                  .filter((menu) => menu.key !== 'profile' && menu.key !== 'service-history')
                 .slice(0, 5)"
               :key="m.key"
               class="flex items-center"
@@ -269,40 +311,91 @@ watch(
             </div>
 
             <template v-if="isAuthenticated">
-              <RouterLink
-                to="/profile"
-                class="flex items-center gap-4 transition md:gap-2 hover:opacity-80"
+              <div
+                ref="profileMenuRef"
+                class="relative"
               >
-                <img
-                  v-if="user?.profile_picture || user?.avatar"
-                  :src="user?.profile_picture || user?.avatar"
-                  alt="Foto Profil"
-                  class="object-cover w-8 h-8 rounded-full"
-                />
-                <span
-                  v-else
-                  class="flex items-center justify-center w-8 h-8 text-2xl font-bold rounded-full bg-muted-background text-muted-foreground"
+                <button
+                  @click="toggleProfileMenu"
+                  class="flex items-center gap-4 transition md:gap-2 hover:opacity-80"
+                  :aria-expanded="showProfileMenu"
+                  aria-haspopup="menu"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke-width="1.5"
-                    stroke="currentColor"
-                    class="w-5 h-5 text-muted-foreground"
+                  <img
+                    v-if="user?.profile_picture || user?.avatar"
+                    :src="user?.profile_picture || user?.avatar"
+                    alt="Foto Profil"
+                    class="object-cover w-8 h-8 rounded-full"
+                  />
+                  <span
+                    v-else
+                    class="flex items-center justify-center w-8 h-8 text-2xl font-bold rounded-full bg-muted-background text-muted-foreground"
                   >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-                    /></svg
-                ></span>
-                <span
-                  class="text-sm font-bold leading-[100%] tracking-[0] text-black md:block hidden"
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                      stroke="currentColor"
+                      class="w-5 h-5 text-muted-foreground"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+                      /></svg
+                  ></span>
+                  <span
+                    class="text-sm font-bold leading-[100%] tracking-[0] text-black md:block hidden"
+                  >
+                    {{ user?.name ? user.name.split(" ")[0] : "Profil" }}
+                  </span>
+                </button>
+
+                <transition
+                  enter-active-class="transition-all duration-200 ease-out"
+                  enter-from-class="opacity-0 translate-y-2 scale-95"
+                  enter-to-class="opacity-100 translate-y-0 scale-100"
+                  leave-active-class="transition-all duration-150 ease-in"
+                  leave-from-class="opacity-100 translate-y-0 scale-100"
+                  leave-to-class="opacity-0 translate-y-2 scale-95"
                 >
-                  {{ user?.name ? user.name.split(" ")[0] : "Profil" }}
-                </span>
-              </RouterLink>
+                  <div
+                    v-if="showProfileMenu"
+                    class="absolute right-0 top-[calc(100%+10px)] w-64 overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-black/5 z-[1001]"
+                    role="menu"
+                  >
+                    <button
+                      @click="goToProfileMenu('/profile')"
+                      class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      role="menuitem"
+                    >
+                      Akun Saya
+                    </button>
+                    <button
+                      @click="goToProfileMenu('/my-order')"
+                      class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      role="menuitem"
+                    >
+                      Pesanan Saya
+                    </button>
+                    <button
+                      @click="goToProfileMenu('/service-history')"
+                      class="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      role="menuitem"
+                    >
+                      History Layanan Jasa
+                    </button>
+                    <button
+                      @click="handleLogout"
+                      class="w-full px-4 py-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50 transition"
+                      role="menuitem"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </transition>
+              </div>
             </template>
             <template v-else>
               <Button variant="secondary" @click="goToLogin"> Login </Button>
@@ -364,58 +457,68 @@ watch(
       <router-view />
     </main>
 
-    <!-- Bottom Dock Navigation (Mobile only) - 5 items termasuk Profile -->
+    <!-- Bottom Dock Navigation (Mobile only) -->
     <nav
       class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg sm:hidden"
     >
       <div class="flex items-center justify-around h-16 px-1">
-        <RouterLink
-          v-for="m in menus"
-          :key="m.key"
-          :to="m.to"
-          @click="(e) => onMenuClick(m, e)"
-          class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
-          :class="
-            isMenuActive(m) ? 'text-primary' : 'text-black hover:text-primary'
-          "
-        >
-          <!-- Jika profile dan authenticated, tampilkan avatar -->
-          <template v-if="m.key === 'profile' && isAuthenticated">
-            <img
-              v-if="user?.profile_picture || user?.avatar"
-              :src="user?.profile_picture || user?.avatar"
-              alt="Foto Profil"
-              class="object-cover w-6 h-6 transition-colors rounded-full"
-              :class="
-                isMenuActive(m)
-                  ? 'border-2 border-primary'
-                  : 'hover:border-2 border-primary'
-              "
-            />
-            <span
-              v-else
-              class="flex items-center justify-center text-2xl font-bold text-black rounded-full w-7 h-7 bg-muted-background"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="2"
-                stroke="currentColor"
-                class="w-4 h-4 text-black"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-                /></svg
-            ></span>
-          </template>
-          <!-- Jika belum login atau menu lain, tampilkan icon -->
-          <template v-else>
+        <template v-for="m in menus.filter((menu) => menu.key !== 'keranjang')" :key="m.key">
+          <RouterLink
+            v-if="m.key !== 'profile'"
+            :to="m.to"
+            @click="(e) => onMenuClick(m, e)"
+            class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
+            :class="
+              isMenuActive(m) ? 'text-primary' : 'text-black hover:text-primary'
+            "
+          >
             <span v-html="m.icon" class="w-6 h-6"></span>
-          </template>
-        </RouterLink>
+          </RouterLink>
+
+          <div
+            v-else
+            class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
+            :class="
+              isMobileProfileActive() ? 'text-primary' : 'text-black hover:text-primary'
+            "
+          >
+            <RouterLink
+              :to="getMobileProfileTarget()"
+              class="flex flex-col items-center justify-center w-full h-full"
+              @click="showProfileMenu = false"
+            >
+              <img
+                v-if="isAuthenticated && (user?.profile_picture || user?.avatar)"
+                :src="user?.profile_picture || user?.avatar"
+                alt="Foto Profil"
+                class="object-cover w-6 h-6 transition-colors rounded-full"
+                :class="
+                  isMobileProfileActive()
+                    ? 'border-2 border-primary'
+                    : 'hover:border-2 border-primary'
+                "
+              />
+              <span
+                v-else
+                class="flex items-center justify-center text-2xl font-bold text-black rounded-full w-7 h-7 bg-muted-background"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                  class="w-4 h-4 text-black"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+                  /></svg
+              ></span>
+            </RouterLink>
+          </div>
+        </template>
       </div>
     </nav>
   </div>

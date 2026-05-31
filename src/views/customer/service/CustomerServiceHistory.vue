@@ -69,40 +69,50 @@ const statusConfig = {
 const fetchOrders = async (status = null) => {
   loading.value = true;
   try {
-    // Debug: Check user auth
-    console.log('[CustomerServiceHistory] Current user:', authStore.user);
-    console.log('[CustomerServiceHistory] Customer ID:', authStore.user?.id);
-
     const params = status && status !== "all" ? { status } : {};
-    console.log('[CustomerServiceHistory] Fetching with params:', params);
-
     const { data } = await api.get("/api/service-orders", { params });
-    console.log('[CustomerServiceHistory] Raw response:', data);
-    console.log('[CustomerServiceHistory] Selected status filter:', activeFilter.value);
 
-    // Handle paginated response: { success: true, data: { data: [], total: ..., ... } }
     const responseData = data?.data;
-    console.log('[CustomerServiceHistory] Response data:', responseData);
-
+    let apiOrders = [];
     if (Array.isArray(responseData)) {
-      // Plain array (no pagination)
-      orders.value = responseData;
+      apiOrders = responseData;
     } else if (responseData && Array.isArray(responseData.data)) {
-      // Laravel paginated response
-      orders.value = responseData.data;
-    } else {
-      orders.value = [];
+      apiOrders = responseData.data;
     }
 
-    console.log('[CustomerServiceHistory] Final orders array:', orders.value);
+    // Merge dengan localStorage bookings
+    const localBookings = getLocalBookings();
+    const merged = [...localBookings, ...apiOrders];
+    // Hapus duplikat berdasarkan id, local bookings lebih diutamakan
+    const seen = new Set();
+    orders.value = merged.filter((o) => {
+      const key = String(o.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    console.log('[CustomerServiceHistory] Merged orders:', orders.value);
   } catch (error) {
     console.error('[CustomerServiceHistory] Gagal memuat history:', error);
-    console.error('[CustomerServiceHistory] Error response:', error.response?.data);
-    toast.error(error.response?.data?.message || "Gagal memuat history layanan");
+    // Fallback ke localStorage saja jika API gagal
+    orders.value = getLocalBookings();
   } finally {
     loading.value = false;
   }
 };
+
+// ===== localStorage helpers =====
+const LOCAL_BOOKINGS_KEY = "customer_service_bookings";
+
+function getLocalBookings() {
+  try {
+    const raw = localStorage.getItem(LOCAL_BOOKINGS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
 
 // Get order price from multiple possible sources
 const getOrderPrice = (order) => {
@@ -162,27 +172,57 @@ const getBookingDisplay = (order) => {
   return formatDateTime(order.booking_date, order.booking_time);
 };
 
-// Get order address based on service_type
+// Get order address/location based on service_type
 const getOrderAddress = (order) => {
   const serviceType = order.service_type ||
-    order.booking_type ||
+    order.booking_service_type ||
     order.jasa?.service_type ||
     '';
 
-  if (serviceType === 'online') return 'Online';
+  if (serviceType === 'online') {
+    return 'Online';
+  }
 
   if (serviceType === 'di_tempat_umkm' || serviceType === 'at_location') {
-    return order?.service_location_address
-      || order?.merchant?.address
-      || order?.merchant_address
-      || 'Alamat tidak tersedia';
+    // Prioritas: merchant_address dari localStorage/booking langsung
+    // lalu alamat merchant dari relasi API
+    const merchantAddr =
+      order?.merchant_address ||
+      order?.merchantAddress ||
+      order?.merchant?.primary_address?.detail ||
+      order?.merchant?.primaryAddress?.detail ||
+      order?.merchant?.location_address ||
+      order?.merchant?.locationAddress ||
+      order?.merchant?.address ||
+      order?.merchant?.alamat ||
+      order?.merchant?.profile_address ||
+      order?.merchant?.profileAddress ||
+      order?.location_address ||
+      order?.jasa?.merchant?.address ||
+      order?.jasa?.merchant?.alamat ||
+      order?.jasa?.location_address ||
+      order?.service_location_address ||
+      '';
+    return merchantAddr || 'Lokasi UMKM tidak tersedia';
   }
 
   if (serviceType === 'ke_rumah_pelanggan' || serviceType === 'on_site') {
-    return order?.customer_address || '-';
+    return order?.customer_address || order?.alamat || '-';
   }
 
-  return order?.customer_address || order?.service_location_address || '-';
+  return order?.customer_address || order?.service_location_address || order?.location_address || '-';
+};
+
+// Get address label based on service_type
+const getAddressLabel = (order) => {
+  const serviceType = order.service_type ||
+    order.booking_service_type ||
+    order.jasa?.service_type ||
+    '';
+  if (serviceType === 'online') return 'Lokasi';
+  if (serviceType === 'di_tempat_umkm' || serviceType === 'at_location') return 'Lokasi UMKM';
+  if (serviceType === 'ke_rumah_pelanggan' || serviceType === 'on_site') return 'Alamat';
+  return 'Lokasi';
 };
 
 // Go to review page
@@ -262,9 +302,28 @@ const confirmCompleted = async (order) => {
 
 // Get payment status label
 const getPaymentStatusLabel = (order) => {
-  return order.payment_status === 'PAID' ? 'Sudah Bayar' :
-         order.payment_status === 'WAITING_CONFIRMATION' ? 'Menunggu Konfirmasi' :
-         'Belum Bayar';
+  const method = order.payment_method || '';
+  if (method && method !== 'undefined' && method !== 'null') {
+    if (order.payment_status === 'PAID') return 'Sudah Bayar';
+    if (order.payment_status === 'WAITING_CONFIRMATION') return 'Menunggu Konfirmasi';
+  }
+  return 'Bayar di Tempat';
+};
+
+// Get payment method display (backend enum → UI label, no undefined)
+const getPaymentMethodDisplay = (order) => {
+  const method = order.payment_method || order.paymentMethod || '';
+  const displayMap = {
+    cash: 'Bayar di Tempat',
+    cod: 'COD',
+    qris: 'QRIS',
+    manual_transfer: 'Transfer Manual',
+    'Bayar di Tempat': 'Bayar di Tempat',
+    'COD': 'COD',
+    'QRIS': 'QRIS',
+  };
+  if (!method || method === 'undefined' || method === 'null') return 'Bayar di Tempat';
+  return displayMap[method] || method;
 };
 
 // Get payment status color
@@ -299,7 +358,7 @@ const getReviewComment = (order) => {
   );
 };
 
-// Get review media - only one declaration
+// Get review media
 const getReviewMedia = (order) => {
   return order?.review?.media
     || order?.review?.medias
@@ -367,9 +426,7 @@ const isEvidenceVideo = (media) => {
 
 // Get service image URL (for order service image)
 const getServiceImage = (order) => {
-  // Try order.service_image first (backend sends this as URL)
   if (order?.service_image) return order.service_image;
-  // Try jasa.cover_img.url (nested relation)
   if (order?.jasa?.cover_img?.url) return order.jasa.cover_img.url;
   if (order?.jasa?.cover_img?.src_url) return order.jasa.cover_img.src_url;
   if (order?.jasa?.image_url) return order.jasa.image_url;
@@ -377,8 +434,67 @@ const getServiceImage = (order) => {
   if (order?.jasa?.cover_img) return order.jasa.cover_img;
   if (order?.jasa?.images?.[0]?.image_url) return order.jasa.images[0].image_url;
   if (order?.jasa?.images?.[0]?.url) return order.jasa.images[0].url;
-  // Return placeholder
   return '/placeholder.png';
+};
+
+// Get service type label
+const getServiceTypeLabel = (order) => {
+  const type = order.service_type || order.booking_service_type || order.jasa?.service_type || '';
+  const labels = {
+    online: 'Online',
+    di_tempat_umkm: 'Di Tempat UMKM',
+    at_location: 'Di Tempat UMKM',
+    ke_rumah_pelanggan: 'Ke Rumah Pelanggan',
+    on_site: 'Ke Rumah Pelanggan',
+  };
+  return labels[type] || type || '-';
+};
+
+// Get booking type label
+// Get booking/mechanism label from multiple possible field names
+const getMekanismeLabel = (order) => {
+  const mechanism =
+    order?.mekanisme_pemesanan ||
+    order?.mechanism ||
+    order?.order_type ||
+    order?.booking_type ||
+    order?.jasa?.mekanisme_pemesanan ||
+    '';
+
+  const normalized = String(mechanism).toLowerCase().trim();
+
+  // Checkout tanpa jadwal keywords
+  const noScheduleKeywords = ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in', 'walkin'];
+  const isNoSchedule = noScheduleKeywords.some((kw) => normalized.includes(kw));
+
+  if (isNoSchedule) {
+    return 'Keranjang (Tanpa Jadwal)';
+  }
+
+  // Booking dengan jadwal: keyword match ATAU ada booking_date/booking_time
+  const scheduleKeywords = ['booking', 'jadwal', 'scheduled', 'schedule'];
+  const hasScheduleKeyword = scheduleKeywords.some((kw) => normalized.includes(kw));
+  const hasBookingDateTime = order?.booking_date || order?.booking_time;
+
+  if (hasScheduleKeyword || hasBookingDateTime) {
+    return 'Booking (Pilih Tanggal & Jam)';
+  }
+
+  // Fallback: jika ada booking_date/booking_time → booking, jika tidak → keranjang
+  if (hasBookingDateTime) {
+    return 'Booking (Pilih Tanggal & Jam)';
+  }
+
+  return 'Keranjang (Tanpa Jadwal)';
+};
+
+// Get status label — different wording for keranjang vs booking
+const getStatusLabel = (order) => {
+  const mechanismLabel = getMekanismeLabel(order);
+  if (mechanismLabel.includes('Booking')) {
+    return 'Booking Diajukan';
+  }
+  return 'Pesanan Diajukan';
 };
 
 // Normalize status for display
@@ -560,7 +676,7 @@ onMounted(async () => {
                   class="px-2.5 py-1 rounded-full text-xs font-medium"
                   :class="statusConfig[order.status]?.color || 'bg-gray-100 text-gray-600'"
                 >
-                  {{ statusConfig[order.status]?.label || order.status }}
+                  {{ order.status === 'menunggu_konfirmasi_merchant' ? getStatusLabel(order) : (statusConfig[order.status]?.label || order.status) }}
                 </span>
                 <span
                   class="px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -590,27 +706,42 @@ onMounted(async () => {
           <div class="p-4">
             <div class="grid grid-cols-2 gap-3 text-sm">
               <div>
+                <span class="text-gray-500">Tipe Layanan</span>
+                <p class="font-medium text-gray-800 text-xs">{{ getServiceTypeLabel(order) }}</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Mekanisme</span>
+                <p class="text-gray-800 text-xs">{{ getMekanismeLabel(order) }}</p>
+              </div>
+              <div>
                 <span class="text-gray-500">Total</span>
                 <p class="font-semibold text-merchant-primary">
                   {{ formatCurrency(getOrderPrice(order)) }}
                 </p>
               </div>
-              <div>
+              <div v-if="getBookingDisplay(order)">
                 <span class="text-gray-500">Jadwal</span>
-                <p v-if="getBookingDisplay(order)" class="text-gray-800 text-xs">{{ getBookingDisplay(order) }}</p>
-                <p v-else class="text-gray-400 text-xs italic">Tidak menggunakan jadwal</p>
+                <p class="text-gray-800 text-xs">{{ getBookingDisplay(order) }}</p>
               </div>
               <div>
-                <span class="text-gray-500">Alamat</span>
-                <p class="text-gray-800 text-xs">{{ getOrderAddress(order) }}</p>
+                <span class="text-gray-500">{{ getAddressLabel(order) }}</span>
+                <p class="text-gray-800 text-xs line-clamp-2">{{ getOrderAddress(order) }}</p>
               </div>
-              <div v-if="order.booking_note">
-                <span class="text-gray-500">Catatan</span>
-                <p class="text-gray-800 line-clamp-2">{{ order.booking_note }}</p>
+              <div v-if="order.customer_name">
+                <span class="text-gray-500">Pemesan</span>
+                <p class="text-gray-800 text-xs">{{ order.customer_name }}</p>
               </div>
-              <div v-if="order.payment_method">
+              <div v-if="order.customer_phone">
+                <span class="text-gray-500">Telepon</span>
+                <p class="text-gray-800 text-xs">{{ order.customer_phone }}</p>
+              </div>
+              <div>
                 <span class="text-gray-500">Metode Bayar</span>
-                <p class="text-gray-800">{{ order.payment_method }}</p>
+                <p class="text-gray-800 text-xs">{{ getPaymentMethodDisplay(order) }}</p>
+              </div>
+              <div v-if="order.booking_note" class="col-span-2">
+                <span class="text-gray-500">Catatan</span>
+                <p class="text-gray-800 text-xs line-clamp-2">{{ order.booking_note }}</p>
               </div>
             </div>
 
