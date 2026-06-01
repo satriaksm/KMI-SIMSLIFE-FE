@@ -560,9 +560,13 @@
                 </div>
 
                 <!-- Button -->
-                <button class="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-bold text-sm transition shadow-lg shadow-amber-500/20" @click="sendToChat">
-                  <i class="pi pi-send text-sm"></i>
-                  Booking Sekarang
+                <button
+                  :disabled="submitting"
+                  class="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-bold text-sm transition shadow-lg shadow-amber-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                  @click="sendToChat"
+                >
+                  <i :class="submitting ? 'pi pi-spin pi-spinner' : 'pi pi-send'" class="text-sm"></i>
+                  {{ submitting ? 'Memproses...' : 'Booking Sekarang' }}
                 </button>
                 <p class="text-xs text-gray-400 text-center mt-2">Pesanan akan dikirim via WhatsApp</p>
               </div>
@@ -732,11 +736,48 @@ function getLocalBookings() {
 const serviceType = ref(route.query.service_type || null);
 
 // Mekanisme pemesanan: booking (dengan jadwal) atau keranjang (tanpa jadwal)
+// Default kosong agar isBookingMechanism aman (false) kecuali route override
+// Helper: ekstrak mekanisme dari data jasa API
+// Priority: service_type_booking > mekanisme_pemesanan > cara_pemesanan > booking_type > order_type
+// API returns: keranjang | booking | konsultasi (via service_type_booking)
+// DB column: cara_pemesanan (langsung_pesan | booking | memerlukan_konsultasi)
+const getMekanismeFromJasa = (jasaData) => {
+  if (!jasaData) return null;
+
+  // 1. service_type_booking — normalized dari API (keranjang | booking | konsultasi)
+  const stb = jasaData?.service_type_booking;
+  if (stb !== null && stb !== undefined && stb !== '' && String(stb).trim() !== '') {
+    const v = String(stb).trim();
+    console.log(`[PembayaranJasa] service_type_booking dari API: "${v}"`);
+    return v;
+  }
+
+  // 2. Legacy DB column: cara_pemesanan
+  const cp = jasaData?.cara_pemesanan;
+  if (cp !== null && cp !== undefined && cp !== '' && String(cp).trim() !== '') {
+    const raw = String(cp).trim();
+    const mapped = raw === 'langsung_pesan' ? 'keranjang' : (raw === 'memerlukan_konsultasi' ? 'konsultasi' : raw);
+    console.log(`[PembayaranJasa] cara_pemesanan dari API: "${raw}" → "${mapped}"`);
+    return mapped;
+  }
+
+  // 3. Fallback: mekanisme_pemesanan / booking_type / order_type
+  const fallbackFields = ['mekanisme_pemesanan', 'booking_type', 'order_type', 'mechanism'];
+  for (const f of fallbackFields) {
+    const v = jasaData?.[f];
+    if (v !== null && v !== undefined && v !== '' && String(v).trim() !== '') {
+      console.log(`[PembayaranJasa] fallback field "${f}" dari API: "${String(v).trim()}"`);
+      return String(v).trim();
+    }
+  }
+
+  return null;
+};
+
 const mekanismePemesanan = ref(
   route.query.mekanisme_pemesanan ||
-  route.query.booking_type ||
   route.query.order_type ||
-  'booking'
+  ''
 );
 
 // Helper: apakah ini checkout tanpa jadwal (keranjang)?
@@ -744,6 +785,48 @@ const isKeranjangCheckout = computed(() => {
   const m = String(mekanismePemesanan.value || '').toLowerCase();
   return ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
 });
+
+// Helper: apakah ini booking dengan jadwal?
+// Kembalikan false secara default — hanya booking jika jelas mengandung keyword tersebut
+const isBookingMechanism = computed(() => {
+  const m = String(mekanismePemesanan.value || '').toLowerCase().trim();
+  // Jika tidak ada nilai, anggap keranjang (aman: tidak perlu jadwal)
+  if (!m) return false;
+  // Hanya true jika JELAS mengandung keyword booking/jadwal/scheduled
+  return ['booking', 'jadwal', 'scheduled'].some((kw) => m.includes(kw));
+});
+
+// Format booking_time ke H:i yang valid
+// Input: "14.00", "14.00 WIB", "14:00", "7:30" → Output: "14:00", "07:30"
+// Return null jika format tidak valid (bukan HH:MM)
+const formatTimeForApi = (time) => {
+  if (!time) return null;
+  const cleaned = String(time)
+    .replace(/\s*WIB\s*$/gi, "")
+    .replace(".", ":")
+    .trim();
+  // Validasi format: HH:MM
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hour = String(match[1]).padStart(2, '0');
+  const minute = match[2];
+  return `${hour}:${minute}`;
+};
+
+// Format tanggal untuk API payload — YYYY-MM-DD
+const formatDateForApi = (iso) => {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  } catch {
+    return null;
+  }
+};
 
 // ===== Form =====
 const form = ref({
@@ -970,6 +1053,9 @@ const userStore = useUserStore();
 const locatingDevice = ref(false);
 const locatingError = ref("");
 const deviceCoordinates = ref(null);
+
+// Checkout state — cekah double-submit & tampilkan loading
+const submitting = ref(false);
 
 // Modal pilihan alamat (legacy, dipertahankan agar kompatibel)
 const openAlamatOptions = ref(false);
@@ -1241,92 +1327,95 @@ const sendToChat = async () => {
   // reset pesan
   errorMessage.value = "";
   successMessage.value = "";
-  const submitting = ref(false);
 
-  // Validasi khusus nama & nomor telepon
-  if (!form.value.nama || !isValidName(form.value.nama)) {
-    errorMessage.value = "Nama wajib diisi dan hanya boleh berisi huruf.";
-    return;
-  }
-
-  if (!form.value.tel || !isValidPhone(form.value.tel)) {
-    errorMessage.value =
-      "Nomor telepon wajib diisi dan hanya boleh berisi angka (min. 8 digit).";
-    return;
-  }
-
-  if (isCustomerAddressRequired.value && !String(form.value.alamat || '').trim()) {
-    errorMessage.value = "Alamat layanan wajib diisi terlebih dahulu.";
-    return;
-  }
-
-  // Validasi jadwal untuk booking (non-keranjang)
-  if (!isKeranjangCheckout.value && !isFormValid.value) {
-    errorMessage.value = "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
-    return;
-  }
-
-  // Skip jadwal validation untuk keranjang checkout
-  if (isKeranjangCheckout.value && !form.value.nama) {
-    errorMessage.value = "Mohon lengkapi data pemesan terlebih dahulu.";
-    return;
-  }
-
-  // ===== Helpers untuk API payload =====
-  // Format booking_time ke H:i (backend requirement: "14:00", bukan "14.00" atau "14.00 WIB")
-  const formatBookingTimeForApi = (time) => {
-    if (!time) return null;
-    return String(time)
-      .replace(/\s*WIB\s*$/gi, "")
-      .replace(".", ":")
-      .trim();
-  };
-
-  // Map payment_method UI label → backend enum
-  const paymentMethodMap = {
-    "COD": "cod",
-    "QRIS": "qris",
-    "Bayar di Tempat": "cash",
-    "cash": "cash",
-    "cod": "cod",
-    "qris": "qris",
-  };
-
-  // Map payment_method backend → UI display label
-  const paymentMethodDisplayMap = {
-    "cash": "Bayar di Tempat",
-    "cod": "COD",
-    "qris": "QRIS",
-    "manual_transfer": "Transfer Manual",
-  };
-
-  const getBackendPaymentMethod = (uiMethod) => {
-    if (!uiMethod) return "cash";
-    return paymentMethodMap[uiMethod] || "cash";
-  };
-
-  const getPaymentMethodDisplayLabel = (backendMethod) => {
-    if (!backendMethod) return "Bayar di Tempat";
-    return paymentMethodDisplayMap[backendMethod] || backendMethod;
-  };
-
+  // Cegah double-submit
+  if (submitting.value) return;
   submitting.value = true;
 
-  // 1. Buat service order di backend
-  let orderId = null;
-  let whatsappRedirectUrl = null;
-
   try {
-    // Ambil jasa_id dari data yang sudah di-fetch di onMounted
+    // ===== Validasi form =====
+    if (!form.value.nama || !isValidName(form.value.nama)) {
+      errorMessage.value = "Nama wajib diisi dan hanya boleh berisi huruf.";
+      return;
+    }
+
+    if (!form.value.tel || !isValidPhone(form.value.tel)) {
+      errorMessage.value = "Nomor telepon wajib diisi dan hanya boleh berisi angka (min. 8 digit).";
+      return;
+    }
+
+    if (isCustomerAddressRequired.value && !String(form.value.alamat || '').trim()) {
+      errorMessage.value = "Alamat layanan wajib diisi terlebih dahulu.";
+      return;
+    }
+
+    // Validasi jadwal: hanya untuk mekanisme Booking
+    // Keranjang/tanpa jadwal langsung skip validasi jadwal
+    console.log("[PembayaranJasa] Mekanisme:", mekanismePemesanan.value, "| isBookingMechanism:", isBookingMechanism.value);
+    if (isBookingMechanism.value) {
+      if (!isFormValid.value) {
+        errorMessage.value = "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
+        return;
+      }
+
+      const parsedTime = formatTimeForApi(form.value.waktu);
+      if (!parsedTime) {
+        errorMessage.value = "Format waktu booking tidak valid. Gunakan format HH:MM, contoh: 14:00.";
+        return;
+      }
+    }
+    // Keranjang/tanpa jadwal: tidak perlu validasi tanggal dan jam
+
+    // ===== Helpers =====
+    const paymentMethodMap = {
+      // Backend accepts: COD, MANUAL, cod, manual (case-insensitive)
+      // Map UI display labels → backend accepted values
+      "COD": "COD",
+      "Bayar di Tempat": "MANUAL",
+      "cash": "MANUAL",
+      "cod": "COD",
+      "qris": "MANUAL",  // QRIS treated as manual bank transfer
+      "manual": "MANUAL",
+    };
+    const getBackendPaymentMethod = (uiMethod) => paymentMethodMap[uiMethod] || "COD";
+
+    const cleanValue = (val) => {
+      if (val === null || val === undefined || val === "") return null;
+      if (val === "—" || val === "-" || val === "null" || val === "undefined") return null;
+      return val;
+    };
+
+    // ===== Ambil jasa_id dari API =====
     let jasaId = null;
+    let jasaDataForLog = null;
+    let fetchedJasaData = null;
     try {
       const { data: jasaData } = await api.get(`/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`);
-      // API returns {id,...} directly, not wrapped
       jasaId = jasaData?.id || jasaData?.data?.id || null;
-      console.log("[PembayaranJasa] jasa_id:", jasaId, "raw:", jasaData);
+      jasaDataForLog = jasaData;
+      fetchedJasaData = jasaData?.data || jasaData; // normalize
+      console.log("[PembayaranJasa] Fetch jasa:", { jasaId, raw: jasaData });
     } catch (e) {
-      console.warn("[PembayaranJasa] Gagal fetch jasa:", e);
+      // Jika 404 (jasa tidak ditemukan), tetap lanjut dengan fallback
+      const isNotFound = e.response?.status === 404;
+      console.warn(`[PembayaranJasa] Gagal fetch jasa (${isNotFound ? '404' : 'other'}):`, e.response?.data);
+      if (!isNotFound) {
+        errorMessage.value = "Gagal memuat data jasa. Silakan coba lagi.";
+        return;
+      }
+      // Fallback: coba dari query param
       jasaId = route.query.jasa_id || null;
+    }
+
+    // ===== Override mekanisme dari data jasa API (prioritas tertinggi) =====
+    const apiMekanisme = getMekanismeFromJasa(fetchedJasaData);
+    if (apiMekanisme) {
+      mekanismePemesanan.value = apiMekanisme;
+      console.log(`[PembayaranJasa] Mekanisme di-override dari API: "${apiMekanisme}"`);
+      console.log(`[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`);
+    } else {
+      console.log(`[PembayaranJasa] Mekanisme dari API kosong — pakai route query / default kosong`);
+      console.log(`[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`);
     }
 
     if (!jasaId) {
@@ -1334,13 +1423,7 @@ const sendToChat = async () => {
       return;
     }
 
-    // Helper to clean nullable values
-    const cleanValue = (val) => {
-      if (val === null || val === undefined || val === "") return null;
-      if (val === "—" || val === "-" || val === "null" || val === "undefined") return null;
-      return val;
-    };
-
+    // ===== Bangun payload =====
     const orderPayload = {
       jasa_id: jasaId,
       service_name: order.title,
@@ -1348,162 +1431,165 @@ const sendToChat = async () => {
       customer_name: form.value.nama,
       customer_phone: form.value.tel,
       customer_address: cleanValue(form.value.alamat),
-      // Keranjang/checkout tanpa jadwal: jangan kirim booking_date/booking_time
-      booking_date: isKeranjangCheckout.value ? null : cleanValue(form.value.tanggalISO),
-      booking_time: isKeranjangCheckout.value ? null : formatBookingTimeForApi(form.value.waktu),
+      booking_date: isKeranjangCheckout.value ? null : formatDateForApi(form.value.tanggalISO),
+      booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
-      booking_type: isKeranjangCheckout.value ? 'keranjang' : 'booking',
+      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
       payment_method: getBackendPaymentMethod(pay.method),
       total_price: total.value || order.price || 0,
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
-      merchant_name: order.merchantSlug || '',
-      merchant_slug: order.merchantSlug || '',
-      service_image: order.image || '',
     };
 
-    console.log("[PembayaranJasa] Creating order with payload:", orderPayload);
-    const { data: orderData } = await api.post("/api/service-orders", orderPayload).catch((err) => {
-      console.error("[PembayaranJasa] Order API error:", err.response?.data);
-      throw err;
+    console.log("[PembayaranJasa] Service Order Payload:", orderPayload);
+    console.log("[PembayaranJasa] Payload fields:", {
+      jasa_id: orderPayload.jasa_id,
+      service_type: orderPayload.service_type,
+      customer_name: orderPayload.customer_name,
+      customer_phone: orderPayload.customer_phone,
+      customer_address: orderPayload.customer_address,
+      booking_date: orderPayload.booking_date,
+      booking_time: orderPayload.booking_time,
+      mekanisme_pemesanan: orderPayload.mekanisme_pemesanan,
+      payment_method: orderPayload.payment_method,
+      total_price: orderPayload.total_price,
     });
-    console.log("[PembayaranJasa] Order response:", orderData);
 
-    // ApiResponse::success returns { message, data: { id, ... } }
-    // Handle both { success: true, data: { id } } and { message, data: { id } }
-    const createdOrder = orderData?.data;
-    if (createdOrder?.id) {
-      orderId = createdOrder.id;
+    // ===== Kirim ke backend — WAJIB SUKSES =====
+    const response = await api.post("/api/service-orders", orderPayload);
+    console.log("[PembayaranJasa] Response service order:", response.data);
 
-      // Simpan ke localStorage sebagai backup (agar muncul di history meskipun API pending/bermasalah)
-      const localBooking = {
-        id: orderId,
-        service_name: order.title,
-        service_type: serviceType.value || order.serviceType || 'on_site',
-        booking_type: 'booking',
-        merchant_name: order.merchantName || createdOrder?.merchant_name || order.merchantSlug || '',
-        merchant_slug: order.merchantSlug || createdOrder?.merchant_slug || '',
-        merchant_address: merchantAddress.value || '',
-        customer_name: form.value.nama,
-        customer_phone: form.value.tel,
-        customer_address: form.value.alamat || '',
-        booking_date: form.value.tanggalISO || order.tglISO || null,
-        booking_time: form.value.waktu || null,
-        booking_note: form.value.catatan || '',
-        payment_method: pay.method || 'COD',
-        total_price: total.value || order.price || 0,
-        latitude: deviceCoordinates.value?.latitude ?? null,
-        longitude: deviceCoordinates.value?.longitude ?? null,
-        service_image: order.image || '',
-        status: 'menunggu_konfirmasi_merchant',
-        created_at: new Date().toISOString(),
-      };
-      saveLocalBooking(localBooking);
+    // ApiResponse::success → { message, data: { id, merchant_id, ... } }
+    const res = response.data;
+    const createdOrder = res?.data;
 
-      // 2. Dapatkan WhatsApp redirect URL dari backend
-      try {
-        const { data: waData } = await api.post(
-          `/api/service-orders/${orderId}/redirect-whatsapp`,
-          { order_id: orderId }
-        ).catch((err) => {
-          console.warn("[PembayaranJasa] WhatsApp redirect failed:", err.response?.data);
-          return { data: { redirect_url: null } };
-        });
-        whatsappRedirectUrl = waData?.data?.redirect_url || null;
-        console.log("[PembayaranJasa] WhatsApp URL:", whatsappRedirectUrl);
-      } catch {
-        // WhatsApp redirect gagal, lanjut dengan link manual
-        whatsappRedirectUrl = null;
-      }
+    // Jika backend tidak mengembalikan id, anggap gagal total
+    if (!createdOrder?.id) {
+      errorMessage.value = res?.message || "Gagal membuat pesanan. Silakan coba lagi.";
+      console.error("Response tanpa id dari backend:", res);
+      return;
     }
-  } catch (err) {
-    console.error("[PembayaranJasa] Gagal membuat service order:", err);
-    if (err.response) {
-      console.error("Status:", err.response.status, "Data:", err.response.data);
-      errorMessage.value = err.response.data?.message || "Gagal membuat pesanan. Silakan coba lagi.";
-    }
-    // Tetap simpan ke localStorage sebagai fallback agar muncul di history
-    const fallbackBooking = {
-      id: "local_" + Date.now(),
-      service_name: order.title,
-      service_type: serviceType.value || order.serviceType || "on_site",
-      booking_type: "booking",
-      merchant_name: order.merchantName || order.merchantSlug || "",
-      merchant_slug: order.merchantSlug || "",
-      merchant_address: merchantAddress.value || "",
-      customer_name: form.value.nama,
-      customer_phone: form.value.tel,
-      customer_address: form.value.alamat || "",
-      booking_date: form.value.tanggalISO || order.tglISO || null,
-      booking_time: form.value.waktu || null,
-      booking_note: form.value.catatan || "",
-      payment_method: pay.method || "COD",
-      total_price: total.value || order.price || 0,
-      latitude: deviceCoordinates.value?.latitude ?? null,
-      longitude: deviceCoordinates.value?.longitude ?? null,
-      service_image: order.image || "",
-      status: "menunggu_konfirmasi_merchant",
-      created_at: new Date().toISOString(),
-      is_local: true,
+
+    const orderId = createdOrder.id;
+    const backendStatus = createdOrder.status || 'menunggu_konfirmasi_merchant';
+
+    // ===== Simpan ke localStorage sebagai backup =====
+    const localBooking = {
+      id: orderId,
+      service_name: createdOrder.service_name || order.title,
+      service_type: createdOrder.service_type || serviceType.value || 'on_site',
+      mekanisme_pemesanan: createdOrder.mekanisme_pemesanan || (isKeranjangCheckout.value ? 'keranjang' : 'booking'),
+      merchant_name: createdOrder.merchant_name || order.merchantName || '',
+      merchant_slug: order.merchantSlug || '',
+      merchant_address: merchantAddress.value || createdOrder.merchant?.primary_address?.detail || '',
+      customer_name: createdOrder.customer_name || form.value.nama,
+      customer_phone: createdOrder.customer_phone || form.value.tel,
+      customer_address: createdOrder.customer_address || form.value.alamat || '',
+      booking_date: createdOrder.booking_date || form.value.tanggalISO || null,
+      booking_time: createdOrder.booking_time || form.value.waktu || null,
+      booking_note: createdOrder.booking_note || form.value.catatan || '',
+      payment_method: createdOrder.payment_method || pay.method || 'COD',
+      total_price: createdOrder.total_price || total.value || order.price || 0,
+      latitude: createdOrder.customer_latitude ?? deviceCoordinates.value?.latitude ?? null,
+      longitude: createdOrder.customer_longitude ?? deviceCoordinates.value?.longitude ?? null,
+      service_image: createdOrder.service_image || order.image || '',
+      status: backendStatus,
+      created_at: createdOrder.created_at || new Date().toISOString(),
     };
-    saveLocalBooking(fallbackBooking);
-    orderId = fallbackBooking.id;
+    saveLocalBooking(localBooking);
+
+    console.log("Data service order (customer):", localBooking);
+
+    // ===== Bangun pesan WhatsApp =====
+    const message = buildWhatsappMessage();
+    if (!message) return;
+
+    // Cek apakah backend punya redirect WhatsApp — jika tidak, tetap buka WhatsApp manual
+    let whatsappRedirectUrl = null;
+    try {
+      const { data: waData } = await api.post(
+        `/api/service-orders/${orderId}/redirect-whatsapp`,
+        { order_id: orderId }
+      ).catch(() => null);
+      // Jika endpoint tidak ada (404), waData akan null — tidak masalah
+      if (waData?.data?.redirect_url) {
+        whatsappRedirectUrl = waData.data.redirect_url;
+      }
+    } catch {
+      // Gagal fetch redirect — abaikan, tetap pakai nomor manual
+    }
+
+    let url = whatsappRedirectUrl || jasaWhatsappLink.value;
+
+    if (!url) {
+      errorMessage.value = "Nomor atau link WhatsApp penjual belum tersedia. Silakan hubungi penjual secara manual.";
+      return;
+    }
+
+    if (!url.startsWith("http") && !url.startsWith("wa.me")) {
+      const phone = url.replace(/[^0-9]/g, "");
+      url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    } else if (url.startsWith("http")) {
+      url += url.includes("?") ? `&text=${encodeURIComponent(message)}` : `?text=${encodeURIComponent(message)}`;
+    }
+
+    window.open(url, "_blank");
+
+    // ===== Redirect ke halaman konfirmasi =====
+    const params = new URLSearchParams({
+      order_id: orderId,
+      jasa_id: route.query.jasa_id || "",
+      merchant_slug: order.merchantSlug || "",
+      merchant_name: order.merchantName || "",
+      merchant_address: merchantAddress.value || "",
+      jasa_title: order.title,
+      service_type: serviceType.value || order.serviceType || "on_site",
+      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
+      nama: form.value.nama,
+      tel: form.value.tel,
+      alamat: form.value.alamat || "",
+      tanggal: form.value.tanggalISO || order.tglISO,
+      waktu: form.value.waktu,
+      payment_method: pay.method || "Bayar di Tempat",
+      total: total.value || order.price,
+      catatan: form.value.catatan || "",
+      service_image: order.image || "",
+    });
+
+    if (order.jasaSlug) {
+      params.set("jasa_slug", order.jasaSlug);
+    }
+
+    router.push({
+      path: "/booking-confirmation",
+      query: Object.fromEntries(params),
+    });
+
+  } catch (err) {
+    console.error("[PembayaranJasa] Error checkout:", err);
+    console.error("[PembayaranJasa] Status:", err.response?.status);
+    console.error("[PembayaranJasa] Response Data:", err.response?.data);
+    console.error("[PembayaranJasa] Validation Errors:", err.response?.data?.errors);
+
+    const backendMessage = err.response?.data?.message;
+    const validationErrors = err.response?.data?.errors;
+
+    if (validationErrors) {
+      // Tampilkan semua error validasi dari backend
+      const allErrors = Object.entries(validationErrors)
+        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+        .join(' | ');
+      errorMessage.value = allErrors || "Validasi gagal. Periksa kembali data Anda.";
+    } else if (backendMessage) {
+      errorMessage.value = backendMessage;
+    } else if (err.request) {
+      errorMessage.value = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+    } else {
+      errorMessage.value = "Terjadi kesalahan. Silakan coba lagi.";
+    }
   } finally {
     submitting.value = false;
   }
-
-  // 3. Bangun pesan WhatsApp
-  const message = buildWhatsappMessage();
-  if (!message) return;
-
-  let url = whatsappRedirectUrl || jasaWhatsappLink.value;
-
-  if (!url) {
-    errorMessage.value =
-      "Nomor atau link WhatsApp penjual belum tersedia. Silakan hubungi penjual secara manual.";
-    return;
-  }
-
-  // Jika URL dari backend, gunakan langsung; jika tidak, bangun dari nomor manual
-  if (!url.startsWith("http") && !url.startsWith("wa.me")) {
-    const phone = url.replace(/[^0-9]/g, "");
-    url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  } else if (url.startsWith("http")) {
-    url += url.includes("?") ? `&text=${encodeURIComponent(message)}` : `?text=${encodeURIComponent(message)}`;
-  }
-
-  // Buka WhatsApp
-  window.open(url, "_blank");
-
-  // 4. Redirect ke halaman konfirmasi
-  const params = new URLSearchParams({
-    order_id: orderId || "pending",
-    jasa_id: route.query.jasa_id || "",
-    merchant_slug: order.merchantSlug || "",
-    merchant_name: order.merchantName || "",
-    merchant_address: merchantAddress.value || "",
-    jasa_title: order.title,
-    service_type: serviceType.value || order.serviceType || "on_site",
-    booking_type: "booking",
-    nama: form.value.nama,
-    tel: form.value.tel,
-    alamat: form.value.alamat || "",
-    tanggal: form.value.tanggalISO || order.tglISO,
-    waktu: form.value.waktu,
-    payment_method: pay.method || "Bayar di Tempat",
-    total: total.value || order.price,
-    catatan: form.value.catatan || "",
-    service_image: order.image || "",
-  });
-
-  if (order.jasaSlug) {
-    params.set("jasa_slug", order.jasaSlug);
-  }
-
-  router.push({
-    path: "/booking-confirmation",
-    query: Object.fromEntries(params),
-  });
 };
 </script>
 

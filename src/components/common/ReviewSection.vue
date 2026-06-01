@@ -20,6 +20,22 @@ const loading = ref(false);
 const page = ref(1);
 const hasMore = ref(true);
 
+// Get reviewer display name and avatar — respects is_anonymous flag
+const getReviewerDisplay = (rating) => {
+  if (rating?.is_anonymous) {
+    return { name: 'Pengguna Anonim', initial: 'A' };
+  }
+  const name = rating?.user?.name || 'Pelanggan';
+  return { name, initial: name.charAt(0).toUpperCase() || '?' };
+};
+
+// Get reviewer badge for anonymous reviews
+const getReviewerBadge = (rating) => {
+  return rating?.is_anonymous
+    ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 ml-1">Anonim</span>'
+    : '';
+};
+
 const fetchRatings = async (pageNum = 1) => {
   loading.value = true;
   try {
@@ -30,8 +46,16 @@ const fetchRatings = async (pageNum = 1) => {
       endpoint = `/api/public/merchants/${props.resourceId}/ratings?page=${pageNum}`;
     }
 
+    console.log(`[ReviewSection] Fetching ratings from: ${endpoint}`);
     const { data } = await api.get(endpoint);
+
+    console.log('[ReviewSection] Raw API response:', JSON.stringify(data, null, 2));
     const newRatings = data?.data || data || [];
+
+    console.log(`[ReviewSection] Extracted ratings: ${newRatings.length}`);
+    if (newRatings.length > 0) {
+      console.log(`[ReviewSection] First rating:`, JSON.stringify(newRatings[0], null, 2));
+    }
 
     if (pageNum === 1) {
       ratings.value = newRatings;
@@ -65,6 +89,72 @@ const formatDate = (date) => {
 
 const getStarClass = (index, rating) => {
   return index < rating ? "text-yellow-400" : "text-gray-300";
+};
+
+// ===== Review Media Helpers =====
+
+// Get all media for a rating — try all possible field names
+const getReviewMedia = (rating) => {
+  return (
+    rating?.media ||
+    rating?.review_media ||
+    rating?.reviewMedia ||
+    rating?.attachments ||
+    []
+  );
+};
+
+// Get public URL for a media item
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const getMediaUrl = (media) => {
+  if (!media) return null;
+
+  // media_url: computed accessor from backend (full URL with /storage/)
+  if (media.media_url && media.media_url.trim()) {
+    const url = media.media_url;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url}`;
+  }
+
+  // file_url: stored URL from DB (may be relative /storage/... or full)
+  if (media.file_url && media.file_url.trim()) {
+    const url = media.file_url;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url}`;
+  }
+
+  // file_path: stored relative path (e.g. "review-media/abc.jpg")
+  if (media.file_path && media.file_path.trim()) {
+    const path = media.file_path;
+    if (path.startsWith('http')) return path;
+    if (path.startsWith('/storage/')) return `${API_BASE}${path}`;
+    return `${API_BASE}/storage/${path}`;
+  }
+
+  // url: alternative field name
+  if (media.url && media.url.trim()) {
+    const url = media.url;
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url}`;
+  }
+
+  return null;
+};
+
+// Check if media item is an image
+const isImage = (media) => {
+  return (
+    media?.file_type === 'image' ||
+    (media?.mime_type && String(media.mime_type).startsWith('image/'))
+  );
+};
+
+// Check if media item is a video
+const isVideo = (media) => {
+  return (
+    media?.file_type === 'video' ||
+    (media?.mime_type && String(media.mime_type).startsWith('video/'))
+  );
 };
 
 onMounted(() => {
@@ -109,13 +199,19 @@ watch(
         <div class="flex items-start gap-3">
           <!-- Avatar -->
           <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold">
-            {{ rating.user?.name?.charAt(0).toUpperCase() || "?" }}
+            {{ getReviewerDisplay(rating).initial }}
           </div>
 
           <div class="flex-1">
             <!-- Header -->
             <div class="flex items-center justify-between mb-1">
-              <p class="font-medium text-gray-800">{{ rating.user?.name || "Anonim" }}</p>
+              <p class="font-medium text-gray-800">
+                {{ getReviewerDisplay(rating).name }}
+                <!-- Anonim badge -->
+                <span v-if="rating.is_anonymous" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 ml-1">
+                  <i class="pi pi-eye-slash text-[8px] mr-0.5"></i>Anonim
+                </span>
+              </p>
               <span class="text-xs text-gray-400">{{ formatDate(rating.created_at) }}</span>
             </div>
 
@@ -137,6 +233,34 @@ watch(
             <p v-if="rating.comment" class="text-sm text-gray-600">
               {{ rating.comment }}
             </p>
+
+            <!-- Review Media (photos/videos) -->
+            <div
+              v-if="getReviewMedia(rating).length > 0"
+              class="mt-3 flex flex-wrap gap-2"
+            >
+              <template
+                v-for="(media, idx) in getReviewMedia(rating)"
+                :key="media.id || idx"
+              >
+                <!-- Image -->
+                <img
+                  v-if="isImage(media)"
+                  :src="getMediaUrl(media)"
+                  class="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition"
+                  loading="lazy"
+                  @error="(e) => { e.target.style.display = 'none'; console.error('Review image load error:', getMediaUrl(media)); }"
+                />
+                <!-- Video -->
+                <video
+                  v-else-if="isVideo(media)"
+                  :src="getMediaUrl(media)"
+                  controls
+                  class="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer"
+                  @error="(e) => { e.target.style.display = 'none'; console.error('Review video load error:', getMediaUrl(media)); }"
+                />
+              </template>
+            </div>
           </div>
         </div>
       </div>

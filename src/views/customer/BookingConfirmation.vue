@@ -42,7 +42,10 @@ function getServiceTypeLabel(type) {
 function getBookingTypeLabel(type) {
   const labels = {
     booking: "Booking (Pilih Tanggal & Jam)",
+    keranjang: "Keranjang (Tanpa Jadwal)",
     walk_in: "Walk-in (Tanpa Jadwal)",
+    tanpa_jadwal: "Tanpa Jadwal",
+    konsultasi: "Konsultasi",
   };
   return labels[type] || (type ? type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Booking (Pilih Tanggal & Jam)");
 }
@@ -71,7 +74,8 @@ function getAddressLabel(serviceType) {
 onMounted(() => {
   const q = route.query;
   const serviceType = q.service_type || q.serviceType || "on_site";
-  const bookingType = q.booking_type || "booking";
+  // Accept both mekanisme_pemesanan and booking_type for compatibility
+  const bookingType = q.mekanisme_pemesanan || q.booking_type || "booking";
   const merchantName = q.merchant_name || q.merchant || q.merchant_slug || "Merchant";
   const merchantAddr = q.merchant_address || q.merchantAddress || "";
   const formattedDate = formatDateID(q.tanggal);

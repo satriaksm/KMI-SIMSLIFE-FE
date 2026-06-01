@@ -192,60 +192,62 @@ const sendMessage = async () => {
 
 // Submit offer
 const submitOffer = async () => {
-  console.log('[submitOffer] clicked');
-
   // Parse price - input type="number" gives us a string or number
-  const price = Number(offerPrice.value);
+  const priceRaw = offerPrice.value;
+  const price = Number(String(priceRaw).replace(/[^\d]/g, ''));
 
-  // Validation - check for NaN or zero/negative
-  if (isNaN(price) || price <= 0) {
-    toast.error('Harga penawaran harus lebih dari 0');
-    console.log('[submitOffer] validation failed: invalid price', price);
+  // Validation
+  if (!priceRaw || String(priceRaw).trim() === '' || isNaN(price) || price <= 0) {
+    toast.error('Harga penawaran wajib diisi dan harus lebih dari 0');
     return;
   }
 
   // Prevent double-submit
-  if (sending.value) {
-    console.log('[submitOffer] already sending, skipping');
-    return;
-  }
+  if (sending.value) return;
 
   sending.value = true;
-  console.log('[submitOffer] sending request with price:', price);
-
   try {
     const responseType = 'perlu_penyesuaian';
     const endpoint = `/api/merchant/${merchantSlug.value}/service-consultations/${route.params.id}/respond`;
-    console.log('[submitOffer] endpoint:', endpoint);
 
     const payload = {
       response: responseType,
       merchant_offered_price: price,
       merchant_note: offerNote.value || null,
     };
-    console.log('[submitOffer] payload:', payload);
 
     const { data } = await api.post(endpoint, payload);
 
-    console.log('[submitOffer] response:', data);
+    // ApiResponse::success → { message, data }
+    // Close modal and reset form
+    showOfferModal.value = false;
+    offerPrice.value = '';
+    offerNote.value = '';
 
-    if (data.success) {
-      toast.success('Penawaran berhasil dikirim');
-      showOfferModal.value = false;
-      offerPrice.value = '';
-      offerNote.value = '';
-      await fetchConsultation();
-      await nextTick();
-      scrollToBottom();
+    toast.success(data?.message || 'Penawaran berhasil dikirim.');
+
+    // Refresh consultation data to get updated status, messages, and offered price
+    await fetchConsultation();
+    await nextTick();
+    scrollToBottom();
+
+    // If response includes a new message from the offer, push it to the chat
+    if (data?.data?.message || data?.data) {
+      const newMsg = data.data?.message || data.data;
+      if (newMsg && newMsg.id && !messages.value.find(m => m.id === newMsg.id)) {
+        messages.value.push(newMsg);
+        await nextTick();
+        scrollToBottom();
+      }
     }
   } catch (error) {
     console.error('[submitOffer] error:', error);
-    console.error('[submitOffer] error response:', error.response?.data);
-    console.error('[submitOffer] error status:', error.response?.status);
-    toast.error(error.response?.data?.message || error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(', ') : 'Gagal mengirim penawaran');
+    toast.error(
+      error.response?.data?.message ||
+      (error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(', ') : 'Gagal mengirim penawaran. Silakan coba lagi.')
+    );
   } finally {
     sending.value = false;
-    console.log('[submitOffer] done, sending reset');
   }
 };
 

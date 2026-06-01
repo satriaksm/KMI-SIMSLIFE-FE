@@ -104,27 +104,36 @@ const fetchOrders = async (status = null) => {
     const { data } = await api.get(url, { params });
 
     // Check if the request was successful (accept multiple response formats)
-    console.log('History response:', data);
-    const res = data;
-    const isSuccess =
-      res?.status === true ||
-      res?.status === 'success' ||
-      res?.success === true ||
-      res?.message === 'success';
+    console.log("Merchant service orders (raw):", data);
+    const res = data; // axios response.data — Laravel ApiResponse: { message, data: [...] }
+    console.log("res?.message:", res?.message, "| res?.data:", res?.data);
+
+    // ApiResponse::success → { message: 'success', data: [...] }
+    // If res.data is undefined and res.message is not 'success', the API call may have failed
+    const hasSuccessFlag = res?.status === true || res?.status === 'success' || res?.success === true;
+    const hasSuccessMessage = typeof res?.message === 'string' && res.message === 'success';
+    const hasDataArray = Array.isArray(res?.data);
+    const hasDataObject = res?.data && typeof res?.data === 'object' && !Array.isArray(res?.data);
+    const isSuccess = hasSuccessFlag || hasSuccessMessage || hasDataArray || hasDataObject;
+
+    console.log("isSuccess check:", { hasSuccessFlag, hasSuccessMessage, hasDataArray, hasDataObject }, "→", isSuccess);
+
     if (!isSuccess) {
-      console.error('API returned error:', res?.message || res?.status);
+      console.error("Merchant orders fetch failed — res:", JSON.stringify(res));
       toast.error(res?.message || 'Gagal memuat history pesanan');
       orders.value = [];
       return;
     }
 
-    // Extract orders data from various response formats
+    // Extract orders data
+    // ApiResponse::success → { message, data: <array or {data:[...]}> }
+    let rawData = res?.data;
+    console.log("rawData:", rawData);
     orders.value =
-      res?.data?.orders ||
-      res?.data?.data ||
-      res?.data ||
-      res?.orders ||
+      Array.isArray(rawData) ? rawData :
+      (rawData && typeof rawData === 'object') ? (rawData.orders || rawData.data || []) :
       [];
+    console.log("Extracted orders count:", orders.value.length, orders.value[0] ? '(first id: ' + orders.value[0].id + ')' : '');
   } catch (error) {
     console.error('Gagal memuat history:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Gagal memuat history pesanan';
@@ -166,22 +175,50 @@ const isTerminal = (order) => {
 };
 
 // Get payment status label and color
-const getPaymentStatusLabel = (status) => {
+// Temporary until Xendit payment gateway integration is completed.
+// COD/manual service orders are treated as paid for demonstration/testing purposes.
+const getPaymentStatusLabel = (order) => {
+  // For COD/manual payment methods, treat as paid (no Xendit integration yet)
+  const isManualPayment =
+    order?.payment_method === 'COD' ||
+    order?.payment_method === 'MANUAL' ||
+    order?.payment_method === 'cash' ||
+    order?.payment_method === 'bayar_di_tempat' ||
+    order?.payment_method === 'Bayar di Tempat' ||
+    order?.payment_status === 'PAID';
+
+  if (isManualPayment) {
+    return 'Sudah Bayar';
+  }
+
   const labels = {
     UNPAID: 'Belum Bayar',
     WAITING_CONFIRMATION: 'Menunggu Konfirmasi',
     PAID: 'Lunas',
   };
-  return labels[status] || status || '—';
+  return labels[order?.payment_status] || order?.payment_status || '—';
 };
 
-const getPaymentStatusColor = (status) => {
+const getPaymentStatusColor = (order) => {
+  // For COD/manual payment methods, show green (paid) - no Xendit integration yet
+  const isManualPayment =
+    order?.payment_method === 'COD' ||
+    order?.payment_method === 'MANUAL' ||
+    order?.payment_method === 'cash' ||
+    order?.payment_method === 'bayar_di_tempat' ||
+    order?.payment_method === 'Bayar di Tempat' ||
+    order?.payment_status === 'PAID';
+
+  if (isManualPayment) {
+    return 'bg-green-100 text-green-700';
+  }
+
   const colors = {
-    UNPAID: 'bg-red-100 text-red-700',
+    UNPAID: 'bg-yellow-100 text-yellow-700',
     WAITING_CONFIRMATION: 'bg-yellow-100 text-yellow-700',
     PAID: 'bg-green-100 text-green-700',
   };
-  return colors[status] || 'bg-gray-100 text-gray-700';
+  return colors[order?.payment_status] || 'bg-gray-100 text-gray-700';
 };
 
 // Open reject modal
@@ -332,6 +369,7 @@ const submitEvidence = async () => {
       completionNote.value = '';
       evidenceFiles.value = [];
       selectedOrder.value = null;
+      console.log('Updated service order:', data);
       await fetchOrders(activeFilter.value);
     } else {
       console.error('Evidence error response:', data);
@@ -378,6 +416,7 @@ const acceptOrder = async (orderId) => {
       toast.success('Pesanan berhasil diterima');
       showDetailModal.value = false;
       selectedOrder.value = null;
+      console.log('Updated service order:', data);
       await fetchOrders(activeFilter.value);
     } else {
       console.error('Accept error response:', data);
@@ -425,6 +464,7 @@ const startWorking = async (orderId) => {
       toast.success('Pesanan sedang dikerjakan');
       showDetailModal.value = false;
       selectedOrder.value = null;
+      console.log('Updated service order:', data);
       await fetchOrders(activeFilter.value);
     } else {
       console.error('Start working error response:', data);
@@ -606,12 +646,30 @@ const getCompletionEvidences = (order) => {
     || [];
 };
 
-// Helper to construct media URL from file_path
-const getMediaUrl = (path) => {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
-  // Use relative path that will be resolved by the backend
-  return `/storage/${path}`;
+// Helper to construct full media URL from file_path or file_url
+const getMediaUrl = (mediaOrPath) => {
+  if (!mediaOrPath) return '';
+  // If string path:
+  if (typeof mediaOrPath === 'string') {
+    const path = mediaOrPath;
+    if (path.startsWith('http')) return path;
+    return `${import.meta.env.VITE_API_BASE_URL}/storage/${path}`;
+  }
+  // If media object:
+  const media = mediaOrPath;
+  // file_url stored by ReviewMedia accessor: /storage/...
+  if (media.file_url && media.file_url.trim()) {
+    const url = media.file_url;
+    if (url.startsWith('http')) return url;
+    return `${import.meta.env.VITE_API_BASE_URL}${url}`;
+  }
+  // file_url from other sources (already has /storage/ or full URL)
+  if (media.file_url) return media.file_url;
+  // Fallback from file_path
+  const fp = media.file_path || media.path || '';
+  if (fp.startsWith('http')) return fp;
+  if (fp.startsWith('/storage/')) return `${import.meta.env.VITE_API_BASE_URL}${fp}`;
+  return `${import.meta.env.VITE_API_BASE_URL}/storage/${fp}`;
 };
 
 // Status helpers for modal detail
@@ -848,9 +906,9 @@ onMounted(() => {
                   <p class="text-xs text-gray-500">Pembayaran</p>
                   <span
                     class="inline-block px-2 py-0.5 rounded-full text-xs font-medium"
-                    :class="getPaymentStatusColor(order.payment_status)"
+                    :class="getPaymentStatusColor(order)"
                   >
-                    {{ getPaymentStatusLabel(order.payment_status) }}
+                    {{ getPaymentStatusLabel(order) }}
                   </span>
                 </div>
                 <div>
@@ -1063,8 +1121,8 @@ onMounted(() => {
               <span class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getStatusClass(selectedOrder.status)">
                 {{ getStatusLabel(selectedOrder.status) }}
               </span>
-              <span v-if="selectedOrder.payment_status" class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getPaymentStatusColor(selectedOrder.payment_status)">
-                {{ getPaymentStatusLabel(selectedOrder.payment_status) }}
+              <span v-if="selectedOrder.payment_status" class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getPaymentStatusColor(selectedOrder)">
+                {{ getPaymentStatusLabel(selectedOrder) }}
               </span>
             </div>
 
@@ -1102,13 +1160,13 @@ onMounted(() => {
                 >
                   <img
                     v-if="ev.file_type === 'image'"
-                    :src="ev.file_url || getMediaUrl(ev.file_path) || '/placeholder.png'"
+                    :src="getMediaUrl(ev)"
                     class="w-full aspect-square object-cover rounded-xl"
                     @error="(e) => (e.target.style.display = 'none')"
                   />
                   <video
                     v-else-if="ev.file_type === 'video'"
-                    :src="ev.file_url || getMediaUrl(ev.file_path)"
+                    :src="getMediaUrl(ev)"
                     controls
                     class="w-full aspect-square object-cover rounded-xl"
                   />
@@ -1221,13 +1279,13 @@ onMounted(() => {
                   >
                     <img
                       v-if="media.file_type === 'image'"
-                      :src="media.file_url || getMediaUrl(media.file_path) || '/placeholder.png'"
+                      :src="getMediaUrl(media)"
                       class="review-media-img"
                       @error="(e) => e.target.style.display = 'none'"
                     />
                     <video
                       v-else-if="media.file_type === 'video'"
-                      :src="media.file_url || getMediaUrl(media.file_path)"
+                      :src="getMediaUrl(media)"
                       controls
                       class="review-media-video"
                     />

@@ -32,34 +32,36 @@ const filters = [
 ];
 
 // Status configurations (new full lifecycle)
+// Label di bawah adalah label UI yang ditampilkan ke customer
+// Mapping: backend status → label tampilan
 const statusConfig = {
   menunggu_konfirmasi_merchant: {
-    label: "Booking Diajukan",
+    label: "Pesanan Diajukan",  // customer pertama kalisubmit
     color: "bg-blue-100 text-blue-700",
     icon: "pi-clock",
   },
   diterima: {
-    label: "Diterima",
+    label: "Pesanan Diterima",   // merchant menerima
     color: "bg-indigo-100 text-indigo-700",
     icon: "pi-check",
   },
   ditolak: {
-    label: "Ditolak",
+    label: "Pesanan Ditolak",    // merchant menolak
     color: "bg-red-100 text-red-700",
     icon: "pi-times",
   },
   layanan_dikerjakan: {
-    label: "Sedang Dikerjakan",
+    label: "Layanan Dikerjakan", // merchant mulai bekerja
     color: "bg-amber-100 text-amber-700",
     icon: "pi-spin pi-spinner",
   },
   menunggu_konfirmasi_selesai: {
-    label: "Menunggu Konfirmasi Selesai",
+    label: "Menunggu Konfirmasi", // bukti dikirim, tunggu customer konfirmasi
     color: "bg-purple-100 text-purple-700",
     icon: "pi-hourglass",
   },
   selesai: {
-    label: "Selesai",
+    label: "Selesai",            // customer mengkonfirmasi selesai
     color: "bg-green-100 text-green-700",
     icon: "pi-check-circle",
   },
@@ -72,6 +74,9 @@ const fetchOrders = async (status = null) => {
     const params = status && status !== "all" ? { status } : {};
     const { data } = await api.get("/api/service-orders", { params });
 
+    // Debug log raw API response
+    console.log('[CustomerServiceHistory] Raw API response:', data);
+
     const responseData = data?.data;
     let apiOrders = [];
     if (Array.isArray(responseData)) {
@@ -80,10 +85,21 @@ const fetchOrders = async (status = null) => {
       apiOrders = responseData.data;
     }
 
-    // Merge dengan localStorage bookings
+    console.log('[CustomerServiceHistory] API orders extracted:', apiOrders.length);
+    apiOrders.forEach(order => {
+      console.log(`[CustomerServiceHistory] Order #${order.id} — status: "${order.status}" | mekanisme: ${order.mekanisme_pemesanan || order.order_type || '-'}`);
+    });
+
+    // API data takes priority over localStorage (backend status is source of truth)
+    // Merge: API orders first, then local bookings for orders not yet in API
     const localBookings = getLocalBookings();
-    const merged = [...localBookings, ...apiOrders];
-    // Hapus duplikat berdasarkan id, local bookings lebih diutamakan
+    const apiIds = new Set(apiOrders.map(o => String(o.id)));
+    const newLocalBookings = localBookings.filter(o => !apiIds.has(String(o.id)));
+
+    // Merge: API data first (source of truth), then local-only bookings
+    const merged = [...apiOrders, ...newLocalBookings];
+
+    // Deduplicate by id — keep first occurrence (API already takes priority)
     const seen = new Set();
     orders.value = merged.filter((o) => {
       const key = String(o.id);
@@ -92,7 +108,7 @@ const fetchOrders = async (status = null) => {
       return true;
     });
 
-    console.log('[CustomerServiceHistory] Merged orders:', orders.value);
+    console.log('[CustomerServiceHistory] Final merged orders:', orders.value.length, orders.value);
   } catch (error) {
     console.error('[CustomerServiceHistory] Gagal memuat history:', error);
     // Fallback ke localStorage saja jika API gagal
@@ -358,12 +374,26 @@ const getReviewComment = (order) => {
   );
 };
 
-// Get review media
+// Get review media - try all possible field names
 const getReviewMedia = (order) => {
-  return order?.review?.media
-    || order?.review?.medias
-    || order?.review?.images
-    || [];
+  // Debug log
+  console.log('[CustomerServiceHistory] Review media check:', {
+    review_id: order?.review_id,
+    review: order?.review,
+    rating: order?.rating,
+    is_reviewed: order?.is_reviewed,
+  });
+
+  return (
+    order?.review?.media ||
+    order?.review?.reviewMedia ||
+    order?.review?.review_media ||
+    order?.review?.attachments ||
+    order?.rating?.media ||
+    order?.rating?.reviewMedia ||
+    order?.rating?.review_media ||
+    []
+  );
 };
 
 // Get completion evidences - try all possible field names
@@ -488,13 +518,21 @@ const getMekanismeLabel = (order) => {
   return 'Keranjang (Tanpa Jadwal)';
 };
 
-// Get status label — different wording for keranjang vs booking
+// Get status label — always based on order.status from backend
+// Status badge di halaman customer history harus mencerminkan status ASLI dari backend,
+// bukan berdasarkan mekanisme_pemesanan atau booking_type
 const getStatusLabel = (order) => {
-  const mechanismLabel = getMekanismeLabel(order);
-  if (mechanismLabel.includes('Booking')) {
-    return 'Booking Diajukan';
-  }
-  return 'Pesanan Diajukan';
+  const status = order?.status;
+  const normalized = normalizeStatusForDisplay(status);
+  const labels = {
+    menunggu_konfirmasi_merchant: 'Pesanan Diajukan',
+    diterima: 'Pesanan Diterima',
+    ditolak: 'Pesanan Ditolak',
+    layanan_dikerjakan: 'Layanan Dikerjakan',
+    menunggu_konfirmasi_selesai: 'Menunggu Konfirmasi',
+    selesai: 'Selesai',
+  };
+  return labels[normalized] || status || '-';
 };
 
 // Normalize status for display
@@ -676,7 +714,7 @@ onMounted(async () => {
                   class="px-2.5 py-1 rounded-full text-xs font-medium"
                   :class="statusConfig[order.status]?.color || 'bg-gray-100 text-gray-600'"
                 >
-                  {{ order.status === 'menunggu_konfirmasi_merchant' ? getStatusLabel(order) : (statusConfig[order.status]?.label || order.status) }}
+                  {{ getStatusLabel(order) }}
                 </span>
                 <span
                   class="px-2 py-0.5 rounded-full text-[10px] font-medium"
@@ -867,7 +905,7 @@ onMounted(async () => {
                   >
                     <img
                       v-if="media.file_type === 'image'"
-                      :src="media.file_url ? getMediaUrlFromMedia(media) : '/placeholder.png'"
+                      :src="getMediaUrlFromMedia(media)"
                       class="review-media-img"
                       @error="(e) => e.target.style.display = 'none'"
                     />

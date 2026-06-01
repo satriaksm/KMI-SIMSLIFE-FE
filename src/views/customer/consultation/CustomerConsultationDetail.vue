@@ -29,6 +29,10 @@ const bookingForm = ref({
   proposed_notes: '',
 });
 
+// Track rejected offer state (for UI before refresh)
+const offerRejected = ref(false);
+const offerRejectedPrice = ref(null);
+
 // Status config
 const statusConfig = {
   pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
@@ -80,45 +84,35 @@ const canSendMessage = computed(() => {
   return ['pending', 'dapat_dikerjakan', 'perlu_penyesuaian'].includes(consultation.value?.status);
 });
 
-// Customer can accept offer - offer must be active and not yet accepted
-const canAcceptOffer = computed(() => {
-  const consultationData = consultation.value;
-  const status = String(consultationData?.status || '').toLowerCase();
-  const merchantResponse = consultationData?.merchant_response;
-  const alreadyAccepted = consultationData?.customer_accepted;
-  const hasServiceOrder = !!consultationData?.service_order_id;
-
-  // Terminal statuses - never show accept button
-  if (['accepted', 'diterima', 'disepakati', 'ditolak', 'dibatalkan', 'ditutup', 'selesai'].includes(status)) {
+// Customer has an active (pending) offer from merchant — show top card
+const hasActiveOffer = computed(() => {
+  const c = consultation.value;
+  if (!c) return false;
+  const status = String(c.status || '').toLowerCase();
+  // Terminal statuses
+  if (['accepted', 'diterima', 'disepakati', 'ditolak', 'dibatalkan', 'ditutup', 'closed', 'selesai'].includes(status)) {
     return false;
   }
-
-  if (alreadyAccepted) return false;
-  if (hasServiceOrder) return false;
-
-  // Only show accept button for workable responses
-  return merchantResponse &&
-    ['dapat_dikerjakan', 'perlu_penyesuaian', 'pending', 'menunggu_respon'].includes(status);
+  // Must have merchant response with workable status
+  const response = c.merchant_response;
+  if (!response || !['dapat_dikerjakan', 'perlu_penyesuaian', 'bisa_dikerjakan'].includes(response)) {
+    return false;
+  }
+  // Must have offered price
+  if (!c.merchant_offered_price) return false;
+  // Must not already be accepted or rejected locally
+  if (offerRejected.value) return false;
+  if (c.customer_accepted) return false;
+  // Must not have a service order yet
+  if (c.service_order_id) return false;
+  return true;
 });
 
-// Guard function for acceptOffer - check before API call
-const canAcceptOfferGuard = () => {
-  const consultationData = consultation.value;
-  if (!consultationData) return false;
+// Customer can accept offer — same as hasActiveOffer but for guards
+const canAcceptOffer = computed(() => hasActiveOffer.value);
 
-  const status = String(consultationData.status || '').toLowerCase();
-  const alreadyAccepted = consultationData.customer_accepted;
-  const hasServiceOrder = !!consultationData.service_order_id;
-
-  // Block if already processed
-  if (['accepted', 'diterima', 'disepakati', 'ditolak', 'dibatalkan', 'ditutup', 'selesai'].includes(status)) {
-    return false;
-  }
-  if (alreadyAccepted) return false;
-  if (hasServiceOrder) return false;
-
-  return true;
-};
+// Guard function for acceptOffer
+const canAcceptOfferGuard = () => hasActiveOffer.value;
 
 // Get response explanation
 const getResponseExplanation = (response) => {
@@ -153,23 +147,14 @@ const openBookingForm = () => {
 // Accept merchant offer
 const acceptOffer = async () => {
   if (sending.value) return;
-
-  // Guard: prevent double accept
   if (!canAcceptOfferGuard()) {
-    toast.info('Penawaran ini sudah diproses atau tidak dapat diterima lagi');
+    toast.info('Penawaran sudah diproses atau tidak dapat diterima');
     await fetchConsultation();
     return;
   }
 
   sending.value = true;
-  console.log('[AcceptOffer] Full consultation data:', JSON.stringify(consultation.value, null, 2));
-  console.log('[AcceptOffer] consultationId:', consultationId.value);
-  console.log('[AcceptOffer] Status:', consultation.value?.status);
-  console.log('[AcceptOffer] customer_accepted:', consultation.value?.customer_accepted);
-  console.log('[AcceptOffer] merchant_response:', consultation.value?.merchant_response);
-
   try {
-    // Send booking proposal data along with accept
     const { data } = await api.post(
       `/api/service-consultations/${consultationId.value}/accept-offer`,
       {
@@ -178,17 +163,13 @@ const acceptOffer = async () => {
         proposed_notes: bookingForm.value.proposed_notes || null,
       }
     );
-    console.log('[AcceptOffer] Response success:', data);
-    if (data.success) {
-      toast.success('Penawaran diterima!');
-      showBookingForm.value = false;
-      await fetchConsultation();
-      await nextTick();
-      scrollToBottom();
-    }
+    // ApiResponse::success → { message, data }
+    showBookingForm.value = false;
+    toast.success(data?.message || 'Penawaran diterima!');
+    await fetchConsultation();
+    await nextTick();
+    scrollToBottom();
   } catch (error) {
-    console.error('[AcceptOffer] Error response:', error.response?.data);
-    console.error('[AcceptOffer] Error status:', error.response?.status);
     toast.error(error.response?.data?.message || 'Gagal menerima penawaran');
   } finally {
     sending.value = false;
@@ -221,10 +202,8 @@ const closeConsultation = async () => {
     const { data } = await api.post(
       `/api/service-consultations/${consultationId.value}/close`
     );
-    if (data.success) {
-      toast.success('Konsultasi ditutup');
-      await fetchConsultation();
-    }
+    toast.success(data?.message || 'Konsultasi ditutup');
+    await fetchConsultation();
   } catch (error) {
     toast.error(error.response?.data?.message || 'Gagal menutup konsultasi');
   } finally {
@@ -232,24 +211,33 @@ const closeConsultation = async () => {
   }
 };
 
-// Reject offer
+// Reject merchant offer
 const rejectOffer = async () => {
   if (sending.value) return;
+  if (!canAcceptOfferGuard()) {
+    toast.info('Penawaran sudah diproses');
+    return;
+  }
 
   sending.value = true;
+  const rejectedPrice = consultation.value?.merchant_offered_price;
   try {
+    // Call customerRespond endpoint with response='reject'
     const { data } = await api.post(
-      `/api/service-consultations/${consultationId.value}/respond`,
+      `/api/service-consultations/${consultationId.value}/customer-respond`,
       {
         response: 'reject',
-        customer_note: 'Pelanggan menolak penawaran ini',
+        customer_note: null,
       }
     );
-    if (data.success) {
-      toast.info('Penawaran ditolak');
-      await fetchConsultation();
-    }
+    // Update local state immediately for UI feedback
+    offerRejected.value = true;
+    offerRejectedPrice.value = rejectedPrice;
+    toast.success(data?.message || 'Penawaran berhasil ditolak.');
+    await fetchConsultation();
   } catch (error) {
+    // Reset local state on error
+    offerRejected.value = false;
     toast.error(error.response?.data?.message || 'Gagal menolak penawaran');
   } finally {
     sending.value = false;
@@ -291,6 +279,8 @@ const fetchConsultation = async () => {
     const response = await api.get(`/api/service-consultations/${consultationId.value}`);
     consultation.value = response.data.data;
     messages.value = response.data.data?.messages || [];
+    // Reset local rejected state so it reflects backend truth
+    offerRejected.value = false;
     scrollToBottom();
   } catch (error) {
     console.error('[CustomerConsultationDetail] Fetch error:', error);
@@ -446,51 +436,62 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Merchant Response Section with Accept Offer Form -->
-      <div v-if="consultation.merchant_response && !['accepted', 'ditolak', 'closed'].includes(consultation.status)" class="px-4 py-2 bg-white border-b border-gray-100 shrink-0">
+      <!-- Active Offer Card (shown only when merchant has a pending offer) -->
+      <div
+        v-if="hasActiveOffer && consultation.merchant_offered_price"
+        class="px-4 py-3 bg-white border-b border-gray-100 shrink-0"
+      >
         <div class="max-w-2xl mx-auto">
-          <!-- Response explanation -->
-          <p class="text-xs text-gray-600">
-            <i class="pi pi-info-circle mr-1 text-purple-500"></i>
-            {{ getResponseExplanation(consultation.merchant_response) }}
-          </p>
-
-          <!-- Merchant note -->
-          <p v-if="consultation.merchant_note" class="text-xs text-gray-500 mt-1 bg-gray-50 px-2 py-1 rounded">
-            <i class="pi pi-comment mr-1"></i>
-            {{ consultation.merchant_note }}
-          </p>
-
-          <!-- Accept offer with booking proposal form -->
-          <div v-if="canAcceptOffer" class="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <p class="text-xs font-medium text-green-700">Penawaran dari Merchant</p>
-                <p class="text-lg font-bold text-green-800">{{ formatCurrency(consultation.merchant_offered_price) }}</p>
+          <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <!-- Header -->
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shrink-0">
+                <i class="pi pi-tag text-white text-sm"></i>
               </div>
+              <div class="flex-1">
+                <p class="text-xs font-semibold text-blue-700 uppercase tracking-wide">Pengajuan Harga dari Merchant</p>
+                <p class="text-2xl font-bold text-blue-900 mt-0.5">{{ formatCurrency(consultation.merchant_offered_price) }}</p>
+                <p v-if="consultation.merchant_note" class="text-sm text-blue-700 mt-1">
+                  <i class="pi pi-comment mr-1"></i>{{ consultation.merchant_note }}
+                </p>
+              </div>
+            </div>
+            <!-- Action buttons -->
+            <div class="flex gap-2 mt-1">
               <button
                 @click="openBookingForm"
-                class="px-4 py-2 bg-green-500 text-white rounded-lg text-xs font-medium hover:bg-green-600 transition shrink-0"
+                :disabled="sending"
+                class="flex-1 py-2.5 bg-green-500 text-white rounded-xl text-sm font-semibold hover:bg-green-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
               >
+                <i v-if="sending" class="pi pi-spin pi-spinner"></i>
                 <i class="pi pi-check mr-1"></i>
-                Terima & Ajukan Jadwal
+                {{ sending ? 'Memproses...' : 'Terima & Ajukan Jadwal' }}
+              </button>
+              <button
+                @click="rejectOffer"
+                :disabled="sending"
+                class="px-4 py-2.5 border border-red-200 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition"
+              >
+                <i class="pi pi-times mr-1"></i>
+                Tolak
               </button>
             </div>
           </div>
+        </div>
+      </div>
 
-          <!-- Already accepted notice (waiting for merchant confirmation) -->
-          <div v-else-if="consultation.customer_accepted" class="mt-2 p-2.5 bg-blue-50 border border-blue-100 rounded-xl">
-            <div class="flex items-center justify-between gap-2">
-              <div>
-                <p class="text-xs font-medium text-blue-700">
-                  <i class="pi pi-check-circle mr-1"></i>
-                  Penawaran diterima
-                </p>
-                <p class="text-xs text-blue-600 mt-0.5">
-                  Harga: {{ formatCurrency(consultation.negotiated_price || consultation.merchant_offered_price) }}
-                </p>
-              </div>
-            </div>
+      <!-- Rejected Offer Banner (shown locally before refresh) -->
+      <div
+        v-if="offerRejected && offerRejectedPrice"
+        class="px-4 py-3 bg-red-50 border-b border-red-100 shrink-0"
+      >
+        <div class="max-w-2xl mx-auto flex items-center gap-3">
+          <div class="w-9 h-9 bg-red-500 rounded-full flex items-center justify-center shrink-0">
+            <i class="pi pi-times text-white text-sm"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Penawaran Ditolak</p>
+            <p class="text-xs text-red-500">Rp {{ Number(offerRejectedPrice).toLocaleString('id-ID') }}</p>
           </div>
         </div>
       </div>
@@ -722,64 +723,21 @@ onMounted(async () => {
 
           <!-- Chat messages -->
           <template v-for="msg in messages" :key="msg.id">
-            <!-- Offer bubble (messages with proposed_price) -->
-            <div v-if="msg.proposed_price" class="w-full max-w-[85%] mx-auto">
-              <!-- Offer from merchant - customer can accept/reject -->
-              <div v-if="msg.sender_type === 'merchant'" class="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-left">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                    <i class="pi pi-tag text-white text-[10px]"></i>
-                  </div>
-                  <span class="text-xs font-medium text-blue-700">Pengajuan Harga Merchant</span>
-                </div>
-                <p class="text-lg font-bold text-blue-800">{{ formatCurrency(msg.proposed_price) }}</p>
-                <p v-if="msg.merchant_note || msg.message" class="text-xs text-gray-600 mt-1">
-                  <i class="pi pi-comment mr-1"></i>
-                  {{ msg.merchant_note || msg.message }}
-                </p>
-                <div class="mt-3 flex items-center justify-between">
-                  <span class="text-[10px] text-gray-400">{{ formatDateTime(msg.created_at) }}</span>
-                  <!-- Accept/Reject buttons if offer not yet accepted -->
-                  <div v-if="canAcceptOffer" class="flex gap-2">
-                    <button
-                      @click="openBookingForm"
-                      class="px-3 py-1 text-[10px] font-medium rounded-full bg-green-500 text-white hover:bg-green-600 transition"
-                    >
-                      <i class="pi pi-check mr-1"></i>
-                      Terima
-                    </button>
-                    <button
-                      @click="rejectOffer"
-                      class="px-3 py-1 text-[10px] font-medium rounded-full border border-red-200 text-red-600 hover:bg-red-50 transition"
-                    >
-                      <i class="pi pi-times mr-1"></i>
-                      Tolak
-                    </button>
-                  </div>
-                  <!-- Already responded -->
-                  <span v-else class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                    {{ consultation.status === 'accepted' ? 'Diterima' : consultation.status === 'ditolak' ? 'Ditolak' : 'Processing' }}
-                  </span>
-                </div>
-              </div>
+            <!-- Offer message from merchant — show as plain text line, not a card -->
+            <div v-if="msg.proposed_price && msg.sender_type === 'merchant'" class="text-center py-1">
+              <span class="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                <i class="pi pi-tag text-[10px] mr-1"></i>
+                Merchant mengajukan harga {{ formatCurrency(msg.proposed_price) }}
+                <span v-if="msg.merchant_note || msg.message"> — {{ msg.merchant_note || msg.message }}</span>
+              </span>
+            </div>
 
-              <!-- Customer's acceptance - show confirmation -->
-              <div v-else class="bg-green-50 border border-green-200 rounded-2xl p-3 text-left">
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                    <i class="pi pi-check text-white text-[10px]"></i>
-                  </div>
-                  <span class="text-xs font-medium text-green-700">Penawaran Diterima</span>
-                </div>
-                <p class="text-lg font-bold text-green-800">{{ formatCurrency(msg.proposed_price) }}</p>
-                <p v-if="msg.message" class="text-xs text-gray-600 mt-1">{{ msg.message }}</p>
-                <div class="mt-2 flex items-center gap-2">
-                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                    Harga Kesepakatan
-                  </span>
-                  <span class="text-[10px] text-gray-400">{{ formatDateTime(msg.created_at) }}</span>
-                </div>
-              </div>
+            <!-- Offer accepted by customer — show as highlighted system text -->
+            <div v-else-if="msg.proposed_price && msg.sender_type === 'customer'" class="text-center py-1">
+              <span class="text-xs text-green-700 bg-green-50 px-3 py-1 rounded-full">
+                <i class="pi pi-check-circle text-[10px] mr-1"></i>
+                Penawaran disetujui: {{ formatCurrency(msg.proposed_price) }}
+              </span>
             </div>
 
             <!-- Regular chat message - customer (right) -->

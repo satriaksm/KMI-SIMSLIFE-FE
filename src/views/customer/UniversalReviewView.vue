@@ -18,7 +18,6 @@ const reviewableId = computed(() => route.params.reviewableId ? Number(route.par
 // Review form state
 const reviewForm = ref({
   rating: 5,
-  title: "",
   comment: "",
   is_anonymous: false,
 });
@@ -35,24 +34,8 @@ const maxFiles = 5;
 const maxFileSize = 10 * 1024 * 1024; // 10MB
 
 // Validation constants
-const MIN_TITLE_LENGTH = 5;
-const MAX_TITLE_LENGTH = 80;
 const MIN_COMMENT_LENGTH = 10;
 const MAX_COMMENT_LENGTH = 500;
-
-// ===== VALIDATION COMPUTEDS =====
-
-// Title validation
-const titleLength = computed(() => reviewForm.value.title?.trim().length || 0);
-const titleTooShort = computed(() => titleLength.value < MIN_TITLE_LENGTH);
-const titleTooLong = computed(() => titleLength.value > MAX_TITLE_LENGTH);
-const titleValid = computed(() => titleLength.value >= MIN_TITLE_LENGTH && titleLength.value <= MAX_TITLE_LENGTH);
-const titleStatus = computed(() => {
-  if (titleLength.value === 0) return 'empty';
-  if (titleTooShort.value) return 'too-short';
-  if (titleTooLong.value) return 'too-long';
-  return 'valid';
-});
 
 // Comment validation
 const commentLength = computed(() => reviewForm.value.comment?.trim().length || 0);
@@ -70,7 +53,6 @@ const commentStatus = computed(() => {
 const canSubmitReview = computed(() => {
   return (
     reviewForm.value.rating > 0 &&
-    titleValid.value &&
     commentValid.value
   );
 });
@@ -179,10 +161,8 @@ const submitReview = async () => {
   if (!canSubmitReview.value) {
     if (!reviewForm.value.rating) {
       toast.error("Silakan pilih rating terlebih dahulu");
-    } else if (titleTooShort.value) {
-      toast.error(`Judul minimal ${MIN_TITLE_LENGTH} karakter`);
     } else if (commentTooShort.value) {
-      toast.error(`Komentar minimal ${MIN_COMMENT_LENGTH} karakter`);
+      toast.error(`Ulasan minimal ${MIN_COMMENT_LENGTH} karakter`);
     }
     return;
   }
@@ -192,13 +172,24 @@ const submitReview = async () => {
     // Build FormData for file upload
     const formData = new FormData();
     formData.append('rating', reviewForm.value.rating);
-    if (reviewForm.value.title) {
-      formData.append('title', reviewForm.value.title);
-    }
     if (reviewForm.value.comment) {
       formData.append('comment', reviewForm.value.comment);
     }
+    // title is optional — only send if not empty
+    if (reviewForm.value.title) {
+      formData.append('title', reviewForm.value.title);
+    }
     formData.append('is_anonymous', reviewForm.value.is_anonymous ? '1' : '0');
+
+    // Console.log full payload for debugging
+    const payload = {
+      rating: reviewForm.value.rating,
+      title: reviewForm.value.title || null,
+      comment: reviewForm.value.comment || null,
+      is_anonymous: reviewForm.value.is_anonymous,
+      media_count: selectedFiles.value.length,
+    };
+    console.log('[UniversalReview] Review Payload:', payload);
 
     // Add media files — key must be 'media' not 'media[]' to match backend validation
     // Backend: 'media' => 'nullable|array|max:5'
@@ -399,38 +390,7 @@ watch(
             </p>
           </div>
 
-          <!-- Title -->
-          <div class="mb-2">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Judul Review (opsional)
-            </label>
-            <input
-              v-model="reviewForm.title"
-              type="text"
-              maxlength="80"
-              placeholder="Judul singkat tentang pengalaman Anda"
-              class="w-full px-3 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary transition"
-              :class="{
-                'border-gray-200': titleLength === 0,
-                'border-red-300': titleLength > 0 && !titleValid,
-                'border-green-400': titleValid
-              }"
-            />
-            <!-- Title Counter -->
-            <div class="mt-1.5 text-xs">
-              <span v-if="titleLength === 0" class="text-gray-400">
-                Minimal {{ MIN_TITLE_LENGTH }} karakter
-              </span>
-              <span v-else-if="!titleValid" class="text-red-500 flex items-center gap-1">
-                <span v-if="titleTooShort">❌ Minimal {{ MIN_TITLE_LENGTH }} karakter ({{ titleLength }}/{{ MIN_TITLE_LENGTH }})</span>
-                <span v-else-if="titleTooLong">❌ Maksimal {{ MAX_TITLE_LENGTH }} karakter ({{ titleLength }}/{{ MAX_TITLE_LENGTH }})</span>
-              </span>
-              <span v-else class="text-green-600 flex items-center gap-1">
-                ✅ Judul sudah memenuhi syarat ({{ titleLength }}/{{ MAX_TITLE_LENGTH }})
-              </span>
-            </div>
-          </div>
-
+          
           <!-- Comment -->
           <div class="mb-2">
             <label class="block text-sm font-medium text-gray-700 mb-2">
