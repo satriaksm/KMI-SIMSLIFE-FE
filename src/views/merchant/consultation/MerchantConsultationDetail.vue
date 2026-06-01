@@ -57,6 +57,15 @@ const canAccept = computed(() => consultation.value?.status === 'dapat_dikerjaka
 const canClose = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian', 'ditolak', 'penawaran_ditolak'].includes(consultation.value?.status));
 const isTerminal = computed(() => ['accepted', 'closed', 'penawaran_ditolak'].includes(consultation.value?.status));
 const canSendMessage = computed(() => !['ditolak', 'closed', 'accepted', 'penawaran_ditolak'].includes(consultation.value?.status));
+const initialMessage = computed(() =>
+  consultation.value?.messages?.find(m => m.message_type === 'initial')
+);
+
+// Initial media: new flow (via initial message) or legacy (direct media on consultation)
+const initialMedia = computed(() => {
+  if (initialMessage.value?.media?.length) return initialMessage.value.media;
+  return consultation.value?.media || [];
+});
 
 // Price helpers
 const getConsultationInitialPrice = () => {
@@ -339,31 +348,29 @@ onMounted(fetchConsultation);
 <template>
   <div class="flex flex-col h-screen bg-gray-50">
     <!-- Header - Sticky -->
-    <header class="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3 shrink-0">
-      <div class="max-w-2xl mx-auto">
-        <div class="flex items-center gap-3">
-          <button
-            @click="router.back()"
-            class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition shrink-0"
-          >
-            <i class="pi pi-arrow-left text-sm"></i>
-          </button>
-          <div class="flex-1 min-w-0">
-            <h1 class="text-sm font-bold text-gray-900 truncate">
-              {{ consultation?.jasa?.title || consultation?.service_name || 'Konsultasi' }}
-            </h1>
-            <p class="text-xs text-gray-500 truncate">
-              <i class="pi pi-user mr-1"></i>
-              {{ consultation?.customer?.name || 'Pelanggan' }}
-            </p>
-          </div>
-          <span
-            v-if="consultation?.status"
-            :class="['px-2 py-0.5 rounded-full text-xs font-medium shrink-0', getStatusColor(consultation.status)]"
-          >
-            {{ getStatusLabel(consultation.status) }}
-          </span>
+    <header class="sticky top-0 z-20 bg-white border-b border-gray-200 lg:px-4 px-4 py-3 shrink-0">
+      <div class="flex items-center">
+        <button
+          @click="router.back()"
+          class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition shrink-0"
+        >
+          <i class="pi pi-arrow-left text-sm"></i>
+        </button>
+        <div class="flex-1 min-w-0 px-3">
+          <h1 class="text-sm font-bold text-gray-900 truncate">
+            {{ consultation?.jasa?.title || consultation?.service_name || 'Konsultasi' }}
+          </h1>
+          <p class="text-xs text-gray-500 truncate">
+            <i class="pi pi-user mr-1"></i>
+            {{ consultation?.customer?.name || 'Pelanggan' }}
+          </p>
         </div>
+        <span
+          v-if="consultation?.status"
+          :class="['px-2 py-0.5 rounded-full text-xs font-medium shrink-0', getStatusColor(consultation.status)]"
+        >
+          {{ getStatusLabel(consultation.status) }}
+        </span>
       </div>
     </header>
 
@@ -374,8 +381,8 @@ onMounted(fetchConsultation);
 
     <template v-else-if="consultation">
       <!-- Service Info Banner -->
-      <div class="bg-white border-b border-gray-100 px-4 py-2 shrink-0">
-        <div class="max-w-2xl mx-auto flex items-center gap-2">
+      <div class="bg-white border-b border-gray-100 lg:pl-4 px-4 py-2 shrink-0">
+        <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
             <img
               :src="consultation.jasa?.cover_img?.url || '/placeholder.png'"
@@ -400,8 +407,8 @@ onMounted(fetchConsultation);
       </div>
 
       <!-- Action Status Card -->
-      <div v-if="consultation.status !== 'pending'" class="px-4 py-2 bg-white border-b border-gray-100 shrink-0">
-        <div class="max-w-2xl mx-auto">
+      <div v-if="consultation.status !== 'pending'" class="lg:pl-4 px-4 py-2 bg-white border-b border-gray-100 shrink-0">
+        <div class="max-w-xl">
           <!-- Response explanation -->
           <p v-if="consultation.merchant_response" class="text-xs text-gray-600">
             <i class="pi pi-info-circle mr-1 text-purple-500"></i>
@@ -461,8 +468,8 @@ onMounted(fetchConsultation);
       </div>
 
       <!-- Rejection Notice -->
-      <div v-if="consultation.status === 'ditolak'" class="px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
-        <div class="max-w-2xl mx-auto">
+      <div v-if="consultation.status === 'ditolak'" class="lg:pl-4 px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
+        <div class="max-w-xl">
           <p class="text-xs text-red-700 font-medium">
             <i class="pi pi-info-circle mr-1"></i>
             Konsultasi ditolak
@@ -471,8 +478,8 @@ onMounted(fetchConsultation);
       </div>
 
       <!-- Offer Rejected by Customer Notice -->
-      <div v-if="consultation.status === 'penawaran_ditolak'" class="px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
-        <div class="max-w-2xl mx-auto">
+      <div v-if="consultation.status === 'penawaran_ditolak'" class="lg:pl-4 px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
+        <div class="max-w-xl">
           <p class="text-xs text-red-700 font-medium">
             <i class="pi pi-times-circle mr-1"></i>
             Penawaran Ditolak oleh Customer
@@ -481,28 +488,28 @@ onMounted(fetchConsultation);
       </div>
 
       <!-- Chat Messages - Scrollable -->
-      <div ref="messageListRef" class="flex-1 overflow-y-auto px-4 py-3 pb-28">
-        <div class="max-w-2xl mx-auto space-y-3">
+      <div ref="messageListRef" class="flex-1 overflow-y-auto lg:pl-4 px-4 py-4 pb-28">
+        <div class="max-w-xl space-y-3">
           <!-- Initial request -->
-          <div class="bg-white rounded-2xl p-3 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-2 mb-1.5">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 lg:rounded-xl">
+            <div class="flex items-center gap-2 mb-2">
               <div class="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center">
                 <i class="pi pi-user text-purple-600 text-[10px]"></i>
               </div>
               <span class="text-xs font-medium text-gray-500">Permintaan</span>
               <span class="text-xs text-gray-400 ml-auto">{{ formatDateTime(consultation.created_at) }}</span>
             </div>
-            <p class="text-xs text-gray-700">{{ consultation.customer_description }}</p>
-            <div v-if="consultation.customer_budget" class="mt-1.5 text-xs text-gray-500">
+            <p class="text-sm text-gray-700">{{ consultation.customer_description }}</p>
+            <div v-if="consultation.customer_budget" class="mt-2 text-xs text-gray-500">
               Budget: {{ formatCurrency(consultation.customer_budget) }}
             </div>
-            <div v-if="consultation.customer_note" class="mt-1 text-xs text-gray-500 italic">
+            <div v-if="consultation.customer_note" class="mt-1.5 text-xs text-gray-500 italic">
               Note: {{ consultation.customer_note }}
             </div>
             <!-- Initial media -->
-            <div v-if="consultation.media?.length" class="mt-2 grid grid-cols-2 gap-1.5">
-              <div v-for="media in consultation.media" :key="media.id" class="rounded-lg overflow-hidden">
-                <img :src="media.file_url" class="w-full h-24 object-cover" />
+            <div v-if="initialMedia?.length" class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div v-for="media in initialMedia" :key="media.id" class="rounded-lg overflow-hidden">
+                <img :src="media.file_url" class="w-full h-28 object-cover" />
               </div>
             </div>
           </div>
@@ -510,21 +517,21 @@ onMounted(fetchConsultation);
           <!-- Chat messages -->
           <template v-for="msg in messages" :key="msg.id">
             <!-- Offer bubble (messages with proposed_price) -->
-            <div v-if="msg.proposed_price" class="w-full max-w-[85%] mx-auto">
+            <div v-if="msg.proposed_price" class="w-full max-w-[95%] mx-auto">
               <!-- Offer from merchant (right side) -->
-              <div v-if="msg.sender_type === 'merchant'" class="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-left">
-                <div class="flex items-center gap-2 mb-2">
+              <div v-if="msg.sender_type === 'merchant'" class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-left lg:rounded-xl">
+                <div class="flex items-center gap-2 mb-3">
                   <div class="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
                     <i class="pi pi-tag text-white text-[10px]"></i>
                   </div>
                   <span class="text-xs font-medium text-blue-700">Pengajuan Harga</span>
                 </div>
                 <p class="text-lg font-bold text-blue-800">{{ formatCurrency(msg.proposed_price) }}</p>
-                <p v-if="msg.merchant_note" class="text-xs text-blue-600 mt-1">
+                <p v-if="msg.merchant_note" class="text-sm text-blue-600 mt-1.5">
                   <i class="pi pi-comment mr-1"></i>
                   {{ msg.merchant_note }}
                 </p>
-                <p v-if="msg.message && !msg.merchant_note" class="text-xs text-gray-600 mt-1">
+                <p v-if="msg.message && !msg.merchant_note" class="text-sm text-gray-600 mt-1.5">
                   {{ msg.message }}
                 </p>
                 <div class="mt-3 flex items-center gap-2">
@@ -536,15 +543,15 @@ onMounted(fetchConsultation);
               </div>
 
               <!-- Offer from customer (left side) - acceptance -->
-              <div v-else class="bg-green-50 border border-green-200 rounded-2xl p-3 text-left">
-                <div class="flex items-center gap-2 mb-2">
+              <div v-else class="bg-green-50 border border-green-200 rounded-2xl p-4 text-left lg:rounded-xl">
+                <div class="flex items-center gap-2 mb-3">
                   <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                     <i class="pi pi-check text-white text-[10px]"></i>
                   </div>
                   <span class="text-xs font-medium text-green-700">Pelanggan Menerima</span>
                 </div>
                 <p class="text-lg font-bold text-green-800">{{ formatCurrency(msg.proposed_price) }}</p>
-                <p v-if="msg.message" class="text-xs text-gray-600 mt-1">{{ msg.message }}</p>
+                <p v-if="msg.message" class="text-sm text-gray-600 mt-1.5">{{ msg.message }}</p>
                 <div class="mt-2 flex items-center gap-2">
                   <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                     Harga Kesepakatan
@@ -557,17 +564,17 @@ onMounted(fetchConsultation);
             <!-- Regular chat message - merchant (right) -->
             <div
               v-else-if="msg.sender_type === 'merchant'"
-              class="max-w-[80%] ml-auto"
+              class="max-w-[90%] ml-auto"
             >
-              <div class="bg-purple-500 text-white rounded-2xl rounded-tr-sm p-2.5">
-                <p v-if="msg.message" class="text-xs">{{ msg.message }}</p>
-                <div v-if="msg.media?.length" class="mt-1.5 space-y-1.5">
+              <div class="bg-purple-500 text-white rounded-2xl rounded-tr-sm p-3">
+                <p v-if="msg.message" class="text-sm">{{ msg.message }}</p>
+                <div v-if="msg.media?.length" class="mt-2 space-y-2">
                   <template v-for="media in msg.media" :key="media.id">
                     <img
                       v-if="media.file_type === 'image' || (media.mime_type && media.mime_type.startsWith('image/'))"
                       :src="media.file_url"
                       class="max-w-full rounded-lg object-cover cursor-pointer hover:opacity-90"
-                      style="max-height: 200px;"
+                      style="max-height: 220px;"
                       @click="openMedia(media.file_url)"
                     />
                     <video
@@ -575,28 +582,28 @@ onMounted(fetchConsultation);
                       :src="media.file_url"
                       controls
                       class="max-w-full rounded-lg"
-                      style="max-height: 200px;"
+                      style="max-height: 220px;"
                     />
                   </template>
                 </div>
               </div>
-              <p class="text-[10px] text-gray-400 mt-0.5 text-right">{{ formatDateTime(msg.created_at) }}</p>
+              <p class="text-[10px] text-gray-400 mt-1 text-right">{{ formatDateTime(msg.created_at) }}</p>
             </div>
 
             <!-- Regular chat message - customer (left) -->
             <div
               v-else
-              class="max-w-[80%]"
+              class="max-w-[90%]"
             >
-              <div class="bg-white border border-gray-100 rounded-2xl rounded-tl-sm p-2.5">
-                <p v-if="msg.message" class="text-xs text-gray-700">{{ msg.message }}</p>
-                <div v-if="msg.media?.length" class="mt-1.5 space-y-1.5">
+              <div class="bg-white border border-gray-100 rounded-2xl rounded-tl-sm p-3 shadow-sm">
+                <p v-if="msg.message" class="text-sm text-gray-700">{{ msg.message }}</p>
+                <div v-if="msg.media?.length" class="mt-2 space-y-2">
                   <template v-for="media in msg.media" :key="media.id">
                     <img
                       v-if="media.file_type === 'image' || (media.mime_type && media.mime_type.startsWith('image/'))"
                       :src="media.file_url"
                       class="max-w-full rounded-lg object-cover cursor-pointer hover:opacity-90"
-                      style="max-height: 200px;"
+                      style="max-height: 220px;"
                       @click="openMedia(media.file_url)"
                     />
                     <video
@@ -604,12 +611,12 @@ onMounted(fetchConsultation);
                       :src="media.file_url"
                       controls
                       class="max-w-full rounded-lg"
-                      style="max-height: 200px;"
+                      style="max-height: 220px;"
                     />
                   </template>
                 </div>
               </div>
-              <p class="text-[10px] text-gray-400 mt-0.5">{{ formatDateTime(msg.created_at) }}</p>
+              <p class="text-[10px] text-gray-400 mt-1">{{ formatDateTime(msg.created_at) }}</p>
             </div>
           </template>
 
@@ -623,8 +630,8 @@ onMounted(fetchConsultation);
     </template>
 
     <!-- File Preview -->
-    <div v-if="selectedFiles.length > 0" class="bg-purple-50 border-t border-purple-100 px-4 py-2 shrink-0">
-      <div class="max-w-2xl mx-auto flex items-center gap-2 overflow-x-auto">
+    <div v-if="selectedFiles.length > 0" class="bg-purple-50 border-t border-purple-100 lg:pl-4 px-4 py-2 shrink-0">
+      <div class="flex items-center gap-3 overflow-x-auto">
         <span class="text-xs text-purple-600 font-medium shrink-0 text-nowrap">Attached:</span>
         <div v-for="(file, index) in selectedFiles" :key="index" class="relative shrink-0">
           <img
@@ -648,58 +655,56 @@ onMounted(fetchConsultation);
     </div>
 
     <!-- Input Area - Sticky Bottom -->
-    <div v-if="canSendMessage" class="bg-white border-t border-gray-200 px-4 py-2 shrink-0">
-      <div class="max-w-2xl mx-auto">
-        <div class="flex gap-2 items-center">
-          <!-- Attachment -->
-          <button
-            @click="triggerFileInput"
-            class="w-9 h-9 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 transition shrink-0"
-          >
-            <i class="pi pi-paperclip text-sm"></i>
-          </button>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
-            multiple
-            class="hidden"
-            @change="handleFileSelect"
-          />
+    <div v-if="canSendMessage" class="bg-white border-t border-gray-200 lg:pl-4 px-4 py-3 shrink-0">
+      <div class="flex gap-3 items-center">
+        <!-- Attachment -->
+        <button
+          @click="triggerFileInput"
+          class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 transition shrink-0"
+        >
+          <i class="pi pi-paperclip text-sm"></i>
+        </button>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+          multiple
+          class="hidden"
+          @change="handleFileSelect"
+        />
 
-          <!-- Message input -->
-          <input
-            v-model="newMessage"
-            type="text"
-            placeholder="Ketik pesan..."
-            class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
-            :disabled="sending"
-            @keyup.enter="sendMessage"
-          />
+        <!-- Message input -->
+        <input
+          v-model="newMessage"
+          type="text"
+          placeholder="Ketik pesan..."
+          class="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
+          :disabled="sending"
+          @keyup.enter="sendMessage"
+        />
 
-          <!-- Quick offer button -->
-          <button
-            @click="openOfferModal"
-            class="w-9 h-9 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition shrink-0"
-            title="Kirim Harga"
-          >
-            <i class="pi pi-tag text-sm"></i>
-          </button>
+        <!-- Quick offer button -->
+        <button
+          @click="openOfferModal"
+          class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition shrink-0"
+          title="Kirim Harga"
+        >
+          <i class="pi pi-tag text-sm"></i>
+        </button>
 
-          <!-- Send button -->
-          <button
-            @click="sendMessage"
-            :disabled="(!newMessage.trim() && selectedFiles.length === 0) || sending"
-            class="w-9 h-9 rounded-full bg-purple-500 text-white flex items-center justify-center hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
-          >
-            <i :class="['pi', sending ? 'pi-spin pi-spinner' : 'pi-send', 'text-sm']"></i>
-          </button>
-        </div>
+        <!-- Send button -->
+        <button
+          @click="sendMessage"
+          :disabled="(!newMessage.trim() && selectedFiles.length === 0) || sending"
+          class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+        >
+          <i :class="['pi', sending ? 'pi-spin pi-spinner' : 'pi-send', 'text-sm']"></i>
+        </button>
       </div>
     </div>
 
     <!-- Cannot send notice -->
-    <div v-else class="bg-gray-50 border-t border-gray-200 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
+    <div v-else class="bg-gray-50 border-t border-gray-200 lg:pl-4 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
       <i class="pi pi-info-circle mr-1"></i>
       {{ consultation?.status === 'penawaran_ditolak' ? 'Penawaran ditolak' : consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
     </div>
