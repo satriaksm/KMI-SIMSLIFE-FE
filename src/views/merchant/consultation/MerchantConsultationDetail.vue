@@ -44,6 +44,7 @@ const statusConfig = {
   ditolak: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: 'pi-times' },
   accepted: { label: 'Disepakati', color: 'bg-green-100 text-green-700', icon: 'pi-check-circle' },
   closed: { label: 'Ditutup', color: 'bg-gray-100 text-gray-700', icon: 'pi-minus-circle' },
+  penawaran_ditolak: { label: 'Penawaran Ditolak', color: 'bg-red-100 text-red-700', icon: 'pi-times-circle' },
 };
 
 const getStatusLabel = (status) => statusConfig[status]?.label || status || '—';
@@ -53,9 +54,9 @@ const getStatusColor = (status) => statusConfig[status]?.color || 'bg-gray-100 t
 const canRespond = computed(() => consultation.value?.status === 'pending');
 const canCreateOffer = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian'].includes(consultation.value?.status));
 const canAccept = computed(() => consultation.value?.status === 'dapat_dikerjakan' || consultation.value?.status === 'perlu_penyesuaian');
-const canClose = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian', 'ditolak'].includes(consultation.value?.status));
-const isTerminal = computed(() => ['accepted', 'closed'].includes(consultation.value?.status));
-const canSendMessage = computed(() => !['ditolak', 'closed', 'accepted'].includes(consultation.value?.status));
+const canClose = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian', 'ditolak', 'penawaran_ditolak'].includes(consultation.value?.status));
+const isTerminal = computed(() => ['accepted', 'closed', 'penawaran_ditolak'].includes(consultation.value?.status));
+const canSendMessage = computed(() => !['ditolak', 'closed', 'accepted', 'penawaran_ditolak'].includes(consultation.value?.status));
 
 // Price helpers
 const getConsultationInitialPrice = () => {
@@ -469,6 +470,16 @@ onMounted(fetchConsultation);
         </div>
       </div>
 
+      <!-- Offer Rejected by Customer Notice -->
+      <div v-if="consultation.status === 'penawaran_ditolak'" class="px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
+        <div class="max-w-2xl mx-auto">
+          <p class="text-xs text-red-700 font-medium">
+            <i class="pi pi-times-circle mr-1"></i>
+            Penawaran Ditolak oleh Customer
+          </p>
+        </div>
+      </div>
+
       <!-- Chat Messages - Scrollable -->
       <div ref="messageListRef" class="flex-1 overflow-y-auto px-4 py-3 pb-28">
         <div class="max-w-2xl mx-auto space-y-3">
@@ -690,7 +701,7 @@ onMounted(fetchConsultation);
     <!-- Cannot send notice -->
     <div v-else class="bg-gray-50 border-t border-gray-200 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
       <i class="pi pi-info-circle mr-1"></i>
-      {{ consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
+      {{ consultation?.status === 'penawaran_ditolak' ? 'Penawaran ditolak' : consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
     </div>
 
     <!-- Offer Modal -->

@@ -41,6 +41,7 @@ const statusConfig = {
   ditolak: { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
   accepted: { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
   closed: { label: 'Ditutup', color: 'bg-gray-100 text-gray-700' },
+  penawaran_ditolak: { label: 'Penawaran Ditolak', color: 'bg-red-100 text-red-700' },
 };
 
 const getStatusLabel = (status) => statusConfig[status]?.label || status || '—';
@@ -89,8 +90,8 @@ const hasActiveOffer = computed(() => {
   const c = consultation.value;
   if (!c) return false;
   const status = String(c.status || '').toLowerCase();
-  // Terminal statuses
-  if (['accepted', 'diterima', 'disepakati', 'ditolak', 'dibatalkan', 'ditutup', 'closed', 'selesai'].includes(status)) {
+  // Terminal statuses — no action can be taken
+  if (['accepted', 'diterima', 'disepakati', 'ditolak', 'dibatalkan', 'ditutup', 'closed', 'selesai', 'penawaran_ditolak'].includes(status)) {
     return false;
   }
   // Must have merchant response with workable status
@@ -100,8 +101,7 @@ const hasActiveOffer = computed(() => {
   }
   // Must have offered price
   if (!c.merchant_offered_price) return false;
-  // Must not already be accepted or rejected locally
-  if (offerRejected.value) return false;
+  // Must not already be accepted locally
   if (c.customer_accepted) return false;
   // Must not have a service order yet
   if (c.service_order_id) return false;
@@ -279,8 +279,9 @@ const fetchConsultation = async () => {
     const response = await api.get(`/api/service-consultations/${consultationId.value}`);
     consultation.value = response.data.data;
     messages.value = response.data.data?.messages || [];
-    // Reset local rejected state so it reflects backend truth
-    offerRejected.value = false;
+    // Reset local rejected state — driven by backend status after refresh
+    offerRejected.value = String(response.data.data?.status || '').toLowerCase() === 'penawaran_ditolak';
+    offerRejectedPrice.value = offerRejected.value ? response.data.data?.merchant_offered_price || null : null;
     scrollToBottom();
   } catch (error) {
     console.error('[CustomerConsultationDetail] Fetch error:', error);
@@ -694,6 +695,16 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Offer Rejected Notice -->
+      <div v-if="consultation.status === 'penawaran_ditolak'" class="px-4 py-2 bg-red-50 border-b border-red-100 shrink-0">
+        <div class="max-w-2xl mx-auto">
+          <p class="text-xs font-medium text-red-700">
+            <i class="pi pi-times-circle mr-1"></i>
+            Penawaran Ditolak
+          </p>
+        </div>
+      </div>
+
       <!-- Chat Messages - Scrollable -->
       <div ref="messageListRef" class="flex-1 overflow-y-auto px-4 py-3 pb-28">
         <div class="max-w-2xl mx-auto space-y-3">
@@ -878,7 +889,7 @@ onMounted(async () => {
     <!-- Cannot send notice -->
     <div v-else class="bg-gray-50 border-t border-gray-200 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
       <i class="pi pi-info-circle mr-1"></i>
-      {{ consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
+      {{ consultation?.status === 'penawaran_ditolak' ? 'Penawaran ditolak' : consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
     </div>
   </div>
 </template>
