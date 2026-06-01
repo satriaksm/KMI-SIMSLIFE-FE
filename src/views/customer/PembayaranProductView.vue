@@ -1005,7 +1005,6 @@ onMounted(async () => {
 
     const cartId = await ensureCartIdForCheckout();
     if (!cartId) {
-      toast.error("Checkout tidak valid. Silakan pilih ulang item dari keranjang.");
       router.replace({ name: "Keranjang" });
       return;
     }
@@ -1013,7 +1012,6 @@ onMounted(async () => {
 
   if (checkout.from === "product") {
     if (!toPositiveInt(checkout.productId)) {
-      toast.error("Produk checkout tidak valid. Silakan ulang dari halaman produk.");
       router.replace({ name: "Beranda" });
       return;
     }

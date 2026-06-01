@@ -15,6 +15,7 @@ import { getMerchantOrders } from "@/services/api/order";
 import { useToast } from "vue-toastification";
 import echo from "@/libs/echo";
 import api from "@/libs/axios";
+import { formatTime, formatDate } from "@/libs/format.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -56,6 +57,7 @@ function mapApiStatus(beStatus, o) {
       if (o.payment_method === 'COD') return "waiting_review"; // COD langsung tunggu konfirmasi
       return beStatus;
     case "responsed":
+    case "accepted":
       return "processing";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
@@ -63,6 +65,10 @@ function mapApiStatus(beStatus, o) {
       return "completed";
     case "cancelled":
       return "cancelled";
+    case "rejected":
+      return "rejected";
+    case "undelivered":
+      return "undelivered";
     default:
       return beStatus;
   }
@@ -149,6 +155,9 @@ async function fetchOrders() {
       total: meta.total || allOrders.value.length,
       per_page: perPage.value
     };
+
+    const countsData = res?.meta?.counts || {};
+    tabCountsData.value = countsData;
   } catch (e) {
     console.error("Gagal memuat pesanan merchant:", e);
     toast.error("Gagal memuat pesanan");
@@ -182,13 +191,15 @@ const tabs = [
   { key: "all", label: "Semua" },
   { key: "waiting_review", label: "Konfirmasi" },
   { key: "processing", label: "Diproses" },
+  { key: "delivered", label: "Dikirim/Siap" },
   { key: "completed", label: "Selesai" },
-  { key: "cancelled", label: "Dibatalkan" },
+  { key: "cancelled", label: "Batal/Gagal" },
 ];
 
+const tabCountsData = ref({});
+
 const tabCounts = computed(() => {
-  const counts = { all: paginationInfo.value.total }; // Approximation since we only have current query total. Real counts would require separate API calls, but we can rely on total for activeTab. Let's just use empty counts for now to avoid confusion with pagination.
-  return counts;
+  return tabCountsData.value;
 });
 
 function openFilterModal() {
@@ -263,20 +274,7 @@ const tableColumns = [
 // HELPERS
 // ========================
 
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-function formatTime(dateStr) {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-}
+
 function statusProps(status) {
   const map = {
     waiting_review: {
@@ -313,6 +311,20 @@ function statusProps(status) {
     cancelled: {
       variant: "order",
       status: "cancelled",
+      size: "sm",
+      showIcon: true,
+    },
+    rejected: {
+      variant: "order",
+      status: "cancelled",
+      label: "Ditolak Penjual",
+      size: "sm",
+      showIcon: true,
+    },
+    undelivered: {
+      variant: "order",
+      status: "cancelled",
+      label: "Gagal Kirim",
       size: "sm",
       showIcon: true,
     },
@@ -377,7 +389,7 @@ function leaveOrdersChannel(id) {
   <div class="min-h-screen bg-gray-50">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
+      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
     >
       <div class="flex items-center gap-3">
         <button
@@ -416,39 +428,41 @@ function leaveOrdersChannel(id) {
 
     <div class="h-24 sm:h-0"></div>
 
-    <div class="px-4 py-2 space-y-4 sm:px-6 sm:py-6">
-      <!-- STATUS TABS -->
-      <div class="overflow-x-auto bg-white shadow-sm rounded-xl no-scrollbar">
-        <div class="flex min-w-max sm:min-w-0">
-          <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            @click="activeTab = tab.key"
-            :class="[
-              'relative flex items-center gap-2 px-4 py-3.5 text-sm font-medium transition whitespace-nowrap',
-              activeTab === tab.key
-                ? 'text-merchant-primary border-b-2 border-merchant-primary'
-                : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent',
-            ]"
-          >
-            {{ tab.label }}
-            <span
-              v-if="tabCounts[tab.key]"
+    <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
+      <!-- STICKY WRAPPER UNTUK TABS DAN SEARCH -->
+      <div class=" z-10 top-[88px] sm:top-0 bg-gray-50 pt-0 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 space-y-2">
+        <!-- STATUS TABS -->
+        <div class="overflow-x-auto bg-white shadow-sm rounded-xl no-scrollbar">
+          <div class="flex min-w-max sm:min-w-0">
+            <button
+              v-for="tab in tabs"
+              :key="tab.key"
+              @click="activeTab = tab.key"
               :class="[
-                'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
+                'relative flex items-center gap-2 px-4 py-3.5 text-sm font-medium transition whitespace-nowrap',
                 activeTab === tab.key
-                  ? 'bg-merchant-primary text-white'
-                  : 'bg-gray-100 text-gray-500',
+                  ? 'text-merchant-primary border-b-2 border-merchant-primary'
+                  : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent',
               ]"
             >
-              {{ tabCounts[tab.key] }}
-            </span>
-          </button>
+              {{ tab.label }}
+              <span
+                v-if="tabCounts[tab.key] && ['waiting_review', 'processing', 'delivered'].includes(tab.key)"
+                :class="[
+                  'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
+                  activeTab === tab.key
+                    ? 'bg-merchant-primary text-white'
+                    : 'bg-gray-100 text-gray-500',
+                ]"
+              >
+                {{ tabCounts[tab.key] }}
+              </span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- SEARCH + FILTER -->
-      <div class="flex items-center gap-2">
+        <!-- SEARCH + FILTER -->
+        <div class="flex items-center gap-2">
         <TextField
           name="search"
           :modelValue="query"
@@ -473,6 +487,7 @@ function leaveOrdersChannel(id) {
           </span>
         </button>
       </div>
+      </div>
 
       <!-- DESKTOP TABLE -->
       <div class="hidden sm:block">
@@ -493,7 +508,6 @@ function leaveOrdersChannel(id) {
               <div class="text-sm font-semibold text-gray-800">
                 {{ item.invoice }}
               </div>
-              <div class="text-xs text-gray-400 mt-0.5">{{ item.id }}</div>
             </div>
           </template>
 
@@ -671,13 +685,17 @@ function leaveOrdersChannel(id) {
       </div>
 
       <!-- Mobile Pagination -->
+
+       <div
+      v-if="!ordersLoading && allOrders.length > 0"
+      class=" pb-4 sm:hidden"
+    >
       <MobilePagination
-        v-if="allOrders.length > 0"
-        :currentPage="currentPage"
-        :totalPages="totalPages"
-        class="sm:hidden"
+        :current-page="currentPage"
+        :total-pages="totalPages"
         @page-change="handlePageChange"
       />
+    </div>
     </div>
 
     <!-- Modals -->

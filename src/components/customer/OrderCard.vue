@@ -145,6 +145,24 @@ const resolvedStatusProps = computed(() => {
       showIcon: true,
     };
   }
+  if (raw === "rejected") {
+    return {
+      variant: "order",
+      status: "cancelled",
+      label: "Ditolak Penjual",
+      size: "sm",
+      showIcon: true,
+    };
+  }
+  if (raw === "undelivered") {
+    return {
+      variant: "order",
+      status: "cancelled",
+      label: "Gagal Kirim",
+      size: "sm",
+      showIcon: true,
+    };
+  }
   if (raw === "ready") {
     return {
       variant: "order",

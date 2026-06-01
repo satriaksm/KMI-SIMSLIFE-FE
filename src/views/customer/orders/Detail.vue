@@ -78,19 +78,26 @@
       </div>
 
       <template v-else>
+        
         <!-- Cancelled banner -->
-        <div v-if="order.status === 'cancelled'" class="flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-2xl mb-4">
-          <i class="text-xl text-red-500 pi pi-times-circle shrink-0"></i>
-          <div>
-            <p class="text-sm font-semibold text-red-700">Pesanan Dibatalkan</p>
-            <p v-if="order.meta.note" class="text-xs text-red-500 mt-0.5">
-              {{ order.meta.note }}
-            </p>
+        <div v-if="['cancelled', 'rejected', 'undelivered'].includes(order.status)" class="flex flex-col gap-3 p-4 border bg-red-50 rounded-2xl mb-4" :class="order.status === 'undelivered' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'">
+          <div class="flex items-center gap-3">
+            <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
+            <div>
+              <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
+                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? 'Pesanan Gagal Kirim' : 'Pesanan Dibatalkan' }}
+              </p>
+              <p v-if="order.meta.note || order.meta.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
+                {{ order.meta.failed_reason || order.meta.note }}
+              </p>
+            </div>
           </div>
         </div>
 
         <!-- Status header -->
         <div v-if="order.status !== 'cancelled'" class="p-4 bg-white border border-gray-200 rounded-2xl">
+                  <h2 class="mb-4 text-sm font-semibold text-gray-700">Status Pesanan</h2>
+
           <!-- Countdown konfirmasi UMKM -->
           <div
             v-if="confirmCountdownText && (order.status === 'paid' || (order.status === 'pending' && order.meta.payment_method === 'COD'))"
@@ -323,6 +330,20 @@
           </div>
         </div>
 
+        <!-- ======================== -->
+        <!-- PROOF OF DELIVERY        -->
+        <!-- ======================== -->
+        <div v-if="order.meta.proof_image_url" class="overflow-hidden bg-white border border-gray-200 rounded-2xl mb-4">
+          <div class="px-4 py-3 border-b border-gray-200">
+            <div class="text-base font-extrabold text-black">
+              Bukti Foto Pengiriman
+            </div>
+          </div>
+          <div class="p-4 flex justify-center">
+            <img :src="order.meta.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
+          </div>
+        </div>
+
         <!-- Order info -->
         <div
           class="overflow-hidden bg-white border border-gray-200 rounded-2xl"
@@ -405,7 +426,7 @@
             {{ cancelling ? "Membatalkan..." : "Batalkan Pesanan" }}
           </button>
           <button
-            v-if="order?.status === 'delivered'"
+            v-if="order?.status === 'delivered' && order?.meta?.payment_method?.toUpperCase() !== 'COD'"
             class="w-full py-3 mt-2 text-sm font-semibold text-white transition bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50"
             :disabled="completing"
             @click="handleComplete"
@@ -481,9 +502,12 @@ const order = computed(() => {
     pending: isCOD ? [true, true, false, false, false] : [true, false, false, false, false],
     paid: [true, true, false, false, false],
     responsed: [true, true, true, false, false],
+    accepted: [true, true, true, false, false],
     delivered: [true, true, true, true, false],
     completed: [true, true, true, true, true],
     cancelled: [false, false, false, false, false],
+    rejected: [false, false, false, false, false],
+    undelivered: [false, false, false, false, false],
   };
   const dones = trackingMap[status] || [false, false, false, false, false];
   const merchantAddressObj = o.merchant?.primary_address || o.merchant?.primaryAddress;
@@ -501,9 +525,9 @@ const order = computed(() => {
       },
       {
         key: "paid",
-        icon: "pi-credit-card",
+        icon: isCOD ? "pi-clock" : "pi-credit-card",
         done: dones[1],
-        label: "Pembayaran\nDiterima",
+        label: isCOD ? "Menunggu\nKonfirmasi" : "Pembayaran\nDiterima",
       },
       {
         key: "prepared",
@@ -577,6 +601,8 @@ const order = computed(() => {
       ordered_at: formatDateTime(o.created_at),
       payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
       delivery_type: o.delivery_type || 'delivery',
+      proof_image_url: o.proof_image_url || null,
+      failed_reason: o.failed_reason || null,
     },
   };
 });

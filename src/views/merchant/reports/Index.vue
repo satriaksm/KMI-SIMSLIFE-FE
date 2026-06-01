@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-50">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
+      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
     >
       <div class="flex items-center gap-3">
         <!-- Hamburger Button (Mobile) -->
@@ -38,33 +38,7 @@
       </div>
 
       <div class="flex gap-2 sm:gap-3 items-center">
-        <!-- Saldo info & withdraw button -->
-        <div class="flex flex-col items-end mr-2 hidden sm:flex">
-           <span class="text-[10px] text-gray-500">Saldo Bisa Ditarik</span>
-           <span class="text-sm font-bold text-gray-900">Rp {{ formatIDR(currentMerchant?.balance_withdrawable || 0) }}</span>
-        </div>
-        <Button
-          @click="requestPayoutAction"
-          variant="merchant"
-          size="sm"
-          :disabled="!canWithdraw || requestingPayout"
-          customClass="!hidden sm:!inline"
-        >
-          <i class="pi" :class="requestingPayout ? 'pi-spin pi-spinner' : 'pi-wallet'"></i>
-          <span class="hidden ml-2 sm:inline">Tarik Saldo</span>
-        </Button>
-        <Button
-          @click="requestPayoutAction"
-          variant="merchant"
-          size="md"
-          :disabled="!canWithdraw || requestingPayout"
-          customClass="sm:!hidden flex-shrink-0"
-          title="Tarik Saldo"
-        >
-          <i class="pi" :class="requestingPayout ? 'pi-spin pi-spinner' : 'pi-wallet'"></i>
-        </Button>
 
-        
                 <Button
           @click="showExportModal = true"
           variant="merchant-outline"
@@ -159,56 +133,83 @@
     <!-- Spacer untuk kompensasi fixed header -->
     <div class="h-24 sm:h-0"></div>
 
-    <div class="px-4 py-2 space-y-4 sm:px-6 sm:py-6">
-      
-    <!-- Action Bar: Filter -->
-    <div class="flex items-center justify-between gap-3 p-4 bg-white border border-gray-200 shadow-sm rounded-2xl mb-4">
-      <div class="text-sm font-medium text-gray-700">
-        Filter Data Laporan
-      </div>
-      <div class="flex gap-2">
-        <Button
-          variant="merchant-outline"
-          @click="showFilterModal = true"
-          size="md"
-        >
-          <i class="pi pi-sliders-h"></i>
-          <span class="hidden ml-2 sm:inline">Filter</span>
-        </Button>
-      </div>
-    </div>
-
-
-
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
-      <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl">
-        <div class="flex items-center gap-4">
-          <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-blue-500">
-            <i class="text-xl pi pi-shopping-cart"></i>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-500">Total Transaksi</p>
-            <p class="text-2xl font-bold text-gray-900">
-              <span v-if="loading" class="text-gray-300 animate-pulse">---</span>
-              <span v-else>{{ summary.total_transactions }}</span>
-            </p>
-          </div>
+    <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
+    <!-- STICKY WRAPPER UNTUK FILTER DAN SUMMARY -->
+    <div class=" z-10 top-[88px] sm:top-0 bg-gray-50 pt-0 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 space-y-2 mb-4">
+      <!-- Action Bar: Filter -->
+      <div class="flex items-center justify-between gap-3 p-4 bg-white border border-gray-200 shadow-sm rounded-2xl">
+        <div class="text-sm font-medium text-gray-700">
+          Filter Data Laporan
+        </div>
+        <div class="flex gap-2">
+          <Button
+            variant="merchant-outline"
+            @click="showFilterModal = true"
+            size="md"
+          >
+            <i class="pi pi-sliders-h"></i>
+            <span class="hidden ml-2 sm:inline">Filter</span>
+          </Button>
         </div>
       </div>
-      
-      <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl">
-        <div class="flex items-center gap-4">
-          <div class="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-500">
-            <i class="text-xl pi pi-money-bill"></i>
+
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-1 gap-2 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl">
+          <div class="flex items-center gap-2 sm:gap-4">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-blue-500">
+              <i class="text-xl pi pi-shopping-cart"></i>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-500">Total Transaksi</p>
+              <p class="text-2xl font-bold text-gray-900">
+                <span v-if="loading" class="text-gray-300 animate-pulse">---</span>
+                <span v-else>{{ summary.total_transactions }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-green-50 text-green-500">
+              <i class="text-xl pi pi-money-bill"></i>
+            </div>
+            <div>
+              <p class="text-xs sm:text-sm font-medium text-gray-500">Pendapatan Bersih</p>
+              <p class="text-lg sm:text-2xl font-bold text-gray-900">
+                <span v-if="loading" class="text-gray-300 animate-pulse">---</span>
+                <span v-else>Rp {{ formatIDR(summary.total_revenue) }}</span>
+              </p>
+              <p class="text-[8px] sm:text-[10px] text-gray-400 mt-1">Hanya pesanan selesai (completed)</p>
+            </div>
+          </div>
+        </div>
+        <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-orange-50 text-orange-500">
+              <i class="text-xl pi pi-wallet"></i>
+            </div>
+            <div>
+              <p class="text-xs sm:text-sm font-medium text-gray-500">Saldo Bisa Ditarik</p>
+              <p class="text-lg sm:text-2xl font-bold text-gray-900">
+                <span v-if="loading" class="text-gray-300 animate-pulse">---</span>
+                <span v-else>Rp {{ formatIDR(walletStats?.balance_withdrawable || 0) }}</span>
+              </p>
+              <p class="text-[8px] sm:text-[10px] text-gray-400 mt-1">Pesanan selesai setelah 24jam</p>
+            </div>
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-500">Pendapatan Bersih</p>
-            <p class="text-2xl font-bold text-gray-900">
-              <span v-if="loading" class="text-gray-300 animate-pulse">---</span>
-              <span v-else>Rp {{ formatIDR(summary.total_revenue) }}</span>
-            </p>
-            <p class="text-[10px] text-gray-400 mt-1">Hanya pesanan selesai (completed)</p>
+            <Button
+              @click="requestPayoutAction"
+              variant="merchant"
+              size="sm"
+              :disabled="!canWithdraw || requestingPayout"
+            >
+              <i class="pi" :class="requestingPayout ? 'pi-spin pi-spinner' : 'pi-wallet'"></i>
+              <span class="ml-2 hidden lg:inline">Tarik Saldo</span>
+              <span class="ml-2 lg:hidden">Tarik</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -228,32 +229,38 @@
         emptyMessage="Tidak ada transaksi ditemukan untuk filter ini."
       >
         <template #cell-order_code="{ item }">
-          <div class="font-medium text-gray-900">{{ item.order_code }}</div>
+          <div class="font-semibold text-gray-900 text-sm">{{ item.order_code }}</div>
         </template>
         <template #cell-created_at="{ item }">
+          <div class="text-gray-900 text-sm">
           {{ formatDate(item.created_at) }}
+              <div class="text-xs text-gray-400">
+                {{ formatTime(item.created_at) }}
+              </div>
+          </div> 
         </template>
         <template #cell-customer_name="{ item }">
-          {{ item.customer_name }}
-        </template>
+              <div class="text-sm font-medium text-gray-800">
+                {{ item.customer_name }}
+              </div>        </template>
         <template #cell-delivery_type="{ item }">
           <span class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-gray-600 bg-gray-100 border border-gray-200 rounded-md uppercase">
             {{ item.delivery_type }}
           </span>
         </template>
         <template #cell-status="{ item }">
-          <span class="px-2.5 py-1 text-xs font-semibold rounded-full" :class="getStatusBadgeClass(item.status)">
-            {{ getStatusText(item.status) }}
-          </span>
+          <StatusLabel v-bind="statusProps(item.status)" />
         </template>
         <template #cell-gross_amount="{ item }">
-          Rp {{ formatIDR(item.gross_amount) }}
+                      <div class="text-sm  text-gray-800">
+              Rp {{ formatIDR(item.gross_amount) }}
+            </div>
         </template>
         <template #cell-platform_fee="{ item }">
-          <span class="text-red-500">- Rp {{ formatIDR(item.platform_fee) }}</span>
+          <span class="text-sm text-red-500">- Rp {{ formatIDR(item.platform_fee) }}</span>
         </template>
         <template #cell-net_amount="{ item }">
-          <span class="font-bold text-gray-900">Rp {{ formatIDR(item.net_amount) }}</span>
+          <div class="text-sm font-bold text-gray-900">Rp {{ formatIDR(item.net_amount) }}</div>
         </template>
       </MerchantTable>
     </div>
@@ -279,9 +286,7 @@
             <div class="text-sm font-bold text-gray-900">{{ order.order_code }}</div>
             <div class="text-xs text-gray-500">{{ formatDate(order.created_at) }}</div>
           </div>
-          <span class="px-2 py-1 text-[10px] font-semibold rounded-full" :class="getStatusBadgeClass(order.status)">
-            {{ getStatusText(order.status) }}
-          </span>
+          <StatusLabel v-bind="statusProps(order.status)" />
         </div>
         
         <div class="flex items-center justify-between py-2 border-y border-gray-50 mb-3">
@@ -310,6 +315,17 @@
           <span class="text-sm font-bold text-merchant-primary">Rp {{ formatIDR(order.net_amount) }}</span>
         </div>
       </div>
+
+          <div
+      v-if="!loading && transactions.length > 0"
+      class=" pb-4 sm:hidden"
+    >
+      <MobilePagination
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @page-change="handlePageChange"
+      />
+    </div>
     </div>
     
     </div>
@@ -418,6 +434,49 @@
       </template>
     </ResponsiveModal>
 
+    <!-- Modal Konfirmasi Penarikan -->
+    <ResponsiveModal
+      v-model:show="showPayoutModal"
+      title="Tarik Saldo"
+      @close="showPayoutModal = false"
+    >
+      <div class="p-4 space-y-4">
+        <div class="p-4 rounded-xl bg-green-50 border border-green-100 flex flex-col items-center justify-center">
+          <p class="text-sm text-green-800 mb-1">Nominal Penarikan</p>
+          <p class="text-2xl font-bold text-green-900">
+            {{ new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(currentMerchant?.balance_withdrawable || 0) }}
+          </p>
+        </div>
+        <div class="px-4 py-3 mt-4 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl">
+          <p class="font-medium">Informasi Penarikan:</p>
+          <ul class="mt-1 ml-4 list-disc space-y-0.5 opacity-90">
+            <li>Biaya admin + VAT (Rp 4.440) akan dipotong dari nominal di atas.</li>
+            <li>Dana yang diterima di bank adalah nominal di atas dikurangi Rp 4.440.</li>
+            <li>Minimal nominal penarikan adalah Rp 14.440.</li>
+          </ul>
+        </div>
+        <p class="text-sm text-gray-600 text-center mt-4">
+          Dana akan ditransfer ke rekening bank yang terdaftar di profil toko Anda. Proses ini mungkin memakan waktu beberapa saat.
+        </p>
+        <div class="flex gap-3 mt-6">
+          <Button
+            variant="muted-outline"
+            @click="showPayoutModal = false"
+            customClass="flex-1"
+          >
+            Batal
+          </Button>
+          <Button
+            variant="primary"
+            @click="confirmPayout"
+            :loading="requestingPayout"
+            customClass="flex-1 bg-green-600 hover:bg-green-700 text-white"
+          >
+            Tarik Sekarang
+          </Button>
+        </div>
+      </div>
+    </ResponsiveModal>
   </div>
 </template>
 
@@ -434,8 +493,10 @@ import Button from "@/components/common/Button.vue";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MerchantTable from "@/components/common/MerchantTable.vue";
+import StatusLabel from "@/components/common/StatusLabel.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
-
+import MobilePagination from "@/components/common/MobilePagination.vue";
+import { formatTime, formatDate } from "@/libs/format.js";
 const route = useRoute();
 const authStore = useAuthStore();
 const toast = useToast();
@@ -450,6 +511,63 @@ const summary = ref({
   total_transactions: 0,
   total_revenue: 0,
 });
+const walletStats = ref({
+  balance_available: 0,
+  balance_pending: 0,
+  balance_held: 0,
+  balance_withdrawable: 0,
+});
+
+function mapApiStatus(beStatus, o) {
+  switch (beStatus) {
+    case "paid":
+      return "waiting_review";
+    case "pending":
+      if (o.payment_method === 'COD') return "waiting_review";
+      return beStatus;
+    case "responsed":
+    case "accepted":
+      return "processing";
+    case "delivered":
+      return o.delivery_type === "pickup" ? "ready" : "shipped";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    case "rejected":
+      return "rejected";
+    case "undelivered":
+      return "undelivered";
+    default:
+      return beStatus;
+  }
+}
+
+function statusProps(beStatus) {
+  const status = mapApiStatus(beStatus, { payment_method: 'Transfer', delivery_type: 'delivery' }); 
+  switch (status) {
+    case "pending":
+      return { status: "pending", variant: "order" };
+    case "waiting_review":
+      return { status: "paid", variant: "order" };
+    case "processing":
+      return { status: "processed", variant: "order", label: "Diproses" };
+    case "ready":
+      return { status: "ready", variant: "order", label: "Siap Diambil" };
+    case "shipped":
+      return { status: "shipped", variant: "order", label: "Dikirim" };
+    case "completed":
+      return { status: "completed", variant: "order", label: "Selesai" };
+    case "cancelled":
+      return { status: "cancelled", variant: "order", label: "Dibatalkan Pembeli" };
+    case "rejected":
+      return { status: "cancelled", variant: "order", label: "Ditolak Penjual" };
+    case "undelivered":
+      return { status: "cancelled", variant: "order", label: "Gagal Kirim" };
+    default:
+      return { status: "pending", variant: "order", label: status };
+  }
+}
 
 const today = new Date();
 const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -470,6 +588,7 @@ const filters = ref({
 
 const showFilterModal = ref(false);
 const showExportModal = ref(false);
+const showPayoutModal = ref(false);
 
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -491,29 +610,36 @@ const statusOptions = [
   { value: "cancelled", label: "Dibatalkan (Cancelled)" },
 ];
 
-const sortOptions = [
-  { value: "newest", label: "Terbaru" },
-  { value: "oldest", label: "Terlama" },
-];
-
 const merchantSlug = route.params.merchantSlug || authStore.merchantSlug;
 
 const breadcrumbItems = computed(() => [{ label: "Laporan" }]);
 
 const currentMerchant = computed(() => authStore.getMerchantBySlug(merchantSlug));
 const currentMerchantName = computed(() => currentMerchant.value?.name || "UMKM");
-const canWithdraw = computed(() => currentMerchant.value?.balance_withdrawable > 0);
+const canWithdraw = computed(() => walletStats.value.balance_withdrawable >= 10000);
 
 const requestingPayout = ref(false);
-const requestPayoutAction = async () => {
-  if (!canWithdraw.value) return;
+
+const requestPayoutAction = () => {
+  if (!canWithdraw.value) {
+    toast.error("Saldo yang dapat ditarik minimal Rp 10.000");
+    return;
+  }
+  showPayoutModal.value = true;
+};
+
+const confirmPayout = async () => {
   try {
     requestingPayout.value = true;
-    const res = await api.post(`/api/merchant/${merchantSlug}/payouts`);
-    toast.success(res.data?.meta?.message || "Berhasil mengajukan penarikan saldo.");
+    const res = await api.post(`/api/merchant/${merchantSlug}/payouts`, {
+      amount: walletStats.value.balance_withdrawable
+    });
+    toast.success(res.data?.meta?.message || "Penarikan berhasil diajukan.");
+    showPayoutModal.value = false;
     await authStore.fetchUserAndMerchants(); 
+    await fetchData(); // Refresh data to get latest wallet stats
   } catch (err) {
-    toast.error(err.response?.data?.meta?.message || "Gagal mengajukan penarikan saldo.");
+    toast.error(err.response?.data?.meta?.message || err.response?.data?.message || "Gagal mengajukan penarikan saldo.");
   } finally {
     requestingPayout.value = false;
   }
@@ -549,6 +675,7 @@ const fetchData = async () => {
     // Ensure we parse transactions from the correct path since API wraps in data object
     transactions.value = res.data?.transactions || res.transactions || [];
     summary.value = res.data?.summary || res.summary || summary.value;
+    walletStats.value = res.data?.wallet || res.wallet || walletStats.value;
     
     // Handle pagination meta
     const meta = res.meta?.pagination || res.data?.pagination || {};
@@ -598,38 +725,27 @@ const resetFilter = () => {
 const handleExport = async (type) => {
   if (!merchantSlug || loadingExport.value) return;
   
-  const params = {
-    start_date: filters.value.start_date,
-    end_date: filters.value.end_date,
-    status: filters.value.status,
-    sort_by: filters.value.sort_by,
-  };
-  
   loadingExport.value = true;
+  showExportModal.value = false;
+  
   try {
+    const params = {
+      start_date: filters.value.start_date,
+      end_date: filters.value.end_date,
+      status: filters.value.status,
+      sort_by: filters.value.sort_by,
+    };
+    
     let res;
     if (type === 'pdf') {
-      res = await exportMerchantReportPdf(merchantSlug, params);
+      const res = await exportMerchantReportPdf(merchantSlug, params);
+      saveBlob(res.data, `Laporan_Transaksi_${merchantSlug}_${formatDateForInput(new Date())}.pdf`);
     } else {
-      res = await exportMerchantReportExcel(merchantSlug, params);
+      const res = await exportMerchantReportExcel(merchantSlug, params);
+      saveBlob(res.data, `Laporan_Transaksi_${merchantSlug}_${formatDateForInput(new Date())}.xlsx`);
     }
     
-    // Extract filename from header if possible
-    let filename = `Laporan_${type.toUpperCase()}.` + (type === 'pdf' ? 'pdf' : 'xlsx');
-    const disposition = res.headers['content-disposition'];
-    if (disposition && disposition.indexOf('attachment') !== -1) {
-      const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-      const matches = filenameRegex.exec(disposition);
-      if (matches != null && matches[1]) { 
-        filename = matches[1].replace(/['"]/g, '');
-      }
-    } else {
-      // Fallback format if header missing
-      filename = `Laporan_Transaksi_${new Date().toISOString().slice(0, 10)}.${type === 'pdf' ? 'pdf' : 'xlsx'}`;
-    }
-    
-    saveBlob(res.data, filename);
-    toast.success(`Berhasil mengunduh laporan ${type.toUpperCase()}`);
+    toast.success(`Laporan ${type.toUpperCase()} berhasil diunduh`);
     showExportModal.value = false;
   } catch (error) {
     console.error('Export error:', error);
@@ -643,17 +759,7 @@ const formatIDR = (value) => {
   return Number(value || 0).toLocaleString('id-ID');
 };
 
-const formatDate = (dateString) => {
-  if (!dateString) return '-';
-  const date = new Date(dateString);
-  return date.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+
 
 const getStatusText = (status) => {
   const map = {

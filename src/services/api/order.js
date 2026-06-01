@@ -66,9 +66,21 @@ export function getMerchantOrderDetail(merchantSlug, orderId) {
  * @param {number} orderId
  * @param {string} status - responsed|delivered|completed|cancelled
  */
-export function updateOrderStatus(merchantSlug, orderId, status) {
+export function updateOrderStatus(merchantSlug, orderId, payload) {
+  if (payload instanceof FormData) {
+    return api.post(
+      `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+  }
+  
   return api.post(
     `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
-    { status },
+    { status: payload },
   );
 }

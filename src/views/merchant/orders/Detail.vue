@@ -52,6 +52,7 @@ function mapApiStatus(beStatus, o) {
       if (o.payment_method === 'COD') return "waiting_review";
       return beStatus;
     case "responsed":
+    case "accepted":
       return "processing";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
@@ -59,6 +60,10 @@ function mapApiStatus(beStatus, o) {
       return "completed";
     case "cancelled":
       return "cancelled";
+    case "rejected":
+      return "rejected";
+    case "undelivered":
+      return "undelivered";
     default:
       return beStatus;
   }
@@ -115,6 +120,8 @@ const order = computed(() => {
     merchant_lng: o.merchant?.primary_address?.longitude,
     delivery_type: o.delivery_type,
     note: o.notes || "",
+    proof_image_url: o.proof_image_url,
+    failed_reason: o.failed_reason,
   };
 });
 
@@ -188,6 +195,26 @@ const statusConfig = {
     props: {
       variant: "order",
       status: "cancelled",
+      size: "sm",
+      showIcon: true,
+    },
+    nextAction: null,
+  },
+  rejected: {
+    props: {
+      variant: "order",
+      status: "cancelled",
+      label: "Ditolak Penjual",
+      size: "sm",
+      showIcon: true,
+    },
+    nextAction: null,
+  },
+  undelivered: {
+    props: {
+      variant: "order",
+      status: "cancelled",
+      label: "Gagal Kirim",
       size: "sm",
       showIcon: true,
     },
@@ -285,27 +312,24 @@ const waLink = computed(() => {
 // CONFIRM STATUS MODAL
 // ========================
 const showConfirmModal = ref(false);
+const actionType = ref("next");
+const proofImage = ref(null);
+const failedReason = ref("");
 
 function getNextStatus() {
   const rawStatus = rawOrder.value?.status;
   switch (rawStatus) {
     case "paid":
-      return "responsed"; // UMKM terima pesanan yang sudah dibayar
+      return "accepted"; // UMKM terima pesanan yang sudah dibayar
     case "pending":
       // COD order — UMKM bisa langsung terima
-      if (rawOrder.value?.payment_method === 'COD') return "responsed";
+      if (rawOrder.value?.payment_method === 'COD') return "accepted";
       return null; // Transfer pending = belum bayar
     case "responsed":
+    case "accepted":
       return "delivered";
     case "delivered":
-      const isPickup = rawOrder.value?.delivery_type === 'pickup';
-      const isCOD = rawOrder.value?.payment_method === 'COD';
-      
-      // Untuk pesanan delivery non-COD, penjual tidak bisa menyelesaikan pesanan.
-      // Hanya pembeli yang bisa menyelesaikan via tombol "Pesanan Diterima".
-      if (!isPickup && !isCOD) {
-        return null;
-      }
+      // UMKM (penjual) bisa menekan "completed" (Pesanan Tiba) untuk semua jenis pesanan
       return "completed";
     default:
       return null;
@@ -316,12 +340,12 @@ const nextActionLabel = computed(() => {
   const next = getNextStatus();
   const isPickup = order.value?.delivery_type === "pickup";
   switch (next) {
-    case "responsed":
+    case "accepted":
       return "Terima & Proses Pesanan";
     case "delivered":
       return isPickup ? "Tandai Siap Diambil" : "Tandai Dikirim";
     case "completed":
-      return isPickup ? "Tandai Selesai / Sudah Diambil" : "Tandai Selesai";
+      return isPickup ? "Tandai Selesai / Sudah Diambil" : "Pesanan Tiba & Selesai";
     default:
       return null;
   }
@@ -330,8 +354,20 @@ const nextActionLabel = computed(() => {
 // Apakah bisa dibatalkan oleh UMKM
 const canCancel = computed(() => {
   const s = rawOrder.value?.status;
-  return s === "paid" || s === "responsed" || (s === "pending" && rawOrder.value?.payment_method === 'COD');
+  return s === "paid" || s === "responsed" || s === "accepted" || (s === "pending" && rawOrder.value?.payment_method === 'COD');
 });
+
+// Apakah bisa ditandai gagal kirim (undelivered)
+const canUndelivered = computed(() => {
+  const s = rawOrder.value?.status;
+  return s === "delivered" && rawOrder.value?.delivery_type !== 'pickup';
+});
+
+function onFileChange(e) {
+  if (e.target.files && e.target.files[0]) {
+    proofImage.value = e.target.files[0];
+  }
+}
 
 // ========================
 // COUNTDOWN TIMER KONFIRMASI
@@ -386,18 +422,42 @@ function startConfirmCountdown() {
 
 
 async function confirmAction() {
-  const nextStatus = getNextStatus();
-  if (!nextStatus || !currentMerchantSlug.value || !rawOrder.value?.id) return;
+  let targetStatus;
+  if (actionType.value === 'reject') targetStatus = 'rejected';
+  else if (actionType.value === 'undelivered') targetStatus = 'undelivered';
+  else targetStatus = getNextStatus();
+  
+  if (!targetStatus || !currentMerchantSlug.value || !rawOrder.value?.id) return;
 
   actionLoading.value = true;
   try {
+    let payload = targetStatus;
+    if ((targetStatus === 'completed' || targetStatus === 'undelivered') && proofImage.value) {
+      payload = new FormData();
+      payload.append('status', targetStatus);
+      payload.append('proof_image', proofImage.value);
+      if (targetStatus === 'undelivered' && failedReason.value) {
+        payload.append('failed_reason', failedReason.value);
+      }
+    } else if (targetStatus === 'undelivered' && !proofImage.value) {
+        toast.error("Bukti foto wajib diunggah untuk pesanan gagal kirim.");
+        actionLoading.value = false;
+        return;
+    } else if (targetStatus === 'completed' && !proofImage.value && rawOrder.value?.delivery_type !== 'pickup') {
+        toast.error("Bukti foto wajib diunggah saat barang telah tiba.");
+        actionLoading.value = false;
+        return;
+    }
+
     await updateOrderStatus(
       currentMerchantSlug.value,
       rawOrder.value.id,
-      nextStatus,
+      payload,
     );
     toast.success("Status pesanan berhasil diperbarui");
     showConfirmModal.value = false;
+    proofImage.value = null;
+    failedReason.value = "";
     await fetchOrder();
   } catch (e) {
     toast.error(e.response?.data?.message || "Gagal memperbarui status");
@@ -406,22 +466,19 @@ async function confirmAction() {
   }
 }
 
-async function handleCancel() {
-  if (!currentMerchantSlug.value || !rawOrder.value?.id) return;
-  actionLoading.value = true;
-  try {
-    await updateOrderStatus(
-      currentMerchantSlug.value,
-      rawOrder.value.id,
-      "cancelled",
-    );
-    toast.success("Pesanan berhasil dibatalkan");
-    await fetchOrder();
-  } catch (e) {
-    toast.error(e.response?.data?.message || "Gagal membatalkan pesanan");
-  } finally {
-    actionLoading.value = false;
-  }
+function handleCancel() {
+  actionType.value = 'reject';
+  showConfirmModal.value = true;
+}
+
+function handleUndelivered() {
+  actionType.value = 'undelivered';
+  showConfirmModal.value = true;
+}
+
+function handleNextAction() {
+  actionType.value = 'next';
+  showConfirmModal.value = true;
 }
 
 // ========================
@@ -524,7 +581,7 @@ function leaveOrderChannel(id) {
     <!-- Loading Skeleton -->
     <div
       v-if="loading"
-      class="max-w-3xl px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6"
+      class=" px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6"
     >
       <!-- Timeline skeleton -->
       <div class="p-4 bg-white shadow-sm rounded-2xl animate-pulse">
@@ -603,7 +660,7 @@ function leaveOrderChannel(id) {
       </button>
     </div>
 
-    <div v-else class="max-w-3xl px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6">
+    <div v-else class=" px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6">
       <!-- ======================== -->
       <!-- TIMELINE                 -->
       <!-- ======================== -->
@@ -655,15 +712,20 @@ function leaveOrderChannel(id) {
 
       <!-- Cancelled banner -->
       <div
-        v-if="order.status === 'cancelled'"
-        class="flex items-center gap-3 p-4 border border-red-200 bg-red-50 rounded-2xl"
+        v-if="['cancelled', 'rejected', 'undelivered'].includes(order.status)"
+        class="flex flex-col gap-3 p-4 border bg-red-50 rounded-2xl"
+        :class="order.status === 'undelivered' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'"
       >
-        <i class="text-xl text-red-500 pi pi-times-circle shrink-0"></i>
-        <div>
-          <p class="text-sm font-semibold text-red-700">Pesanan Dibatalkan</p>
-          <p v-if="order.note" class="text-xs text-red-500 mt-0.5">
-            {{ order.note }}
-          </p>
+        <div class="flex items-center gap-3">
+          <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
+          <div>
+            <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
+              {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? 'Pesanan Gagal Kirim' : 'Pesanan Dibatalkan' }}
+            </p>
+            <p v-if="order.note || order.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
+              {{ order.failed_reason || order.note }}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -786,6 +848,18 @@ function leaveOrderChannel(id) {
       </div>
 
       <!-- ======================== -->
+      <!-- PROOF OF DELIVERY        -->
+      <!-- ======================== -->
+      <div v-if="order.proof_image_url" class="p-4 bg-white shadow-sm rounded-2xl">
+        <h2 class="pb-2 text-sm font-semibold text-gray-700 border-b border-gray-100">
+          Bukti Foto
+        </h2>
+        <div class="mt-3">
+          <img :src="order.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
+        </div>
+      </div>
+
+      <!-- ======================== -->
       <!-- ITEMS                    -->
       <!-- ======================== -->
       <div class="p-4 bg-white shadow-sm rounded-2xl">
@@ -869,10 +943,11 @@ function leaveOrderChannel(id) {
       <!-- ======================== -->
       <!-- ACTION BUTTON            -->
       <!-- ======================== -->
-      <div v-if="nextActionLabel" class="pb-6 space-y-2">
+      <div class="pb-6 space-y-2">
         <button
+          v-if="nextActionLabel"
           type="button"
-          @click="showConfirmModal = true"
+          @click="handleNextAction"
           :disabled="actionLoading"
           class="w-full py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition active:scale-[0.98] bg-merchant-primary disabled:opacity-50"
         >
@@ -888,6 +963,15 @@ function leaveOrderChannel(id) {
         >
           Tolak / Batalkan Pesanan
         </button>
+        <button
+          v-if="canUndelivered"
+          type="button"
+          @click="handleUndelivered"
+          :disabled="actionLoading"
+          class="w-full py-3 text-sm font-semibold text-orange-600 transition bg-orange-50 rounded-2xl hover:bg-orange-100 disabled:opacity-50"
+        >
+          Tandai Gagal Kirim
+        </button>
       </div>
     </div>
 
@@ -901,12 +985,28 @@ function leaveOrderChannel(id) {
       :showFooter="true"
     >
       <div class="flex items-center gap-4 py-2">
-        <div class="flex items-center justify-center w-12 h-12 rounded-full shrink-0 bg-merchant-primary/10">
-          <i class="text-xl pi pi-check-circle text-merchant-primary"></i>
+        <div class="flex items-center justify-center w-12 h-12 rounded-full shrink-0" :class="actionType === 'next' ? 'bg-merchant-primary/10' : (actionType === 'undelivered' ? 'bg-orange-100' : 'bg-red-100')">
+          <i class="text-xl pi" :class="actionType === 'next' ? 'pi-check-circle text-merchant-primary' : (actionType === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500')"></i>
         </div>
         <p class="text-sm text-gray-600">
-          Tindakan ini akan memperbarui status pesanan dan dapat mengirimkan notifikasi ke pelanggan.
+          <span v-if="actionType === 'undelivered'">Tindakan ini akan menandai pesanan gagal kirim. Dana akan tetap diteruskan.</span>
+          <span v-else-if="actionType === 'reject'">Tindakan ini akan menolak pesanan dan dana akan dikembalikan ke pembeli.</span>
+          <span v-else>Tindakan ini akan memperbarui status pesanan dan dapat mengirimkan notifikasi ke pelanggan.</span>
         </p>
+      </div>
+
+      <!-- Upload Proof Image -->
+      <div v-if="(actionType === 'next' && getNextStatus() === 'completed') || actionType === 'undelivered'" class="mt-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          Bukti Foto {{ actionType === 'undelivered' ? 'Gagal Kirim (Wajib)' : (rawOrder?.delivery_type === 'pickup' ? 'Selesai (Opsional)' : 'Barang Tiba (Wajib)') }}
+        </label>
+        <input type="file" @change="onFileChange" accept="image/*" class="w-full text-sm text-gray-500 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-l-lg file:border-0 file:text-sm file:font-semibold file:bg-merchant-primary file:text-white hover:file:bg-merchant-primary/90" />
+      </div>
+
+      <!-- Failed Reason -->
+      <div v-if="actionType === 'undelivered'" class="mt-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Alasan Gagal Kirim (Wajib)</label>
+        <textarea v-model="failedReason" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary" rows="3" placeholder="Contoh: Pembeli tidak dapat dihubungi dan rumah kosong..."></textarea>
       </div>
 
       <template #footer>

@@ -149,13 +149,7 @@
             :key="order.id"
             :order="order"
             @click="openOrder"
-          >
-            <template #action="{ order: o }">
-              <Button variant="primary" size="sm" @click.stop="buyAgain(o)">
-                Beli Lagi
-              </Button>
-            </template>
-          </OrderCard>
+          />
         </div>
 
         <!-- Empty -->
@@ -412,6 +406,7 @@ function mapApiStatus(beStatus, o) {
       return "pending_payment";
     case "paid":
     case "responsed":
+    case "accepted":
       return "processing";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
@@ -419,6 +414,10 @@ function mapApiStatus(beStatus, o) {
       return "completed";
     case "cancelled":
       return "cancelled";
+    case "rejected":
+      return "rejected";
+    case "undelivered":
+      return "undelivered";
     default:
       return beStatus;
   }
@@ -460,6 +459,7 @@ function mapOrder(o) {
       })),
       price: it.unit_price_snapshot,
       imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      productSlug: it.product?.slug, // Get product slug for Buy Again
     })),
     _raw: o,
   };
@@ -506,7 +506,11 @@ const filteredOrders = computed(() => {
 
   // Filter by status
   if (selectedStatus.value) {
-    result = result.filter((o) => o.status === selectedStatus.value);
+    if (selectedStatus.value === 'cancelled') {
+        result = result.filter((o) => ['cancelled', 'rejected', 'undelivered'].includes(o.status));
+    } else {
+        result = result.filter((o) => o.status === selectedStatus.value);
+    }
   }
 
   // Filter by date range
@@ -532,9 +536,7 @@ function openOrder(order) {
     .catch(() => router.push(`/orders/${order.id}`));
 }
 
-function buyAgain() {
-  router.push({ path: "/explore" }).catch(() => router.push("/"));
-}
+
 
 function goToPendingPayment() {
   router

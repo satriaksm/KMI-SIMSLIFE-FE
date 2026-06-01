@@ -515,7 +515,7 @@ defineExpose({
     <!-- Main Content Area -->
     <div
       :class="[
-        'flex-1 w-full min-h-screen overflow-x-hidden transition-all duration-300',
+        'flex-1 w-full min-h-screen transition-all duration-300',
         !isOpen ? 'sm:ml-16' : 'sm:ml-64',
       ]"
     >
