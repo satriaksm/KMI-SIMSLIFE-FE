@@ -366,6 +366,9 @@ export default {
       this.myMarker = L.marker([coords.lat, coords.lng], { icon })
         .addTo(this.map)
         .bindPopup(popup);
+
+      // ✅ RE-CENTER map to user's location if available
+      this.map.setView([coords.lat, coords.lng], 15);
     },
 
     async getMyCoordinates() {

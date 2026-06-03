@@ -61,6 +61,17 @@
 
       <div class="flex flex-col gap-2 mt-6">
         <AppButton
+          v-if="status === '' || status === 'invalid'"
+          type="button"
+          variant="primary"
+          size="md"
+          @click="resend"
+          :loading="sending"
+          block
+        >
+          Kirim Ulang Link Verifikasi
+        </AppButton>
+        <AppButton
           type="button"
           variant="primary-outline"
           size="md"

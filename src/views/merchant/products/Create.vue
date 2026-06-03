@@ -742,7 +742,7 @@ const onSubmit = veeHandleSubmit(
     />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block bg-gray-50">
       <div
         class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
       >

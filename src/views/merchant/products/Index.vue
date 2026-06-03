@@ -752,7 +752,7 @@ const tableActions = [
   <div class="">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6"
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:bg-gray-50 sm:z-30 sm:px-6"
     >
       <div class="flex items-center gap-3">
         <!-- Hamburger Button (Mobile) -->

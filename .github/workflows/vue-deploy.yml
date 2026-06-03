@@ -2,7 +2,7 @@ name: Vue (Vite) CI/CD -> FTPS
 
 on:
   push:
-    branches: [staging]
+    branches: [prod-kel-banyuanyar]
   workflow_dispatch:
 
 jobs:
