@@ -321,6 +321,29 @@ const removeFile = (index) => {
   evidenceFiles.value.splice(index, 1);
 };
 
+const mimeExtensionMap = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/webm': '.webm',
+};
+
+// Normalize file name — add extension from MIME type if missing
+const normalizeFile = (file) => {
+  let name = file.name || 'evidence';
+  const ext = name.split('.').pop()?.toLowerCase();
+  if (!ext || ext.length > 5 || !/\w/.test(ext)) {
+    const addedExt = mimeExtensionMap[file.type] || '';
+    if (addedExt && !name.endsWith(addedExt)) {
+      name = name + addedExt;
+    }
+  }
+  return new File([file], name, { type: file.type });
+};
+
 // Submit evidence and complete
 const submitEvidence = async () => {
   if (!selectedOrder.value) {
@@ -333,51 +356,51 @@ const submitEvidence = async () => {
   }
   submitting.value = true;
   try {
-    console.log('Evidence payload:', {
-      orderId: selectedOrder.value.id,
-      status: 'menunggu_konfirmasi_selesai',
-      files: evidenceFiles.value.map(f => f.name)
-    });
-
     const formData = new FormData();
-    formData.append('status', 'menunggu_konfirmasi_selesai');
+    formData.append('_method', 'PATCH');
+    formData.append('status', 'completed');
     formData.append('completion_note', completionNote.value || '');
     evidenceFiles.value.forEach((file) => {
-      formData.append('evidences[]', file);
+      const normalized = normalizeFile(file);
+      formData.append('evidences[]', normalized, normalized.name);
     });
 
-    const { data } = await api.patch(
+    const { data } = await api.post(
       `/api/merchant/${merchantSlug.value}/service-orders/${selectedOrder.value.id}/status`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      formData
     );
 
-    console.log('Evidence response:', data);
-
-    // Check response with multiple formats including Indonesian message
     const isSuccess =
       data?.status === true ||
       data?.status === 'success' ||
       data?.success === true ||
       data?.message === 'success' ||
-      data?.message === 'Status berhasil diperbarui';
+      data?.message === 'Status berhasil diperbarui' ||
+      (data?.message && data?.message.includes('berhasil'));
 
     if (isSuccess) {
-      toast.success('Bukti pengerjaan berhasil dikirim. Menunggu konfirmasi pelanggan.');
+      toast.success('Bukti pengerjaan berhasil dikirim.');
       showEvidenceModal.value = false;
       showDetailModal.value = false;
       completionNote.value = '';
       evidenceFiles.value = [];
       selectedOrder.value = null;
-      console.log('Updated service order:', data);
       await fetchOrders(activeFilter.value);
     } else {
-      console.error('Evidence error response:', data);
       toast.error(data?.message || 'Gagal mengirim bukti pengerjaan');
     }
   } catch (error) {
-    console.error('Gagal mengirim bukti:', error);
-    console.error('Evidence error response:', error.response?.data);
+    const validationErrors = error.response?.data?.errors;
+    if (validationErrors && typeof validationErrors === 'object') {
+      const messages = Object.entries(validationErrors)
+        .flatMap(([field, values]) =>
+          (Array.isArray(values) ? values : [values]).map((value) => `${field}: ${value}`)
+        );
+      if (messages.length > 0) {
+        toast.error(messages.join(' | '));
+        return;
+      }
+    }
     toast.error(
       error.response?.data?.message ||
       error.response?.data?.error ||
@@ -657,18 +680,22 @@ const getMediaUrl = (mediaOrPath) => {
   }
   // If media object:
   const media = mediaOrPath;
-  // file_url stored by ReviewMedia accessor: /storage/...
-  if (media.file_url && media.file_url.trim()) {
-    const url = media.file_url;
-    if (url.startsWith('http')) return url;
-    return `${import.meta.env.VITE_API_BASE_URL}${url}`;
+  // file_url: try raw value first (may be relative /storage/... or full http://...)
+  const rawFileUrl = media?.file_url;
+  if (rawFileUrl && typeof rawFileUrl === 'string' && rawFileUrl.trim()) {
+    if (rawFileUrl.startsWith('http')) return rawFileUrl;
+    return `${import.meta.env.VITE_API_BASE_URL}${rawFileUrl}`;
   }
-  // file_url from other sources (already has /storage/ or full URL)
-  if (media.file_url) return media.file_url;
+  // media_url accessor (always returns full URL or null)
+  const mediaUrl = media?.media_url;
+  if (mediaUrl && typeof mediaUrl === 'string') {
+    if (mediaUrl.startsWith('http')) return mediaUrl;
+    return `${import.meta.env.VITE_API_BASE_URL}${mediaUrl}`;
+  }
   // Fallback from file_path
-  const fp = media.file_path || media.path || '';
+  const fp = media?.file_path || media?.path || '';
+  if (!fp) return '';
   if (fp.startsWith('http')) return fp;
-  if (fp.startsWith('/storage/')) return `${import.meta.env.VITE_API_BASE_URL}${fp}`;
   return `${import.meta.env.VITE_API_BASE_URL}/storage/${fp}`;
 };
 

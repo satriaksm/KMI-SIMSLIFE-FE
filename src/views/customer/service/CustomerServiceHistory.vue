@@ -431,6 +431,16 @@ const getMediaUrlFromMedia = (media) => {
     return fileUrl;
   }
 
+  // Try media_url accessor (may have full URL or relative path)
+  const mediaUrl = media?.media_url || '';
+  if (mediaUrl) {
+    if (mediaUrl.startsWith('http')) return mediaUrl;
+    if (mediaUrl.startsWith('/')) {
+      return `${import.meta.env.VITE_API_BASE_URL}${mediaUrl}`;
+    }
+    return mediaUrl;
+  }
+
   // Fallback to constructing from file_path
   const filePath = media?.file_path || media?.path || '';
   if (!filePath) return '';
