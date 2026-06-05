@@ -160,17 +160,11 @@ const fetchDashboard = async () => {
       `/api/merchant/${currentMerchantSlug.value}/dashboard`,
     );
 
-<<<<<<< HEAD
     const data = response?.data?.data || {};
     const voucherStats = data.voucher_stats || {};
     
     orderStats.value = data.order_stats || null;
     walletStats.value = data.wallet || null;
-=======
-    const data = response?.data?.data ?? response?.data ?? {};
-    const statsData = data.stats ?? {};
-    const voucherStats = data.voucher_stats ?? {};
->>>>>>> staging-ta
 
     const label = catalogLabel.value;
     const catalogIcon = isJasaMerchant.value ? "pi pi-briefcase" : "pi pi-box";

@@ -1,7 +1,6 @@
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-<<<<<<< HEAD
     <MerchantMobileHeader
       title="Edit Informasi Toko"
       :backRoute="
@@ -10,25 +9,6 @@
           : '/merchant-profile'
       "
     />
-=======
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="
-          router.push(
-            merchantSlug
-              ? `/merchant-center/${merchantSlug}/profile`
-              : '/merchant-profile',
-          )
-        "
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="text-xl pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Edit Informasi UMKM</h1>
-    </div>
->>>>>>> staging-ta
 
     <!-- Desktop Header with Breadcrumb -->
     <div class="hidden py-6 sm:block bg-gray-50">
@@ -474,56 +454,33 @@
             <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
-<<<<<<< HEAD
             <div class="space-y-3">
-=======
-            <div class="space-y-2">
->>>>>>> staging-ta
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
                 class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
                 <!-- Header row -->
-<<<<<<< HEAD
                 <div class="flex items-center justify-between p-4">
                   <div class="flex items-center gap-4">
                     <span
                       class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
-=======
-                <div class="flex items-center justify-between p-3">
-                  <div class="flex items-center gap-3">
-                    <span
-                      class="px-3 py-1.5 rounded-lg text-xs font-semibold min-w-[75px] text-center transition-colors"
->>>>>>> staging-ta
                       :class="
                         day.isOpen
                           ? 'bg-merchant-primary text-white'
                           : 'bg-gray-200 text-gray-500'
                       "
                     >
-<<<<<<< HEAD
                       {{ day.name }}
-=======
-                      {{ day.shortName }}
->>>>>>> staging-ta
                     </span>
                     <div>
                       <span
                         v-if="day.isOpen"
-<<<<<<< HEAD
                         class="text-base font-medium text-gray-700"
                       >
                         {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
                       </span>
                       <span v-else class="text-base font-medium text-gray-400">
-=======
-                        class="text-sm font-medium text-gray-700"
-                      >
-                        {{ day.open || "06:00" }} - {{ day.close || "18:00" }}
-                      </span>
-                      <span v-else class="text-sm font-medium text-gray-400">
->>>>>>> staging-ta
                         Tutup
                       </span>
                     </div>
@@ -545,21 +502,12 @@
                 </div>
 
                 <!-- Inline time inputs (shown when open) -->
-<<<<<<< HEAD
                 <div v-if="day.isOpen" class="px-4 pb-4">
                   <div class="flex items-center gap-3">
                     <div class="flex-1">
                       <label
                         class="block mb-1.5 text-xs font-medium text-gray-500"
                         >Jam Buka</label
-=======
-                <div v-if="day.isOpen" class="px-3 pb-3">
-                  <div class="flex items-center gap-2">
-                    <div class="flex-1">
-                      <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Buka</label
->>>>>>> staging-ta
                       >
                       <input
                         type="time"
@@ -568,7 +516,6 @@
                           day.open = $event.target.value;
                           updateDayHours(index);
                         "
-<<<<<<< HEAD
                         class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
                       />
                     </div>
@@ -577,16 +524,6 @@
                       <label
                         class="block mb-1.5 text-xs font-medium text-gray-500"
                         >Jam Tutup</label
-=======
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
-                      />
-                    </div>
-                    <span class="mt-5 text-xs text-gray-400">—</span>
-                    <div class="flex-1">
-                      <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Tutup</label
->>>>>>> staging-ta
                       >
                       <input
                         type="time"
@@ -595,11 +532,7 @@
                           day.close = $event.target.value;
                           updateDayHours(index);
                         "
-<<<<<<< HEAD
                         class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
-=======
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
->>>>>>> staging-ta
                       />
                     </div>
                   </div>
@@ -1384,7 +1317,6 @@ const handleUploadLogo = () => {
 
 const onDayToggle = (index) => {
   const day = form.value.operationalHours[index];
-<<<<<<< HEAD
   if (!day) return;
 
   if (day.isOpen) {
@@ -1395,16 +1327,10 @@ const onDayToggle = (index) => {
     day.open = null;
     day.close = null;
     day.hours = "Tutup";
-=======
-  if (day.isOpen && !day.open) {
-    day.open = "06:00";
-    day.close = "18:00";
->>>>>>> staging-ta
   }
 };
 
 const updateDayHours = (index) => {
-<<<<<<< HEAD
   const day = form.value.operationalHours[index];
   if (!day) return;
 
@@ -1415,10 +1341,6 @@ const updateDayHours = (index) => {
   day.close = close;
   day.isOpen = true;
   day.hours = `[${open} - ${close}]`;
-=======
-  // No-op — time inputs directly mutate day.open / day.close via @input
-  // Kept as hook for future validation if needed
->>>>>>> staging-ta
 };
 
 const buildOperationalHoursPayload = () => {
