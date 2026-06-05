@@ -682,6 +682,12 @@ watch(currentPage, () => {
   loadProducts();
 });
 
+// Sinkronkan selectAll dengan realita seleksi (desktop ↔ mobile)
+watch(selectedProducts, (newVal) => {
+  selectAll.value =
+    products.value.length > 0 && newVal.length === products.value.length;
+});
+
 watch(perPage, (val, oldVal) => {
   if (val === oldVal) return;
 
@@ -800,7 +806,7 @@ const tableActions = [
   <div class="">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6"
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:bg-gray-50 sm:z-30 sm:px-6"
     >
       <div class="flex items-center gap-3">
         <!-- Hamburger Button (Mobile) -->
@@ -840,16 +846,16 @@ const tableActions = [
           @click="goToCreate"
           variant="merchant"
           size="sm"
-          customClass="!hidden sm:!inline"
+          customClass="!hidden md:!inline"
         >
           <i class="pi pi-plus"></i>
-          <span class="hidden ml-2 sm:inline">Tambah Produk</span>
+          <span class="hidden ml-2 md:inline">Tambah Produk</span>
         </Button>
         <Button
           @click="goToCreate"
           variant="merchant"
           size="md"
-          customClass="sm:!hidden"
+          customClass="md:!hidden"
         >
           <i class="pi pi-plus"></i>
         </Button>
@@ -857,16 +863,16 @@ const tableActions = [
           @click="openExportModal"
           variant="merchant-outline"
           size="sm"
-          customClass="!hidden sm:!inline"
+          customClass="!hidden md:!inline"
         >
           <i class="pi pi-download"></i>
-          <span class="hidden ml-2 sm:inline">Export</span>
+          <span class="hidden ml-2 md:inline">Export</span>
         </Button>
         <Button
           @click="openExportModal"
           variant="merchant-outline"
           size="md"
-          customClass="sm:!hidden"
+          customClass="md:!hidden"
         >
           <i class="pi pi-download"></i>
         </Button>

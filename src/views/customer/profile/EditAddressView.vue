@@ -49,9 +49,17 @@ const schema = yup.object({
   district_id: yup.string().required("Pilih kecamatan."),
   village_id: yup.string().required("Pilih desa/kelurahan."),
   detail: yup.string().nullable(),
+  latitude: yup
+    .number()
+    .typeError("Tentukan lokasi Anda di peta.")
+    .required("Tentukan lokasi Anda di peta."),
+  longitude: yup
+    .number()
+    .typeError("Tentukan lokasi Anda di peta.")
+    .required("Tentukan lokasi Anda di peta."),
 });
 
-const { values, setFieldValue } = useForm({
+const { values, setFieldValue, setFieldError, errors } = useForm({
   validationSchema: schema,
   initialValues: {
     province_id: "",
@@ -59,11 +67,23 @@ const { values, setFieldValue } = useForm({
     district_id: "",
     village_id: "",
     detail: "",
+    latitude: null,
+    longitude: null,
   },
 });
 
 const lat = ref(null);
 const lng = ref(null);
+
+// Sync lat/lng ref → vee-validate field
+watch(lat, (val) => {
+  setFieldValue("latitude", val ?? null);
+  if (val !== null) setFieldError("latitude", undefined);
+});
+watch(lng, (val) => {
+  setFieldValue("longitude", val ?? null);
+  if (val !== null) setFieldError("longitude", undefined);
+});
 
 // =========================
 // COMPUTED
@@ -164,12 +184,18 @@ async function prefillFromApi() {
 
     lat.value = address.latitude ?? null;
     lng.value = address.longitude ?? null;
+    setFieldValue("latitude", lat.value);
+    setFieldValue("longitude", lng.value);
   } finally {
     prefilling.value = false;
   }
 }
 
 async function handleSave(formValues) {
+  if (lat.value === null || lng.value === null) {
+    toast.error("Tentukan lokasi Anda di peta terlebih dahulu.");
+    return;
+  }
   saving.value = true;
   try {
     await upsertMyAddress({
@@ -363,6 +389,7 @@ onMounted(async () => {
           <div>
             <label class="block mb-2 text-sm font-semibold text-gray-700">
               Lokasi di Peta
+              <span class="text-red-500">*</span>
             </label>
             <MapPicker
               v-model:lat="lat"
@@ -370,6 +397,13 @@ onMounted(async () => {
               height="320px"
               variant="user"
             />
+            <p
+              v-if="errors.latitude || errors.longitude"
+              class="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-500"
+            >
+              <i class="pi pi-exclamation-circle"></i>
+              Tentukan lokasi Anda di peta.
+            </p>
           </div>
 
           <div class="flex gap-4">

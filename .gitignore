@@ -17,6 +17,10 @@ dist
 dist-ssr
 dev-dist/
 
+# Local Docker setup
+/.dockerignore
+/Dockerfile.frontend
+
 # Local overrides
 *.local
 
@@ -34,3 +38,6 @@ Thumbs.db
 
 # Ignore specific file
 dev-dist/sw.js
+# PNPM Store
+.pnpm-store
+.pnpm-store/

@@ -116,7 +116,7 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { Form } from "vee-validate";
 import * as yup from "yup";
@@ -130,6 +130,7 @@ import ErrorAlert from "@/components/forms/ErrorAlert.vue";
 import AppButton from "@/components/common/Button.vue";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const isLoading = ref(false);
@@ -172,20 +173,28 @@ const handleLogin = async (values) => {
     }
 
     if (userRoles.includes("umkm-owner") || userRoles.includes("customer")) {
+      const redirectPath = route.query.redirect || "/";
       if (isDev) {
-        console.log("Redirecting to /");
+        console.log("Redirecting to", redirectPath);
       }
-      await router.replace("/");
+      await router.replace(redirectPath);
     } else {
+      const redirectPath = route.query.redirect || "/admin/dashboard";
       if (isDev) {
-        console.log("Redirecting to /dashboard (default)");
+        console.log("Redirecting to", redirectPath);
       }
-      await router.replace("/admin/dashboard");
+      await router.replace(redirectPath);
     }
   } catch (error) {
     if (isDev) {
       console.error("Login error:", error);
     }
+    
+    if (error.response?.data?.need_verify) {
+      router.push({ path: "/verify-email", query: { email: values.email } });
+      return;
+    }
+
     errorMessage.value =
       error.response?.data?.message || "Login gagal. Silakan coba lagi.";
   } finally {

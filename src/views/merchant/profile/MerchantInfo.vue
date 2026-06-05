@@ -205,6 +205,10 @@ onMounted(async () => {
         typeof data?.banner_url === "string" && data.banner_url.trim()
           ? data.banner_url
           : "",
+      NPWP: data.NPWP || "",
+      bank_code: data.bank_code || "",
+      bank_account_number: data.bank_account_number || "",
+      bank_account_name: data.bank_account_name || "",
     };
 
     const hours = data.operational_hours ?? {};
@@ -523,23 +527,93 @@ const goToEdit = () => {
             <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
               Jam Operasional
             </h3>
+
             <div
-              class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4"
+              class="w-full overflow-hidden bg-white border border-gray-100 rounded-xl"
             >
               <div
-                v-for="day in operationalHours"
-                :key="day.name"
-                class="flex items-center justify-between p-3 bg-gray-50 rounded-xl sm:p-4"
+                class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 lg:grid-cols-3 sm:divide-y-0 sm:divide-x"
               >
-                <span
-                  class="px-4 py-2 bg-merchant-primary text-white rounded-full text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[110px] text-center"
+                <template v-for="day in operationalHours" :key="day.name">
+                  <div class="flex items-center justify-between p-3 sm:p-4">
+                    <div class="flex items-center gap-3">
+                      <span
+                        class="inline-block text-sm font-medium w-28 text-merchant-primary"
+                      >
+                        {{ day.name }}
+                      </span>
+                    </div>
+
+                    <div class="ml-4">
+                      <span
+                        v-if="day.hours === 'Tutup'"
+                        class="inline-block px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-full"
+                      >
+                        Tutup
+                      </span>
+
+                      <span
+                        v-else
+                        class="inline-block px-3 py-1 text-xs font-semibold rounded-full text-merchant-primary bg-merchant-primary/10"
+                      >
+                        {{ day.hours.replace(/\[|\]/g, "") }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Informasi Pajak & Bank -->
+          <div class="pt-4">
+            <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
+              Informasi Pajak & Bank
+            </h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >NPWP</label
                 >
-                  {{ day.name }}
-                </span>
-                <span
-                  class="ml-3 text-sm font-medium text-gray-700 sm:text-base"
-                  >{{ day.hours }}</span
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
                 >
+                  {{ merchantInfo.NPWP || "-" }}
+                </div>
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nama Bank</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_code || "-" }}
+                </div>
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nomor Rekening</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_account_number || "-" }}
+                </div>
+              </div>
+              <div>
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >Nama Pemilik Rekening</label
+                >
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
+                >
+                  {{ merchantInfo.bank_account_name || "-" }}
+                </div>
               </div>
             </div>
           </div>

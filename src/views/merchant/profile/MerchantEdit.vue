@@ -1,23 +1,14 @@
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="
-          router.push(
-            merchantSlug
-              ? `/merchant-center/${merchantSlug}/profile`
-              : '/merchant-profile',
-          )
-        "
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="text-xl pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Edit Informasi UMKM</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Edit Informasi Toko"
+      :backRoute="
+        merchantSlug
+          ? `/merchant-center/${merchantSlug}/profile`
+          : '/merchant-profile'
+      "
+    />
 
     <!-- Desktop Header with Breadcrumb -->
     <div class="hidden py-6 sm:block bg-gray-50">
@@ -281,47 +272,87 @@
 
           <!-- Nama UMKM -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Nama UMKM
-            </label>
-            <input
+            <TextField
+              name="form.name"
               v-model="form.name"
-              type="text"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              label="Nama UMKM"
               placeholder="Masukkan nama toko"
+              variant="merchant"
             />
           </div>
 
           <!-- Kontak -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Kontak
-            </label>
-            <input
+            <TextField
+              name="form.contact"
               v-model="form.contact"
               type="tel"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              label="Kontak"
               placeholder="Masukkan nomor kontak"
+              variant="merchant"
             />
           </div>
 
           <!-- Tentang -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Tentang
-            </label>
-            <textarea
+            <TextField
+              name="form.description"
               v-model="form.description"
-              rows="4"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              :textarea="true"
+              :rows="4"
+              label="Tentang"
               placeholder="Ceritakan tentang toko Anda..."
-            ></textarea>
+              variant="merchant"
+            />
+          </div>
+
+          <!-- Informasi Pajak & Bank -->
+          <div class="pt-2">
+            <p
+              class="mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+            >
+              Informasi Pajak &amp; Bank
+            </p>
+            <div class="space-y-4">
+              <div>
+                <TextField
+                  name="form.NPWP"
+                  v-model="form.NPWP"
+                  label="NPWP"
+                  placeholder="Contoh: 12.345.678.9-012.345"
+                  variant="merchant"
+                />
+              </div>
+              <div>
+                <SelectField
+                  name="bank_code"
+                  label="Nama Bank"
+                  v-model="form.bank_code"
+                  :loading="banksLoading"
+                  :disabled="banksLoading"
+                  :options="banks.map((bank) => ({ value: bank.code, label: bank.name }))"
+                  emptyText="Data bank tidak tersedia"
+                />
+              </div>
+              <div>
+                <TextField
+                  name="form.bank_account_number"
+                  v-model="form.bank_account_number"
+                  label="Nomor Rekening"
+                  placeholder="Contoh: 1234567890"
+                  variant="merchant"
+                />
+              </div>
+              <div>
+                <TextField
+                  name="form.bank_account_name"
+                  v-model="form.bank_account_name"
+                  label="Nama Pemilik Rekening"
+                  placeholder="Sesuai buku tabungan"
+                  variant="merchant"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- Lokasi (Langsung di halaman, bukan modal) -->
@@ -390,7 +421,7 @@
               <div class="mt-3">
                 <TextField
                   name="form.address"
-                  textarea="true"
+                  :textarea="true"
                   v-model="form.address"
                   label="Alamat Lengkap"
                   placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
@@ -401,37 +432,37 @@
           </div>
 
           <!-- Jam Operasional -->
-          <div>
-            <h3 class="mb-3 text-base font-bold text-merchant-primary">
+          <div class="pt-4">
+            <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
-            <div class="space-y-2">
+            <div class="space-y-3">
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
                 class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
                 <!-- Header row -->
-                <div class="flex items-center justify-between p-3">
-                  <div class="flex items-center gap-3">
+                <div class="flex items-center justify-between p-4">
+                  <div class="flex items-center gap-4">
                     <span
-                      class="px-3 py-1.5 rounded-lg text-xs font-semibold min-w-[75px] text-center transition-colors"
+                      class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
                       :class="
                         day.isOpen
                           ? 'bg-merchant-primary text-white'
                           : 'bg-gray-200 text-gray-500'
                       "
                     >
-                      {{ day.shortName }}
+                      {{ day.name }}
                     </span>
                     <div>
                       <span
                         v-if="day.isOpen"
-                        class="text-sm font-medium text-gray-700"
+                        class="text-base font-medium text-gray-700"
                       >
-                        {{ day.open || "06:00" }} - {{ day.close || "18:00" }}
+                        {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
                       </span>
-                      <span v-else class="text-sm font-medium text-gray-400">
+                      <span v-else class="text-base font-medium text-gray-400">
                         Tutup
                       </span>
                     </div>
@@ -447,18 +478,18 @@
                       @change="onDayToggle(index)"
                     />
                     <div
-                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
+                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
                     ></div>
                   </label>
                 </div>
 
                 <!-- Inline time inputs (shown when open) -->
-                <div v-if="day.isOpen" class="px-3 pb-3">
-                  <div class="flex items-center gap-2">
+                <div v-if="day.isOpen" class="px-4 pb-4">
+                  <div class="flex items-center gap-3">
                     <div class="flex-1">
                       <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Buka</label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Buka</label
                       >
                       <input
                         type="time"
@@ -467,14 +498,14 @@
                           day.open = $event.target.value;
                           updateDayHours(index);
                         "
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
                       />
                     </div>
-                    <span class="mt-5 text-xs text-gray-400">—</span>
+                    <span class="mt-6 text-sm text-gray-400">—</span>
                     <div class="flex-1">
                       <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Tutup</label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Tutup</label
                       >
                       <input
                         type="time"
@@ -483,7 +514,7 @@
                           day.close = $event.target.value;
                           updateDayHours(index);
                         "
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -507,47 +538,87 @@
           >
             <!-- Nama UMKM -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Nama UMKM
-              </label>
-              <input
+              <TextField
+                name="form.name"
                 v-model="form.name"
-                type="text"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Nama UMKM"
                 placeholder="Masukkan nama UMKM"
+                variant="merchant"
               />
             </div>
 
             <!-- Kontak -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Kontak
-              </label>
-              <input
+              <TextField
+                name="form.contact"
                 v-model="form.contact"
                 type="tel"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Kontak"
                 placeholder="Masukkan nomor kontak"
+                variant="merchant"
               />
             </div>
 
             <!-- Tentang - Full Width -->
             <div class="md:col-span-2">
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Tentang
-              </label>
-              <textarea
+              <TextField
+                name="form.description"
                 v-model="form.description"
-                rows="4"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                :textarea="true"
+                :rows="4"
+                label="Tentang"
                 placeholder="Ceritakan tentang UMKM Anda..."
-              ></textarea>
+                variant="merchant"
+              />
+            </div>
+
+            <!-- Informasi Pajak & Bank - Full Width -->
+            <div class="md:col-span-2">
+              <p
+                class="mb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
+              >
+                Informasi Pajak &amp; Bank
+              </p>
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <TextField
+                    name="form.NPWP"
+                    v-model="form.NPWP"
+                    label="NPWP"
+                    placeholder="Contoh: 12.345.678.9-012.345"
+                    variant="merchant"
+                  />
+                </div>
+                <div>
+                  <SelectField
+                    name="bank_code"
+                    label="Nama Bank"
+                    v-model="form.bank_code"
+                    :loading="banksLoading"
+                    :disabled="banksLoading"
+                    :options="banks.map((bank) => ({ value: bank.code, label: bank.name }))"
+                    emptyText="Data bank tidak tersedia"
+                  />
+                </div>
+                <div>
+                  <TextField
+                    name="form.bank_account_number"
+                    v-model="form.bank_account_number"
+                    label="Nomor Rekening"
+                    placeholder="Contoh: 1234567890"
+                    variant="merchant"
+                  />
+                </div>
+                <div>
+                  <TextField
+                    name="form.bank_account_name"
+                    v-model="form.bank_account_name"
+                    label="Nama Pemilik Rekening"
+                    placeholder="Sesuai buku tabungan"
+                    variant="merchant"
+                  />
+                </div>
+              </div>
             </div>
 
             <!-- Lokasi - Full Width -->
@@ -627,7 +698,7 @@
                 <div class="mt-3">
                   <TextField
                     name="form.address"
-                    textarea="true"
+                    :textarea="true"
                     v-model="form.address"
                     label="Alamat Lengkap (Opsional)"
                     placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
@@ -774,6 +845,7 @@
 import { ref, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { onMounted, watch } from "vue";
 import { useMerchants } from "@/composables/useMerchants";
 import { useAuthStore } from "@/stores/auth";
@@ -783,6 +855,7 @@ import {
   getDistricts,
   getVillages,
 } from "@/services/api/location";
+import { fetchBanks } from "@/services/api/bank";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
@@ -831,6 +904,10 @@ const form = ref({
   district_id: null,
   province_id: null,
   village_id: null,
+  NPWP: "",
+  bank_code: "",
+  bank_account_number: "",
+  bank_account_name: "",
   operationalHours: [
     {
       key: "monday",
@@ -922,11 +999,25 @@ const provincesLoading = ref(false);
 const citiesLoading = ref(false);
 const districtsLoading = ref(false);
 const villagesLoading = ref(false);
+const banksLoading = ref(false);
 
 const provinces = ref([]);
 const cities = ref([]);
 const districts = ref([]);
 const villages = ref([]);
+const banks = ref([]);
+
+async function loadBanks() {
+  banksLoading.value = true;
+  try {
+    banks.value = await fetchBanks();
+  } catch (e) {
+    console.error("Gagal memuat daftar bank:", e);
+    banks.value = [];
+  } finally {
+    banksLoading.value = false;
+  }
+}
 
 watch(
   () => form.value.province_id,
@@ -1059,6 +1150,7 @@ const DAYS = [
 ];
 
 onMounted(async () => {
+  loadBanks();
   isLoading.value = true;
   await loadProvinces();
 
@@ -1096,6 +1188,11 @@ onMounted(async () => {
       await loadVillages(form.value.district_id);
     }
     form.value.village_id = data?.primary_address?.village_id ?? null;
+
+    form.value.NPWP = data?.NPWP ?? "";
+    form.value.bank_code = data?.bank_code ?? "";
+    form.value.bank_account_number = data?.bank_account_number ?? "";
+    form.value.bank_account_name = data?.bank_account_name ?? "";
 
     form.value.logo =
       typeof data?.logo_url === "string" && data.logo_url.trim()
@@ -1184,15 +1281,30 @@ const handleUploadLogo = () => {
 
 const onDayToggle = (index) => {
   const day = form.value.operationalHours[index];
-  if (day.isOpen && !day.open) {
-    day.open = "06:00";
-    day.close = "18:00";
+  if (!day) return;
+
+  if (day.isOpen) {
+    day.open = day.open || "06:00";
+    day.close = day.close || "18:00";
+    day.hours = `[${day.open} - ${day.close}]`;
+  } else {
+    day.open = null;
+    day.close = null;
+    day.hours = "Tutup";
   }
 };
 
 const updateDayHours = (index) => {
-  // No-op — time inputs directly mutate day.open / day.close via @input
-  // Kept as hook for future validation if needed
+  const day = form.value.operationalHours[index];
+  if (!day) return;
+
+  const open = day.open || "06:00";
+  const close = day.close || "18:00";
+
+  day.open = open;
+  day.close = close;
+  day.isOpen = true;
+  day.hours = `[${open} - ${close}]`;
 };
 
 const buildOperationalHoursPayload = () => {
@@ -1231,6 +1343,12 @@ const handleSave = async () => {
     fd.append("name", form.value.name || "");
     fd.append("phone", form.value.contact || "");
     fd.append("description", form.value.description || "");
+
+    // Tax & bank info
+    fd.append("NPWP", form.value.NPWP || "");
+    fd.append("bank_code", form.value.bank_code || "");
+    fd.append("bank_account_number", form.value.bank_account_number || "");
+    fd.append("bank_account_name", form.value.bank_account_name || "");
 
     // Address - only append if value exists (don't send empty strings for integers)
     if (form.value.province_id) {

@@ -1,7 +1,7 @@
 <template>
   <div class="bg-gray-100">
     <!-- Mobile Header -->
-    <MobileHeader title="Keranjang" @back="goBack" />
+    <MobileHeader title="Keranjang" @back="goBack" variant="primary" />
 
     <!-- Skeleton Loading -->
     <div v-if="loading" class="px-4 py-4 mx-auto space-y-4 max-w-7xl">
@@ -86,12 +86,20 @@
           class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50"
         >
           <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              :checked="isStoreSelected(store.id)"
-              @change="toggleStoreSelection(store.id)"
-              class="w-4 h-4 text-[#FFA30E] border-gray-300 rounded focus:ring-[#FFA30E]"
-            />
+            <!-- Store Checkbox -->
+            <label class="relative flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                :checked="isStoreSelected(store.id)"
+                @change="toggleStoreSelection(store.id)"
+                class="sr-only peer"
+              />
+              <div
+                class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md peer-checked:bg-primary peer-checked:border-primary"
+              >
+                <i class="text-[10px] text-white pi pi-check"></i>
+              </div>
+            </label>
             <div class="flex items-center gap-2">
               <div
                 class="w-6 h-6 rounded-full bg-[#FFA30E] flex items-center justify-center"
@@ -138,19 +146,29 @@
             :class="item.isUnavailable ? 'opacity-60 ' : ''"
           >
             <!-- Checkbox -->
-            <input
-              type="checkbox"
-              :checked="isItemSelected(item.id)"
-              @change="toggleItemSelection(item.id, store.id)"
-              class="mt-1 w-4 h-4 text-[#FFA30E] border-gray-300 rounded focus:ring-[#FFA30E]"
-              :class="{
-                'cursor-not-allowed':
-                  item.isUnavailable ||
-                  item.isOverStock ||
-                  hasConfigurationIssue(item),
-              }"
-              :disabled="item.isUnavailable || item.isOverStock"
-            />
+            <label
+              class="relative flex items-center mt-1 shrink-0"
+              :class="
+                item.isUnavailable ||
+                item.isOverStock ||
+                hasConfigurationIssue(item)
+                  ? 'cursor-not-allowed'
+                  : 'cursor-pointer'
+              "
+            >
+              <input
+                type="checkbox"
+                :checked="isItemSelected(item.id)"
+                @change="toggleItemSelection(item.id, store.id)"
+                class="sr-only peer"
+                :disabled="item.isUnavailable || item.isOverStock"
+              />
+              <div
+                class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md peer-checked:bg-primary peer-checked:border-primary peer-disabled:opacity-40"
+              >
+                <i class="text-[10px] text-white pi pi-check"></i>
+              </div>
+            </label>
 
             <!-- Product Image -->
             <div
@@ -473,13 +491,25 @@
                     : 'border-gray-200'
                 "
               >
-                <input
-                  type="radio"
-                  :name="`addon-group-${group.id}`"
-                  :checked="isAddonSelected(addon)"
-                  @change="selectSingleAddon(addon, group)"
-                  class="w-4 h-4 text-[#FFA30E]"
-                />
+                <span class="relative flex items-center shrink-0">
+                  <input
+                    type="radio"
+                    :name="`addon-group-${group.id}`"
+                    :checked="isAddonSelected(addon)"
+                    @change="selectSingleAddon(addon, group)"
+                    class="sr-only peer"
+                  />
+                  <span
+                    class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-full peer-checked:border-primary"
+                  >
+                    <span
+                      class="w-2.5 h-2.5 rounded-full transition-all bg-transparent peer-checked:bg-primary"
+                      :class="
+                        isAddonSelected(addon) ? 'bg-primary' : 'bg-transparent'
+                      "
+                    ></span>
+                  </span>
+                </span>
 
                 <span class="flex-1">{{ addon.name }}</span>
                 <span class="font-semibold">
@@ -500,12 +530,27 @@
                     : 'border-gray-200'
                 "
               >
-                <input
-                  type="checkbox"
-                  :checked="isAddonSelected(addon)"
-                  @change="toggleAddon(addon, group)"
-                  class="w-4 h-4 text-[#FFA30E]"
-                />
+                <span class="relative flex items-center shrink-0">
+                  <input
+                    type="checkbox"
+                    :checked="isAddonSelected(addon)"
+                    @change="toggleAddon(addon, group)"
+                    class="sr-only peer"
+                  />
+                  <span
+                    class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md"
+                    :class="
+                      isAddonSelected(addon) ? 'bg-primary border-primary' : ''
+                    "
+                  >
+                    <i
+                      class="text-[10px] text-white pi pi-check transition-opacity"
+                      :class="
+                        isAddonSelected(addon) ? 'opacity-100' : 'opacity-0'
+                      "
+                    ></i>
+                  </span>
+                </span>
 
                 <span class="flex-1">{{ addon.name }}</span>
                 <span class="font-semibold">
@@ -1331,8 +1376,10 @@ const checkoutFromCart = (storeId) => {
 
   checkoutStore.setFromCart({
     store: {
-      id: store.id,
-      slug: store.slug || store.merchant_slug || store.store_slug || null,
+      id: store.merchantId ?? null,
+      merchantId: store.merchantId ?? null,
+      cartId: store.cartId ?? store.id ?? null,
+      slug: store.slug ?? null,
       name: store.name,
       address: store.address,
       phone:

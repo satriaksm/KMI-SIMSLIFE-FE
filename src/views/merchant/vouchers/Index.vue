@@ -473,6 +473,12 @@ watch(perPage, () => {
   currentPage.value = 1;
   loadVouchers();
 });
+
+// Sinkronkan selectAll dengan realita seleksi (desktop ↔ mobile)
+watch(selectedVouchers, (newVal) => {
+  selectAll.value =
+    vouchers.value.length > 0 && newVal.length === vouchers.value.length;
+});
 onBeforeRouteLeave(() => {
   selectedVouchers.value = [];
   selectAll.value = false;
@@ -506,16 +512,16 @@ onBeforeRouteLeave(() => {
         @click="goToCreate"
         variant="merchant"
         size="sm"
-        customClass="!hidden sm:!inline"
+        customClass="!hidden md:!inline"
       >
         <i class="pi pi-plus"></i>
-        <span class="hidden ml-2 sm:inline">Tambah Voucher</span>
+        <span class="hidden ml-2 md:inline">Tambah Voucher</span>
       </Button>
       <Button
         @click="goToCreate"
         variant="merchant"
         size="md"
-        customClass="sm:!hidden"
+        customClass="md:!hidden"
       >
         <i class="pi pi-plus"></i>
       </Button>

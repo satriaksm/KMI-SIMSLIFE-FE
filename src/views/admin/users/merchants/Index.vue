@@ -357,8 +357,8 @@ onMounted(() => {
 <template>
   <div class="p-4 sm:p-6">
     <!-- Search & Toolbar -->
-    <div class="space-y-2 sm:space-y-4 mb-4 bg-white">
-      <div class="sm:flex sm:items-center sm:gap-4 pb-1">
+    <div class="mb-4 space-y-2 bg-white sm:space-y-4">
+      <div class="pb-1 sm:flex sm:items-center sm:gap-4">
         <div class="flex-1 mb-2 sm:mb-0">
           <TextField
             name="search"
@@ -380,7 +380,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -403,7 +403,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -458,7 +458,7 @@ onMounted(() => {
 
         <template #cell-owner="{ item }">
           <div>
-            <p class="font-medium text-sm">{{ item.user?.name || "-" }}</p>
+            <p class="text-sm font-medium">{{ item.user?.name || "-" }}</p>
             <p class="text-xs text-gray-500">{{ item.user?.email || "-" }}</p>
           </div>
         </template>
@@ -534,14 +534,14 @@ onMounted(() => {
     <!-- Mobile List -->
     <div class="sm:hidden">
       <div v-if="loading" class="flex justify-center py-12">
-        <i class="pi pi-spin pi-spinner text-4xl text-merchant-primary"></i>
+        <i class="text-4xl pi pi-spin pi-spinner text-merchant-primary"></i>
       </div>
 
       <div
         v-else-if="!merchants || merchants.length === 0"
-        class="text-center py-12"
+        class="py-12 text-center"
       >
-        <i class="pi pi-building text-6xl text-gray-300 mb-4"></i>
+        <i class="mb-4 text-6xl text-gray-300 pi pi-building"></i>
         <p class="text-gray-500">Tidak ada merchant</p>
       </div>
 
@@ -550,7 +550,7 @@ onMounted(() => {
           v-for="m in merchants"
           :key="m.id"
           @click="goToDetail(m)"
-          class="bg-white rounded-lg shadow-sm p-4 active:bg-gray-50 transition"
+          class="p-4 transition bg-white rounded-lg shadow-sm active:bg-gray-50"
         >
           <div class="flex items-start gap-3 mb-3">
             <div
@@ -591,7 +591,7 @@ onMounted(() => {
             <StatusLabel :status="m.status" variant="merchant" size="sm" />
           </div>
 
-          <div class="flex items-center justify-between text-xs border-t pt-2">
+          <div class="flex items-center justify-between pt-2 text-xs border-t">
             <StatusLabel
               :status="
                 m.segmentation?.code ||
@@ -602,7 +602,7 @@ onMounted(() => {
               size="sm"
             />
             <span class="text-gray-600">
-              <i class="pi pi-box mr-1"></i>
+              <i class="mr-1 pi pi-box"></i>
               {{ m.products_count || 0 }} Produk
             </span>
           </div>
@@ -610,7 +610,7 @@ onMounted(() => {
           <!-- ✅ NEW: Mobile action buttons for pending -->
           <div
             v-if="m.status === 'pending'"
-            class="flex gap-2 mt-3 pt-3 border-t"
+            class="flex gap-2 pt-3 mt-3 border-t"
             @click.stop
           >
             <Button
@@ -619,7 +619,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-green-500 !text-green-600"
             >
-              <i class="pi pi-check mr-1"></i>
+              <i class="mr-1 pi pi-check"></i>
               Approve
             </Button>
             <Button
@@ -628,7 +628,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-red-500 !text-red-600"
             >
-              <i class="pi pi-times mr-1"></i>
+              <i class="mr-1 pi pi-times"></i>
               Reject
             </Button>
           </div>
@@ -672,7 +672,7 @@ onMounted(() => {
       </div>
 
       <template #footer>
-        <div class="flex gap-3 justify-end">
+        <div class="flex justify-end gap-3">
           <Button @click="resetFilters" variant="secondary">Reset</Button>
           <Button @click="applyFilters" variant="merchant">Terapkan</Button>
         </div>
@@ -687,7 +687,7 @@ onMounted(() => {
       subtitle="Unduh laporan data merchants dalam format PDF"
     >
       <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="p-4 border border-blue-200 rounded-lg bg-blue-50">
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
@@ -709,10 +709,10 @@ onMounted(() => {
           @click="exportPDF"
           variant="merchant"
           size="lg"
-          custom-class="w-full justify-center"
+          custom-class="justify-center w-full"
           :loading="exportLoading"
         >
-          <i class="pi pi-download mr-2"></i>
+          <i class="mr-2 pi pi-download"></i>
           <span>Download Laporan PDF</span>
         </Button>
       </div>
@@ -725,9 +725,9 @@ onMounted(() => {
       title="Approve Merchant"
       subtitle="Apakah Anda yakin ingin meng-approve merchant ini?"
     >
-      <div class="text-center py-4">
-        <i class="pi pi-check-circle text-green-500 text-4xl mb-4"></i>
-        <p class="text-gray-800 font-semibold mb-2">
+      <div class="py-4 text-center">
+        <i class="mb-4 text-4xl text-green-500 pi pi-check-circle"></i>
+        <p class="mb-2 font-semibold text-gray-800">
           Merchant "{{ selectedMerchant?.name }}" akan di-approve
         </p>
         <p class="text-sm text-gray-500">
@@ -768,7 +768,7 @@ onMounted(() => {
       <div class="space-y-4">
         <textarea
           v-model="rejectionReason"
-          class="w-full p-3 border rounded-md focus:ring-1 focus:ring-primary focus:outline-none resize-none"
+          class="w-full p-3 border rounded-md resize-none focus:ring-1 focus:ring-primary focus:outline-none"
           rows="3"
           placeholder="Masukkan alasan penolakan di sini..."
         ></textarea>

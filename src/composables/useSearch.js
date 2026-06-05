@@ -26,20 +26,20 @@ export function useSearch() {
     try {
       const data = await searchProducts(params);
       if (append) {
-        products.value.push(...(data.data ?? []));
+        products.value.push(...(data.data.products ?? []));
       } else {
-        products.value = data.data ?? [];
+        products.value = data.data.products ?? [];
       }
-      productsMeta.value = data.meta ?? {};
+      productsMeta.value = data.meta.products_meta ?? {};
 
       // Also hydrate jasa results if present (nested under meta by ApiResponse)
       const meta = data.meta ?? {};
       if (append) {
-        jasas.value.push(...(meta.jasas ?? []));
+        jasas.value.push(...(data.data.jasas ?? []));
       } else {
-        jasas.value = meta.jasas ?? [];
+        jasas.value = data.data.jasas ?? [];
       }
-      jasasMeta.value = meta.jasas_meta ?? {};
+      jasasMeta.value = data.meta.jasas_meta ?? {};
     } catch (err) {
       if (isDev) {
         console.error("Error fetching products:", err);

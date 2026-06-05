@@ -5,6 +5,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth"; // ✅ ADD: Import auth store
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
@@ -352,6 +353,14 @@ watch(formMinPurchase, (newVal) => {
 const canAddSubCategory = computed(
   () => selectedSubCategories.value.length < 4,
 );
+
+const getAvailableSubCategories = (currentIndex) => {
+  return categoriesLevel2.value.filter(cat => {
+    return !selectedSubCategories.value.some((selectedVal, idx) => {
+      return idx !== currentIndex && selectedVal === cat.value;
+    });
+  });
+};
 const canAddAddOnGroup = computed(
   () => addOnGroups.value.length < maxAddOnGroups,
 );
@@ -735,21 +744,13 @@ const onSubmit = veeHandleSubmit(
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <!-- ✅ FIXED: Back button dengan dynamic route -->
-      <button
-        @click="router.push(`/merchant-center/${currentMerchantSlug}/products`)"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Tambah Produk</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Tambah Produk"
+      :backRoute="`/merchant-center/${currentMerchantSlug}/products`"
+    />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block bg-gray-50">
       <div
         class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
       >
@@ -1026,20 +1027,15 @@ const onSubmit = veeHandleSubmit(
                   :key="index"
                   class="flex items-center gap-2"
                 >
-                  <select
-                    v-model="selectedSubCategories[index]"
-                    class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
-                  >
-                    <option value="" disabled>Pilih sub kategori</option>
-                    <option
-                      v-for="cat in categoriesLevel2"
-                      :key="cat.value"
-                      :value="cat.value"
-                      :disabled="selectedSubCategories.includes(cat.value)"
-                    >
-                      {{ cat.label }}
-                    </option>
-                  </select>
+                  <div class="flex-1">
+                    <SelectField
+                      :name="`sub_category_${index}`"
+                      :options="getAvailableSubCategories(index)"
+                      v-model="selectedSubCategories[index]"
+                      placeholder="Pilih sub kategori"
+                      variant="merchant"
+                    />
+                  </div>
                   <button
                     @click="selectedSubCategories.splice(index, 1)"
                     type="button"

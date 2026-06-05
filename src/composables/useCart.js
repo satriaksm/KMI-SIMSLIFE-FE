@@ -90,6 +90,8 @@ export function useCart() {
 
       cartStores.value = (data.data || []).map((cart) => ({
         id: cart.cart_id,
+        cartId: cart.cart_id,
+        merchantId: cart.merchant?.id ?? null,
         name: cart.merchant.name,
         slug: cart.merchant.slug,
         phone: cart.merchant.phone,

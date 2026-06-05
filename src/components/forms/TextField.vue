@@ -43,6 +43,13 @@ const toDigits = (value) => {
   return String(value).replace(/\D/g, "");
 };
 
+const getModelDigits = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const numValue = Math.trunc(Number(value));
+  if (Number.isNaN(numValue)) return "";
+  return String(numValue).replace(/\D/g, "");
+};
+
 const normalizeDigits = (digits) => {
   // Prevent leading zeros: "02000" -> "2000", but keep single "0"
   if (!digits) return "";
@@ -50,7 +57,7 @@ const normalizeDigits = (digits) => {
 };
 
 const formatThousandsDot = (value) => {
-  const digits = normalizeDigits(toDigits(value));
+  const digits = normalizeDigits(getModelDigits(value));
   if (!digits) return "";
 
   // Add dot thousand separators: 10000 -> 10.000
@@ -138,7 +145,7 @@ const setFieldFromDigits = (digits, field) => {
 
 const handleNumberFocus = (field) => {
   isNumberEditing.value = true;
-  numberDisplay.value = normalizeDigits(toDigits(field.value));
+  numberDisplay.value = normalizeDigits(getModelDigits(field.value));
 };
 
 const handleNumberBlur = (field) => {

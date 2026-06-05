@@ -107,11 +107,16 @@ const menuItems = computed(() => {
       icon: "pi-chart-bar",
       route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
     },
-    // {
-    //   label: "Pesanan",
-    //   icon: "pi-shopping-bag",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    // },
+    {
+      label: "Pesanan",
+      icon: "pi-shopping-bag",
+      route: `/merchant-center/${currentMerchantSlug.value}/orders`,
+    },
+    {
+      label: "Laporan",
+      icon: "pi-file",
+      route: `/merchant-center/${currentMerchantSlug.value}/reports`,
+    },
 
     productOrServiceItem,
     // {
@@ -520,7 +525,7 @@ defineExpose({
     <!-- Main Content Area -->
     <div
       :class="[
-        'flex-1 w-full min-h-screen overflow-x-hidden transition-all duration-300',
+        'flex-1 min-w-0 min-h-screen transition-all duration-300',
         !isOpen ? 'sm:ml-16' : 'sm:ml-64',
       ]"
     >

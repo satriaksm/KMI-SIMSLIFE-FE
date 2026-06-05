@@ -4,6 +4,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth"; // ✅ ADD: Import auth store
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
@@ -80,7 +81,10 @@ const breadcrumbItems = computed(() => [
 // ============================================================
 const schema = yup.object({
   voucher_name: yup.string().required("Nama voucher wajib diisi"),
-  voucher_code: yup.string().required("Kode voucher wajib diisi"),
+  voucher_code: yup
+    .string()
+    .required("Kode voucher wajib diisi")
+    .matches(/^\S+$/, "Kode voucher tidak boleh mengandung spasi"),
   voucher_description: yup.string().required("Deskripsi wajib diisi"),
   voucher_type: yup.string().required(),
   value: yup.number().required().min(1),
@@ -265,21 +269,13 @@ const onSubmit = veeHandleSubmit(async () => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <!-- ✅ FIXED: Back button dengan dynamic route -->
-      <button
-        @click="router.push(`/merchant-center/${currentMerchantSlug}/vouchers`)"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Edit Voucher</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Edit Voucher"
+      :backRoute="`/merchant-center/${currentMerchantSlug}/vouchers`"
+    />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 bg-gray-50 sm:block">
       <div
         class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-8 gap-y-2 gap-x-4"
       >
@@ -354,7 +350,7 @@ const onSubmit = veeHandleSubmit(async () => {
           </div>
         </div>
       </div>
-      <Form @submit="onSubmit">
+      <form @submit.prevent="onSubmit">
         <!-- Info Dasar -->
         <div
           class="p-4 mb-2 space-y-3 bg-white sm:mb-4 sm:p-6 sm:rounded-xl sm:shadow-sm"
@@ -521,7 +517,7 @@ const onSubmit = veeHandleSubmit(async () => {
             {{ loading ? "Menyimpan..." : "Simpan Perubahan" }}
           </Button>
         </div>
-      </Form>
+      </form>
     </div>
   </div>
 </template>

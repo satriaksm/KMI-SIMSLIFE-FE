@@ -36,7 +36,7 @@ export function useMerchants() {
       return merchants.value;
     } catch (error) {
       console.error("[useMerchants] Fetch failed:", error);
-      toast.error("Gagal memuat data merchant");
+      toast.error("Gagal memuat data UMKM");
       merchants.value = [];
     } finally {
       loading.value = false;
@@ -51,7 +51,7 @@ export function useMerchants() {
       return response.data.data;
     } catch (error) {
       console.error("[useMerchants] Detail fetch failed:", error);
-      toast.error("Gagal memuat detail merchant");
+      toast.error("Gagal memuat detail UMKM");
       throw error;
     } finally {
       loading.value = false;
@@ -63,10 +63,10 @@ export function useMerchants() {
     loading.value = true;
     try {
       await api.patch(`/api/admin/merchants/${id}/approve`);
-      toast.success("Merchant berhasil di-approve!");
+      toast.success("UMKM berhasil di-approve!");
     } catch (error) {
       console.error("[useMerchants] Approve failed:", error);
-      toast.error(error.response?.data?.message || "Gagal approve merchant");
+      toast.error(error.response?.data?.message || "Gagal approve UMKM");
       throw error;
     } finally {
       loading.value = false;
@@ -80,10 +80,10 @@ export function useMerchants() {
       await api.patch(`/api/admin/merchants/${id}/reject`, {
         rejection_reason: reason,
       });
-      toast.success("Merchant berhasil ditolak!");
+      toast.success("UMKM berhasil ditolak!");
     } catch (error) {
       console.error("[useMerchants] Reject failed:", error);
-      toast.error(error.response?.data?.message || "Gagal reject merchant");
+      toast.error(error.response?.data?.message || "Gagal reject UMKM");
       throw error;
     } finally {
       loading.value = false;
@@ -109,7 +109,7 @@ export function useMerchants() {
       if (isDev) {
         console.error("[useMerchants] Owner fetch failed:", error);
       }
-      toast.error("Gagal memuat data merchant");
+      toast.error("Gagal memuat data UMKM");
       merchant.value = null;
       throw error;
     } finally {
@@ -128,14 +128,14 @@ export function useMerchants() {
         String(merchantSlug),
         payload,
       );
-      toast.success("Profil merchant berhasil diperbarui!");
+      toast.success("Profil UMKM berhasil diperbarui!");
       merchant.value = data.data ?? merchant.value;
       return merchant.value;
     } catch (error) {
       if (isDev) {
         console.error("[useMerchants] Owner update failed:", error);
       }
-      toast.error("Gagal memperbarui profil merchant");
+      toast.error("Gagal memperbarui profil UMKM");
       throw error;
     } finally {
       loading.value = false;
@@ -156,7 +156,7 @@ export function useMerchants() {
       if (isDev) {
         console.error("[useMerchants] Owner delete failed:", error);
       }
-      toast.error("Gagal menghapus merchant");
+      toast.error("Gagal menghapus UMKM");
       throw error;
     } finally {
       loading.value = false;
@@ -176,7 +176,7 @@ export function useMerchants() {
       if (isDev) {
         console.error("[useMerchants] Public fetch failed:", error);
       }
-      toast.error("Gagal memuat data merchant publik");
+      toast.error("Gagal memuat data UMKM publik");
       merchants.value = [];
     } finally {
       loading.value = false;

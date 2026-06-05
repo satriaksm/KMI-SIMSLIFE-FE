@@ -6,6 +6,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue"; // ✅ ADD
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
@@ -382,20 +383,10 @@ onMounted(() => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white shadow-lg sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="router.back()"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Detail Produk</h1>
-    </div>
+    <MerchantMobileHeader title="Detail Produk" />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
       <div
         class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 lg:px-8 gap-y-2 gap-x-4"
       >

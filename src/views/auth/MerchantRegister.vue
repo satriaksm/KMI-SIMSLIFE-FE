@@ -61,6 +61,7 @@
               placeholder="Masukkan nama usaha"
               autocomplete="organization"
               class="sm:col-span-2"
+              required
             />
 
             <!-- Phone Number -->
@@ -70,6 +71,7 @@
               placeholder="Contoh: 081234567890"
               autocomplete="tel"
               class="sm:col-span-2"
+              required
             />
 
             <!-- Jenis Usaha (dari API /segmentations) -->
@@ -84,7 +86,23 @@
                 segmentations.map((s) => ({ value: s.id, label: s.name }))
               "
               class="sm:col-span-2"
+              required
             />
+
+            <TextField
+              name="NPWP"
+              label="NPWP (Opsional)"
+              placeholder="Contoh: 12.345.678.9-012.345"
+              class="sm:col-span-2"
+            />
+
+            <div class="sm:col-span-2">
+              <p
+                class="mt-3 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+              >
+                Alamat Usaha
+              </p>
+            </div>
 
             <!-- Wilayah (nested di address.*) -->
             <SelectField
@@ -94,7 +112,7 @@
               v-model="provinceId"
               :loading="provincesLoading"
               :options="provinces.map((p) => ({ value: p.id, label: p.name }))"
-              autocomplete="address-level1"
+              required
             />
 
             <SelectField
@@ -105,7 +123,7 @@
               :loading="citiesLoading"
               :disabled="!provinceId"
               :options="cities.map((r) => ({ value: r.id, label: r.name }))"
-              autocomplete="address-level2"
+              required
             />
 
             <SelectField
@@ -116,7 +134,7 @@
               :loading="districtsLoading"
               :disabled="!cityId"
               :options="districts.map((d) => ({ value: d.id, label: d.name }))"
-              autocomplete="address-level3"
+              required
             />
 
             <SelectField
@@ -127,7 +145,7 @@
               :loading="villagesLoading"
               :disabled="!districtId"
               :options="villages.map((v) => ({ value: v.id, label: v.name }))"
-              autocomplete="address-level4"
+              required
             />
 
             <!-- Pemetaan Lokasi -->
@@ -137,23 +155,32 @@
                 v-model:lng="longitude"
                 :zoom="15"
               />
-            </div>
 
-            <!-- Koordinat (nested di address.*) -->
-            <!-- <TextField
-              name="address.latitude"
-              label="Latitude"
-              v-model="latitude"
-              :readonly="true"
-              placeholder="-6.200000"
-            />
-            <TextField
-              name="address.longitude"
-              label="Longitude"
-              v-model="longitude"
-              :readonly="true"
-              placeholder="106.816666"
-            /> -->
+              <!-- Bind map coords into vee-validate values (required by schema) -->
+              <Field
+                name="address.latitude"
+                :modelValue="latitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="latitude ?? ''" />
+              </Field>
+              <Field
+                name="address.longitude"
+                :modelValue="longitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="longitude ?? ''" />
+              </Field>
+
+              <ErrorMessage
+                name="address.latitude"
+                class="mt-1 text-xs text-danger-foreground"
+              />
+              <ErrorMessage
+                name="address.longitude"
+                class="text-xs text-danger-foreground"
+              />
+            </div>
 
             <!-- Detail alamat (nested di address.detail) -->
             <TextField
@@ -161,6 +188,41 @@
               label="Alamat Lengkap"
               placeholder="Nama jalan, RT/RW, patokan, dsb (opsional)"
               autocomplete="address-line1"
+              class="sm:col-span-2"
+            />
+
+            <!-- Bank -->
+            <div class="sm:col-span-2">
+              <p
+                class="mt-3 text-xs font-semibold tracking-wide text-gray-500 uppercase"
+              >
+                Bank
+              </p>
+            </div>
+
+            <SelectField
+              name="bank_code"
+              label="Nama Bank"
+              v-model="bankCode"
+              placeholder="Pilih Nama Bank"
+              :loading="banksLoading"
+              :disabled="banksLoading"
+              :options="
+                banks.map((bank) => ({ value: bank.code, label: bank.name }))
+              "
+              emptyText="Data bank tidak tersedia"
+            />
+
+            <TextField
+              name="bank_account_number"
+              label="Nomor Rekening"
+              placeholder="Contoh: 1234567890"
+            />
+
+            <TextField
+              name="bank_account_name"
+              label="Nama Pemilik Rekening"
+              placeholder="Sesuai buku tabungan"
               class="sm:col-span-2"
             />
 
@@ -197,9 +259,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Form } from "vee-validate";
+import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
 import {
   getProvinces,
@@ -207,6 +269,7 @@ import {
   getDistricts,
   getVillages,
 } from "@/services/api/location";
+import { fetchBanks } from "@/services/api/bank";
 import { getSegmentations } from "@/services/api/segmentation";
 import { registerMerchant } from "@/services/api/merchant";
 import TextField from "@/components/forms/TextField.vue";
@@ -230,6 +293,8 @@ const longitude = ref(null);
 // Segmentation (Select dari API)
 const segmentations = ref([]);
 const segmentationId = ref("");
+const banks = ref([]);
+const bankCode = ref("");
 
 // Validation Schema (pakai objek address)
 const schema = yup.object({
@@ -243,6 +308,10 @@ const schema = yup.object({
     .typeError("Jenis usaha wajib dipilih")
     .required("Jenis usaha wajib dipilih"),
   description: yup.string().nullable(),
+  NPWP: yup.string().nullable(),
+  bank_code: yup.string().nullable(),
+  bank_account_number: yup.string().nullable(),
+  bank_account_name: yup.string().nullable(),
   address: yup.object({
     province_id: yup
       .number()
@@ -261,6 +330,13 @@ const schema = yup.object({
       .typeError("Desa wajib dipilih")
       .required("Desa wajib dipilih"),
     detail: yup.string().nullable(),
+    latitude: yup
+      .number()
+      .typeError("Tentukan lokasi UMKM Anda di peta terlebih dahulu.")
+      .min(-90)
+      .max(90)
+      .required("Tentukan lokasi UMKM Anda di peta terlebih dahulu."),
+    longitude: yup.number().min(-180).max(180).required(""),
   }),
 });
 
@@ -277,6 +353,7 @@ const villageId = ref("");
 
 // Loading flags untuk setiap dropdown
 const segmentationsLoading = ref(false);
+const banksLoading = ref(false);
 const provincesLoading = ref(false);
 const citiesLoading = ref(false);
 const districtsLoading = ref(false);
@@ -358,6 +435,18 @@ async function loadSegmentations() {
   }
 }
 
+async function loadBanks() {
+  banksLoading.value = true;
+  try {
+    banks.value = await fetchBanks();
+  } catch (e) {
+    console.error("Gagal memuat daftar bank:", e);
+    banks.value = [];
+  } finally {
+    banksLoading.value = false;
+  }
+}
+
 watch(provinceId, async (val) => {
   cityId.value = "";
   districtId.value = "";
@@ -383,10 +472,12 @@ watch(districtId, async (val) => {
 onMounted(() => {
   loadProvinces();
   loadSegmentations();
+  loadBanks();
 });
 
 // Submit pakai service
 const handleRegister = async (values) => {
+  console.log("Submitting merchant registration with values:", values);
   isLoading.value = true;
   errorMessage.value = "";
 
@@ -420,6 +511,10 @@ const handleRegister = async (values) => {
       name: values.name,
       phone: values.phone,
       description: values.description,
+      NPWP: values.NPWP || null,
+      bank_code: values.bank_code || null,
+      bank_account_number: values.bank_account_number || null,
+      bank_account_name: values.bank_account_name || null,
       segmentation_id: Number(values.segmentation_id),
       address: {
         province_id: Number(values.address.province_id),

@@ -1,5 +1,52 @@
 <template>
   <div class="min-h-screen">
+    <!-- Mobile Sticky Search -->
+    <transition
+      enter-active-class="transition-all ease-out duration-250"
+      enter-from-class="-translate-y-full opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-full opacity-0"
+    >
+      <div
+        class="sticky top-0 z-50 bg-white border-b border-gray-200 sm:hidden"
+      >
+        <div
+          v-if="showMobileStickySearch"
+          class="flex items-center gap-2 px-3 py-3"
+          @focusin="stickySearchFocused = true"
+          @focusout="stickySearchFocused = false"
+        >
+          <!-- SEARCH INPUT -->
+          <form @submit.prevent="submitMobileSearch" class="flex-1">
+            <div class="relative">
+              <TextField
+                :modelValue="mobileSearchQuery"
+                @update:modelValue="(v) => (mobileSearchQuery = v)"
+                name="mobileSearch"
+                placeholder="Cari produk atau UMKM…"
+                variant="primary"
+              />
+            </div>
+          </form>
+          <button
+            v-if="!isAdmin"
+            @click="goToCart"
+            class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
+          >
+            <i class="text-lg pi pi-shopping-cart"></i>
+
+            <span
+              v-if="cartCount > 0"
+              class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+            >
+              {{ cartCount > 9 ? "9+" : cartCount }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </transition>
     <!-- HERO (banner + search bar) - disamakan dengan Home.vue -->
     <section id="hero" class="relative">
       <div
@@ -280,6 +327,23 @@
       </section>
     </div>
 
+    <!-- Floating Cart Button (Mobile only) -->
+    <button
+      v-if="isAuthenticated && !isAdmin && !showMobileStickySearch"
+      type="button"
+      @click="goToCart"
+      aria-label="Keranjang"
+      class="fixed z-40 flex items-center justify-center w-10 h-10 text-white transition-transform rounded-full shadow-lg sm:hidden top-3 right-3 bg-primary active:scale-95"
+    >
+      <i class="text-lg pi pi-shopping-cart" />
+      <span
+        v-if="cartCount > 0"
+        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger-foreground text-white text-[10px] font-bold flex items-center justify-center leading-none"
+      >
+        {{ cartCount > 99 ? "99+" : cartCount }}
+      </span>
+    </button>
+
     <!-- BACK TO TOP BUTTON -->
     <button
       v-show="showBackToTop"
@@ -313,8 +377,9 @@ import { useToast } from "vue-toastification";
 import { getImageUrl, getEventBannerUrl } from "@/libs/getImageUrl.js";
 import { usePublicEvents } from "@/composables/usePublicEvents";
 import { useRoute, useRouter } from "vue-router";
-import * as ProductService from "@/services/api/product";
-import { searchProducts, searchMerchants } from "@/services/api/search";
+import { useSearch } from "@/composables/useSearch";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
 
 import TextField from "@/components/forms/TextField.vue";
 import Button from "@/components/common/Button.vue";
@@ -327,6 +392,7 @@ import jasaIcon from "@/assets/icons/Jasa.svg";
 import kulinerIcon from "@/assets/icons/Kuliner.svg";
 import tokoIcon from "@/assets/icons/Toko.svg";
 import merchantIcon from "@/assets/icons/merchant.svg";
+import { data } from "autoprefixer";
 
 // =========================
 // STATE
@@ -336,9 +402,49 @@ const toast = useToast();
 const route = useRoute();
 const router = useRouter();
 
+const authStore = useAuthStore();
+const cartStore = useCartStore();
+
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isAdmin = computed(() => authStore.isAdmin);
+const cartCount = computed(() => cartStore.totalItems);
+
+// Mobile sticky search
+const mobileScrollY = ref(0);
+const mobileSearchQuery = ref("");
+const stickySearchFocused = ref(false);
+
+const showMobileStickySearch = computed(
+  () => mobileScrollY.value > 80 || stickySearchFocused.value,
+);
+
+function submitMobileSearch() {
+  const q = (mobileSearchQuery.value || "").trim();
+  if (!q) return;
+  router.push({ path: "/search", query: { q } });
+  mobileSearchQuery.value = "";
+}
+
+function goToCart() {
+  router.push("/cart");
+}
+
 // Nearest sorting needs user coordinates (reuse logic from SearchPage)
 const myLatitude = ref(null);
 const myLongitude = ref(null);
+
+const {
+  products,
+  jasas,
+  merchants,
+  productsMeta,
+  jasasMeta,
+  merchantsMeta,
+  loadingProducts,
+  loadingMerchants,
+  fetchProducts,
+  fetchMerchants,
+} = useSearch();
 
 // If user is not authenticated, /api/profile/address will 401.
 // Cache that fact so we don't keep hitting the endpoint.
@@ -349,15 +455,10 @@ let profileCoordsPromise = null;
 
 const searchInputRef = ref(null);
 const searchQuery = ref("");
-const jasaList = ref([]);
-const productList = ref([]);
-const merchantList = ref([]);
+
 const categories = ref([]);
 const loadingCategories = ref(true);
 const selectedCategoryId = ref(null);
-const loadingJasa = ref(false);
-const loadingProducts = ref(false);
-const loadingMerchants = ref(false);
 const showAllCategories = ref(false);
 
 // Infinite scroll state (mirip SearchPage.vue)
@@ -530,6 +631,7 @@ async function ensureMyCoordinates({ allowDevice } = { allowDevice: true }) {
 }
 
 function handleScroll() {
+  mobileScrollY.value = window.scrollY;
   showBackToTop.value = window.scrollY > 300;
 
   // Fallback infinite scroll (kalau IntersectionObserver tidak terpanggil)
@@ -775,44 +877,10 @@ function getJasaId(jasa) {
   return jasa?.jasa_id ?? jasa?.id;
 }
 
-// Filtered jasa list (hanya jasa yang layak tampil ke customer)
-const filteredJasaList = computed(() => {
-  // Jasa dari endpoint public search sudah semestinya "layak tampil".
-  // Jangan terlalu ketat filter client-side, karena beberapa payload tidak
-  // mengirim field `status` / `is_active` (contoh: hasil `/api/public/search`).
-  let result = (jasaList.value || []).filter((j) => {
-    const status = j?.status;
-    if (status === "draft" || status === "inactive") return false;
-    if (j?.is_active === false) return false;
-    return true;
-  });
+const filteredJasaList = computed(() => jasas.value || []);
 
-  // Filter by category
-  if (selectedCategoryId.value) {
-    result = result.filter(
-      (j) => j.jasa_category_id === selectedCategoryId.value,
-    );
-  }
-
-  return result || [];
-});
-
-const filteredProductList = computed(() => {
-  let result = productList.value || [];
-
-  // Filter by category (client-side fallback; server-side juga difetch dengan category_id)
-  if (selectedCategoryId.value) {
-    const cid = Number(selectedCategoryId.value);
-    result = result.filter((p) =>
-      Array.isArray(p?.categories)
-        ? p.categories.some((c) => Number(c?.id) === cid)
-        : false,
-    );
-  }
-
-  return result;
-});
-
+const filteredProductList = computed(() => products.value || []);
+const merchantList = computed(() => merchants.value || []);
 // Adapt jasa -> ProductCard shape (agar satu card bisa dipakai untuk jasa / product)
 const jasaToProductCard = (jasa) => {
   const fixed = Number(jasa?.fixed_price || 0);
@@ -868,9 +936,7 @@ const currentCardItems = computed(() => {
 
 const loadingItems = computed(() => {
   if (activeMode.value === "umkm") return loadingMerchants.value;
-  return activeMode.value === "jasa"
-    ? loadingJasa.value
-    : loadingProducts.value;
+  return loadingProducts.value;
 });
 
 const isEmpty = computed(() => {
@@ -1045,31 +1111,12 @@ async function loadMore() {
 }
 
 const fetchJasas = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingJasa.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
-      // explore jasa -> gunakan endpoint search supaya bisa nearest/price/date
+  await fetchProducts(
+    {
       q: undefined,
       segments: ["UMKM Jasa"],
       ...sortParams,
@@ -1077,85 +1124,31 @@ const fetchJasas = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
+  const current = Number(jasasMeta.value?.current_page ?? 1);
+  const last = Number(jasasMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    // Backward compatible parser:
-    // - legacy: { jasas, jasas_meta }
-    // - current ApiResponse: { data, meta: { jasas, jasas_meta } }
-    const rootJasas = Array.isArray(payload?.jasas) ? payload.jasas : [];
-    const metaJasas = Array.isArray(payload?.meta?.jasas)
-      ? payload.meta.jasas
-      : [];
-
-    const items = rootJasas.length > 0 ? rootJasas : metaJasas;
-
-    const meta = payload?.jasas_meta ??
-      payload?.meta?.jasas_meta ?? {
-        current_page: Number(payload?.meta?.current_page ?? 1),
-        last_page: Number(payload?.meta?.last_page ?? 1),
-      };
-    const mapped = items.map((j) => ({
-      ...j,
-      image: resolveJasaImage(j),
-    }));
-
-    if (append) {
-      jasaList.value.push(...mapped);
-    } else {
-      jasaList.value = mapped;
-    }
-
-    const current = Number(meta?.current_page ?? 1);
-    const last = Number(meta?.last_page ?? 1);
-    hasMore.value = current < last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data jasa:", e);
-    toast.error("Gagal memuat data layanan. Silakan coba lagi nanti.");
-    if (!append) {
-      jasaList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingJasa.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
 const fetchProductsByMode = async ({ append } = { append: false }) => {
   const segments = modeToSegments[activeMode.value];
   if (!segments) {
-    productList.value = [];
+    products.value = [];
     hasMore.value = false;
     return;
   }
 
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingProducts.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
+  await fetchProducts(
+    {
       q: undefined,
       segments,
       ...sortParams,
@@ -1163,81 +1156,39 @@ const fetchProductsByMode = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
-    const parsed = parseLaravelPaginator(payload);
+  const current = Number(productsMeta.value?.current_page ?? 1);
+  const last = Number(productsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    if (append) productList.value.push(...(parsed.items ?? []));
-    else productList.value = parsed.items ?? [];
-
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data produk:", e);
-    toast.error("Gagal memuat data produk. Silakan coba lagi nanti.");
-    if (!append) {
-      productList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingProducts.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
-const fetchMerchants = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingMerchants.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+const fetchMerchantsExplore = async ({ append } = { append: false }) => {
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForMerchants();
 
-    const sortParams = buildSortParamsForMerchants();
-    const res = await searchMerchants({
+  await fetchMerchants(
+    {
       q: undefined,
       ...sortParams,
       lat: hasMyCoordinates.value ? myLatitude.value : undefined,
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    });
+    },
+    append,
+  );
 
-    const parsed = parseLaravelPaginator(res);
-    if (append) {
-      merchantList.value.push(...(parsed.items ?? []));
-    } else {
-      merchantList.value = parsed.items ?? [];
-    }
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data merchant:", e);
-    toast.error("Gagal memuat data UMKM. Silakan coba lagi nanti.");
-    if (!append) {
-      merchantList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingMerchants.value = false;
-  }
+  const current = Number(merchantsMeta.value?.current_page ?? 1);
+  const last = Number(merchantsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
+
+  await ensureSentinelObserved();
 };
 
 let isModeChanging = false;
@@ -1262,7 +1213,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1284,7 +1235,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1325,6 +1276,10 @@ onMounted(async () => {
   window.addEventListener("resize", updateViewportWidth, { passive: true });
   updateViewportWidth();
 
+  if (isAuthenticated.value && !isAdmin.value) {
+    cartStore.fetchCartCount();
+  }
+
   // fetch banner event (independen dari fetch data jasa)
   isLoadingBanner.value = true;
   const bannerTask = fetchPublicEvents().catch((e) => {
@@ -1359,7 +1314,7 @@ onMounted(async () => {
   resetInfiniteScroll();
   currentPage.value = 1;
   if (activeMode.value === "umkm") {
-    await fetchMerchants();
+    await fetchMerchantsExplore();
   } else if (activeMode.value === "jasa") {
     await fetchJasas();
   } else {
