@@ -1194,6 +1194,44 @@
       </button>
     </template>
   </ResponsiveModal>
+
+  <!-- Penilaian Produk -->
+  <div class="px-4 py-6 bg-gray-50">
+    <div class="max-w-2xl mx-auto">
+      <!-- Rating Summary Header -->
+      <div class="mb-4">
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Produk</h3>
+        <div v-if="product?.rating_summary && product.rating_summary.total_reviews > 0" class="flex items-center gap-3">
+          <div class="flex items-center gap-1">
+            <i
+              v-for="star in 5"
+              :key="star"
+              :class="[
+                'text-xl',
+                star <= Math.round(product.rating_summary.average_rating) ? 'pi pi-star-fill text-orange-400' : 'pi pi-star text-gray-300'
+              ]"
+            ></i>
+          </div>
+          <span class="font-semibold text-gray-700">{{ product.rating_summary.average_rating?.toFixed(1) || '0.0' }}</span>
+          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} keseluruhan)</span>
+        </div>
+        <p v-else class="text-sm text-gray-500">Belum ada ulasan</p>
+      </div>
+
+      <!-- Reviews List -->
+      <ReviewSection
+        v-if="product?.id"
+        resourceType="product"
+        :resourceId="product.id"
+        title=""
+        :showHeader="false"
+      />
+      <div v-else class="empty-review-state">
+        <i class="pi pi-star"></i>
+        <p>Belum ada ulasan untuk produk ini.</p>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -1212,6 +1250,7 @@ import { useBodyScrollLock } from "@/composables/useBodyScrollLock.js";
 import Button from "@/components/common/Button.vue";
 import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
+import ReviewSection from "@/components/common/ReviewSection.vue";
 import Textfield from "@/components/forms/TextField.vue";
 import { useProducts } from "@/composables/useProducts.js";
 import { useToast } from "vue-toastification";
@@ -2459,5 +2498,22 @@ function viewProduct(slug) {
   border-color: var(--color-primary, #ffa30e);
   box-shadow: 0 0 0 4px rgba(255, 163, 14, 0.15);
   transform: scale(1.05);
+}
+
+.empty-review-state {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-review-state i {
+  font-size: 32px;
+  margin-bottom: 12px;
+  color: #d1d5db;
+}
+
+.empty-review-state p {
+  margin: 0;
+  font-size: 14px;
 }
 </style>

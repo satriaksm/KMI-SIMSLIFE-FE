@@ -119,19 +119,28 @@
             {{ jasa?.merchant?.segmentation?.name || '-' }}
           </p>
         </div>
-        <router-link
-          v-if="jasa?.merchant?.slug"
-          :to="{ name: 'Merchant Detail', params: { slug: jasa.merchant.slug } }"
-          class="px-3 py-1.5 rounded-lg bg-[#FFA30E] text-white text-xs font-semibold shrink-0 hover:bg-[#e5920d] transition"
-        >
-          Kunjungi
-        </router-link>
-        <button
-          v-else
-          class="px-3 py-1.5 rounded-lg bg-[#FFA30E] text-white text-xs font-semibold shrink-0"
-        >
-          Kunjungi
-        </button>
+        <div class="flex items-center gap-2">
+          <router-link
+            v-if="jasa?.merchant?.slug"
+            :to="{ name: 'Merchant Detail', params: { slug: jasa.merchant.slug } }"
+            class="px-3 py-1.5 rounded-lg bg-[#FFA30E] text-white text-xs font-semibold shrink-0 hover:bg-[#e5920d] transition"
+          >
+            Kunjungi
+          </router-link>
+          <router-link
+            v-if="jasa?.merchant?.slug"
+            :to="{ name: 'Merchant Detail', params: { slug: jasa.merchant.slug }, hash: '#reviews' }"
+            class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold shrink-0 hover:bg-gray-100 transition"
+          >
+            Ulasan
+          </router-link>
+          <button
+            v-else
+            class="px-3 py-1.5 rounded-lg bg-[#FFA30E] text-white text-xs font-semibold shrink-0"
+          >
+            Kunjungi
+          </button>
+        </div>
       </div>
 
       <!-- Info Jasa -->
@@ -200,9 +209,35 @@
             </span>
           </div>
 
-          <!-- Lokasi UMKM (untuk service_type at_location) -->
+          <div v-if="jasa?.service_type_booking" class="flex items-center justify-between">
+            <span class="text-gray-600 flex items-center gap-1.5">
+              <i class="text-gray-500 pi pi-list"></i>
+              Mekanisme Pemesanan
+            </span>
+            <span class="font-medium text-gray-900">
+              {{ serviceBookingLabel }}
+            </span>
+          </div>
+
+          <!-- Display available operating times for booking mode -->
+          <div v-if="isBookingMode && hasOperatingTimes" class="flex items-start justify-between">
+            <span class="text-gray-600 flex items-center gap-1.5">
+              <i class="text-gray-500 pi pi-clock"></i>
+              Jam Layanan
+            </span>
+            <span class="font-medium text-gray-900 text-right text-sm">
+              {{ parsedOperatingTimes.join(', ') }}
+            </span>
+          </div>
+
+          <div v-if="isConsultationMode" class="p-3 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700">
+            Layanan ini memerlukan konsultasi terlebih dahulu sebelum pemesanan. Setelah konsultasi selesai, penjual akan mengirim link layanan jasa atau detail pemesanan.
+            Gunakan tombol <strong>Minta Konsultasi</strong> di bawah untuk langsung menghubungi penjual.
+          </div>
+
+          <!-- Lokasi UMKM (untuk service_type di_tempat_umkm) -->
           <div
-            v-if="jasa?.service_type === 'at_location' && merchantAddress"
+            v-if="(jasa?.service_type === 'di_tempat_umkm' || jasa?.service_type === 'at_location') && merchantAddress"
             class="flex items-start gap-2"
           >
             <span class="mt-0.5">
@@ -216,9 +251,29 @@
             </div>
           </div>
 
-          <!-- Alamat untuk service_type on_site atau fallback -->
+          <!-- Area Layanan untuk ke_rumah_pelanggan -->
           <div
-            v-if="jasa?.service_type === 'on_site' || (jasa?.service_type !== 'at_location' && jasa?.service_type !== 'online' && jasa?.location_address)"
+            v-if="jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site'"
+            class="flex items-start gap-2"
+          >
+            <span class="mt-0.5">
+              <i class="text-gray-500 pi pi-map-marker"></i>
+            </span>
+            <div class="flex-1">
+              <p class="text-xs text-gray-500 mb-0.5">Area Layanan</p>
+              <p class="text-sm leading-snug text-gray-700">
+                {{ jasa.service_area || '-' }}
+              </p>
+              <p class="text-xs text-gray-400 mt-0.5">
+                <i class="pi pi-info-circle mr-1"></i>
+                Anda akan diminta mengisi alamat lengkap saat checkout
+              </p>
+            </div>
+          </div>
+
+          <!-- Fallback address (jika service_type tidak dikenal tapi ada alamat) -->
+          <div
+            v-if="jasa?.service_type !== 'di_tempat_umkm' && jasa?.service_type !== 'at_location' && jasa?.service_type !== 'ke_rumah_pelanggan' && jasa?.service_type !== 'on_site' && jasa?.service_type !== 'online' && jasa?.location_address"
             class="flex items-start gap-2"
           >
             <span class="mt-0.5">
@@ -233,7 +288,7 @@
     </section>
 
     <!-- Pembayaran & Kontak -->
-    <section v-if="hasOperatingDays" class="px-4 py-4 mt-3 bg-white/95">
+    <section v-if="jasa" class="px-4 py-4 mt-3 bg-white/95">
       <div class="max-w-3xl mx-auto lg:max-w-5xl">
         <h2 class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900">
           <i class="pi pi-wallet text-merchant-primary"></i>
@@ -261,8 +316,7 @@
       </div>
     </section>
 
-    <!-- Pilih Jadwal -->
-    <section class="px-4 py-4 mt-3 bg-white/95">
+    <section v-if="isBookingMode" class="px-4 py-4 mt-3 bg-white/95">
       <div class="max-w-3xl mx-auto lg:max-w-5xl">
         <h3 class="flex items-center gap-2 mb-3 text-sm font-semibold">
           <i class="pi pi-calendar text-merchant-primary"></i>
@@ -299,8 +353,27 @@
       </div>
     </section>
 
+    <section v-if="jasa && !isBookingMode" class="px-4 py-4 mt-3 bg-white/95">
+      <div class="max-w-3xl mx-auto lg:max-w-5xl">
+        <div class="p-4 rounded-2xl bg-yellow-50 border border-yellow-200 text-yellow-900 text-sm">
+          <p class="font-semibold">Mekanisme layanan</p>
+          <p class="mt-2">
+            Layanan ini diproses sebagai <strong>{{ serviceBookingLabel }}</strong>.
+          </p>
+          <div class="mt-2 space-y-2 text-sm">
+            <p v-if="isCartMode">
+              • Langsung masuk ke keranjang dan dapat dilanjutkan ke pembayaran.
+            </p>
+            <p v-else-if="isConsultationMode">
+              • Pelanggan akan menghubungi penjual terlebih dahulu. Setelah konsultasi selesai, penjual akan mengirim link layanan atau detail pemesanan.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Pilih Waktu -->
-    <section v-if="hasOperatingTimes" class="px-4 py-4 mt-3 mb-2 bg-white/95">
+    <section v-if="hasOperatingTimes && isBookingMode" class="px-4 py-4 mt-3 mb-2 bg-white/95">
       <div class="max-w-3xl mx-auto lg:max-w-5xl">
         <h3 class="flex items-center gap-2 mb-2 text-sm font-semibold">
           <i class="pi pi-clock text-merchant-primary"></i>
@@ -372,38 +445,109 @@
 
     <!-- Bottom bar -->
     <div
+      v-if="jasa"
       class="fixed left-0 right-0 bottom-16 sm:bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] px-4 py-3"
     >
       <div class="flex items-center max-w-3xl gap-4 mx-auto lg:max-w-5xl">
-        <router-link
-          :to="{
-            name: 'Pembayaran Jasa',
-            query: {
-               title: jasa?.title || '-',
-              image: jasaImage,
-              price: jasa?.fixed_price || jasa?.base_price || 100000,
-              tgl: hasOperatingDays ? selectedDate.toISOString() : '',
-              waktu: hasOperatingTimes ? activeTime : '',
-              payment_methods: jasa?.payment_methods || '',
-              service_type: jasa?.service_type || '',
-              merchant_slug: jasa?.merchant?.slug || '',
-              jasa_slug: jasa?.slug || route.params.slug || '',
-              alamat:
-                jasa?.service_type === 'on_site'
-                  ? ''
-                  : jasa?.location_address || merchantAddress || '',
-              price_type:
-                jasa?.fixed_price && jasa.fixed_price > 0
-                  ? 'fixed'
-                  : jasa?.base_price && jasa.base_price > 0
-                    ? 'base'
-                    : '',
-            },
-          }"
-          class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
-        >
-          Booking Sekarang
-        </router-link>
+        <template v-if="isBookingMode">
+          <router-link
+            :to="{
+              name: 'Pembayaran Jasa',
+              query: {
+                 title: jasa?.title || '-',
+                image: jasaImage,
+                price: jasa?.fixed_price || jasa?.base_price || 100000,
+                tgl: hasOperatingDays ? selectedDate.toISOString() : '',
+                waktu: hasOperatingTimes ? activeTime : '',
+                payment_methods: jasa?.payment_methods || '',
+                service_type: jasa?.service_type || '',
+                merchant_slug: jasa?.merchant?.slug || '',
+                jasa_slug: jasa?.slug || route.params.slug || '',
+                // Alamat tidak diisi untuk: online, di_tempat_umkm (dari profil merchant), ke_rumah_pelanggan (dari customer)
+                alamat:
+                  (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
+                    ? ''
+                    : jasa?.location_address || merchantAddress || '',
+                price_type:
+                  jasa?.fixed_price && jasa.fixed_price > 0
+                    ? 'fixed'
+                    : jasa?.base_price && jasa.base_price > 0
+                      ? 'base'
+                      : '',
+                service_type_booking: 'booking',
+              },
+            }"
+            class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
+          >
+            Booking Sekarang
+          </router-link>
+        </template>
+        <template v-else-if="isConsultationMode">
+          <div class="flex items-center gap-3 flex-1">
+            <!-- Tombol Chat In-App -->
+            <button
+              type="button"
+              @click="openConsultationChat"
+              class="flex-1 py-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500 text-white font-semibold text-center transition shadow-md flex items-center justify-center gap-2"
+            >
+              <i class="pi pi-comments"></i>
+              Konsultasi Gratis
+            </button>
+
+            <!-- Tombol WhatsApp -->
+            <button
+              v-if="whatsappLink"
+              type="button"
+              @click="openConsultationContact"
+              class="px-5 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition shadow-md"
+              title="Hubungi via WhatsApp"
+            >
+              <i class="pi pi-whatsapp text-xl"></i>
+            </button>
+          </div>
+        </template>
+        <template v-else-if="isCartMode">
+          <router-link
+            :to="{
+              name: 'Pembayaran Jasa',
+              query: {
+                title: jasa?.title || '-',
+                image: jasaImage,
+                price: jasa?.fixed_price || jasa?.base_price || 100000,
+                tgl: '',
+                waktu: '',
+                payment_methods: jasa?.payment_methods || '',
+                service_type: jasa?.service_type || '',
+                merchant_slug: jasa?.merchant?.slug || '',
+                jasa_slug: jasa?.slug || route.params.slug || '',
+                // Alamat tidak diisi untuk: online, di_tempat_umkm (dari profil merchant), ke_rumah_pelanggan (dari customer)
+                alamat:
+                  (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
+                    ? ''
+                    : jasa?.location_address || merchantAddress || '',
+                price_type:
+                  jasa?.fixed_price && jasa.fixed_price > 0
+                    ? 'fixed'
+                    : jasa?.base_price && jasa.base_price > 0
+                      ? 'base'
+                      : 'cart',
+                service_type_booking: 'keranjang',
+              },
+            }"
+            class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
+          >
+            Checkout Cepat
+          </router-link>
+        </template>
+        <template v-else>
+          <button
+            type="button"
+            disabled
+            class="flex-1 py-3 rounded-full bg-gray-200 text-gray-600 font-semibold text-center"
+          >
+            Pilih Mekanisme Pemesanan
+          </button>
+        </template>
       </div>
     </div>
 
@@ -415,6 +559,52 @@
       @close="calendarOpen = false"
     />
 
+    <!-- Kalender -->
+    <CalendarModal
+      v-model="selectedDate"
+      :open="calendarOpen"
+      :operating-days="jasa?.operating_days || ''"
+      @close="calendarOpen = false"
+    />
+
+    <!-- Penilaian Layanan -->
+    <div class="px-4 py-6 bg-gray-50">
+      <div class="max-w-2xl mx-auto">
+        <!-- Rating Summary Header -->
+        <div class="mb-4">
+          <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Layanan</h3>
+          <div v-if="jasa?.rating_summary && jasa.rating_summary.total_reviews > 0" class="flex items-center gap-3">
+            <div class="flex items-center gap-1">
+              <i
+                v-for="star in 5"
+                :key="star"
+                :class="[
+                  'text-xl',
+                  star <= Math.round(jasa.rating_summary.average_rating) ? 'pi pi-star-fill text-orange-400' : 'pi pi-star text-gray-300'
+                ]"
+              ></i>
+            </div>
+            <span class="font-semibold text-gray-700">{{ jasa.rating_summary.average_rating?.toFixed(1) || '0.0' }}</span>
+            <span class="text-sm text-gray-500">({{ jasa.rating_summary.total_reviews }} ulasan)</span>
+          </div>
+          <p v-else class="text-sm text-gray-500"></p>
+        </div>
+
+        <!-- Reviews List -->
+        <ReviewSection
+          v-if="jasa?.id"
+          resourceType="jasa"
+          :resourceId="jasa.id"
+          title=""
+          :showHeader="false"
+        />
+        <div v-else class="empty-review-state">
+          <i class="pi pi-star"></i>
+          <p>Belum ada ulasan untuk layanan ini.</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -424,9 +614,15 @@ import { useRoute, useRouter } from "vue-router";
 import api from "@/libs/axios.js";
 import { getImageUrl, getMerchantLogoUrl } from "@/libs/getImageUrl.js";
 import CalendarModal from "@/components/CalendarModal.vue";
+import ReviewSection from "@/components/common/ReviewSection.vue";
+import { useAuthStore } from "@/stores/auth";
+import { useToast } from "vue-toastification";
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
+const authStore = useAuthStore();
+
 const jasa = ref(null);
 const selectedImagePath = ref(null);
 
@@ -442,12 +638,17 @@ const hasOperatingDays = computed(() =>
   Boolean(String(jasa.value?.operating_days || "").trim())
 );
 
-const parsedOperatingTimes = computed(() =>
-  String(jasa.value?.operating_times || "")
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean)
-);
+const parsedOperatingTimes = computed(() => {
+  const raw = jasa.value?.operating_times;
+  // Handle both array (from DB cast) and string (old data)
+  if (Array.isArray(raw)) {
+    return raw.map(t => String(t).trim()).filter(Boolean);
+  }
+  if (typeof raw === 'string') {
+    return raw.split(",").map(t => t.trim()).filter(Boolean);
+  }
+  return [];
+});
 
 const hasOperatingTimes = computed(() => parsedOperatingTimes.value.length > 0);
 
@@ -555,10 +756,13 @@ const initActiveTime = () => {
 // ----- gambar jasa -----
 const resolveJasaAssetSrc = (img) => {
   if (!img) return "";
-  // Prioritas: API URL terlebih dahulu (sama seperti produk)
-  if (img.id) return getImageUrl(img.id);
+  // Priority: API URL first (sama seperti produk)
   if (img.src_url) return getImageUrl(img.src_url);
   if (img.url) return getImageUrl(img.url);
+  if (img.image_url) return getImageUrl(img.image_url);
+  if (img.image_path) return getImageUrl(img.image_path);
+  if (img.path) return getImageUrl(img.path);
+  if (img.id) return getImageUrl(img.id);
   return "";
 };
 
@@ -576,6 +780,9 @@ const jasaImage = computed(() => {
   }
   if (jasa.value.cover_img?.url) {
     return getImageUrl(jasa.value.cover_img.url);
+  }
+  if (jasa.value.image_url) {
+    return jasa.value.image_url;
   }
 
   // Fallback ke array images (cover image)
@@ -602,13 +809,122 @@ const jasaDesc = computed(
   () => jasa.value?.description || "Belum ada deskripsi jasa."
 );
 
+// ----- mekanisme pemesanan (keranjang / booking / konsultasi) -----
+const serviceBookingLabel = computed(() => {
+  // Check both FE field (service_type_booking) and DB field (cara_pemesanan)
+  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  if (!raw) return "Tidak tersedia";
+
+  const t = String(raw).toLowerCase();
+
+  // Support both old values (cart/consultation) and new values (keranjang/konsultasi)
+  if (t === 'keranjang' || t === 'cart' || t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
+  if (t === 'booking') return "Booking (Pilih Tanggal & Jam)";
+  if (t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
+  return String(raw);
+});
+
+const isBookingMode = computed(() => {
+  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  return String(raw || '').toLowerCase() === 'booking';
+});
+
+const isConsultationMode = computed(() => {
+  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const t = String(raw || '').toLowerCase();
+  return t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi';
+});
+
+const isCartMode = computed(() => {
+  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const t = String(raw || '').toLowerCase();
+  return t === 'keranjang' || t === 'cart' || t === 'langsung_pesan' || (!raw);
+});
+
+function buildConsultationMessage() {
+  const jasaTitle = jasa.value?.title || "Layanan Jasa";
+  const serviceType = serviceTypeLabel.value || "-";
+  const lines = [
+    "Halo, saya ingin konsultasi layanan Sumilir.",
+    "",
+    "Layanan yang ingin dikonsultasikan:",
+    `- ${jasaTitle}`,
+    `- Tipe layanan: ${serviceType}`,
+    `- Mekanisme: ${serviceBookingLabel.value}`,
+    "",
+    "Mohon bantuannya untuk menjelaskan detail, harga, dan jadwal layanan.",
+  ];
+  return lines.join("\n");
+}
+
+function openConsultationContact() {
+  if (!whatsappLink.value) {
+    window.alert(
+      "Kontak WhatsApp penjual belum tersedia. Silakan hubungi penjual secara manual."
+    );
+    return;
+  }
+
+  const encoded = encodeURIComponent(buildConsultationMessage());
+  let url = whatsappLink.value.trim();
+  if (url.startsWith("http")) {
+    url += url.includes("?") ? `&text=${encoded}` : `?text=${encoded}`;
+  } else {
+    const phone = url.replace(/[^0-9]/g, "");
+    url = `https://wa.me/${phone}?text=${encoded}`;
+  }
+
+  window.open(url, "_blank");
+}
+
+const goToCart = () => {
+  router.push({ name: "Keranjang" });
+};
+
+// ⭐ Konsultasi functions
+async function openConsultationChat() {
+  if (!authStore.isAuthenticated) {
+    toast.warning("Silakan login terlebih dahulu");
+    router.push({ name: "Login", query: { redirect: route.fullPath } });
+    return;
+  }
+
+  if (!jasa.value?.id) {
+    toast.error("Data layanan tidak ditemukan");
+    return;
+  }
+
+  try {
+    // Create consultation via API
+    const response = await api.post('/api/service-consultations', {
+      jasa_id: jasa.value.id,
+      customer_description: `Halo, saya ingin konsultasi layanan "${jasa.value.title}".`
+    });
+
+    const consultationId = response.data?.data?.id;
+
+    if (consultationId) {
+      toast.success("Konsultasi berhasil diajukan. Menunggu tanggapan merchant.");
+      router.push(`/customer/consultations/${consultationId}`);
+    } else {
+      throw new Error("Konsultasi ID tidak ditemukan");
+    }
+  } catch (err) {
+    console.error("[JasaDetail] Failed to start consultation:", err);
+    toast.error(err.response?.data?.message || "Gagal mengajukan konsultasi. Silakan coba lagi.");
+  }
+}
+
 // ----- tipe layanan (online / di tempat / ke alamat pelanggan) -----
 const serviceTypeLabel = computed(() => {
   const t = jasa.value?.service_type;
   if (!t) return "-";
-  if (t === "at_location") return "Di Tempat Saya";
-  if (t === "on_site") return "Ke Rumah/Lokasi Pelanggan";
-  if (t === "online") return "Online";
+  // Normalize from old values
+  if (t === 'at_location' || t === 'ditempat_saya') return "Di Tempat UMKM";
+  if (t === 'on_site' || t === 'kerumah_pelanggan') return "Ke Rumah Pelanggan";
+  if (t === 'online') return "Online";
+  if (t === 'di_tempat_umkm') return "Di Tempat UMKM";
+  if (t === 'ke_rumah_pelanggan') return "Ke Rumah Pelanggan";
   return t;
 });
 
@@ -705,10 +1021,13 @@ onMounted(async () => {
     }
 
     const { data } = response;
-    const payload = data?.data ?? data;
-    console.log("[JasaDetail] Jasa data:", payload);
+    const rawPayload = data?.data ?? data;
+    console.log("[JasaDetail] Jasa data:", rawPayload);
+
+    // Normalize image URLs so getImageUrl resolves them correctly
+    const payload = normalizeJasaImagePayload(rawPayload);
     jasa.value = payload;
-    
+
     // Set selectedDate ke hari pertama yang tersedia
     if (payload?.operating_days) {
       const operatingDays = payload.operating_days.split(',').map(d => parseInt(d.trim()));
@@ -722,7 +1041,7 @@ onMounted(async () => {
         }
       }
     }
-    
+
     // Set active time ke waktu pertama yang tersedia
     initActiveTime();
   } catch (e) {
@@ -732,12 +1051,48 @@ onMounted(async () => {
   }
 });
 
+/**
+ * Normalize jasa image payload — ensures cover_img and images have full URLs.
+ * Backend already provides public URLs; this ensures getImageUrl resolves correctly.
+ */
+function normalizeJasaImagePayload(jasaData) {
+  if (!jasaData || typeof jasaData !== "object") return jasaData;
+  const normalized = { ...jasaData };
+
+  if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      : "";
+    normalized.cover_img = {
+      id: normalized.cover_img.id ?? null,
+      url: srcUrl,
+      src_url: srcUrl,
+    };
+  }
+
+  if (Array.isArray(normalized.images)) {
+    normalized.images = normalized.images.map((img) => {
+      if (!img || typeof img !== "object") return img;
+      const srcUrl = img.src_url || img.url || img.image_path || img.id
+        ? getImageUrl(img.src_url || img.url || img.image_path || String(img.id))
+        : "";
+      return { id: img.id ?? null, url: srcUrl, src_url: srcUrl, is_cover: img.is_cover ?? false };
+    });
+  }
+
+  if (normalized.image) {
+    normalized.image = getImageUrl(normalized.image);
+  }
+
+  return normalized;
+}
+
 
 function onImgError(e, type) {
-  if (type === 'header') {
-    e.target.src = fallbackHeader
-  } else if (type === 'logo') {
-    e.target.src = fallbackLogo
+  switch (type) {
+    case 'header': e.target.src = fallbackHeader; break;
+    case 'logo': e.target.src = fallbackLogo; break;
+    case 'gallery': e.target.src = fallbackHeader; break;
   }
 }
 </script>
@@ -749,5 +1104,22 @@ function onImgError(e, type) {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.empty-review-state {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-review-state i {
+  font-size: 32px;
+  margin-bottom: 12px;
+  color: #d1d5db;
+}
+
+.empty-review-state p {
+  margin: 0;
+  font-size: 14px;
 }
 </style>

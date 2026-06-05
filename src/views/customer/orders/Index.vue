@@ -149,7 +149,17 @@
             :key="order.id"
             :order="order"
             @click="openOrder"
-          />
+          >
+            <template #action="{ order: o }">
+              <Button
+                v-if="o.status === 'completed'"
+                @click.stop="$router.push({ path: `/review/product/${o.id}/${o.items[0]?.productId}`, query: { merchantId: o._raw.merchant_id } })"
+                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
+              >
+                Beri Ulasan
+              </Button>
+            </template>
+          </OrderCard>
         </div>
 
         <!-- Empty -->
@@ -450,6 +460,7 @@ function mapOrder(o) {
     delivery_type: o.delivery_type || "delivery",
     items: (o.items || []).map((it) => ({
       id: it.id,
+      productId: it.product_id,
       title: it.product_name_snapshot || "Produk",
       qty: it.quantity,
       variant: it.product_variant_snapshot || "",

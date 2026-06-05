@@ -43,18 +43,11 @@
           {{ merchant.name }}
         </h3>
 
-        <!-- Products Count -->
+        <!-- Products/Jasa Count - Dynamic label based on merchant type -->
         <div class="flex items-center gap-1 mb-1 text-[11px] text-gray-500 mt-2">
           <i class="text-base me-1 pi pi-shopping-bag text-primary"></i>
           <span class="line-clamp-1">
-            {{
-              merchant.products_count && merchant.products_count !== 0
-                ? merchant.products_count
-                : merchant.jasas_count && merchant.jasas_count !== 0
-                  ? merchant.jasas_count
-                  : 0
-            }}
-            Produk
+            {{ displayCount }} {{ displayLabel }}
           </span>
         </div>
 
@@ -160,27 +153,50 @@ const merchantLogoUrl = computed(() => {
   return "";
 });
 
-// Tentukan apakah merchant ini tipe Jasa berdasarkan segmentation
+// Tentukan apakah merchant ini tipe Jasa berdasarkan segmentation atau category
 const isMerchantJasa = computed(() => {
+  // Cek dari segmentation name
   const segmentName = String(props.merchant?.segmentation?.name || "").toLowerCase();
+  // Cek dari category name
+  const categoryName = String(props.merchant?.category?.name || props.merchant?.category_name || "").toLowerCase();
+  // Cek dari business_type
+  const businessType = String(props.merchant?.business_type || props.merchant?.type || "").toLowerCase();
+
+  const hasJasaKeyword = segmentName.includes("jasa") || categoryName.includes("jasa") || businessType.includes("jasa");
+
   const jasasCount = Number(
     props.merchant?.jasas_count ??
       props.merchant?.services_count ??
       props.merchant?.jasa_count ??
+      props.merchant?.total_services ??
+      props.merchant?.service_count ??
       0,
   );
-  const productsCount = Number(props.merchant?.products_count ?? 0);
+  const productsCount = Number(
+    props.merchant?.products_count ??
+      props.merchant?.total_products ??
+      props.merchant?.product_count ??
+      0,
+  );
 
-  return segmentName.includes("jasa") || (jasasCount > 0 && productsCount === 0);
+  // UMKM Jasa jika: ada keyword jasa ATAU hanya punya jasas_count
+  return hasJasaKeyword || (jasasCount > 0 && productsCount === 0);
 });
 
 // Tampilkan counter yang sesuai
 const displayCount = computed(() => {
-  const productsCount = Number(props.merchant?.products_count ?? 0);
+  const productsCount = Number(
+    props.merchant?.products_count ??
+      props.merchant?.total_products ??
+      props.merchant?.product_count ??
+      0,
+  );
   const jasasCount = Number(
     props.merchant?.jasas_count ??
       props.merchant?.services_count ??
       props.merchant?.jasa_count ??
+      props.merchant?.total_services ??
+      props.merchant?.service_count ??
       (isMerchantJasa.value ? productsCount : 0),
   );
 

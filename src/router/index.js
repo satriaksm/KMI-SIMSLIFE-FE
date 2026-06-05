@@ -269,6 +269,63 @@ const routes = [
           title: "Pembayaran | SUMILIR",
         },
       },
+      {
+        path: "booking-confirmation",
+        name: "Booking Confirmation",
+        component: () => import("@/views/customer/BookingConfirmation.vue"),
+        meta: {
+          title: "Konfirmasi Pemesanan | SUMILIR",
+        },
+      },
+      {
+        path: "service-history",
+        name: "Customer Service History",
+        component: () => import("@/views/customer/service/CustomerServiceHistory.vue"),
+        meta: {
+          title: "History Layanan Jasa | SUMILIR",
+        },
+      },
+      // ===========================
+      // KONSULTASI CUSTOMER (UMKM JASA)
+      // ===========================
+      {
+        path: "customer/consultations",
+        name: "Customer Consultation History",
+        component: () => import("@/views/customer/consultation/CustomerConsultationHistory.vue"),
+        meta: {
+          title: "Konsultasi Saya | SUMILIR",
+          requiresAuth: true,
+        },
+      },
+      {
+        path: "customer/consultations/:consultationId",
+        name: "Customer Consultation Detail",
+        component: () => import("@/views/customer/consultation/CustomerConsultationDetail.vue"),
+        meta: {
+          title: "Detail Konsultasi | SUMILIR",
+          requiresAuth: true,
+        },
+      },
+      {
+        path: "customer/consultations/:consultationId/checkout",
+        name: "Customer Consultation Checkout",
+        component: () => import("@/views/customer/consultation/CustomerConsultationCheckout.vue"),
+        meta: {
+          title: "Checkout Konsultasi | SUMILIR",
+          requiresAuth: true,
+        },
+      },
+
+      // Universal Review Route - for all types: service, product, food, merchant
+      {
+        path: "review/:reviewableType/:orderId/:reviewableId",
+        name: "Universal Review",
+        component: () => import("@/views/customer/UniversalReviewView.vue"),
+        meta: {
+          title: "Beri Review | SUMILIR",
+          requiresAuth: true,
+        },
+      },
 
       // ===========================
       // Profil User
@@ -663,6 +720,32 @@ const routes = [
         name: "Merchant - Jasa Edit",
         component: () => import("@/views/merchant/productsjasa/Editjasa.vue"),
         meta: { title: "Edit Jasa UMKM | SUMILIR" },
+      },
+
+      // ===========================
+      // BOOKING MANAGEMENT
+      // ===========================
+      {
+        path: "bookings",
+        name: "Merchant - Booking Management",
+        component: () => import("@/views/merchant/service/MerchantServiceHistory.vue"),
+        meta: { title: "History Layanan Jasa | SUMILIR" },
+      },
+
+      // ===========================
+      // 🆕 KONSULTASI (UMKM JASA)
+      // ===========================
+      {
+        path: "consultations",
+        name: "Merchant Konsultasi",
+        component: () => import("@/views/merchant/consultation/MerchantConsultations.vue"),
+        meta: { title: "Konsultasi | SUMILIR" },
+      },
+      {
+        path: "consultations/:id",
+        name: "Merchant Konsultasi Detail",
+        component: () => import("@/views/merchant/consultation/MerchantConsultationDetail.vue"),
+        meta: { title: "Detail Konsultasi | SUMILIR" },
       },
 
       // ===========================

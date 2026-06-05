@@ -21,6 +21,7 @@ const authStore = useAuthStore();
 const searchBarRef = ref(null);
 const searchInputRef = ref(null);
 const searchToggleRef = ref(null);
+const profileMenuRef = ref(null);
 
 const accountToggleRef = ref(null);
 const accountDropdownRef = ref(null);
@@ -34,6 +35,7 @@ const cartStore = useCartStore();
 const cartItemsCount = computed(() => {
   return cartStore.totalItems || 0;
 });
+const showProfileMenu = ref(false);
 
 const baseMenus = [
   {
@@ -88,6 +90,9 @@ const baseMenus = [
 const menus = computed(() => {
   return baseMenus.filter((m) => {
     if (m.key === "pesanan" && (!isAuthenticated.value || isAdmin.value)) {
+      return false;
+    }
+    if (m.key === "service-history" && !isAuthenticated.value) {
       return false;
     }
     return true;
@@ -155,6 +160,8 @@ function isMenuActive(m) {
   if (m.key === "profile") {
     return (
       route.path.startsWith("/profile") ||
+      route.path.startsWith("/my-order") ||
+      route.path.startsWith("/service-history") ||
       (!isAuthenticated.value && route.path === "/login")
     );
   }
@@ -174,34 +181,78 @@ function onMenuClick(m, e) {
     activeKey.value = m.key;
   } else {
     activeKey.value = null;
+    showProfileMenu.value = false;
   }
 }
 function goToLogin() {
   router.push({ name: "Login" }).catch(() => router.push("/login"));
 }
+function toggleProfileMenu() {
+  if (!isAuthenticated.value) {
+    goToLogin();
+    return;
+  }
+
+  showProfileMenu.value = !showProfileMenu.value;
+}
+
+function closeProfileMenu() {
+  showProfileMenu.value = false;
+}
+
+function goToProfileMenu(path) {
+  showProfileMenu.value = false;
+  router.push(path);
+}
+
+function getMobileProfileTarget() {
+  return isAuthenticated.value ? "/profile" : "/login";
+}
+
+function getMobileHistoryTarget() {
+  return isAuthenticated.value ? "/service-history" : "/login";
+}
+
+function isMobileProfileActive() {
+  return route.path.startsWith("/profile") || (!isAuthenticated.value && route.path === "/login");
+}
+
+function isMobileHistoryActive() {
+  return route.path.startsWith("/service-history");
+}
+
+async function handleLogout() {
+  showProfileMenu.value = false;
+  await authStore.logout();
+  router.push("/login");
+}
+
 const showSearch = ref(false);
 const searchQuery = ref("");
 
 const onDocumentPointerDown = (event) => {
-  if (!showSearch.value) return;
-
   const target = event?.target;
   const panelEl = searchBarRef.value;
   const toggleEl = searchToggleRef.value;
+  const profileEl = profileMenuRef.value;
 
-  // Click inside search panel
-  if (panelEl && target && panelEl.contains(target)) return;
+  const clickedInsideSearch = panelEl && target && panelEl.contains(target);
+  const clickedSearchToggle = toggleEl && target && toggleEl.contains(target);
+  const clickedInsideProfile = profileEl && target && profileEl.contains(target);
 
-  // Click on the search toggle button
-  if (toggleEl && target && toggleEl.contains(target)) return;
+  if (showSearch.value && !clickedInsideSearch && !clickedSearchToggle) {
+    showSearch.value = false;
+  }
 
-  showSearch.value = false;
+  if (showProfileMenu.value && !clickedInsideProfile) {
+    showProfileMenu.value = false;
+  }
 };
 
 watch(
-  () => showSearch.value,
-  (open) => {
-    if (open) {
+  () => [showSearch.value, showProfileMenu.value],
+  ([searchOpen, profileOpen]) => {
+    if (searchOpen || profileOpen) {
       // Use pointerdown so it closes immediately on outside click
       document.addEventListener("pointerdown", onDocumentPointerDown, true);
     } else {
@@ -479,58 +530,68 @@ watch(
       <router-view />
     </main>
 
-    <!-- Bottom Dock Navigation (Mobile only) - 5 items termasuk Profile -->
+    <!-- Bottom Dock Navigation (Mobile only) -->
     <nav
       class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg sm:hidden"
     >
       <div class="flex items-center justify-around h-16 px-1">
-        <RouterLink
-          v-for="m in menus"
-          :key="m.key"
-          :to="m.to"
-          @click="(e) => onMenuClick(m, e)"
-          class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
-          :class="
-            isMenuActive(m) ? 'text-primary' : 'text-black hover:text-primary'
-          "
-        >
-          <!-- Jika profile dan authenticated, tampilkan avatar -->
-          <template v-if="m.key === 'profile' && isAuthenticated">
-            <img
-              v-if="user?.profile_picture || user?.avatar"
-              :src="user?.profile_picture || user?.avatar"
-              alt="Foto Profil"
-              class="object-cover w-6 h-6 transition-colors rounded-full"
-              :class="
-                isMenuActive(m)
-                  ? 'border-2 border-primary'
-                  : 'hover:border-2 border-primary'
-              "
-            />
-            <span
-              v-else
-              class="flex items-center justify-center text-2xl font-bold text-black rounded-full w-7 h-7 bg-muted-background"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="2"
-                stroke="currentColor"
-                class="w-4 h-4 text-black"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-                /></svg
-            ></span>
-          </template>
-          <!-- Jika belum login atau menu lain, tampilkan icon -->
-          <template v-else>
+        <template v-for="m in menus.filter((menu) => menu.key !== 'keranjang')" :key="m.key">
+          <RouterLink
+            v-if="m.key !== 'profile'"
+            :to="m.to"
+            @click="(e) => onMenuClick(m, e)"
+            class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
+            :class="
+              isMenuActive(m) ? 'text-primary' : 'text-black hover:text-primary'
+            "
+          >
             <span v-html="m.icon" class="w-6 h-6"></span>
-          </template>
-        </RouterLink>
+          </RouterLink>
+
+          <div
+            v-else
+            class="flex flex-col items-center justify-center flex-1 h-full transition-colors"
+            :class="
+              isMobileProfileActive() ? 'text-primary' : 'text-black hover:text-primary'
+            "
+          >
+            <RouterLink
+              :to="getMobileProfileTarget()"
+              class="flex flex-col items-center justify-center w-full h-full"
+              @click="showProfileMenu = false"
+            >
+              <img
+                v-if="isAuthenticated && (user?.profile_picture || user?.avatar)"
+                :src="user?.profile_picture || user?.avatar"
+                alt="Foto Profil"
+                class="object-cover w-6 h-6 transition-colors rounded-full"
+                :class="
+                  isMobileProfileActive()
+                    ? 'border-2 border-primary'
+                    : 'hover:border-2 border-primary'
+                "
+              />
+              <span
+                v-else
+                class="flex items-center justify-center text-2xl font-bold text-black rounded-full w-7 h-7 bg-muted-background"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                  class="w-4 h-4 text-black"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
+                  /></svg
+              ></span>
+            </RouterLink>
+          </div>
+        </template>
       </div>
     </nav>
 

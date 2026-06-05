@@ -437,6 +437,14 @@
           >
             Pesanan Diterima (Selesai)
           </Button>
+          <Button
+            v-if="order?.status === 'completed'"
+            block
+            @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
+            customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Beri Ulasan
+          </Button>
         </div>
       </template>
     </div>
@@ -518,6 +526,7 @@ const order = computed(() => {
 
   return {
     id: o.id,
+    merchantId: o.merchant_id,
     status,
 
     tracking: [
@@ -579,6 +588,7 @@ const order = computed(() => {
 
     items: (o.items || []).map((it) => ({
       id: it.id,
+      productId: it.product_id,
       title: it.product_name_snapshot || "Produk",
       qty: it.quantity,
       variant: it.product_variant_snapshot || "",

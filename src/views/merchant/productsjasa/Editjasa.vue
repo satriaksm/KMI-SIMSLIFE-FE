@@ -155,7 +155,9 @@ const formData = ref({
   jasa_subcategory_id: null,
   fixed_price: 0,
   base_price: 0,
-  service_type: "at_location",
+  service_type: "di_tempat_umkm", // online | di_tempat_umkm | ke_rumah_pelanggan
+  service_type_booking: "keranjang",  // keranjang / booking / konsultasi
+  cara_pemesanan: "langsung_pesan", // DB value: langsung_pesan / booking / memerlukan_konsultasi
   location_address: "",
   service_area: "",
   special_notes: "",
@@ -227,6 +229,7 @@ const validationSchema = yup.object({
       }
     ),
   service_type: yup.string().required("Tipe layanan wajib dipilih"),
+  service_type_booking: yup.string().required("Cara pemesanan wajib dipilih").oneOf(['keranjang', 'booking', 'konsultasi'], "Pilih 'Keranjang', 'Booking', atau 'Konsultasi'"),
   operating_times: yup.string().nullable().max(255),
   location_address: yup.string().nullable().max(255),
   service_area: yup.string().nullable(),
@@ -238,10 +241,10 @@ const validationSchema = yup.object({
 watch(
   [() => formData.value.service_type, merchantProfileAddress],
   ([serviceType, profileAddress]) => {
-    if (serviceType === "at_location") {
+    if (serviceType === "di_tempat_umkm") {
       formData.value.location_address = profileAddress || "";
     }
-    if (serviceType === "online" || serviceType === "on_site") {
+    if (serviceType === "online" || serviceType === "ke_rumah_pelanggan") {
       formData.value.location_address = "";
     }
   },
@@ -578,7 +581,24 @@ const loadJasa = async () => {
     const cover = existingImages.value.find((img) => img.is_cover && img.id);
     currentCoverId.value = cover ? cover.id : null;
 
+    // Map FE booking type from API response (service_type_booking or mapped from cara_pemesanan)
+    const rawBookingType = jasaData.service_type_booking || jasaData.cara_pemesanan || 'keranjang';
+    const mappedBookingType = (() => {
+      const t = String(rawBookingType).toLowerCase();
+      if (t === 'keranjang' || t === 'cart' || t === 'langsung_pesan') return 'keranjang';
+      if (t === 'booking') return 'booking';
+      if (t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi') return 'konsultasi';
+      return 'keranjang';
+    })();
+
     // Initialize form with loaded data
+    // Normalize service_type to new standard format
+    const normalizeServiceType = (type) => {
+      if (type === 'at_location' || type === 'ditempat_saya') return 'di_tempat_umkm';
+      if (type === 'on_site' || type === 'kerumah_pelanggan') return 'ke_rumah_pelanggan';
+      return type || 'di_tempat_umkm';
+    };
+
     formData.value = {
       title: jasaData.title || "",
       description: jasaData.description || "",
@@ -586,11 +606,14 @@ const loadJasa = async () => {
       jasa_subcategory_id: jasaData.jasa_subcategory_id || null,
       fixed_price: parseInt(jasaData.fixed_price) || 0,
       base_price: parseInt(jasaData.base_price) || 0,
-      service_type: jasaData.service_type || "at_location",
+      service_type: normalizeServiceType(jasaData.service_type),
+      service_type_booking: mappedBookingType,
       location_address: jasaData.location_address || "",
       service_area: jasaData.service_area || "",
       special_notes: jasaData.special_notes || "",
-      operating_times: jasaData.operating_times || "",
+      operating_times: Array.isArray(jasaData.operating_times)
+        ? jasaData.operating_times.join(',')
+        : (jasaData.operating_times || ""),
       payment_methods: jasaData.payment_methods || "cod",
       status: jasaData.status || "draft",
     };
@@ -643,43 +666,73 @@ const submitForm = async (values) => {
     // Explicitly add fields that use v-model on formData
     fd.set("status", formData.value.status);
     fd.set("service_type", formData.value.service_type);
+    fd.set("service_type_booking", formData.value.service_type_booking || "keranjang");
+    // Always send both FE and DB field names for consistency
+    const caraPemesanan = formData.value.service_type_booking === 'keranjang' ? 'langsung_pesan'
+      : formData.value.service_type_booking === 'konsultasi' ? 'memerlukan_konsultasi'
+      : formData.value.service_type_booking;
+    fd.set("cara_pemesanan", caraPemesanan);
     fd.set("location_address", formData.value.location_address || "");
     fd.set("operating_times", formData.value.operating_times || "");
 
-    // Ensure integer prices
-    fd.set("fixed_price", parseInt(values.fixed_price) || 0);
-    fd.set("base_price", parseInt(values.base_price) || 0);
+    // === DEBUG: Pastikan title ada di FormData ===
+    const titleToSend = values?.title ?? formData.value.title ?? "";
+    fd.set("title", titleToSend);
+    fd.set("description", values?.description ?? formData.value.description ?? "");
 
-    // Add new images if any
-    if (newImageFiles.value && newImageFiles.value.length) {
-      const fileError = validateSelectedImages(newImageFiles.value);
-      if (fileError) {
-        toast.error(fileError);
-        return;
-      }
+    console.log("[Editjasa] Submitting:", {
+      title: titleToSend,
+      service_type_booking: formData.value.service_type_booking,
+      cara_pemesanan: fd.get("cara_pemesanan"),
+    });
 
-      newImageFiles.value.forEach((file) => fd.append("images[]", file));
-    }
+    // Ensure integer prices from formData (not from vee-validate values slot)
+    fd.set("fixed_price", parseInt(formData.value.fixed_price) || 0);
+    fd.set("base_price", parseInt(formData.value.base_price) || 0);
 
-    // Add images to remove (if backend supports it)
+    // === UPLOAD GAMBAR: hanya images[] berisi File object (maks 10) ===
+    const filesToUpload = (newImageFiles.value || [])
+      .filter((file) => file instanceof File)
+      .slice(0, 10);
+
+    console.log('existingImages:', existingImages.value);
+    console.log('selectedImages (newImageFiles):', newImageFiles.value);
+
+    filesToUpload.forEach((file) => {
+      fd.append('images[]', file);
+    });
+
+    // Add images to remove (ID array, bukan images[])
     if (imagesToRemove.value.length) {
-      fd.append("remove_images", JSON.stringify(imagesToRemove.value));
+      fd.append('remove_images', JSON.stringify(imagesToRemove.value));
     }
 
     // Set cover image id if selected
     if (currentCoverId.value) {
-      fd.append("cover_image_id", currentCoverId.value);
+      fd.append('cover_image_id', String(currentCoverId.value));
+    }
+
+    // Debug: log all FormData entries
+    console.log("[Editjasa] FormData entries:");
+    for (const [key, value] of fd.entries()) {
+      console.log(`  FORMDEBUG ${key}:`, typeof value === "object" ? `File(${value.name})` : value);
     }
 
     console.log("Submitting jasa with FormData", {
       status: formData.value.status,
-      new_images_count: newImageFiles.value.length,
+      new_images_count: filesToUpload.length,
+      existing_images_count: existingImages.value.length,
       images_to_remove: imagesToRemove.value.length,
     });
 
     // Use POST with _method spoofing for multipart compatibility
     // Biarkan axios yang set header multipart/form-data + boundary secara otomatis
-    const { data } = await api.post(`/api/jasa/${currentJasaId.value}`, fd);
+    const { data } = await api.post(`/api/jasa/${currentJasaId.value}`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }).catch((err) => {
+      console.error("[Editjasa] API Error:", err.response?.status, err.response?.data);
+      throw err;
+    });
 
     toast.success("Jasa berhasil diperbarui!");
 
@@ -703,9 +756,22 @@ const submitForm = async (values) => {
       `/merchant-center/${currentMerchantSlug.value}/jasas?t=${Date.now()}`
     );
   } catch (error) {
+    // Detailed error logging
     console.error("Error updating jasa:", error);
-    const msg = error.response?.data?.message || "Gagal memperbarui jasa";
-    toast.error(msg);
+    console.error("Error status:", error.response?.status);
+    console.error("Error data:", error.response?.data);
+    console.error("Error headers:", error.response?.headers);
+    const errors = error.response?.data?.errors;
+    if (errors) {
+      console.error("Validation errors:", errors);
+      Object.entries(errors).forEach(([field, messages]) => {
+        messages.forEach((msg) => {
+          toast.error(`${field}: ${msg}`);
+        });
+      });
+    }
+    const msg = error.response?.data?.message || error.response?.data?.error || "Gagal memperbarui jasa";
+    if (!errors) toast.error(msg);
   } finally {
     loading.value = false;
   }
@@ -760,10 +826,9 @@ onMounted(async () => {
           :validationSchema="validationSchema"
           :initialValues="formData"
           @submit="submitForm"
-          v-slot="{ handleSubmit, values, setFieldValue }"
+          v-slot="{ errors }"
         >
           <form
-            @submit.prevent="handleSubmit(submitForm)"
             class="p-6 space-y-6"
           >
             <!-- 1. KLASIFIKASI LAYANAN -->
@@ -805,7 +870,7 @@ onMounted(async () => {
 
                 <SelectField
                   name="jasa_category_id"
-                  label="Kategori Utama"
+                  label="Kategori"
                   placeholder="Pilih kategori..."
                   :options="
                     jasaCategories.map((c) => ({
@@ -890,7 +955,7 @@ onMounted(async () => {
                             field.onChange(newValue);
                             formData.fixed_price = newValue;
                             // Auto-clear base_price jika fixed_price diisi
-                            if (newValue > 0 && values?.base_price > 0) {
+                            if (newValue > 0 && Number(formData.base_price || 0) > 0) {
                               setFieldValue('base_price', 0);
                               formData.base_price = 0;
                             }
@@ -900,7 +965,7 @@ onMounted(async () => {
                         type="text"
                         placeholder="0"
                         class="w-full py-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        :disabled="Number(values?.base_price || 0) > 0"
+                        :disabled="Number(formData.base_price || 0) > 0"
                       />
                     </div>
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
@@ -910,7 +975,7 @@ onMounted(async () => {
                       v-else
                       class="mt-1 text-sm"
                       :class="
-                        Number(values?.base_price || 0) > 0
+                        Number(formData.base_price || 0) > 0
                           ? 'text-gray-400'
                           : 'text-gray-600'
                       "
@@ -939,7 +1004,7 @@ onMounted(async () => {
                             field.onChange(newValue);
                             formData.base_price = newValue;
                             // Auto-clear fixed_price jika base_price diisi
-                            if (newValue > 0 && values?.fixed_price > 0) {
+                            if (newValue > 0 && Number(formData.fixed_price || 0) > 0) {
                               setFieldValue('fixed_price', 0);
                               formData.fixed_price = 0;
                             }
@@ -949,7 +1014,7 @@ onMounted(async () => {
                         type="text"
                         placeholder="0"
                         class="w-full py-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                        :disabled="Number(values?.fixed_price || 0) > 0"
+                        :disabled="Number(formData.fixed_price || 0) > 0"
                       />
                     </div>
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
@@ -959,7 +1024,7 @@ onMounted(async () => {
                       v-else
                       class="mt-1 text-sm"
                       :class="
-                        Number(values?.fixed_price || 0) > 0
+                        Number(formData.fixed_price || 0) > 0
                           ? 'text-gray-400'
                           : 'text-gray-600'
                       "
@@ -1003,7 +1068,7 @@ onMounted(async () => {
                       class="relative"
                     >
                       <img
-                        :src="getImageUrl(image.url || image.src_url || image.id)"
+                        :src="getImageUrl(image.url || image.src_url || image.id || image.path)"
                         alt="preview"
                         class="object-cover w-full border border-gray-200 rounded h-28 bg-gray-50"
                         @error="(e) => (e.target.style.display = 'none')"
@@ -1114,6 +1179,60 @@ onMounted(async () => {
               </div>
             </div>
 
+            <!-- 3.5. CARA PEMESANAN -->
+            <div
+              class="p-5 border bg-linear-to-r from-pink-50 to-transparent rounded-xl border-pink-100"
+            >
+              <div class="flex items-center gap-3 mb-5">
+                <div
+                  class="flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-pink-500 rounded-full"
+                >
+                  3.5
+                </div>
+                <h2 class="text-lg font-bold text-gray-800">
+                  Cara Pemesanan
+                </h2>
+              </div>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <SelectField
+                  name="service_type_booking"
+                  label="Mekanisme Pemesanan"
+                  :options="[
+                    { value: 'keranjang', label: '🛒 Keranjang (Tanpa Jadwal)' },
+                    { value: 'booking', label: '📅 Booking (Pilih Jadwal)' },
+                    { value: 'konsultasi', label: '💬 Konsultasi (Hubungi Penjual)' },
+                  ]"
+                  v-model="formData.service_type_booking"
+                  required
+                />
+                <div class="sm:col-span-2">
+                  <p class="text-xs text-gray-500 mb-2">
+                    Pilih cara pemesanan yang paling mudah untuk pelanggan:
+                    langsung checkout, pilih jadwal terlebih dahulu, atau konsultasi dulu.
+                    Jika pilih Booking, bagian Jam Layanan akan muncul di bawah.
+                  </p>
+                  <div
+                    v-if="formData.service_type_booking === 'keranjang'"
+                    class="p-3 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700"
+                  >
+                    💡 <strong>Keranjang:</strong> Layanan langsung masuk keranjang tanpa konsultasi atau jadwal. Pelanggan bisa segera melanjutkan pembayaran.
+                  </div>
+                  <div
+                    v-else-if="formData.service_type_booking === 'booking'"
+                    class="p-3 text-xs border border-green-200 rounded-lg bg-green-50 text-green-700"
+                  >
+                    💡 <strong>Booking:</strong> Pelanggan memilih tanggal dan jam terlebih dahulu, kemudian lanjut ke ringkasan pembayaran.
+                  </div>
+                  <div
+                    v-else-if="formData.service_type_booking === 'konsultasi'"
+                    class="p-3 text-xs border border-purple-200 rounded-lg bg-purple-50 text-purple-700"
+                  >
+                    💡 <strong>Konsultasi:</strong> Pelanggan menghubungi UMKM dulu untuk berdiskusi. Setelah konsultasi, penjual akan mengirimkan link layanan atau detail order.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- 4. LOKASI -->
             <div
               class="p-5 border border-orange-100 bg-linear-to-r from-orange-50 to-transparent rounded-xl"
@@ -1133,8 +1252,8 @@ onMounted(async () => {
                   name="service_type"
                   label="Tipe Layanan"
                   :options="[
-                    { value: 'at_location', label: '📍 Di Tempat Saya' },
-                    { value: 'on_site', label: '🏠 Ke Rumah Pelanggan' },
+                    { value: 'di_tempat_umkm', label: '📍 Di Tempat UMKM' },
+                    { value: 'ke_rumah_pelanggan', label: '🏠 Ke Rumah Pelanggan' },
                     { value: 'online', label: '💻 Online' },
                   ]"
                   v-model="formData.service_type"
@@ -1142,7 +1261,7 @@ onMounted(async () => {
                 />
 
                 <Field
-                  v-if="formData.service_type === 'at_location'"
+                  v-if="formData.service_type === 'di_tempat_umkm'"
                   name="location_address"
                   v-slot="{ errors }"
                 >
@@ -1166,7 +1285,7 @@ onMounted(async () => {
                 </Field>
 
                 <Field
-                  v-if="formData.service_type === 'on_site'"
+                  v-if="formData.service_type === 'ke_rumah_pelanggan'"
                   name="service_area"
                   v-slot="{ field, errors }"
                 >
@@ -1184,7 +1303,7 @@ onMounted(async () => {
                       class="w-full px-4 py-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     ></textarea>
                     <p class="mt-1 text-xs text-gray-500">
-                      Saat checkout, customer akan diminta izin lokasi device untuk menentukan alamat layanan.
+                      Customer akan diminta alamat lengkap saat booking.
                     </p>
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
                       {{ errors[0] }}
@@ -1196,7 +1315,7 @@ onMounted(async () => {
                   v-if="formData.service_type === 'online'"
                   class="sm:col-span-2 p-3 text-xs border border-blue-200 rounded-lg bg-blue-50 text-blue-700"
                 >
-                  Layanan online tidak membutuhkan alamat lokasi.
+                  Layanan dilakukan secara online, alamat tidak diperlukan.
                 </div>
 
                 <Field name="operating_times" v-slot="{ errors }">
@@ -1205,9 +1324,10 @@ onMounted(async () => {
                       >Jam Layanan <span class="text-xs font-normal text-gray-500">(opsional)</span></label
                     >
 
-                    <div class="p-3 bg-white border border-orange-100 rounded-lg">
+                    <div v-if="formData.service_type_booking === 'booking'" class="p-3 bg-white border border-orange-100 rounded-lg">
                       <p class="mb-2 text-xs text-gray-500">
                         Pilih satu atau beberapa jam layanan yang bisa dipilih customer.
+                        Jika tidak diisi, customer tetap bisa memilih atau mengetik jam manual di halaman pemesanan.
                       </p>
 
                       <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -1302,6 +1422,10 @@ onMounted(async () => {
                       </p>
                     </div>
 
+                    <div v-else class="p-3 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-600">
+                      Jam layanan hanya perlu diisi untuk pemesanan Booking. Jika memilih Keranjang atau Konsultasi, customer tidak perlu menentukan jam di sini.
+                    </div>
+
                     <p v-if="errors[0]" class="mt-1 text-sm text-red-500">
                       {{ errors[0] }}
                     </p>
@@ -1393,7 +1517,7 @@ onMounted(async () => {
                     variant="primary"
                     @click="
                       formData.status = 'published';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2"
                   >
@@ -1408,7 +1532,7 @@ onMounted(async () => {
                     variant="muted-outline"
                     @click="
                       formData.status = 'archived';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2 text-red-700 border-red-200 bg-red-50 hover:bg-red-100"
                   >
@@ -1423,7 +1547,7 @@ onMounted(async () => {
                     variant="primary"
                     @click="
                       formData.status = 'published';
-                      handleSubmit(submitForm)();
+                      submitForm(formData);
                     "
                     class="flex items-center gap-2"
                   >
@@ -1446,11 +1570,12 @@ onMounted(async () => {
                 Kembali
               </Button>
               <Button
-                type="submit"
+                type="button"
                 variant="primary"
                 :disabled="loading"
                 :loading="loading"
                 class="flex-1"
+                @click="submitForm(formData)"
               >
                 <i class="mr-2 pi pi-check"></i>
                 {{ loading ? "Menyimpan..." : "Simpan Perubahan" }}
