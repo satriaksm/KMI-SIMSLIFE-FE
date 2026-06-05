@@ -12,6 +12,10 @@ const props = defineProps({
     type: [Number, String],
     default: null,
   },
+  textClass: {
+    type: String,
+    default: "text-gray-600",
+  },
 });
 
 const route = useRoute();
@@ -20,12 +24,7 @@ const router = useRouter();
 const processedItems = computed(() => {
   return props.items.map((item) => {
     if (!item.path) return item;
-
-    // If path is a route object, pass through as-is
-    if (typeof item.path !== "string") {
-      return item;
-    }
-
+    if (typeof item.path !== "string") return item;
     if (
       item.path.startsWith("http") ||
       item.path.includes("/:merchantId") ||
@@ -33,7 +32,6 @@ const processedItems = computed(() => {
     ) {
       return item;
     }
-
     if (
       item.path.includes("/merchant-center") &&
       props.merchantId &&
@@ -45,14 +43,12 @@ const processedItems = computed(() => {
       );
       return { ...item, path: newPath };
     }
-
     return item;
   });
 });
 
 const navigateTo = (path) => {
   if (path) {
-    // Supports both string paths and route objects { name, params, query }
     router.push(path);
   }
 };
@@ -65,8 +61,7 @@ const navigateTo = (path) => {
       <button
         v-if="crumb.path"
         @click="navigateTo(crumb.path)"
-        class="flex items-center gap-2 text-base font-medium transition cursor-pointer text-muted-foreground hover:text-merchant-primary sm:text-2xl"
-        :class="{ '': crumb.path }"
+        :class="['flex items-center gap-2 text-base font-medium transition cursor-pointer hover:text-merchant-primary sm:text-2xl', textClass]"
       >
         <i v-if="crumb.icon" :class="crumb.icon" class="text-sm"></i>
         {{ crumb.label }}
@@ -75,7 +70,7 @@ const navigateTo = (path) => {
       <!-- Current breadcrumb (no link) -->
       <span
         v-else
-        class="text-base font-bold text-merchant-primary sm:text-2xl whitespace-nowrap"
+        :class="['text-base font-bold sm:text-2xl whitespace-nowrap text-merchant-primary', textClass]"
       >
         <i v-if="crumb.icon" :class="crumb.icon" class="mr-1 text-sm"></i>
         {{ crumb.label }}
@@ -84,7 +79,7 @@ const navigateTo = (path) => {
       <!-- Separator -->
       <i
         v-if="index < processedItems.length - 1"
-        class="text-xs text-gray-400 pi pi-chevron-right"
+        :class="['text-xs pi pi-chevron-right', textClass.replace('font-medium', '').replace('font-bold', '')]"
       ></i>
     </template>
   </nav>

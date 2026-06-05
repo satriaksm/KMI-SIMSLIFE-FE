@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import ReportButton from "@/components/ReportButton.vue";
 
 const imageError = ref(false);
@@ -25,6 +25,38 @@ const props = defineProps({
     default: "max-w-xs",
   },
 });
+
+// Helper function to get item rating from various possible field names
+const getItemRating = (item) => {
+  const summary =
+    item.rating_summary ||
+    item.ratingSummary ||
+    item.item_rating_summary ||
+    null;
+
+  if (summary) {
+    return Number(summary?.average_rating || 0).toFixed(1);
+  }
+  return Number(item.average_rating || item.rating || 0).toFixed(1);
+};
+
+// Helper function to get total reviews
+const getItemTotalReviews = (item) => {
+  const summary =
+    item.rating_summary ||
+    item.ratingSummary ||
+    item.item_rating_summary ||
+    null;
+
+  if (summary) {
+    return Number(summary?.total_reviews || 0);
+  }
+  return Number(item.total_reviews || item.review_count || 0);
+};
+
+const itemRating = computed(() => getItemRating(props.product));
+const itemReviewCount = computed(() => getItemTotalReviews(props.product));
+const hasItemReviews = computed(() => itemReviewCount.value > 0);
 
 // Format harga ke Rupiah
 const formatIDR = (v) =>
@@ -60,13 +92,37 @@ const formattedPrice = computed(() => {
   return `Rp ${minFormatted} - Rp ${maxFormatted}`;
 });
 
-// Get image URL
+// Get image URL — supports both products (cover_image) and jasa (cover_img)
 const productImageUrl = computed(() => {
   if (imageError.value) return null;
 
-  if (props.product.cover_image) {
-    return props.product.cover_image.src_url || props.product.cover_image;
+  const item = props.product;
+
+  // Priority 1: cover_image (products)
+  if (item.cover_image) {
+    if (typeof item.cover_image === "object") {
+      return item.cover_image.src_url || item.cover_image.url || item.cover_image.id || null;
+    }
+    return item.cover_image;
   }
+
+  // Priority 2: cover_img (jasa) — getImageUrl handles full URLs too
+  if (item.cover_img) {
+    if (typeof item.cover_img === "object") {
+      return item.cover_img.src_url || item.cover_img.url || item.cover_img.id || null;
+    }
+    return item.cover_img;
+  }
+
+  // Priority 3: images array first item (jasa/products fallback)
+  if (item.images && item.images.length > 0) {
+    const first = item.images[0];
+    if (typeof first === "object") {
+      return first.src_url || first.url || first.id || null;
+    }
+    return first;
+  }
+
   return null;
 });
 
@@ -85,12 +141,6 @@ const formattedDistanceKm = computed(() => {
   return `${distanceKm.value.toFixed(1)} km`;
 });
 
-watch(
-  () => props.product?.id,
-  () => {
-    imageError.value = false;
-  }
-);
 </script>
 
 <template>
@@ -164,6 +214,13 @@ watch(
       <p class="mb-2 text-xs font-bold text-primary">
         {{ formattedPrice }}
       </p>
+
+      <!-- Rating -->
+      <div class="mb-2 flex items-center gap-1 text-[11px]">
+        <i class="pi pi-star-fill text-orange-400"></i>
+        <span class="text-gray-700 font-semibold">{{ itemRating }}</span>
+        <span v-if="hasItemReviews" class="text-gray-500">({{ itemReviewCount }})</span>
+      </div>
 
       <!-- Rating & Distance (auto push to bottom) -->
       <div

@@ -166,6 +166,21 @@
                     ></i>
                     {{ formattedDistanceKm }}
                   </span>
+
+                  <span
+                    v-if="merchantRating && totalReviews > 0"
+                    class="flex items-center gap-1 text-xs font-semibold text-gray-600"
+                  >
+                    <i class="pi pi-star-fill text-orange-400"></i>
+                    {{ averageRating }} ({{ totalReviews }} ulasan)
+                  </span>
+                  <span
+                    v-else
+                    class="flex items-center gap-1 text-xs font-semibold text-gray-400"
+                  >
+                    <i class="pi pi-star-fill"></i>
+                    Belum ada rating
+                  </span>
                 </div>
               </div>
 
@@ -309,6 +324,17 @@
                   >
                 </template>
               </p>
+
+              <!-- Rating Jasa -->
+              <div class="mt-2 flex items-center gap-1">
+                <i class="pi pi-star-fill text-orange-400"></i>
+                <span class="text-xs font-semibold text-gray-700">
+                  {{ getItemRating(jasa) }}
+                </span>
+                <span v-if="getItemTotalReviews(jasa) > 0" class="text-xs text-gray-500">
+                  ({{ getItemTotalReviews(jasa) }})
+                </span>
+              </div>
             </div>
           </router-link>
 
@@ -435,6 +461,10 @@
           >
             <span>Rute</span>
           </AppButton>
+
+          <div v-if="merchant?.id" ref="reviewSectionRef" id="reviews" class="mt-6">
+            <ReviewSection :resourceType="'merchant'" :resourceId="merchant.slug" />
+          </div>
         </div>
       </div>
     </template>
@@ -481,6 +511,8 @@ import LeafletMap from "@/components/LeafletMap.vue";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import AppButton from "@/components/common/Button.vue";
+import ReviewSection from "@/components/common/ReviewSection.vue";
+import JasaRatingBadge from "@/components/common/JasaRatingBadge.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 
@@ -538,10 +570,53 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Merchant rating (from API response, not composable)
+const merchantRating = computed(() => merchant.value?.rating_summary || null)
+const averageRating = computed(() => Number(merchantRating.value?.average_rating || 0).toFixed(1))
+const totalReviews = computed(() => Number(merchantRating.value?.total_reviews || 0))
+
+// Helper function to get item rating from various possible field names
+const getItemRating = (item) => {
+  const summary =
+    item.rating_summary ||
+    item.ratingSummary ||
+    item.item_rating_summary ||
+    null
+
+  if (summary) {
+    return Number(summary?.average_rating || 0).toFixed(1)
+  }
+  return Number(item.average_rating || item.rating || 0).toFixed(1)
+}
+
+// Helper function to get total reviews
+const getItemTotalReviews = (item) => {
+  const summary =
+    item.rating_summary ||
+    item.ratingSummary ||
+    item.item_rating_summary ||
+    null
+
+  if (summary) {
+    return Number(summary?.total_reviews || 0)
+  }
+  return Number(item.total_reviews || item.review_count || 0)
+}
+
 // Sync data state
 const merchantInfo = ref({
   address: "",
 });
+const reviewSectionRef = ref(null);
+
+const scrollToReviewSection = async () => {
+  if (route.hash !== "#reviews") return;
+
+  await nextTick();
+  if (reviewSectionRef.value) {
+    reviewSectionRef.value.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+};
 const operationalHours = ref([]);
 const latitude = ref(null);
 const longitude = ref(null);
@@ -872,14 +947,40 @@ const resolveJasaImage = (jasa) => {
       jasa.images.find((img) => img.is_cover) || jasa.images[0];
 
     // API returns url/src_url
-    if (coverImage.id) return getImageUrl(coverImage.id);
     if (coverImage.src_url) return getImageUrl(coverImage.src_url);
     if (coverImage.url) return getImageUrl(coverImage.url);
-
+    if (coverImage.id) return getImageUrl(coverImage.id);
+    if (coverImage.image_path) return getImageUrl(coverImage.image_path);
   }
 
   return null;
 };
+
+/**
+ * Normalize jasa image payload — ensures cover_img and images have full URLs.
+ * Backend provides public URLs; this ensures getImageUrl resolves them correctly.
+ */
+function normalizeJasaImagePayload(jasaData) {
+  if (!jasaData || typeof jasaData !== "object") return jasaData;
+  const normalized = { ...jasaData };
+  if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      : "";
+    normalized.cover_img = { id: normalized.cover_img.id ?? null, url: srcUrl, src_url: srcUrl };
+  }
+  if (Array.isArray(normalized.images)) {
+    normalized.images = normalized.images.map((img) => {
+      if (!img || typeof img !== "object") return img;
+      const srcUrl = img.src_url || img.url || img.image_path || img.id
+        ? getImageUrl(img.src_url || img.url || img.image_path || String(img.id))
+        : "";
+      return { id: img.id ?? null, url: srcUrl, src_url: srcUrl, is_cover: img.is_cover ?? false };
+    });
+  }
+  if (normalized.image) normalized.image = getImageUrl(normalized.image);
+  return normalized;
+}
 
 const goToProductDetail = (product) => {
   if (!product?.slug) return;
@@ -1035,7 +1136,8 @@ async function fetchMerchantMenu(
       );
 
       const parsed = parseLaravelPaginator(data);
-      const mapped = (parsed.items ?? []).map((j) => ({
+      const normalizedItems = (parsed.items ?? []).map(normalizeJasaImagePayload);
+      const mapped = normalizedItems.map((j) => ({
         ...j,
         // keep image resolver compat
         image: j?.image ?? null,
@@ -1124,6 +1226,7 @@ const fetchMerchantData = async () => {
 
     await nextTick();
     setupObserver();
+    await scrollToReviewSection();
   } catch (error) {
     console.error("Error fetching merchant:", error);
     merchant.value = null;
@@ -1163,10 +1266,20 @@ watch(
 
     await nextTick();
     setupObserver();
+    await scrollToReviewSection();
   },
 );
 
 watch(() => route.params.slug, fetchMerchantData, { immediate: true });
+
+watch(
+  () => route.hash,
+  async (hash) => {
+    if (hash === "#reviews") {
+      await scrollToReviewSection();
+    }
+  },
+);
 </script>
 
 <style scoped>

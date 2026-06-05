@@ -907,6 +907,9 @@ const jasaToProductCard = (jasa) => {
     // Fallback compatibility for any UI relying on min/max.
     min_price: price,
     max_price: price,
+    // Primary: cover_img (ProductCard now handles this)
+    cover_img: jasa?.cover_img || null,
+    // Fallback: cover_image (used by older code)
     cover_image: resolveJasaImage(jasa),
     merchant: merchantFromJasa,
   };

@@ -7,41 +7,37 @@ const normalizeJasaImagePayload = (jasa) => {
 
   const normalized = { ...jasa };
 
+  // cover_img: src_url and url should both be the full public URL from backend
   if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      : "";
     normalized.cover_img = {
-      ...normalized.cover_img,
-      src_url: normalized.cover_img.src_url
-        ? getImageUrl(normalized.cover_img.src_url)
-        : normalized.cover_img.url
-          ? getImageUrl(normalized.cover_img.url)
-          : normalized.cover_img.id
-            ? getImageUrl(normalized.cover_img.id)
-            : normalized.cover_img.src_url,
+      id: normalized.cover_img.id ?? null,
+      url: srcUrl,
+      src_url: srcUrl,
     };
   }
 
+  // images array: resolve url/src_url/image_path to full URL
   if (Array.isArray(normalized.images)) {
     normalized.images = normalized.images.map((image) => {
       if (!image || typeof image !== "object") return image;
-
-      const resolvedUrl = image.url
-        ? getImageUrl(image.url)
-        : image.src_url
-          ? getImageUrl(image.src_url)
-          : image.image_path
-            ? getImageUrl(image.image_path)
-            : image.id
-              ? getImageUrl(image.id)
-              : "";
-
+      const srcUrl = image.src_url || image.url || image.image_path || image.id
+        ? getImageUrl(image.src_url || image.url || image.image_path || String(image.id))
+        : "";
       return {
-        ...image,
-        url: resolvedUrl || image.url,
-        src_url: resolvedUrl || image.src_url,
+        id: image.id ?? null,
+        url: srcUrl,
+        src_url: srcUrl,
+        image_path: image.image_path ?? null,
+        is_cover: image.is_cover ?? false,
+        display_order: image.display_order ?? 0,
       };
     });
   }
 
+  // legacy image field
   if (normalized.image) {
     normalized.image = getImageUrl(normalized.image);
   }
@@ -168,7 +164,7 @@ export function useJasa() {
       if (payload.addon_groups) payload.addonGroups = payload.addon_groups;
       if (!Array.isArray(payload.images))
         payload.images = payload.images ? [payload.images] : [];
-      return payload;
+      return normalizeJasaImagePayload(payload);
     } catch (err) {
       throw err;
     }

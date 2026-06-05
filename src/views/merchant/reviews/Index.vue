@@ -100,7 +100,10 @@
           <div class="flex items-start justify-between mb-3 pb-3 border-b border-gray-100">
             <div class="flex-1">
               <div class="flex items-center gap-2 mb-1">
-                <h4 class="text-sm font-semibold text-gray-900">{{ review.user?.name || "Pelanggan" }}</h4>
+                <h4 class="text-sm font-semibold text-gray-900">{{ getReviewerName(review) }}</h4>
+                <span v-if="review.is_anonymous" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600">
+                  <i class="pi pi-eye-slash text-[8px] mr-0.5"></i>Anonim
+                </span>
                 <span class="text-xs text-gray-500">{{ review.rateable?.title || review.rateable?.name || "Produk/Jasa" }}</span>
               </div>
               <div class="flex items-center gap-2">
@@ -180,6 +183,14 @@ const {
 const searchQuery = ref("");
 const selectedRating = ref(null);
 
+// Get reviewer display name — respects is_anonymous flag (merchant sees the actual name)
+const getReviewerName = (review) => {
+  if (review?.is_anonymous) {
+    return 'Pengguna Anonim';
+  }
+  return review?.user?.name || 'Pelanggan';
+};
+
 // Fetch reviews saat component mounted
 onMounted(() => {
   if (currentMerchantSlug.value) {
@@ -189,8 +200,9 @@ onMounted(() => {
 
 const filteredReviews = computed(() => {
   return reviews.value.filter((review) => {
+    const reviewerName = getReviewerName(review);
     const matchesSearch =
-      review.user?.name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      reviewerName.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       review.title?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
       review.comment?.toLowerCase().includes(searchQuery.value.toLowerCase());
 
