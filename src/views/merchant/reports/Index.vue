@@ -43,17 +43,17 @@
           @click="showExportModal = true"
           variant="merchant-outline"
           size="sm"
-          customClass="!hidden sm:!inline"
+          customClass="!hidden md:!inline"
         >
           <i class="pi pi-download"></i>
-          <span class="hidden ml-2 sm:inline">Export</span>
+          <span class="hidden ml-2 md:inline">Export</span>
         </Button>
 
                 <Button
           @click="showExportModal = true"
           variant="merchant-outline"
           size="md"
-          customClass="sm:!hidden"
+          customClass="md:!hidden"
         >
           <i class="pi pi-download"></i>
         </Button>

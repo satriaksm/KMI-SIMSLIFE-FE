@@ -141,6 +141,36 @@ async function fetchOrder() {
       route.params.orderId,
     );
     rawOrder.value = res?.data ?? res ?? null;
+
+    // Preload images
+    const imageUrls = [];
+    if (order.value?.items) {
+      order.value.items.forEach((item) => {
+        if (item.image) imageUrls.push(item.image);
+      });
+    }
+    if (order.value?.customer?.profile_picture) {
+      imageUrls.push(order.value.customer.profile_picture);
+    }
+    if (order.value?.proof_image_url) {
+      imageUrls.push(order.value.proof_image_url);
+    }
+
+    if (imageUrls.length > 0) {
+      await Promise.all(
+        imageUrls.map(
+          (url) =>
+            new Promise((resolve) => {
+              const img = new Image();
+              img.crossOrigin = "use-credentials";
+              img.onload = resolve;
+              img.onerror = resolve;
+              img.src = url;
+            })
+        )
+      );
+    }
+
     startConfirmCountdown();
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
@@ -802,7 +832,7 @@ function leaveOrderChannel(id) {
         </h2>
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 overflow-hidden bg-gray-100 rounded-full shrink-0 flex items-center justify-center border border-gray-200">
-            <img v-if="order.customer.profile_picture" :src="order.customer.profile_picture" class="object-cover w-full h-full" alt="Customer avatar" />
+            <img v-if="order.customer.profile_picture" :src="order.customer.profile_picture" class="object-cover w-full h-full" alt="Customer avatar" crossorigin="use-credentials" />
             <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
@@ -855,7 +885,7 @@ function leaveOrderChannel(id) {
           Bukti Foto
         </h2>
         <div class="mt-3">
-          <img :src="order.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
+          <img :src="order.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" crossorigin="use-credentials" />
         </div>
       </div>
 
@@ -944,34 +974,35 @@ function leaveOrderChannel(id) {
       <!-- ACTION BUTTON            -->
       <!-- ======================== -->
       <div class="pb-6 space-y-2">
-        <button
+        <Button
           v-if="nextActionLabel"
-          type="button"
+          variant="merchant"
+          block
+          :loading="actionLoading"
           @click="handleNextAction"
-          :disabled="actionLoading"
-          class="w-full py-3.5 rounded-2xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition active:scale-[0.98] bg-merchant-primary disabled:opacity-50"
+          size="lg"
         >
           <i class="pi pi-check-circle"></i>
           {{ nextActionLabel }}
-        </button>
-        <button
+        </Button>
+        <Button
           v-if="canCancel"
-          type="button"
-          @click="handleCancel"
+          variant="danger-outline"
+          block
           :disabled="actionLoading"
-          class="w-full py-3 text-sm font-semibold text-red-600 transition bg-red-50 rounded-2xl hover:bg-red-100 disabled:opacity-50"
+          @click="handleCancel"
         >
           Tolak / Batalkan Pesanan
-        </button>
-        <button
+        </Button>
+        <Button
           v-if="canUndelivered"
-          type="button"
-          @click="handleUndelivered"
+          variant="warning-outline"
+          block
           :disabled="actionLoading"
-          class="w-full py-3 text-sm font-semibold text-orange-600 transition bg-orange-50 rounded-2xl hover:bg-orange-100 disabled:opacity-50"
+          @click="handleUndelivered"
         >
           Tandai Gagal Kirim
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -1011,21 +1042,21 @@ function leaveOrderChannel(id) {
 
       <template #footer>
         <div class="flex gap-3">
-          <button
-            type="button"
+          <Button
+            variant="muted-outline"
+            block
             @click="showConfirmModal = false"
-            class="flex-1 py-2.5 text-sm font-semibold border border-gray-300 rounded-xl hover:bg-gray-50 transition"
           >
             Batal
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="merchant"
+            block
+            :loading="actionLoading"
             @click="confirmAction"
-            :disabled="actionLoading"
-            class="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl bg-merchant-primary hover:bg-merchant-primary/90 transition disabled:opacity-50"
           >
-            {{ actionLoading ? "Memproses..." : "Ya, Konfirmasi" }}
-          </button>
+            Ya, Konfirmasi
+          </Button>
         </div>
       </template>
     </ResponsiveModal>

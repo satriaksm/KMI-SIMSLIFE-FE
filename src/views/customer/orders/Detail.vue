@@ -165,7 +165,7 @@
             <template v-if="order.meta.delivery_type === 'pickup'">
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" />
+                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" crossorigin="use-credentials" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -195,7 +195,7 @@
             <template v-else>
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" />
+                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" crossorigin="use-credentials" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -255,7 +255,6 @@
                   :src="it.imageUrl"
                   :alt="it.title"
                   class="object-cover w-full h-full"
-                  loading="lazy"
                   crossorigin="use-credentials"
                 />
               </div>
@@ -409,30 +408,35 @@
           <div v-else-if="order?.status === 'pending' && countdownText" class="mb-3 text-center text-sm font-medium text-amber-700 bg-amber-50 py-2 rounded-xl">
             Sisa waktu pembayaran: <span class="font-bold">{{ countdownText }}</span>
           </div>
-          <button
+          <Button
             v-if="order?.status === 'pending' && order?.meta?.payment_method !== 'COD'"
-            class="w-full py-3 mb-2 text-sm font-semibold text-white transition rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-50"
-            :disabled="paying || isPaymentExpired"
+            variant="primary"
+            block
+            :loading="paying"
+            :disabled="isPaymentExpired"
             @click="handlePayNow"
           >
-            {{ paying ? "Mengarahkan..." : "Bayar Sekarang" }}
-          </button>
-          <button
+            Bayar Sekarang
+          </Button>
+          <Button
             v-if="order?.status === 'pending' && order?.payment_method?.toUpperCase() === 'COD'"
-            class="w-full py-3 mt-2 text-sm font-semibold text-red-600 transition bg-red-50 rounded-xl hover:bg-red-100 disabled:opacity-50"
-            :disabled="cancelling"
+            variant="danger-outline"
+            block
+            :loading="cancelling"
             @click="handleCancel"
+            customClass="mt-2"
           >
-            {{ cancelling ? "Membatalkan..." : "Batalkan Pesanan" }}
-          </button>
-          <button
+            Batalkan Pesanan
+          </Button>
+          <Button
             v-if="order?.status === 'delivered' && order?.meta?.payment_method?.toUpperCase() !== 'COD'"
-            class="w-full py-3 mt-2 text-sm font-semibold text-white transition bg-green-600 rounded-xl hover:bg-green-700 disabled:opacity-50"
-            :disabled="completing"
+            block
+            :loading="completing"
             @click="handleComplete"
+            customClass="mt-2 bg-green-600 hover:bg-green-700 text-white"
           >
-            {{ completing ? "Memproses..." : "Pesanan Diterima (Selesai)" }}
-          </button>
+            Pesanan Diterima (Selesai)
+          </Button>
         </div>
       </template>
     </div>

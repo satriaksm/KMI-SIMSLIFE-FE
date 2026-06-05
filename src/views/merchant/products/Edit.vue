@@ -254,6 +254,14 @@ watch(selectedCategory, async (v) => {
 const canAddSubCategory = computed(
   () => selectedSubCategories.value.length < 4,
 );
+
+const getAvailableSubCategories = (currentIndex) => {
+  return categoriesLevel2.value.filter(cat => {
+    return !selectedSubCategories.value.some((selectedVal, idx) => {
+      return idx !== currentIndex && selectedVal === cat.value;
+    });
+  });
+};
 const canAddAddOnGroup = computed(
   () => addOnGroups.value.length < maxAddOnGroups,
 );
@@ -1091,23 +1099,15 @@ const formMinPurchase = computed({
                     :key="index"
                     class="flex items-center gap-2"
                   >
-                    <select
-                      v-model="selectedSubCategories[index]"
-                      class="flex-1 px-3 py-2.5 border border-primary rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="" disabled>Pilih sub kategori</option>
-                      <option
-                        v-for="cat in categoriesLevel2"
-                        :key="cat.value"
-                        :value="cat.value"
-                        :disabled="
-                          selectedSubCategories.includes(cat.value) &&
-                          selectedSubCategories[index] !== cat.value
-                        "
-                      >
-                        {{ cat.label }}
-                      </option>
-                    </select>
+                    <div class="flex-1">
+                      <SelectField
+                        :name="`sub_category_${index}`"
+                        :options="getAvailableSubCategories(index)"
+                        v-model="selectedSubCategories[index]"
+                        placeholder="Pilih sub kategori"
+                        variant="merchant"
+                      />
+                    </div>
                     <button
                       @click="selectedSubCategories.splice(index, 1)"
                       type="button"

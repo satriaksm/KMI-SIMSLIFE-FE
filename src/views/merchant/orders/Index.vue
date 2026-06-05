@@ -426,20 +426,6 @@ function leaveOrdersChannel(id) {
       </div>
     </div>
 
-    <!-- Search Bar & Filters -->
-    <div class="px-4 py-4 sm:px-6 space-y-4 border-b border-gray-200">
-      <div class="relative max-w-md">
-        <i
-          class="absolute left-3 top-3 pi pi-search text-gray-400 text-sm"
-        ></i>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Cari pesanan..."
-          class="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary"
-        />
-      </div>
-    </div>
 
     <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
       <!-- STICKY WRAPPER UNTUK TABS DAN SEARCH -->

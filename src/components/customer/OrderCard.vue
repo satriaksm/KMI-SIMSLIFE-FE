@@ -42,7 +42,6 @@
               :src="it.imageUrl"
               :alt="it.title"
               class="object-cover w-full h-full"
-              loading="lazy"
               crossorigin="use-credentials"
             />
           </div>

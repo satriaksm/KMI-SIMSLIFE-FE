@@ -389,11 +389,7 @@ onMounted(() => {
 
       <!-- Mobile toolbar -->
       <div
-<<<<<<< HEAD
-        class="flex flex-row items-center justify-between gap-4 px-3 pb-1 rounded-lg sm:hidden"
-=======
         class="flex sm:hidden flex-row justify-between items-center px-3 rounded-lg gap-4 pb-1"
->>>>>>> staging-ta
       >
         <div class="text-xs text-muted-foreground">Total: {{ totalItems }}</div>
 
@@ -435,43 +431,25 @@ onMounted(() => {
           <div class="flex items-center justify-center">
             <div
               v-if="item.logo_path"
-<<<<<<< HEAD
-              class="w-10 h-10 overflow-hidden rounded-full"
-=======
               class="w-10 h-10 rounded-full overflow-hidden"
->>>>>>> staging-ta
             >
               <img
                 :src="getMerchantLogoUrl(item)"
                 :alt="item.name"
-<<<<<<< HEAD
-                class="object-cover w-full h-full"
-                @error="
-                  (e) => {
-                    e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = `<span class='text-sm font-semibold text-merchant-primary'>${item.name?.charAt(0)?.toUpperCase()}</span>`;
-=======
                 class="w-full h-full object-cover"
                 @error="
                   (e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold text-sm'>${item.name?.charAt(0)?.toUpperCase()}</span>`;
->>>>>>> staging-ta
                   }
                 "
               />
             </div>
             <div
               v-else
-<<<<<<< HEAD
-              class="flex items-center justify-center w-10 h-10 rounded-full bg-merchant-primary/10"
-            >
-              <span class="text-sm font-semibold text-merchant-primary">
-=======
               class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center"
             >
               <span class="text-merchant-primary font-semibold text-sm">
->>>>>>> staging-ta
                 {{ item.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
@@ -577,43 +555,25 @@ onMounted(() => {
           <div class="flex items-start gap-3 mb-3">
             <div
               v-if="m.logo_path"
-<<<<<<< HEAD
-              class="w-12 h-12 overflow-hidden rounded-full shrink-0"
-=======
               class="w-12 h-12 rounded-full overflow-hidden shrink-0"
->>>>>>> staging-ta
             >
               <img
                 :src="getMerchantLogoUrl(m)"
                 :alt="m.name"
-<<<<<<< HEAD
-                class="object-cover w-full h-full"
-                @error="
-                  (e) => {
-                    e.target.style.display = 'none';
-                    e.target.parentElement.innerHTML = `<div class='flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0'><span class='font-semibold text-merchant-primary'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`;
-=======
                 class="w-full h-full object-cover"
                 @error="
                   (e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = `<div class='w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0'><span class='text-merchant-primary font-semibold'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`;
->>>>>>> staging-ta
                   }
                 "
               />
             </div>
             <div
               v-else
-<<<<<<< HEAD
-              class="flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0"
-            >
-              <span class="font-semibold text-merchant-primary">
-=======
               class="w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0"
             >
               <span class="text-merchant-primary font-semibold">
->>>>>>> staging-ta
                 {{ m.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
@@ -731,17 +691,10 @@ onMounted(() => {
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
-<<<<<<< HEAD
-              <p class="mb-1 text-sm font-medium text-blue-900">
-                Laporan akan mencakup:
-              </p>
-              <ul class="space-y-1 text-xs text-blue-800 list-disc list-inside">
-=======
               <p class="text-sm text-blue-900 font-medium mb-1">
                 Laporan akan mencakup:
               </p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
->>>>>>> staging-ta
                 <li>Data lengkap merchants (Nama, Owner, Email, Phone)</li>
                 <li>Segmentasi dan status merchants</li>
                 <li>Jumlah produk yang dimiliki</li>
@@ -782,11 +735,7 @@ onMounted(() => {
         </p>
       </div>
 
-<<<<<<< HEAD
-      <div class="flex justify-center gap-3">
-=======
       <div class="flex gap-3 justify-center">
->>>>>>> staging-ta
         <Button
           @click="closeApproveModal"
           variant="secondary"
@@ -826,11 +775,7 @@ onMounted(() => {
       </div>
 
       <template #footer>
-<<<<<<< HEAD
-        <div class="flex justify-end gap-3">
-=======
         <div class="flex gap-3 justify-end">
->>>>>>> staging-ta
           <Button
             @click="closeRejectModal"
             variant="secondary"

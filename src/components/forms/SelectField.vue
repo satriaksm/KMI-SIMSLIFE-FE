@@ -30,7 +30,7 @@ Events:
 - update:modelValue => emit saat nilai berubah
 */
 import { Field, ErrorMessage } from "vee-validate";
-import { computed, ref, onMounted, onUnmounted, watch } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch, getCurrentInstance } from "vue";
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -149,7 +149,6 @@ onUnmounted(() => {
           :id="name"
           @click="toggleDropdown"
           :disabled="disabled || loading"
-          :autocomplete="autocomplete || undefined"
           :class="selectClasses(meta.touched && errors.length)"
         >
           <span

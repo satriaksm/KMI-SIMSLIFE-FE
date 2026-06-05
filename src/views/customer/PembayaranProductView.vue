@@ -228,7 +228,19 @@
         <div class="space-y-3">
           <div>
             <div class="mb-2 text-sm font-bold text-gray-800">Metode Pembayaran</div>
-            <div class="space-y-4">
+            <div v-if="paymentFeesLoading" class="space-y-4 py-2 animate-pulse">
+              <div class="w-32 h-3 bg-gray-200 rounded mb-3"></div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <div v-for="n in 4" :key="'skl-'+n" class="border border-gray-100 rounded-xl p-3 flex gap-3">
+                  <div class="w-4 h-4 rounded-full bg-gray-200 shrink-0 mt-0.5"></div>
+                  <div class="space-y-2 flex-1">
+                    <div class="w-24 h-4 bg-gray-200 rounded"></div>
+                    <div class="w-32 h-3 bg-gray-100 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="space-y-4">
               <div v-for="group in groupedPaymentMethods" :key="group.type">
                 <div class="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">{{ group.title }}</div>
                 <div class="grid gap-2 sm:grid-cols-2">
@@ -310,7 +322,14 @@
               <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
             </div>
             <div
-              v-if="platformFee > 0"
+              v-if="paymentFeesLoading"
+              class="flex justify-between text-xs"
+            >
+              <span>Biaya Layanan/Admin</span>
+              <span class="text-gray-400">Menghitung...</span>
+            </div>
+            <div
+              v-else-if="platformFee > 0"
               class="flex justify-between text-xs"
             >
               <span>Biaya Layanan/Admin</span>
@@ -452,6 +471,7 @@ import { checkoutProductFromCart } from "@/services/api/order";
 import { getMyAddress } from "@/services/api/address";
 import { calculateShippingCost } from "@/services/api/shipping";
 import { fetchCart as fetchCartApi, addToCart as addToCartApi } from "@/services/api/cart";
+import api from "@/libs/axios";
 
 const {
   fetchVouchersByMerchant,
@@ -522,7 +542,7 @@ const order = computed(() => {
 
 const amounts = ref({ product: 0, ongkir: 0, diskon: 0 });
 
-const paymentMethodsList = [
+const paymentMethodsList = ref([
   { id: 'COD', name: 'Bayar di Tempat (COD)', type: 'cod', feeType: 'fixed', feeValue: 0, icon: 'pi-money-bill', description: 'Hanya untuk ambil sendiri' },
   { id: 'QRIS', name: 'QRIS (Gopay, OVO, Dana, dll)', type: 'qris', feeType: 'percent', feeValue: 0.007, icon: 'pi-qrcode', description: 'Biaya admin 0.7%' },
   { id: 'BCA', name: 'BCA Virtual Account', type: 'va', feeType: 'fixed', feeValue: 4440, icon: 'pi-building', description: 'Biaya admin Rp 4.440' },
@@ -533,7 +553,66 @@ const paymentMethodsList = [
   { id: 'OVO', name: 'OVO', type: 'ewallet', feeType: 'percent', feeValue: 0.015, icon: 'pi-wallet', description: 'Biaya admin 1.5%' },
   { id: 'DANA', name: 'DANA', type: 'ewallet', feeType: 'percent', feeValue: 0.015, icon: 'pi-wallet', description: 'Biaya admin 1.5%' },
   { id: 'ALFAMART', name: 'Alfamart / Alfamidi', type: 'retail', feeType: 'fixed', feeValue: 5550, icon: 'pi-shopping-bag', description: 'Biaya admin Rp 5.550' },
-];
+]);
+
+const paymentFeesLoading = ref(true);
+
+/**
+ * Fetch payment fees from backend and update paymentMethodsList dynamically.
+ * Maps backend method_code (QRIS, VA, EWALLET, SHOPEEPAY, RETAIL, COD)
+ * to the frontend payment method IDs.
+ */
+async function fetchPaymentFees() {
+  try {
+    const { data: res } = await api.get('/api/public/home/payment-fees');
+    const fees = res?.data || [];
+    if (!fees.length) return;
+
+    // Build a lookup: method_code -> { type, value }
+    const feeMap = {};
+    fees.forEach(f => {
+      feeMap[f.method_code] = f;
+    });
+
+    // Map backend method_code to frontend payment method IDs
+    const codeMapping = {
+      'COD': ['COD'],
+      'QRIS': ['QRIS'],
+      'VA': ['BCA', 'BNI', 'BRI', 'MANDIRI'],
+      'EWALLET': ['OVO', 'DANA'],
+      'SHOPEEPAY': ['SHOPEEPAY'],
+      'RETAIL': ['ALFAMART'],
+    };
+
+    const formatDescription = (fee) => {
+      if (fee.type === 'percentage') {
+        return `Biaya admin ${fee.value}%`;
+      }
+      return `Biaya admin Rp ${Number(fee.value).toLocaleString('id-ID')}`;
+    };
+
+    const updated = paymentMethodsList.value.map(method => {
+      for (const [code, ids] of Object.entries(codeMapping)) {
+        if (ids.includes(method.id) && feeMap[code]) {
+          const f = feeMap[code];
+          return {
+            ...method,
+            feeType: f.type === 'percentage' ? 'percent' : 'fixed',
+            feeValue: f.type === 'percentage' ? f.value / 100 : f.value,
+            description: method.id === 'COD' ? method.description : formatDescription(f),
+          };
+        }
+      }
+      return method;
+    });
+
+    paymentMethodsList.value = updated;
+  } catch (e) {
+    console.error('Failed to fetch payment fees, using defaults:', e);
+  } finally {
+    paymentFeesLoading.value = false;
+  }
+}
 
 const groupedPaymentMethods = computed(() => {
   const groups = [
@@ -544,7 +623,7 @@ const groupedPaymentMethods = computed(() => {
     { title: 'Bayar Tunai', type: 'cod', items: [] },
   ];
   
-  paymentMethodsList.forEach(m => {
+  paymentMethodsList.value.forEach(m => {
     if (m.id === 'QRIS') {
       groups.find(g => g.type === 'recommended').items.push(m);
     } else if (m.type === 'va') {
@@ -569,7 +648,7 @@ const baseGross = computed(() => {
 });
 
 const platformFee = computed(() => {
-  const method = paymentMethodsList.find(m => m.id === pay.value.method);
+  const method = paymentMethodsList.value.find(m => m.id === pay.value.method);
   if (!method || method.id === 'COD') return 0;
   
   if (method.feeType === 'fixed') {
@@ -1025,6 +1104,9 @@ onMounted(async () => {
     if (order.value.store?.slug)
       await fetchVouchersByMerchant(order.value.store.slug);
   }
+
+  // Fetch payment fees from backend (non-blocking, falls back to defaults)
+  fetchPaymentFees();
 });
 
 onBeforeRouteLeave(() => {

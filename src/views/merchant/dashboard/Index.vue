@@ -162,6 +162,7 @@ const fetchDashboard = async () => {
 
     const data = response?.data?.data || {};
     const voucherStats = data.voucher_stats || {};
+    const statsData = data.stats || {};
     
     orderStats.value = data.order_stats || null;
     walletStats.value = data.wallet || null;

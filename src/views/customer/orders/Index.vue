@@ -471,6 +471,10 @@ async function fetchOrders() {
     const { data: res } = await getCustomerOrders({ per_page: 100 });
     const list = res?.data ?? res ?? [];
     orders.value = (Array.isArray(list) ? list : []).map(mapOrder);
+
+    // Preload images
+
+
   } catch (e) {
     console.error("Gagal memuat pesanan:", e);
     toast.error("Gagal memuat pesanan");

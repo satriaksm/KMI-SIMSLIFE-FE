@@ -203,12 +203,13 @@ onMounted(async () => {
   if (isAuthenticated.value && !isAdmin.value) {
     cartStore.fetchCartCount();
   }
+
+  // Load statistics (uses 5-min cache)
+  fetchStatistics();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("scroll", onMobileScroll);
-  // Load statistics (uses 5-min cache)
-  fetchStatistics();
 });
 </script>
 

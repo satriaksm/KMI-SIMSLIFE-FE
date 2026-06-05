@@ -272,47 +272,38 @@
 
           <!-- Nama UMKM -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Nama UMKM
-            </label>
-            <input
+            <TextField
+              name="form.name"
               v-model="form.name"
-              type="text"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              label="Nama UMKM"
               placeholder="Masukkan nama toko"
+              variant="merchant"
             />
           </div>
 
           <!-- Kontak -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Kontak
-            </label>
-            <input
+            <TextField
+              name="form.contact"
               v-model="form.contact"
               type="tel"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              label="Kontak"
               placeholder="Masukkan nomor kontak"
+              variant="merchant"
             />
           </div>
 
           <!-- Tentang -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Tentang
-            </label>
-            <textarea
+            <TextField
+              name="form.description"
               v-model="form.description"
-              rows="4"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              :textarea="true"
+              :rows="4"
+              label="Tentang"
               placeholder="Ceritakan tentang toko Anda..."
-            ></textarea>
+              variant="merchant"
+            />
           </div>
 
           <!-- Informasi Pajak & Bank -->
@@ -324,15 +315,12 @@
             </p>
             <div class="space-y-4">
               <div>
-                <label
-                  class="block mb-2 text-sm font-semibold text-merchant-primary"
-                  >NPWP</label
-                >
-                <input
+                <TextField
+                  name="form.NPWP"
                   v-model="form.NPWP"
-                  type="text"
-                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  label="NPWP"
                   placeholder="Contoh: 12.345.678.9-012.345"
+                  variant="merchant"
                 />
               </div>
               <div>
@@ -347,27 +335,21 @@
                 />
               </div>
               <div>
-                <label
-                  class="block mb-2 text-sm font-semibold text-merchant-primary"
-                  >Nomor Rekening</label
-                >
-                <input
+                <TextField
+                  name="form.bank_account_number"
                   v-model="form.bank_account_number"
-                  type="text"
-                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  label="Nomor Rekening"
                   placeholder="Contoh: 1234567890"
+                  variant="merchant"
                 />
               </div>
               <div>
-                <label
-                  class="block mb-2 text-sm font-semibold text-merchant-primary"
-                  >Nama Pemilik Rekening</label
-                >
-                <input
+                <TextField
+                  name="form.bank_account_name"
                   v-model="form.bank_account_name"
-                  type="text"
-                  class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                  label="Nama Pemilik Rekening"
                   placeholder="Sesuai buku tabungan"
+                  variant="merchant"
                 />
               </div>
             </div>
@@ -439,7 +421,7 @@
               <div class="mt-3">
                 <TextField
                   name="form.address"
-                  textarea="true"
+                  :textarea="true"
                   v-model="form.address"
                   label="Alamat Lengkap"
                   placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
@@ -556,47 +538,38 @@
           >
             <!-- Nama UMKM -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Nama UMKM
-              </label>
-              <input
+              <TextField
+                name="form.name"
                 v-model="form.name"
-                type="text"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Nama UMKM"
                 placeholder="Masukkan nama UMKM"
+                variant="merchant"
               />
             </div>
 
             <!-- Kontak -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Kontak
-              </label>
-              <input
+              <TextField
+                name="form.contact"
                 v-model="form.contact"
                 type="tel"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Kontak"
                 placeholder="Masukkan nomor kontak"
+                variant="merchant"
               />
             </div>
 
             <!-- Tentang - Full Width -->
             <div class="md:col-span-2">
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Tentang
-              </label>
-              <textarea
+              <TextField
+                name="form.description"
                 v-model="form.description"
-                rows="4"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                :textarea="true"
+                :rows="4"
+                label="Tentang"
                 placeholder="Ceritakan tentang UMKM Anda..."
-              ></textarea>
+                variant="merchant"
+              />
             </div>
 
             <!-- Informasi Pajak & Bank - Full Width -->
@@ -608,15 +581,12 @@
               </p>
               <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label
-                    class="block mb-2 text-base font-medium text-merchant-primary"
-                    >NPWP</label
-                  >
-                  <input
+                  <TextField
+                    name="form.NPWP"
                     v-model="form.NPWP"
-                    type="text"
-                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    label="NPWP"
                     placeholder="Contoh: 12.345.678.9-012.345"
+                    variant="merchant"
                   />
                 </div>
                 <div>
@@ -631,27 +601,21 @@
                   />
                 </div>
                 <div>
-                  <label
-                    class="block mb-2 text-base font-medium text-merchant-primary"
-                    >Nomor Rekening</label
-                  >
-                  <input
+                  <TextField
+                    name="form.bank_account_number"
                     v-model="form.bank_account_number"
-                    type="text"
-                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    label="Nomor Rekening"
                     placeholder="Contoh: 1234567890"
+                    variant="merchant"
                   />
                 </div>
                 <div>
-                  <label
-                    class="block mb-2 text-base font-medium text-merchant-primary"
-                    >Nama Pemilik Rekening</label
-                  >
-                  <input
+                  <TextField
+                    name="form.bank_account_name"
                     v-model="form.bank_account_name"
-                    type="text"
-                    class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                    label="Nama Pemilik Rekening"
                     placeholder="Sesuai buku tabungan"
+                    variant="merchant"
                   />
                 </div>
               </div>
@@ -734,7 +698,7 @@
                 <div class="mt-3">
                   <TextField
                     name="form.address"
-                    textarea="true"
+                    :textarea="true"
                     v-model="form.address"
                     label="Alamat Lengkap (Opsional)"
                     placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
