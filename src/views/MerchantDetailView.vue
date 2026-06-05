@@ -266,7 +266,7 @@
           <router-link
             v-for="jasa in jasaList"
             :key="jasa.id"
-            :to="{ name: 'JasaDetail', params: { id: jasa.id } }"
+            :to="{ name: 'JasaDetail', params: { slug: jasa.slug || String(jasa.id) } }"
             class="block overflow-hidden transition bg-white border border-gray-200 shadow-sm rounded-2xl hover:shadow-md"
           >
             <!-- Gambar -->
@@ -405,6 +405,8 @@
               v-if="hasCoordinates"
               :lat="latitude"
               :lng="longitude"
+              :myLat="myLatitude"
+              :myLng="myLongitude"
               :zoom="12"
               :showMyLocation="true"
               variant="merchant"
@@ -449,61 +451,6 @@
       </router-link>
     </div>
 
-    <!-- Chat Modal -->
-    <transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="translate-y-full opacity-0"
-      enter-to-class="translate-y-0 opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="translate-y-0 opacity-100"
-      leave-to-class="translate-y-full opacity-0"
-    >
-      <div
-        v-if="showChat && selectedJasaId"
-        class="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/40"
-        @click.self="showChat = false"
-      >
-        <div
-          class="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-xl h-[70vh] sm:h-[520px] flex flex-col"
-        >
-          <div
-            class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-2xl"
-          >
-            <div class="flex items-center gap-3">
-              <div
-                class="flex items-center justify-center w-10 h-10 overflow-hidden bg-gray-100 rounded-full shrink-0"
-              >
-                <img
-                  v-if="merchant?.logo_url"
-                  :src="merchant.logo_url"
-                  alt="Logo Toko"
-                  class="object-cover w-full h-full"
-                />
-                <i v-else class="text-gray-400 pi pi-shop"></i>
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900">
-                  {{ merchant?.name || "Penjual" }}
-                </p>
-                <p class="text-xs text-gray-500">Konsultasi Layanan</p>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="flex items-center justify-center w-8 h-8 text-gray-500 rounded-full hover:bg-gray-100"
-              @click="showChat = false"
-            >
-              <i class="text-sm pi pi-times"></i>
-            </button>
-          </div>
-
-          <div class="flex-1 p-3">
-            <ChatWindow :jasa-id="selectedJasaId" mode="buyer" />
-          </div>
-        </div>
-      </div>
-    </transition>
-
     <!-- BACK TO TOP BUTTON -->
     <button
       v-show="showBackToTop"
@@ -528,9 +475,8 @@ import {
 import { useRoute } from "vue-router";
 import { useRouter } from "vue-router";
 import api from "@/libs/axios.js";
-import { getImageUrl, getImageUrlJasa } from "@/libs/getImageUrl.js";
+import { getImageUrl } from "@/libs/getImageUrl.js";
 import { setMeta, setJsonLd } from "@/router/seo";
-import ChatWindow from "@/components/common/ChatWindow.vue";
 import LeafletMap from "@/components/LeafletMap.vue";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
@@ -556,8 +502,6 @@ const merchant = ref(null);
 const jasaList = ref([]);
 const productList = ref([]);
 const loading = ref(true);
-const showChat = ref(false);
-const selectedJasaId = ref(null);
 const activeTab = ref("menu");
 const menuKind = ref("jasa"); // 'product' | 'jasa'
 
@@ -726,6 +670,20 @@ const hasMyCoordinates = computed(() => {
   );
 });
 
+// Helper function to get segmentation ID
+function getSegmentationId(data) {
+  const raw = data?.segmentation_id ?? data?.segmentation?.id ?? null;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : null;
+}
+
+// Check if merchant is a Jasa (Service) merchant
+// Only Jasa merchants (segmentation id = 3) should have chat feature
+const isJasaMerchant = computed(() => {
+  const segId = getSegmentationId(merchant.value);
+  return segId === 3;
+});
+
 function toRad(deg) {
   return (deg * Math.PI) / 180;
 }
@@ -890,48 +848,43 @@ function applyMerchantSeo(merchantData, merchantSlug) {
 
 // Resolve gambar jasa
 const resolveJasaImage = (jasa) => {
-  // Prefer API-provided cover image URL (id-based)
+  // Prefer API-provided cover image URL (id-based) - sama seperti produk
+  if (jasa?.cover_img?.id) {
+    return getImageUrl(jasa.cover_img.id);
+  }
+
   if (jasa?.cover_img?.src_url) {
-    return jasa.cover_img.src_url;
+    return getImageUrl(jasa.cover_img.src_url);
+  }
+
+  if (jasa?.cover_img?.url) {
+    return getImageUrl(jasa.cover_img.url);
+  }
+
+  if (jasa?.cover_image && typeof jasa.cover_image === "object") {
+    if (jasa.cover_image?.id) return getImageUrl(jasa.cover_image.id);
+    if (jasa.cover_image?.src_url) return getImageUrl(jasa.cover_image.src_url);
+    if (jasa.cover_image?.url) return getImageUrl(jasa.cover_image.url);
   }
 
   if (jasa.images && jasa.images.length > 0) {
     const coverImage =
       jasa.images.find((img) => img.is_cover) || jasa.images[0];
 
-    // New API returns url/src_url; keep backward-compat
-    const url = coverImage.src_url || coverImage.url;
-    if (url) return url;
-
-    // Fallbacks
+    // API returns url/src_url
     if (coverImage.id) return getImageUrl(coverImage.id);
-    if (coverImage.path || coverImage.image)
-      return getImageUrlJasa(coverImage.path || coverImage.image);
-  }
-  if (jasa.image) {
-    return getImageUrlJasa(jasa.image);
-  }
-  return null;
-};
+    if (coverImage.src_url) return getImageUrl(coverImage.src_url);
+    if (coverImage.url) return getImageUrl(coverImage.url);
 
-// Buka chat dengan jasa pertama dari merchant
-const openChat = () => {
-  if (jasaList.value.length > 0) {
-    selectedJasaId.value = jasaList.value[0].id;
-    showChat.value = true;
   }
+
+  return null;
 };
 
 const goToProductDetail = (product) => {
   if (!product?.slug) return;
   router.push({ name: "Product Detail", params: { slug: product.slug } });
 };
-
-function getSegmentationId(data) {
-  const raw = data?.segmentation_id ?? data?.segmentation?.id ?? null;
-  const num = Number(raw);
-  return Number.isFinite(num) ? num : null;
-}
 
 function parseLaravelPaginator(payload) {
   // Support: array (legacy) OR Laravel paginator object

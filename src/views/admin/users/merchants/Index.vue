@@ -49,6 +49,12 @@ const activeFilters = ref({
   segmentation: "",
 });
 
+// Status change modal
+const showStatusModal = ref(false);
+const selectedStatusMerchant = ref(null);
+const newMerchantStatus = ref('');
+const statusChangeLoading = ref(false);
+
 const isAnyModalOpen = computed(
   () =>
     showFilterModal.value ||
@@ -57,6 +63,35 @@ const isAnyModalOpen = computed(
     showRejectModal.value,
 );
 useBodyScrollLock(isAnyModalOpen);
+
+const merchantStatusOptions = [
+  { value: 'approved', label: 'Disetujui', color: 'text-green-700 bg-green-50 border-green-200' },
+  { value: 'suspended', label: 'Dibekukan', color: 'text-red-700 bg-red-50 border-red-200' },
+  { value: 'archived', label: 'Diarsipkan', color: 'text-gray-700 bg-gray-50 border-gray-200' },
+  { value: 'rejected', label: 'Ditolak', color: 'text-orange-700 bg-orange-50 border-orange-200' },
+];
+
+const openMerchantStatusModal = (merchant) => {
+  selectedStatusMerchant.value = merchant;
+  newMerchantStatus.value = merchant.status;
+  showStatusModal.value = true;
+};
+
+const confirmMerchantStatusChange = async () => {
+  if (!selectedStatusMerchant.value || !newMerchantStatus.value) return;
+  statusChangeLoading.value = true;
+  try {
+    await api.patch(`/api/admin/merchants/${selectedStatusMerchant.value.id}/status`, { status: newMerchantStatus.value });
+    toast.success(`Status merchant berhasil diubah`);
+    showStatusModal.value = false;
+    selectedStatusMerchant.value = null;
+    loadMerchants();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Gagal mengubah status');
+  } finally {
+    statusChangeLoading.value = false;
+  }
+};
 
 // Table config
 const tableColumns = [
@@ -354,7 +389,11 @@ onMounted(() => {
 
       <!-- Mobile toolbar -->
       <div
+<<<<<<< HEAD
         class="flex flex-row items-center justify-between gap-4 px-3 pb-1 rounded-lg sm:hidden"
+=======
+        class="flex sm:hidden flex-row justify-between items-center px-3 rounded-lg gap-4 pb-1"
+>>>>>>> staging-ta
       >
         <div class="text-xs text-muted-foreground">Total: {{ totalItems }}</div>
 
@@ -396,25 +435,43 @@ onMounted(() => {
           <div class="flex items-center justify-center">
             <div
               v-if="item.logo_path"
+<<<<<<< HEAD
               class="w-10 h-10 overflow-hidden rounded-full"
+=======
+              class="w-10 h-10 rounded-full overflow-hidden"
+>>>>>>> staging-ta
             >
               <img
                 :src="getMerchantLogoUrl(item)"
                 :alt="item.name"
+<<<<<<< HEAD
                 class="object-cover w-full h-full"
                 @error="
                   (e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = `<span class='text-sm font-semibold text-merchant-primary'>${item.name?.charAt(0)?.toUpperCase()}</span>`;
+=======
+                class="w-full h-full object-cover"
+                @error="
+                  (e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold text-sm'>${item.name?.charAt(0)?.toUpperCase()}</span>`;
+>>>>>>> staging-ta
                   }
                 "
               />
             </div>
             <div
               v-else
+<<<<<<< HEAD
               class="flex items-center justify-center w-10 h-10 rounded-full bg-merchant-primary/10"
             >
               <span class="text-sm font-semibold text-merchant-primary">
+=======
+              class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center"
+            >
+              <span class="text-merchant-primary font-semibold text-sm">
+>>>>>>> staging-ta
                 {{ item.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
@@ -457,6 +514,16 @@ onMounted(() => {
               title="Lihat Detail"
             >
               <i class="pi pi-eye"></i>
+            </Button>
+
+            <Button
+              @click.stop="openMerchantStatusModal(item)"
+              variant="outline"
+              size="sm"
+              class="!border-blue-400 !text-blue-600 hover:!bg-blue-50"
+              title="Ubah Status"
+            >
+              <i class="pi pi-pencil"></i>
             </Button>
 
             <!-- Show approve/reject buttons only for pending -->
@@ -510,25 +577,43 @@ onMounted(() => {
           <div class="flex items-start gap-3 mb-3">
             <div
               v-if="m.logo_path"
+<<<<<<< HEAD
               class="w-12 h-12 overflow-hidden rounded-full shrink-0"
+=======
+              class="w-12 h-12 rounded-full overflow-hidden shrink-0"
+>>>>>>> staging-ta
             >
               <img
                 :src="getMerchantLogoUrl(m)"
                 :alt="m.name"
+<<<<<<< HEAD
                 class="object-cover w-full h-full"
                 @error="
                   (e) => {
                     e.target.style.display = 'none';
                     e.target.parentElement.innerHTML = `<div class='flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0'><span class='font-semibold text-merchant-primary'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`;
+=======
+                class="w-full h-full object-cover"
+                @error="
+                  (e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<div class='w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0'><span class='text-merchant-primary font-semibold'>${m.name?.charAt(0)?.toUpperCase()}</span></div>`;
+>>>>>>> staging-ta
                   }
                 "
               />
             </div>
             <div
               v-else
+<<<<<<< HEAD
               class="flex items-center justify-center w-12 h-12 rounded-full bg-merchant-primary/10 shrink-0"
             >
               <span class="font-semibold text-merchant-primary">
+=======
+              class="w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0"
+            >
+              <span class="text-merchant-primary font-semibold">
+>>>>>>> staging-ta
                 {{ m.name?.charAt(0)?.toUpperCase() }}
               </span>
             </div>
@@ -646,10 +731,17 @@ onMounted(() => {
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
+<<<<<<< HEAD
               <p class="mb-1 text-sm font-medium text-blue-900">
                 Laporan akan mencakup:
               </p>
               <ul class="space-y-1 text-xs text-blue-800 list-disc list-inside">
+=======
+              <p class="text-sm text-blue-900 font-medium mb-1">
+                Laporan akan mencakup:
+              </p>
+              <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
+>>>>>>> staging-ta
                 <li>Data lengkap merchants (Nama, Owner, Email, Phone)</li>
                 <li>Segmentasi dan status merchants</li>
                 <li>Jumlah produk yang dimiliki</li>
@@ -690,7 +782,11 @@ onMounted(() => {
         </p>
       </div>
 
+<<<<<<< HEAD
       <div class="flex justify-center gap-3">
+=======
+      <div class="flex gap-3 justify-center">
+>>>>>>> staging-ta
         <Button
           @click="closeApproveModal"
           variant="secondary"
@@ -730,7 +826,11 @@ onMounted(() => {
       </div>
 
       <template #footer>
+<<<<<<< HEAD
         <div class="flex justify-end gap-3">
+=======
+        <div class="flex gap-3 justify-end">
+>>>>>>> staging-ta
           <Button
             @click="closeRejectModal"
             variant="secondary"
@@ -747,6 +847,61 @@ onMounted(() => {
           </Button>
         </div>
       </template>
+    </ResponsiveModal>
+
+    <!-- Merchant Status Change Modal -->
+    <ResponsiveModal
+      :show="showStatusModal"
+      @close="showStatusModal = false"
+      title="Ubah Status Merchant"
+      :subtitle="selectedStatusMerchant ? selectedStatusMerchant.name : ''"
+    >
+      <div class="space-y-4" v-if="selectedStatusMerchant">
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <i class="pi pi-building text-gray-500"></i>
+          <div>
+            <p class="text-xs text-gray-500">Status saat ini</p>
+            <StatusLabel :status="selectedStatusMerchant.status" variant="merchant" size="sm" />
+          </div>
+        </div>
+
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-3">Pilih status baru:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="opt in merchantStatusOptions"
+              :key="opt.value"
+              @click="newMerchantStatus = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                newMerchantStatus === opt.value
+                  ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              ]"
+            >
+              <i :class="['pi', newMerchantStatus === opt.value ? 'pi-check-circle' : 'pi-circle', 'text-sm']"></i>
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button
+            @click="showStatusModal = false"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmMerchantStatusChange"
+            :disabled="statusChangeLoading || newMerchantStatus === selectedStatusMerchant.status"
+            class="flex-1 px-4 py-2 bg-merchant-primary text-white rounded-lg text-sm font-medium hover:bg-merchant-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <i v-if="statusChangeLoading" class="pi pi-spin pi-spinner text-sm"></i>
+            {{ statusChangeLoading ? 'Menyimpan...' : 'Simpan Perubahan' }}
+          </button>
+        </div>
+      </div>
     </ResponsiveModal>
   </div>
 </template>

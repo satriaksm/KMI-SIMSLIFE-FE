@@ -18,7 +18,7 @@ export function useEvents() {
   const fetchEvents = async (params = {}, isAdmin = false) => {
     loading.value = true;
     try {
-      const endpoint = isAdmin ? "/api/admin/events" : "/events";
+      const endpoint = isAdmin ? "/api/admin/events" : "/api/public/events";
 
       const response = await api.get(endpoint, { params });
 

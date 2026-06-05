@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from "vue";
+import ReportButton from "@/components/ReportButton.vue";
 
 const imageError = ref(false);
 
@@ -107,21 +108,45 @@ watch(
     ${customClass} `"
   >
     <!-- Product Image (1:1 aspect ratio) -->
-    <div
-      class="relative w-full overflow-hidden bg-muted-background aspect-square"
-    >
-      <img
-        v-if="productImageUrl"
-        :src="productImageUrl"
-        :alt="product.name"
-        class="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out group-hover:scale-105"
-        @error="imageError = true"
-      />
-      <div
-        v-else
-        class="absolute inset-0 flex items-center justify-center w-full h-full bg-muted-background"
-      >
-        <i class="text-4xl pi pi-shopping-bag text-primary"></i>
+    <!-- Image Container -->
+      <div class="relative aspect-[1/1] overflow-hidden bg-gray-100">
+        <img
+          v-if="productImageUrl"
+          :src="productImageUrl"
+          :alt="product.name"
+          class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          @error="imageError = true"
+        />
+        <div
+          v-else
+          class="flex h-full w-full items-center justify-center bg-gray-50 text-gray-300"
+        >
+          <i class="pi pi-image text-4xl"></i>
+        </div>
+
+        <!-- Event Tag -->
+        <div v-if="product.event" class="absolute top-3 left-3 right-3 z-10">
+          <div 
+            @click.stop="$router.push({ name: 'Event Detail', params: { id: product.event.id } })"
+            class="px-3 py-1.5 bg-primary/90 backdrop-blur-md text-white rounded-xl shadow-lg border border-white/20 flex items-center justify-between group/tag cursor-pointer hover:bg-primary transition-all"
+          >
+            <div class="flex items-center gap-1.5 min-w-0">
+              <i class="pi pi-bolt text-[10px] animate-pulse"></i>
+              <span class="text-[10px] font-black uppercase tracking-wider truncate">{{ product.event.name }}</span>
+            </div>
+            <div class="bg-white/20 px-1.5 py-0.5 rounded-md text-[9px] font-black">
+              {{ product.event.discount }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Badges -->
+      <div class="absolute top-2 right-2 z-10">
+        <ReportButton
+          reportable-type="product"
+          :reportable-id="product.id"
+          :reportable-name="product.name"
+        />
       </div>
     </div>
 
@@ -159,4 +184,4 @@ watch(
       </div>
     </div>
   </div>
-</template>
+</template> 

@@ -50,14 +50,18 @@ const voucherToDelete = ref(null);
 // Removed merchants state
 const showRemoveMerchantModal = ref(false);
 const merchantToRemove = ref(null);
-const removalReason = ref("");
-const showRemovedMerchantsModal = ref(false);
-const removedMerchants = ref([]);
-
 const breadcrumbItems = computed(() => [
   { label: "Events", to: { name: "Admin - Events" } },
   { label: event.value?.event_name || "Detail Event" },
 ]);
+
+const showAllVouchers = ref(false);
+const displayedVouchers = computed(() => {
+  if (!event.value?.vouchers) return [];
+  return showAllVouchers.value 
+    ? event.value.vouchers 
+    : event.value.vouchers.slice(0, 2);
+});
 
 const eventBannerUrl = computed(() => {
   if (!event.value?.id || !event.value?.banner_img_path) {
@@ -147,8 +151,8 @@ const loadEvent = async () => {
 const loadMerchants = async () => {
   loadingMerchants.value = true;
   try {
-    const response = await api.get("/api/public/merchants");
-    merchants.value = response.data.data || response.data || [];
+    const response = await api.get("/api/admin/merchants");
+    merchants.value = response.data.data || [];
   } catch (error) {
     console.error("Failed to load merchants:", error);
     toast.error("Gagal memuat data merchant");
@@ -434,741 +438,500 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Content -->
-    <div class="px-4 sm:px-6 py-6" v-if="event">
-      <div class="max-w-6xl mx-auto space-y-6">
-        <!-- Banner & Basic Info -->
-        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-          <img
-            :src="eventBannerUrl"
-            alt="Event banner"
-            class="w-full h-64 object-cover"
-          />
-          <div class="p-6">
-            <div class="flex items-start justify-between mb-4">
-              <div class="flex-1">
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">
-                  {{ event.event_name }}
-                </h2>
-                <p class="text-gray-600">{{ event.event_description }}</p>
+  <div class="min-h-screen bg-gray-50/50 pb-20">
+    <!-- Header Section -->
+    <div class="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex items-center gap-3">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+              {{ event?.event_name }}
+            </h1>
+            <StatusLabel v-if="event" :status="event.status" variant="event" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button 
+            @click="goBack" 
+            class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            Kembali
+          </button>
+          <div class="w-px h-6 bg-gray-200 mx-1"></div>
+          <Button @click="goToEdit" variant="merchant-outline" size="sm">
+            <i class="pi pi-pencil mr-2 text-xs"></i>
+            Edit Event
+          </Button>
+          <Button @click="confirmDelete" variant="danger-outline" size="sm">
+            <i class="pi pi-trash mr-2 text-xs"></i>
+            Hapus
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Left Column: Banner & Info -->
+        <div class="lg:col-span-2 space-y-8">
+          <!-- Banner Card -->
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="relative group aspect-[16/6] sm:aspect-[21/9]">
+              <img
+                :src="eventBannerUrl"
+                alt="Event banner"
+                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                @error="(e) => (e.target.src = '/placeholder.png')"
+              />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                <p class="text-white text-sm font-medium">Banner Event KMI Simslife</p>
               </div>
-              
-              <!-- ✅ ADD: Edit button next to status -->
+            </div>
+            <div class="p-6 sm:p-8">
+              <div class="flex items-center gap-4 mb-6">
+                <div class="w-12 h-12 rounded-2xl bg-merchant-primary/10 flex items-center justify-center text-merchant-primary">
+                  <i class="pi pi-info-circle text-xl"></i>
+                </div>
+                <div>
+                  <h3 class="text-xl font-black text-gray-900 flex items-center gap-3">
+                    <span class="w-2 h-8 bg-merchant-primary rounded-full"></span>
+                    Voucher Event ({{ event?.vouchers?.length || 0 }})
+                  </h3>
+                </div>
+              </div>
+              <p class="text-gray-700 leading-relaxed bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                {{ event.event_description }}
+              </p>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-8">
+                <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-merchant-primary/20 transition-colors">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+                      <i class="pi pi-calendar"></i>
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Tanggal Mulai</p>
+                      <p class="font-bold text-gray-900">{{ formatDate(event.event_start_date) }}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-merchant-primary/20 transition-colors">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
+                      <i class="pi pi-calendar-times"></i>
+                    </div>
+                    <div>
+                      <p class="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-0.5">Tanggal Selesai</p>
+                      <p class="font-bold text-gray-900">{{ formatDate(event.event_end_date) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Participating Merchants Section -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <h3 class="text-xl font-bold text-gray-900">UMKM Terdaftar</h3>
+                <span class="px-2.5 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">{{ activeMerchants.length }}</span>
+              </div>
               <div class="flex items-center gap-2">
-                <StatusLabel :status="event.status" variant="event"/>
-                
-                <Button
-                  @click="goToEdit"
-                  variant="merchant-outline"
-                  size="sm"
+                <button
+                  v-if="removedMerchantsCount > 0"
+                  @click="viewRemovedMerchants"
+                  class="px-3 py-1.5 text-xs text-orange-600 hover:bg-orange-50 rounded-lg font-bold transition-colors flex items-center gap-2"
                 >
-                  <i class="pi pi-pencil mr-2"></i>
-                  Edit
+                  <i class="pi pi-history"></i>
+                  Riwayat
+                </button>
+                <Button @click="openInviteModal" variant="merchant" size="sm">
+                  <i class="pi pi-plus mr-2 text-xs"></i>
+                  Undang
                 </Button>
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-              <div class="flex items-center gap-3">
-                <i class="pi pi-calendar text-merchant-primary"></i>
-                <div>
-                  <p class="text-sm text-gray-500">Tanggal Mulai</p>
-                  <p class="font-medium">{{ formatDate(event.event_start_date) }}</p>
+            <div v-if="activeMerchants.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div
+                v-for="merchant in activeMerchants"
+                :key="merchant.id"
+                class="bg-white border border-gray-200 rounded-2xl p-5 hover:border-merchant-primary hover:shadow-md transition-all group relative overflow-hidden"
+              >
+                <!-- Selection Overlay / Background Decor -->
+                <div class="absolute -right-4 -top-4 w-20 h-20 bg-merchant-primary/5 rounded-full blur-2xl group-hover:bg-merchant-primary/10 transition-colors"></div>
+                
+                <div class="relative flex items-start justify-between mb-4">
+                  <div class="flex items-center gap-4 min-w-0">
+                    <div class="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border-2 border-gray-50 shadow-sm group-hover:border-merchant-primary/30 transition-colors">
+                      <img 
+                        v-if="merchant.logo_path" 
+                        :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
+                        :alt="merchant.name" 
+                        class="w-full h-full object-cover"
+                        @error="(e) => { e.target.src = '/placeholder.png' }"
+                      />
+                      <div v-else class="w-full h-full flex items-center justify-center bg-merchant-primary/10">
+                        <span class="text-merchant-primary font-bold text-xl">{{ merchant.name?.charAt(0)?.toUpperCase() }}</span>
+                      </div>
+                    </div>
+                    <div class="min-w-0">
+                      <h4 class="font-bold text-gray-900 truncate leading-tight mb-0.5 group-hover:text-merchant-primary transition-colors">{{ merchant.name }}</h4>
+                      <p class="text-xs text-gray-500 truncate mb-1.5">@{{ merchant.slug }}</p>
+                      <StatusLabel :status="merchant.pivot.status" variant="merchant" size="xs" />
+                    </div>
+                  </div>
+                  
+                  <button
+                    @click="confirmRemoveMerchant(merchant)"
+                    class="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0"
+                    title="Keluarkan Merchant"
+                  >
+                    <i class="pi pi-trash text-xs"></i>
+                  </button>
                 </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <i class="pi pi-calendar-times text-merchant-primary"></i>
-                <div>
-                  <p class="text-sm text-gray-500">Tanggal Selesai</p>
-                  <p class="font-medium">{{ formatDate(event.event_end_date) }}</p>
+
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                  <div class="bg-gray-50 rounded-xl p-2.5">
+                    <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Segmentasi</p>
+                    <p class="text-xs font-bold text-gray-700 truncate">{{ segmentationMap[merchant.segmentation_id] || 'N/A' }}</p>
+                  </div>
+                  <div class="bg-gray-50 rounded-xl p-2.5">
+                    <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Produk</p>
+                    <p class="text-xs font-bold text-gray-700">{{ merchant.products_count || 0 }} Item</p>
+                  </div>
                 </div>
+
+                <button
+                  @click="router.push({ name: 'Admin - Merchant Detail', params: { id: merchant.id } })"
+                  class="w-full py-2 text-xs font-bold text-merchant-primary hover:bg-merchant-primary hover:text-white border border-merchant-primary/20 rounded-xl transition-all"
+                >
+                  Detail UMKM
+                </button>
               </div>
+            </div>
+
+            <div v-else class="bg-white rounded-2xl p-12 text-center border border-gray-200 border-dashed">
+              <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                <i class="pi pi-users text-3xl"></i>
+              </div>
+              <h4 class="text-gray-900 font-bold mb-1">Belum Ada Merchant</h4>
+              <p class="text-sm text-gray-500 mb-6">Undang merchant untuk bergabung dalam event ini.</p>
+              <Button @click="openInviteModal" variant="merchant" size="sm">
+                <i class="pi pi-plus mr-2 text-xs"></i>
+                Undang Merchant
+              </Button>
             </div>
           </div>
         </div>
 
-        <!-- Vouchers Section -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">
-                Voucher Event
-              </h3>
-              <p class="text-sm text-gray-500 mt-1">
-                {{ event.vouchers?.length || 0 }} voucher terdaftar
-              </p>
+        <!-- Right Column: Vouchers & Stats -->
+        <div class="space-y-8">
+          <!-- Quick Stats -->
+          <div class="bg-gradient-to-br from-merchant-primary to-merchant-primary/80 rounded-2xl p-6 text-white shadow-lg shadow-merchant-primary/20 relative overflow-hidden group">
+            <div class="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
+            <h4 class="text-sm font-bold opacity-80 uppercase tracking-widest mb-4">Ringkasan Event</h4>
+            <div class="grid grid-cols-2 gap-4 relative z-10">
+              <div class="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                <p class="text-3xl font-bold mb-1">{{ activeMerchants.length }}</p>
+                <p class="text-[10px] font-bold uppercase opacity-80">Total UMKM</p>
+              </div>
+              <div class="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                <p class="text-3xl font-bold mb-1">{{ event.vouchers?.length || 0 }}</p>
+                <p class="text-[10px] font-bold uppercase opacity-80">Total Voucher</p>
+              </div>
             </div>
-            <Button 
-              @click="openAddVoucherModal" 
-              variant="merchant"
-              size="sm"
-            >
-              <i class="pi pi-plus mr-2"></i>
-              Tambah Voucher
-            </Button>
           </div>
 
-          <div v-if="event.vouchers && event.vouchers.length > 0">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                v-for="voucher in event.vouchers"
-                :key="voucher.id"
-                class="border border-gray-200 rounded-xl p-5 hover:border-merchant-primary hover:shadow-md transition-all group"
-              >
-                <div class="flex items-start justify-between mb-3">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                      <div class="p-2 bg-merchant-primary/10 rounded-lg">
-                        <i class="pi pi-ticket text-merchant-primary text-lg"></i>
+          <!-- Vouchers Section -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xl font-bold text-gray-900">Voucher Event ({{ event?.vouchers?.length || 0 }})</h3>
+              <Button @click="openAddVoucherModal" variant="merchant-outline" size="sm">
+                <i class="pi pi-plus text-xs"></i>
+              </Button>
+            </div>
+
+            <div v-if="event.vouchers && event.vouchers.length > 0" class="space-y-4">
+              <div class="grid grid-cols-1  gap-4">
+                <div
+                  v-for="voucher in displayedVouchers"
+                  :key="voucher.id"
+                  class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm group hover:border-merchant-primary/20 transition-all flex flex-col h-full"
+                >
+                  <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500">
+                        <i class="pi pi-ticket"></i>
                       </div>
                       <div>
-                        <h4 class="font-semibold text-gray-900">{{ voucher.voucher_code }}</h4>
+                        <h4 class="font-bold text-gray-900 leading-tight mb-0.5">{{ voucher.voucher_code }}</h4>
                         <StatusLabel :status="voucher.voucher_status" variant="voucher" size="xs" />
                       </div>
                     </div>
+                    <button 
+                      @click="confirmDeleteVoucher(voucher)"
+                      class="text-gray-400 hover:text-red-500 transition-colors p-1"
+                    >
+                      <i class="pi pi-trash text-sm"></i>
+                    </button>
                   </div>
-                  
-                  <Button
-                    @click="confirmDeleteVoucher(voucher)"
-                    variant="danger-outline"
-                    size="sm"
-                    class="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <i class="pi pi-trash"></i>
-                  </Button>
-                </div>
-                
-                <p class="text-sm text-gray-600 mb-4 line-clamp-2">
-                  {{ voucher.voucher_description || 'Tidak ada deskripsi' }}
-                </p>
-                
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-500 mb-1">Tipe</p>
-                    <p class="text-sm font-medium text-gray-900">
-                      {{ voucher.voucher_type === 'percent' ? 'Persentase' : 'Nominal' }}
-                    </p>
-                  </div>
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-500 mb-1">Nilai</p>
-                    <p class="text-sm font-medium text-merchant-primary">
-                      {{ voucher.voucher_type === 'percent' ? voucher.value + '%' : formatCurrency(voucher.value) }}
-                    </p>
-                  </div>
-                </div>
 
-                <div class="pt-3 border-t border-gray-100">
-                  <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span class="flex items-center gap-1">
-                      <i class="pi pi-shopping-cart"></i>
-                      Min: {{ formatCurrency(voucher.min_purchase_amount || 0) }}
-                    </span>
-                    <span class="flex items-center gap-1">
-                      <i class="pi pi-users"></i>
-                      {{ voucher.merchants_voucher_count || 0 }} Merchant
-                    </span>
+                  <div class="flex items-end justify-between bg-gray-50 rounded-2xl p-4 mb-4">
+                    <div>
+                      <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Diskon</p>
+                      <p class="text-xl font-black text-merchant-primary leading-none">
+                        {{ voucher.voucher_type === 'percent' ? `${voucher.value}%` : formatCurrency(voucher.value) }}
+                      </p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Min. Beli</p>
+                      <p class="text-sm font-bold text-gray-700 leading-none">{{ formatCurrency(voucher.min_purchase_amount || 0) }}</p>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                    <i class="pi pi-calendar"></i>
+
+                  <div class="flex items-center justify-between pt-4 border-t border-gray-50 text-[11px] text-gray-400 font-bold uppercase tracking-wider">
                     <span>{{ formatDate(voucher.voucher_start_date) }}</span>
-                    <span>-</span>
+                    <i class="pi pi-arrow-right text-[8px]"></i>
                     <span>{{ formatDate(voucher.voucher_end_date) }}</span>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-          
-          <div v-else class="text-center py-12">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i class="pi pi-ticket text-3xl text-gray-400"></i>
-            </div>
-            <p class="text-gray-600 font-medium mb-2">Belum ada voucher</p>
-            <p class="text-sm text-gray-500 mb-4">
-              Tambahkan voucher untuk event ini
-            </p>
-            <Button 
-              @click="openAddVoucherModal" 
-              variant="merchant"
-              size="sm"
-            >
-              <i class="pi pi-plus mr-2"></i>
-              Tambah Voucher
-            </Button>
-          </div>
-        </div>
-        
-        <!-- Participating Merchants Section -->
-        <div class="bg-white rounded-lg shadow-sm p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">
-                Merchant Terdaftar
-              </h3>
-              <div class="flex items-center gap-4 mt-1">
-                <p class="text-sm text-gray-500">
-                  {{ activeMerchants.length }} merchant aktif
-                </p>
-                <button
-                  v-if="removedMerchantsCount > 0"
-                  @click="viewRemovedMerchants"
-                  class="text-sm text-orange-600 hover:text-orange-700 font-medium flex items-center gap-1"
+
+              <!-- Show More Button -->
+              <div v-if="event?.vouchers?.length > 2" class="mt-6 flex justify-center">
+                <button 
+                  @click="showAllVouchers = !showAllVouchers"
+                  type="button"
+                  class="px-6 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 hover:border-merchant-primary/20 hover:text-merchant-primary transition-all flex items-center gap-2"
                 >
-                  <i class="pi pi-history text-xs"></i>
-                  {{ removedMerchantsCount }} dikeluarkan
+                  {{ showAllVouchers ? 'Tampilkan Lebih Sedikit' : 'Tampilkan Lebih Banyak' }}
+                  <i class="pi" :class="showAllVouchers ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
                 </button>
               </div>
             </div>
-            <!-- openInviteModal -->
-            <Button @click="openInviteModal" variant="merchant" size="sm">
-              <i class="pi pi-plus mr-2"></i>
-              Undang Merchant
-            </Button>
-          </div>
 
-          <!-- Active Merchants Grid -->
-          <div v-if="activeMerchants.length > 0">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                v-for="merchant in activeMerchants"
-                :key="merchant.id"
-                class="border border-gray-200 rounded-xl p-5 hover:border-merchant-primary hover:shadow-md transition-all group"
-              >
-                <!-- Header with Logo, Status, and Delete Button -->
-                <div class="flex items-start justify-between mb-4">
-                  <div class="flex items-center gap-3 flex-1">
-                    <div class="relative">
-                      <img
-                        :src="merchant.logo_url || merchant.logo_path || '/placeholder.png'"
-                        alt="Merchant logo"
-                        class="w-14 h-14 rounded-full object-cover border-2 border-gray-200"
-                      />
-                    </div>
-                    
-                    <div class="flex-1 min-w-0">
-                      <h4 class="font-semibold text-gray-900 truncate mb-1" :title="merchant.name">
-                        {{ merchant.name }}
-                      </h4>
-                      <p class="text-xs text-gray-500 truncate" :title="merchant.slug">
-                        @{{ merchant.slug }}
-                      </p>
-                      <StatusLabel :status="merchant.pivot.status" variant="merchant" size="xs" class="mt-1" />
-                    </div>
-                  </div>
-                  
-                  <!-- Delete Button (like voucher) -->
-                  <Button
-                    @click="confirmRemoveMerchant(merchant)"
-                    variant="danger-outline"
-                    size="sm"
-                    class="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <i class="pi pi-trash"></i>
-                  </Button>
-                </div>
-
-                <!-- Info Grid -->
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-500 mb-1">Segmentasi</p>
-                    <div class="flex items-center gap-1">
-                      <i class="pi pi-tag text-xs text-merchant-primary"></i>
-                      <p class="text-sm font-medium text-gray-900 truncate">
-                        {{ segmentationMap[merchant.segmentation_id] || 'N/A' }}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div class="bg-gray-50 rounded-lg p-3">
-                    <p class="text-xs text-gray-500 mb-1">Paguyuban</p>
-                    <div class="flex items-center gap-1">
-                      <i class="pi pi-users text-xs text-merchant-primary"></i>
-                      <p class="text-sm font-medium text-gray-900 truncate" :title="merchant.paguyuban?.name">
-                        {{ merchant.paguyuban?.name || 'Tidak ada' }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Contact Info -->
-                <div v-if="merchant.phone" class="flex items-center gap-2 text-xs text-gray-600 mb-3">
-                  <i class="pi pi-phone"></i>
-                  <span>{{ merchant.phone }}</span>
-                </div>
-
-                <!-- Stats Bar -->
-                <div class="pt-3 border-t border-gray-100 mb-3">
-                  <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span class="flex items-center gap-1">
-                      <i class="pi pi-box"></i>
-                      {{ merchant.products_count || merchant.products?.length || 0 }} Produk
-                    </span>
-                    <span class="flex items-center gap-1">
-                      <i class="pi pi-ticket"></i>
-                      {{ merchant.vouchers_count || 0 }} Voucher
-                    </span>
-                    <span class="flex items-center gap-1">
-                      <i class="pi pi-star-fill text-yellow-500"></i>
-                      {{ merchant.rating || '4.5' }}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Detail Button (full width, always visible) -->
-                <Button
-                  @click="router.push({ name: 'Admin - Merchant Detail', params: { id: merchant.id } })"
-                  variant="merchant-outline"
-                  size="sm"
-                  block
-                >
-                  <i class="pi pi-eye mr-2"></i>
-                  Lihat Detail Merchant
-                </Button>
-              </div>
+            <div v-else class="bg-gray-50 rounded-2xl p-8 text-center border border-gray-200 border-dashed">
+              <i class="pi pi-ticket text-3xl text-gray-300 mb-2"></i>
+              <p class="text-xs text-gray-500 font-medium">Belum ada voucher yang ditautkan.</p>
+              <button @click="openAddVoucherModal" class="text-xs text-merchant-primary font-bold mt-2 hover:underline">Tambah Voucher</button>
             </div>
           </div>
-          
-          <div v-else class="text-center py-12">
-            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <i class="pi pi-users text-3xl text-gray-400"></i>
-            </div>
-            <p class="text-gray-600 font-medium mb-2">Belum ada merchant terdaftar</p>
-            <p class="text-sm text-gray-500 mb-4">
-              Undang merchant untuk berpartisipasi di event ini
-            </p>
-            <Button 
-              @click="showInviteModal = true" 
-              variant="merchant"
-              size="sm"
-            >
-              <i class="pi pi-plus mr-2"></i>
-              Undang Merchant
+
+          <!-- Report Export Card -->
+          <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+            <h4 class="font-bold text-gray-900 mb-4">Laporan Event</h4>
+            <p class="text-xs text-gray-500 mb-6 leading-relaxed">Unduh laporan detail event termasuk daftar merchant dan statistik penggunaan voucher.</p>
+            <Button @click="openExportModal" variant="merchant" block>
+              <i class="pi pi-download mr-2"></i>
+              Download PDF
             </Button>
           </div>
         </div>
-
-
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-else class="flex items-center justify-center py-12">
-      <div class="text-center">
-        <i class="pi pi-spin pi-spinner text-4xl text-merchant-primary mb-4"></i>
-        <p class="text-gray-600">Memuat data event...</p>
-      </div>
-    </div>
-
-    <!-- Invite Modal -->
+    <!-- Modals Section -->
+    <!-- Invite Merchant Modal -->
     <ResponsiveModal
-      variant="merchant"
       :show="showInviteModal"
       @close="showInviteModal = false"
       title="Undang Merchant ke Event"
       size="xl"
     >
-      <div class="space-y-4">
-        <!-- Info Banner -->
-        <div class="bg-merchant-primary/5 border border-merchant-primary/20 rounded-xl p-4">
-          <div class="flex items-start gap-3">
-            <i class="pi pi-info-circle text-merchant-primary text-lg mt-0.5"></i>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-merchant-primary mb-1">
-                Pilih satu atau lebih merchant
-              </p>
-              <p class="text-xs text-gray-600">
-                Merchant yang dipilih akan menerima undangan untuk berpartisipasi di event ini.
-              </p>
-            </div>
+      <div class="p-1 space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <TextField
+            name="search_merchant_invite"
+            v-model="searchMerchantQuery"
+            placeholder="Cari merchant..."
+            variant="muted"
+            :hide-label="true"
+            icon="pi pi-search"
+          />
+          <div class="relative">
+            <select
+              v-model="filterSegmentation"
+              class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
+            >
+              <option value="">Semua Segmentasi</option>
+              <option value="1">UMKM Toko</option>
+              <option value="2">UMKM Kuliner</option>
+              <option value="3">UMKM Jasa</option>
+            </select>
+            <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
           </div>
         </div>
 
-        <!-- Search & Filter Bar -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <div class="flex-1">
-            <TextField
-              v-model="searchMerchantQuery"
-              placeholder="Cari nama atau slug merchant..."
-              :icon="'pi-search'"
-            />
-          </div>
-          <select
-            v-model="filterSegmentation"
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-merchant-primary focus:border-merchant-primary"
-          >
-            <option value="">Semua Segmentasi</option>
-            <option value="1">UMKM Toko</option>
-            <option value="2">UMKM Kuliner</option>
-            <option value="3">UMKM Jasa</option>
-          </select>
-        </div>
-
-        <!-- Selection Actions -->
-        <div v-if="filteredAvailableMerchants.length > 0" class="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
-          <div class="flex items-center gap-4">
-            <label class="flex items-center gap-2 cursor-pointer">
+        <div v-if="filteredAvailableMerchants.length > 0" class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl border border-gray-100">
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative w-5 h-5 flex items-center justify-center">
               <input
                 type="checkbox"
                 :checked="selectedMerchantsCount === filteredAvailableMerchants.length && filteredAvailableMerchants.length > 0"
                 @change="selectAllMerchants"
-                class="w-4 h-4 rounded border-gray-300 text-merchant-primary focus:ring-merchant-primary"
+                class="peer absolute opacity-0 w-full h-full cursor-pointer"
               />
-              <span class="text-sm font-medium text-gray-700">
-                Pilih Semua
-              </span>
-            </label>
-            
-            <div v-if="selectedMerchantsCount > 0" class="text-sm text-merchant-primary font-medium">
-              {{ selectedMerchantsCount }} merchant dipilih
+              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+              </div>
             </div>
+            <span class="text-sm font-bold text-gray-700">Pilih Semua Merchant</span>
+          </label>
+          <p class="text-xs font-bold text-merchant-primary" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Merchant Dipilih</p>
+        </div>
+
+        <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+          <div v-if="loadingMerchants" class="py-10 text-center">
+            <i class="pi pi-spin pi-spinner text-3xl text-merchant-primary animate-spin"></i>
           </div>
-
-          <button
-            v-if="selectedMerchantsCount > 0"
-            @click="clearMerchantSelection"
-            class="text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Hapus Pilihan
-          </button>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="loadingMerchants" class="text-center py-12">
-          <i class="pi pi-spin pi-spinner text-3xl text-merchant-primary mb-3"></i>
-          <p class="text-sm text-gray-600">Memuat merchant...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div v-else-if="filteredAvailableMerchants.length === 0" class="text-center py-12">
-          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="pi pi-users text-3xl text-gray-400"></i>
+          <div v-else-if="filteredAvailableMerchants.length === 0" class="py-10 text-center text-gray-400">
+            <i class="pi pi-inbox text-4xl mb-2"></i>
+            <p>Tidak ada merchant ditemukan</p>
           </div>
-          <p class="text-gray-600 font-medium mb-2">
-            {{ searchMerchantQuery || filterSegmentation ? 'Tidak ada merchant yang sesuai' : 'Semua merchant sudah diundang' }}
-          </p>
-          <p class="text-sm text-gray-500">
-            {{ searchMerchantQuery || filterSegmentation ? 'Coba ubah filter pencarian' : 'Tidak ada merchant lain yang tersedia' }}
-          </p>
-        </div>
-
-        <!-- Merchant List -->
-        <div v-else class="space-y-3 max-h-96 overflow-y-auto pr-2">
           <label
             v-for="merchant in filteredAvailableMerchants"
             :key="merchant.id"
-            class="flex items-start gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md"
-            :class="[
-              isMerchantSelected(merchant.id)
-                ? 'border-merchant-primary bg-merchant-primary/5'
-                : 'border-gray-200 hover:border-merchant-primary/50'
-            ]"
+            class="flex items-center gap-4 p-4 border rounded-2xl cursor-pointer transition-all hover:bg-gray-50"
+            :class="isMerchantSelected(merchant.id) ? 'border-merchant-primary bg-merchant-primary/5 ring-1 ring-merchant-primary' : 'border-gray-100'"
           >
-            <input
-              type="checkbox"
-              :checked="isMerchantSelected(merchant.id)"
-              @change="toggleMerchant(merchant.id)"
-              class="mt-1 w-5 h-5 rounded border-gray-300 text-merchant-primary focus:ring-merchant-primary"
-            />
+            <div class="relative w-5 h-5 flex items-center justify-center shrink-0">
+              <input
+                type="checkbox"
+                :checked="isMerchantSelected(merchant.id)"
+                @change="toggleMerchant(merchant.id)"
+                class="peer absolute opacity-0 w-full h-full cursor-pointer"
+              />
+              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+              </div>
+            </div>
             
+            <div class="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-gray-200 bg-white">
+              <img 
+                v-if="merchant.logo_path" 
+                :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
+                class="w-full h-full object-cover"
+                @error="(e) => (e.target.src = '/placeholder.png')"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 font-bold text-xs">
+                {{ merchant.name?.charAt(0) }}
+              </div>
+            </div>
+
             <div class="flex-1 min-w-0">
-              <!-- Header -->
-              <div class="flex items-start gap-3 mb-3">
-                <img
-                  :src="merchant.logo_url || merchant.logo_path || '/placeholder.png'"
-                  alt="Logo"
-                  class="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
-                />
-                <div class="flex-1 min-w-0">
-                  <h4 class="font-semibold text-gray-900 truncate" :title="merchant.name">
-                    {{ merchant.name }}
-                  </h4>
-                  <p class="text-sm text-gray-500 truncate" :title="merchant.slug">
-                    @{{ merchant.slug }}
-                  </p>
-                  <StatusLabel 
-                    :status="segmentationMap[merchant.segmentation_id]?.toLowerCase().replace(/\s/g, '_')" 
-                    :label="segmentationMap[merchant.segmentation_id]"
-                    variant="segmentation"
-                    size="xs"
-                    class="mt-1"
-                  />
-                </div>
-              </div>
-
-              <!-- Info Grid -->
-              <div class="grid grid-cols-2 gap-2">
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Paguyuban</p>
-                  <p class="text-sm font-medium text-gray-900 truncate" :title="merchant.paguyuban?.name">
-                    {{ merchant.paguyuban?.name || 'Tidak ada' }}
-                  </p>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Produk</p>
-                  <p class="text-sm font-medium text-gray-900">
-                    {{ merchant.products_count || 0 }} Produk
-                  </p>
-                </div>
-              </div>
-
-              <!-- Contact -->
-              <div v-if="merchant.phone" class="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                <i class="pi pi-phone"></i>
-                <span>{{ merchant.phone }}</span>
-              </div>
+              <p class="text-sm font-bold text-gray-900 truncate">{{ merchant.name }}</p>
+              <p class="text-[10px] text-gray-400 font-medium">@{{ merchant.slug }} • {{ segmentationMap[merchant.segmentation_id] }}</p>
             </div>
           </label>
         </div>
       </div>
-
       <template #footer>
-        <div class="flex items-center justify-between gap-3">
-          <div class="text-sm text-gray-600">
-            <span v-if="selectedMerchantsCount > 0">
-              {{ selectedMerchantsCount }} merchant akan diundang
-            </span>
-            <span v-else class="text-gray-400">
-              Pilih minimal 1 merchant
-            </span>
-          </div>
-          <div class="flex gap-3">
-            <Button 
-              @click="showInviteModal = false" 
-              variant="secondary"
-            >
-              Batal
-            </Button>
-            <Button
-              @click="handleInvite"
-              variant="merchant"
-              :disabled="selectedMerchantsCount === 0 || loading"
-            >
-              <i v-if="loading" class="pi pi-spin pi-spinner mr-2"></i>
-              <i v-else class="pi pi-send mr-2"></i>
-              Undang {{ selectedMerchantsCount > 0 ? `(${selectedMerchantsCount})` : '' }}
-            </Button>
-          </div>
-        </div>
-      </template>
-    </ResponsiveModal>
-
-    <!-- Delete Confirmation -->
-    <ResponsiveModal
-      :show="showDeleteModal"
-      @close="showDeleteModal = false"
-      title="Konfirmasi Hapus"
-    >
-      <p class="text-sm text-gray-600 mb-4">
-        Apakah Anda yakin ingin menghapus event
-        <strong>{{ event?.event_name }}</strong>? Tindakan ini tidak dapat dibatalkan.
-      </p>
-      <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button @click="showDeleteModal = false" variant="secondary">
-            Batal
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showInviteModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleInvite" variant="merchant" block :disabled="selectedMerchantsCount === 0 || loading">
+            Kirim Undangan ({{ selectedMerchantsCount }})
           </Button>
-          <Button @click="handleDelete" variant="danger"> Hapus </Button>
         </div>
       </template>
     </ResponsiveModal>
 
-    <!-- Add Voucher Modal with Multiple Selection -->
+    <!-- Add Voucher Modal -->
     <ResponsiveModal
-      variant="merchant"
       :show="showAddVoucherModal"
       @close="showAddVoucherModal = false"
-      title="Tambah Voucher ke Event"
+      title="Tautkan Voucher ke Event"
       size="xl"
     >
-      <div class="space-y-4">
-        <!-- Info Banner -->
-        <div class="bg-merchant-primary/5 border border-merchant-primary/20 rounded-xl p-4">
-          <div class="flex items-start gap-3">
-            <i class="pi pi-info-circle text-merchant-primary text-lg mt-0.5"></i>
-            <div class="flex-1">
-              <p class="text-sm font-medium text-merchant-primary mb-1">
-                Pilih satu atau lebih voucher
-              </p>
-              <p class="text-xs text-gray-600">
-                Voucher akan otomatis terhubung dengan semua merchant yang berpartisipasi di event ini.
-              </p>
-            </div>
+      <div class="p-1 space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <TextField
+            name="search_voucher_invite"
+            v-model="searchVoucherQuery"
+            placeholder="Cari kode voucher..."
+            variant="muted"
+            :hide-label="true"
+            icon="pi pi-search"
+          />
+          <div class="relative">
+            <select
+              v-model="filterVoucherType"
+              class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
+            >
+              <option value="">Semua Tipe</option>
+              <option value="percent">Persentase</option>
+              <option value="fixed">Nominal</option>
+            </select>
+            <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
           </div>
         </div>
 
-        <!-- Search & Filter Bar -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <div class="flex-1">
-            <TextField
-              v-model="searchVoucherQuery"
-              placeholder="Cari kode atau deskripsi voucher..."
-              :icon="'pi-search'"
-            />
-          </div>
-          <select
-            v-model="filterVoucherType"
-            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-merchant-primary focus:border-merchant-primary"
-          >
-            <option value="">Semua Tipe</option>
-            <option value="percent">Persentase</option>
-            <option value="fixed">Nominal</option>
-          </select>
-        </div>
-
-        <!-- Selection Actions -->
-        <div v-if="filteredVouchers.length > 0" class="flex items-center justify-between py-2 px-4 bg-gray-50 rounded-lg">
-          <div class="flex items-center gap-4">
-            <label class="flex items-center gap-2 cursor-pointer">
+        <div v-if="filteredVouchers.length > 0" class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl border border-gray-100">
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative w-5 h-5 flex items-center justify-center">
               <input
                 type="checkbox"
                 :checked="selectedVouchersCount === filteredVouchers.length && filteredVouchers.length > 0"
                 @change="selectAllVouchers"
-                class="w-4 h-4 rounded border-gray-300 text-merchant-primary focus:ring-merchant-primary"
+                class="peer absolute opacity-0 w-full h-full cursor-pointer"
               />
-              <span class="text-sm font-medium text-gray-700">
-                Pilih Semua
-              </span>
-            </label>
-            
-            <div v-if="selectedVouchersCount > 0" class="text-sm text-merchant-primary font-medium">
-              {{ selectedVouchersCount }} voucher dipilih
+              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+              </div>
             </div>
+            <span class="text-sm font-bold text-gray-700">Pilih Semua Voucher</span>
+          </label>
+          <p class="text-xs font-bold text-merchant-primary" v-if="selectedVouchersCount > 0">{{ selectedVouchersCount }} Voucher Dipilih</p>
+        </div>
+
+        <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+          <div v-if="voucherLoading" class="py-10 text-center">
+            <i class="pi pi-spin pi-spinner text-3xl text-merchant-primary animate-spin"></i>
           </div>
-
-          <button
-            v-if="selectedVouchersCount > 0"
-            @click="clearSelection"
-            class="text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Hapus Pilihan
-          </button>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="voucherLoading" class="text-center py-12">
-          <i class="pi pi-spin pi-spinner text-3xl text-merchant-primary mb-3"></i>
-          <p class="text-sm text-gray-600">Memuat voucher...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div v-else-if="filteredVouchers.length === 0" class="text-center py-12">
-          <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="pi pi-ticket text-3xl text-gray-400"></i>
+          <div v-else-if="filteredVouchers.length === 0" class="py-10 text-center text-gray-400">
+            <i class="pi pi-ticket text-4xl mb-2"></i>
+            <p>Tidak ada voucher ditemukan</p>
           </div>
-          <p class="text-gray-600 font-medium mb-2">
-            {{ searchVoucherQuery || filterVoucherType ? 'Tidak ada voucher yang sesuai' : 'Tidak ada voucher tersedia' }}
-          </p>
-          <p class="text-sm text-gray-500">
-            {{ searchVoucherQuery || filterVoucherType ? 'Coba ubah filter pencarian' : 'Semua voucher sudah terhubung dengan event lain' }}
-          </p>
-        </div>
-
-        <!-- Voucher List -->
-        <div v-else class="space-y-3 max-h-96 overflow-y-auto pr-2">
           <label
             v-for="voucher in filteredVouchers"
             :key="voucher.id"
-            class="flex items-start gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all hover:shadow-md"
-            :class="[
-              isVoucherSelected(voucher.id)
-                ? 'border-merchant-primary bg-merchant-primary/5'
-                : 'border-gray-200 hover:border-merchant-primary/50'
-            ]"
+            class="flex items-center gap-4 p-4 border rounded-2xl cursor-pointer transition-all hover:bg-gray-50"
+            :class="isVoucherSelected(voucher.id) ? 'border-merchant-primary bg-merchant-primary/5 ring-1 ring-merchant-primary' : 'border-gray-100'"
           >
-            <input
-              type="checkbox"
-              :checked="isVoucherSelected(voucher.id)"
-              @change="toggleVoucherSelection(voucher.id)"
-              class="mt-1 w-5 h-5 rounded border-gray-300 text-merchant-primary focus:ring-merchant-primary"
-            />
+            <div class="relative w-5 h-5 flex items-center justify-center shrink-0">
+              <input
+                type="checkbox"
+                :checked="isVoucherSelected(voucher.id)"
+                @change="toggleVoucherSelection(voucher.id)"
+                class="peer absolute opacity-0 w-full h-full cursor-pointer"
+              />
+              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+              </div>
+            </div>
             
+            <div class="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 border border-gray-200">
+              <i class="pi pi-ticket text-gray-400"></i>
+            </div>
+
             <div class="flex-1 min-w-0">
-              <!-- Header -->
-              <div class="flex items-start justify-between gap-3 mb-2">
-                <div class="flex items-center gap-2">
-                  <div class="p-2 bg-merchant-primary/10 rounded-lg">
-                    <i class="pi pi-ticket text-merchant-primary"></i>
-                  </div>
-                  <div>
-                    <h4 class="font-semibold text-gray-900">{{ voucher.voucher_code }}</h4>
-                    <StatusLabel :status="voucher.voucher_status" variant="voucher" size="xs" />
-                  </div>
-                </div>
-              </div>
-
-              <!-- Description -->
-              <p class="text-sm text-gray-600 mb-3 line-clamp-2">
-                {{ voucher.voucher_description || 'Tidak ada deskripsi' }}
+              <p class="text-sm font-bold text-gray-900 truncate">{{ voucher.voucher_code }}</p>
+              <p class="text-[10px] text-gray-400 font-medium">
+                {{ voucher.voucher_type === 'percent' ? `${voucher.value}%` : formatCurrency(voucher.value) }} • {{ voucher.voucher_name }}
               </p>
-
-              <!-- Details Grid -->
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Tipe</p>
-                  <p class="text-sm font-medium text-gray-900">
-                    {{ voucher.voucher_type === 'percent' ? 'Persentase' : 'Nominal' }}
-                  </p>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Nilai</p>
-                  <p class="text-sm font-medium text-merchant-primary">
-                    {{ voucher.voucher_type === 'percent' ? voucher.value + '%' : formatCurrency(voucher.value) }}
-                  </p>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Min. Pembelian</p>
-                  <p class="text-sm font-medium text-gray-900">
-                    {{ formatCurrency(voucher.min_purchase_amount || 0) }}
-                  </p>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-2">
-                  <p class="text-xs text-gray-500">Digunakan</p>
-                  <p class="text-sm font-medium text-gray-900">
-                    {{ voucher.usages_count || 0 }}x
-                  </p>
-                </div>
-              </div>
-
-              <!-- Period -->
-              <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
-                <i class="pi pi-calendar"></i>
-                <span>{{ formatDate(voucher.voucher_start_date) }}</span>
-                <span>-</span>
-                <span>{{ formatDate(voucher.voucher_end_date) }}</span>
-              </div>
             </div>
           </label>
         </div>
       </div>
-
       <template #footer>
-        <div class="flex items-center justify-between gap-3">
-          <div class="text-sm text-gray-600">
-            <span v-if="selectedVouchersCount > 0">
-              {{ selectedVouchersCount }} voucher akan ditambahkan
-            </span>
-            <span v-else class="text-gray-400">
-              Pilih minimal 1 voucher
-            </span>
-          </div>
-          <div class="flex gap-3">
-            <Button 
-              @click="showAddVoucherModal = false" 
-              variant="secondary"
-            >
-              Batal
-            </Button>
-            <Button
-              @click="handleAddVouchers"
-              variant="merchant"
-              :disabled="selectedVouchersCount === 0 || voucherLoading"
-            >
-              <i v-if="voucherLoading" class="pi pi-spin pi-spinner mr-2"></i>
-              <i v-else class="pi pi-plus mr-2"></i>
-              Tambah {{ selectedVouchersCount > 0 ? `(${selectedVouchersCount})` : '' }}
-            </Button>
-          </div>
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showAddVoucherModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleAddVouchers" variant="merchant" block :disabled="selectedVouchersCount === 0 || voucherLoading">
+            Tautkan Voucher ({{ selectedVouchersCount }})
+          </Button>
         </div>
       </template>
     </ResponsiveModal>
@@ -1177,204 +940,169 @@ onMounted(async () => {
     <ResponsiveModal
       :show="showDeleteVoucherModal"
       @close="showDeleteVoucherModal = false"
-      title="Hapus Voucher dari Event"
+      title="Hapus Voucher"
     >
-      <div class="space-y-4">
-        <div class="flex items-start gap-3 p-4 bg-warning-background/10 border border-warning-foreground/20 rounded-xl">
-          <i class="pi pi-exclamation-triangle text-warning-foreground text-xl shrink-0 mt-0.5"></i>
-          <div>
-            <h4 class="mb-1 text-sm font-semibold text-warning-foreground">Perhatian!</h4>
-            <p class="text-xs text-warning-foreground/80">
-              Voucher akan dilepas dari event dan semua merchant yang terhubung.
-            </p>
-          </div>
+      <div class="text-center py-6">
+        <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="pi pi-trash text-4xl text-red-500"></i>
         </div>
-
-        <p class="text-sm text-gray-600">
-          Apakah Anda yakin ingin melepas voucher 
-          <strong>{{ voucherToDelete?.voucher_code }}</strong> dari event ini?
+        <p class="text-sm text-gray-600 px-4">
+          Lepaskan voucher <span class="font-bold text-gray-900">"{{ voucherToDelete?.voucher_code }}"</span> dari event ini?
         </p>
       </div>
-
       <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button 
-            @click="showDeleteVoucherModal = false" 
-            variant="secondary"
-          >
-            Batal
-          </Button>
-          <Button 
-            @click="handleDeleteVoucher" 
-            variant="danger"
-            :disabled="voucherLoading"
-          >
-            <i v-if="voucherLoading" class="pi pi-spin pi-spinner mr-2"></i>
-            Hapus Voucher
-          </Button>
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showDeleteVoucherModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleDeleteVoucher" variant="danger" block>Hapus</Button>
         </div>
       </template>
     </ResponsiveModal>
 
-    <!-- Remove Merchant Confirmation -->
+    <!-- Remove Merchant Modal -->
     <ResponsiveModal
       :show="showRemoveMerchantModal"
       @close="showRemoveMerchantModal = false"
-      title="Keluarkan Merchant dari Event"
+      title="Keluarkan Merchant"
     >
-      <div class="space-y-4">
-        <div class="flex items-start gap-3 p-4 bg-warning-background/10 border border-warning-foreground/20 rounded-xl">
-          <i class="pi pi-exclamation-triangle text-warning-foreground text-xl shrink-0 mt-0.5"></i>
+      <div class="p-1 space-y-6">
+        <div class="p-4 bg-orange-50 border border-orange-200 rounded-2xl flex gap-3">
+          <i class="pi pi-exclamation-triangle text-orange-500 mt-1"></i>
           <div>
-            <h4 class="mb-1 text-sm font-semibold text-warning-foreground">Perhatian!</h4>
-            <p class="text-xs text-warning-foreground/80">
-              Merchant akan dikeluarkan dari event dan tidak bisa menggunakan voucher event.
-            </p>
+            <p class="text-sm font-bold text-orange-800">Perhatian</p>
+            <p class="text-xs text-orange-700 leading-relaxed">Mengeluarkan merchant akan membatalkan semua voucher event yang terhubung dengan merchant ini.</p>
           </div>
         </div>
 
-        <p class="text-sm text-gray-600">
-          Anda akan mengeluarkan merchant 
-          <strong>{{ merchantToRemove?.name }}</strong> dari event ini.
-        </p>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Alasan Penghapusan <span class="text-red-500">*</span>
-          </label>
+        <div class="space-y-4">
+          <label class="block text-sm font-bold text-gray-700">Alasan Pengeluaran</label>
           <textarea
             v-model="removalReason"
-            rows="4"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-merchant-primary focus:border-merchant-primary"
-            placeholder="Jelaskan alasan merchant dikeluarkan dari event..."
+            class="w-full px-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none text-sm min-h-[120px]"
+            placeholder="Tuliskan alasan mengeluarkan merchant ini..."
           ></textarea>
         </div>
       </div>
-
       <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button 
-            @click="showRemoveMerchantModal = false" 
-            variant="secondary"
-          >
-            Batal
-          </Button>
-          <Button 
-            @click="handleRemoveMerchant" 
-            variant="danger"
-            :disabled="!removalReason.trim() || merchantLoading"
-          >
-            <i v-if="merchantLoading" class="pi pi-spin pi-spinner mr-2"></i>
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showRemoveMerchantModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleRemoveMerchant" variant="danger" block :disabled="!removalReason.trim() || merchantLoading">
             Keluarkan Merchant
           </Button>
         </div>
       </template>
     </ResponsiveModal>
 
-    <!-- Removed Merchants History Modal -->
+    <!-- History Removed Merchants Modal -->
     <ResponsiveModal
       :show="showRemovedMerchantsModal"
       @close="showRemovedMerchantsModal = false"
-      title="Riwayat Merchant yang Dikeluarkan"
-      size="lg"
+      title="Riwayat Merchant Dikeluarkan"
     >
-      <div v-if="removedMerchants.length > 0" class="space-y-3 max-h-96 overflow-y-auto">
+      <div class="max-h-[500px] overflow-y-auto pr-2 space-y-4 custom-scrollbar p-1">
+        <div v-if="removedMerchants.length === 0" class="py-12 text-center text-gray-400">
+          <i class="pi pi-history text-4xl mb-2"></i>
+          <p>Belum ada riwayat pengeluaran</p>
+        </div>
         <div
-          v-for="merchant in removedMerchants"
-          :key="merchant.id"
-          class="border border-orange-200 rounded-xl p-4 bg-orange-50/50"
+          v-for="m in removedMerchants"
+          :key="m.id"
+          class="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm"
         >
           <div class="flex items-start justify-between mb-3">
-            <div class="flex items-center gap-3 flex-1">
-              <img
-                :src="merchant.logo_url || '/placeholder.png'"
-                alt="Logo"
-                class="w-12 h-12 rounded-full object-cover border-2 border-orange-200"
-              />
-              <div>
-                <h4 class="font-semibold text-gray-900">{{ merchant.name }}</h4>
-                <p class="text-sm text-gray-500">@{{ merchant.slug }}</p>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-gray-50 border border-gray-100">
+                <img v-if="m.logo_url" :src="m.logo_url" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xs">{{ m.name?.charAt(0) }}</div>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-bold text-gray-900 truncate">{{ m.name }}</p>
+                <p class="text-[10px] text-gray-400">Dikeluarkan: {{ formatDate(m.removal_info.removed_at) }}</p>
               </div>
             </div>
-            
-            <Button
-              @click="handleRestoreMerchant(merchant.id)"
-              variant="success-outline"
-              size="sm"
+            <button
+              @click="handleRestoreMerchant(m.id)"
+              class="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-[10px] font-bold hover:bg-green-600 hover:text-white transition-all"
             >
-              <i class="pi pi-refresh mr-1"></i>
-              Kembalikan
-            </Button>
+              Pulihkan
+            </button>
           </div>
-
-          <div class="bg-white rounded-lg p-3 space-y-2">
-            <div class="flex items-start gap-2">
-              <i class="pi pi-info-circle text-orange-600 text-sm mt-0.5"></i>
-              <div class="flex-1">
-                <p class="text-xs text-gray-500">Alasan Dikeluarkan:</p>
-                <p class="text-sm text-gray-700">{{ merchant.removal_info.reason }}</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-4 text-xs text-gray-500 pt-2 border-t">
-              <span class="flex items-center gap-1">
-                <i class="pi pi-calendar"></i>
-                {{ formatDate(merchant.removal_info.removed_at) }}
-              </span>
-            </div>
+          <div class="bg-gray-50 rounded-xl p-3 border border-gray-100">
+            <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Alasan</p>
+            <p class="text-xs text-gray-600 leading-relaxed">{{ m.removal_info.reason }}</p>
           </div>
         </div>
       </div>
-      
-      <div v-else class="text-center py-8">
-        <i class="pi pi-inbox text-4xl text-gray-300 mb-3"></i>
-        <p class="text-gray-500">Tidak ada riwayat merchant yang dikeluarkan</p>
-      </div>
-
       <template #footer>
-        <Button 
-          @click="showRemovedMerchantsModal = false" 
-          variant="secondary"
-          block
-        >
-          Tutup
-        </Button>
+        <div class="px-2 pb-2">
+          <Button @click="showRemovedMerchantsModal = false" variant="secondary" block>Tutup</Button>
+        </div>
       </template>
     </ResponsiveModal>
 
-    <!-- ✅ Export Modal -->
+    <!-- Delete Event Confirmation -->
+    <ResponsiveModal
+      :show="showDeleteModal"
+      @close="showDeleteModal = false"
+      title="Hapus Event"
+    >
+      <div class="text-center py-6">
+        <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="pi pi-exclamation-triangle text-4xl text-red-500 animate-bounce"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Hapus Event?</h3>
+        <p class="text-gray-600 px-4 mb-4">
+          Semua data terkait event <span class="font-bold">"{{ event?.event_name }}"</span> akan dihapus permanen dari sistem.
+        </p>
+        <div class="bg-red-50 p-4 rounded-2xl border border-red-100 mx-4">
+          <p class="text-xs text-red-700 flex items-start gap-2 text-left">
+            <i class="pi pi-info-circle mt-0.5 shrink-0"></i>
+            Tindakan ini akan melepaskan semua voucher dari merchant terkait dan membatalkan status keikutsertaan mereka.
+          </p>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showDeleteModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleDelete" variant="danger" block>Ya, Hapus Permanen</Button>
+        </div>
+      </template>
+    </ResponsiveModal>
+
+    <!-- Export Modal -->
     <ResponsiveModal
       :show="showExportModal"
       @close="showExportModal = false"
       title="Export Detail Event"
-      subtitle="Unduh detail lengkap event dalam format PDF"
     >
-      <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div class="flex items-start gap-3">
-            <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
-            <div class="flex-1">
-              <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
-              <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Informasi lengkap event (Nama, Deskripsi, Periode)</li>
-                <li>Daftar merchant yang berpartisipasi</li>
-                <li>Daftar voucher yang terhubung dengan event</li>
-                <li>Status event dan jumlah merchants aktif</li>
-                <li>Informasi pembuat event dan waktu pembuatan</li>
-              </ul>
+      <div class="p-1 space-y-6">
+        <div class="bg-gradient-to-br from-merchant-primary/5 to-merchant-primary/10 border border-merchant-primary/10 rounded-2xl p-6">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <i class="pi pi-file-pdf text-2xl text-red-500"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-900">Format Laporan PDF</h4>
+              <p class="text-xs text-gray-500">Dokumen detail event KMI Simslife</p>
             </div>
           </div>
+          
+          <ul class="space-y-3">
+            <li v-for="(item, i) in ['Informasi fundamental event', 'Daftar merchant yang terdaftar', 'Rincian voucher dan periode', 'Status dan statistik partisipasi']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
+              <i class="pi pi-check-circle text-merchant-primary text-xs shrink-0"></i>
+              {{ item }}
+            </li>
+          </ul>
         </div>
 
         <Button
           @click="exportDetailPDF"
           variant="merchant"
           size="lg"
-          custom-class="w-full justify-center"
-          :disabled="exportLoading"
+          block
+          :loading="exportLoading"
         >
-          <i v-if="exportLoading" class="pi pi-spin pi-spinner mr-2"></i>
-          <i v-else class="pi pi-download mr-2"></i>
-          <span>{{ exportLoading ? 'Mengunduh...' : 'Download Laporan PDF' }}</span>
+          <i class="pi pi-download mr-2"></i>
+          Download Laporan PDF
         </Button>
       </div>
     </ResponsiveModal>

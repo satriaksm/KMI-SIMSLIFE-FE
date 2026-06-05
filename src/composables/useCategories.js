@@ -2,6 +2,9 @@ import { ref, computed } from "vue";
 import api from "@/libs/axios";
 import { useToast } from "vue-toastification";
 
+// Module-level cache for level 1 categories (rarely change)
+let cachedLevel1 = null;
+
 export function useCategories() {
   const toast = useToast();
 
@@ -33,15 +36,21 @@ export function useCategories() {
    * ✅ UPDATED: Fetch level 1 categories with normalization
    */
   const fetchLevel1Categories = async () => {
+    if (cachedLevel1) {
+      categoriesLevel1.value = cachedLevel1;
+      loadingLevel1.value = false;
+      return;
+    }
+
     loadingLevel1.value = true;
     try {
       const response = await api.get("/api/public/categories/level-1");
 
       if (response.data.success) {
-        // ✅ Normalize all categories
         categoriesLevel1.value = (response.data.data || [])
           .map(normalizeCategory)
-          .filter(Boolean); // Remove null values
+          .filter(Boolean);
+        cachedLevel1 = categoriesLevel1.value;
       } else {
         throw new Error(response.data.message || "Failed to fetch categories");
       }
@@ -65,7 +74,7 @@ export function useCategories() {
     loadingLevel2.value = true;
     try {
       const response = await api.get(
-        `/api/public/categories/${parentId}/sub-categories`
+        `/api/public/categories/${parentId}/sub-categories`,
       );
 
       if (response.data.success) {
@@ -75,7 +84,7 @@ export function useCategories() {
           .filter(Boolean);
       } else {
         throw new Error(
-          response.data.message || "Failed to fetch sub-categories"
+          response.data.message || "Failed to fetch sub-categories",
         );
       }
     } catch (error) {
@@ -97,7 +106,7 @@ export function useCategories() {
     loadingLevel2.value = true;
     try {
       const response = await api.get(
-        `/api/public/categories/${parentId}/sub-categories`
+        `/api/public/categories/${parentId}/sub-categories`,
       );
 
       if (response.data.success) {

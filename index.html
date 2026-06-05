@@ -1,7 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
+
+    <!--
+      Backend API redirect: Sets a global flag so Vue Router's catch-all
+      does NOT redirect /backend/ paths to "/". Then unregisters SW and
+      hard-navigates so the real server handles the request.
+      NO window.stop() — that breaks parsing in many browsers.
+    -->
+    <script>
+      (function () {
+        if (location.pathname.indexOf("/backend/") !== 0) return;
+
+        // Signal to Vue Router: do NOT redirect this path.
+        window.__BACKEND_REDIRECT = true;
+
+        // Unregister all Service Workers, then hard-navigate to the real server URL.
+        function hardNav() {
+          location.replace(location.href);
+        }
+
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (r) {
+              return Promise.all(
+                r.map(function (sw) {
+                  return sw.unregister();
+                }),
+              );
+            })
+            .then(hardNav)
+            .catch(hardNav);
+        } else {
+          hardNav();
+        }
+      })();
+    </script>
+
     <!-- Favicons (cache-busted) -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="shortcut icon" href="/favicon.ico" />
@@ -9,10 +46,8 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon16.png?v=6" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=6" />
     <link rel="apple-touch-icon" href="/icon192.png?v=6" />
-    <link rel="manifest" href="/manifest.webmanifest" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="/src/style.css" rel="stylesheet" />
     <meta name="theme-color" content="#ff9800" />
     <style>
       #splash {
@@ -22,7 +57,9 @@
         display: grid;
         place-items: center;
         background: #ff9800;
-        transition: opacity 0.3s ease, visibility 0.3s ease;
+        transition:
+          opacity 0.3s ease,
+          visibility 0.3s ease;
       }
       #splash.splash-hidden {
         opacity: 0;
@@ -30,8 +67,13 @@
       }
 
       .splash-title {
-        font: 800 clamp(36px, 8vw, 72px) / 1 system-ui, -apple-system, Segoe UI,
-          Roboto, Arial, sans-serif;
+        font:
+          800 clamp(36px, 8vw, 72px) / 1 system-ui,
+          -apple-system,
+          Segoe UI,
+          Roboto,
+          Arial,
+          sans-serif;
         color: #fff;
         text-transform: uppercase;
         animation: breathe 3s ease-in-out infinite;
@@ -85,6 +127,25 @@
     </div>
 
     <div id="app"></div>
+    
+    <!-- PWA Install Prompt -->
+    <div
+      id="pwa-install-prompt"
+      style="display: none;"
+      class="fixed bottom-4 left-4 right-4 bg-[#ff9800] text-white p-4 rounded-lg shadow-lg z-50 md:left-auto md:right-4 md:max-w-sm"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex-1 mr-3">
+          <p class="text-sm font-medium">Install Sumilir</p>
+          <p class="text-xs opacity-90">Akses lebih mudah dari homescreen</p>
+        </div>
+        <div class="flex gap-2">
+          <button id="pwa-dismiss" class="text-xs bg-white/20 px-2 py-1 rounded">Nanti</button>
+          <button id="pwa-install" class="text-xs bg-white text-[#ff9800] px-2 py-1 rounded font-medium">Install</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.js"></script>
     <script type="application/ld+json">
       {
@@ -96,6 +157,51 @@
         "description": "Marketplace UMKM lokal Banyuanyar untuk produk kuliner, toko, dan jasa.",
         "sameAs": []
       }
+    </script>
+    <script>
+      let deferredPrompt
+      const promptEl = document.getElementById('pwa-install-prompt')
+      const installBtn = document.getElementById('pwa-install')
+      const dismissBtn = document.getElementById('pwa-dismiss')
+
+      const isStandalone = () =>
+        window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
+
+      const isDismissed = () => {
+        const dismissed = localStorage.getItem('pwa-prompt-dismissed')
+        return dismissed && Date.now() < parseInt(dismissed, 10)
+      }
+
+      const hidePrompt = () => {
+        if (promptEl) promptEl.style.display = 'none'
+      }
+
+      const showPrompt = () => {
+        if (!promptEl) return
+        if (isStandalone() || isDismissed()) return
+        promptEl.style.display = 'block'
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault()
+        deferredPrompt = e
+        setTimeout(showPrompt, 3000)
+      })
+
+      installBtn?.addEventListener('click', async () => {
+        if (!deferredPrompt) return hidePrompt()
+        deferredPrompt.prompt()
+        await deferredPrompt.userChoice
+        deferredPrompt = null
+        hidePrompt()
+      })
+
+      dismissBtn?.addEventListener('click', () => {
+        hidePrompt()
+        localStorage.setItem('pwa-prompt-dismissed', Date.now() + 7 * 24 * 60 * 60 * 1000)
+      })
+
+      if (isStandalone()) hidePrompt()
     </script>
   </body>
 </html>

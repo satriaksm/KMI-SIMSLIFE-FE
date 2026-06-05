@@ -106,7 +106,7 @@
               <div class="p-2 bg-blue-100 rounded-lg">
                 <i class="pi pi-building text-blue-600"></i>
               </div>
-              <p class="text-xs text-gray-600 font-medium">Merchants</p>
+              <p class="text-xs text-gray-600 font-medium">UMKM</p>
             </div>
             <p class="text-2xl font-bold text-gray-900">
               {{ user.merchants_count ?? (user.merchants?.length || 0) }}
@@ -118,7 +118,7 @@
               <div class="p-2 bg-green-100 rounded-lg">
                 <i class="pi pi-comments text-green-600"></i>
               </div>
-              <p class="text-xs text-gray-600 font-medium">Community Posts</p>
+              <p class="text-xs text-gray-600 font-medium">Postingan Komunitas</p>
             </div>
             <p class="text-2xl font-bold text-gray-900">{{ user.community_posts_count ?? 0 }}</p>
           </div>
@@ -128,7 +128,7 @@
               <div class="p-2 bg-purple-100 rounded-lg">
                 <i class="pi pi-comment text-purple-600"></i>
               </div>
-              <p class="text-xs text-gray-600 font-medium">Post Comments</p>
+              <p class="text-xs text-gray-600 font-medium">Komentar Postingan</p>
             </div>
             <p class="text-2xl font-bold text-gray-900">{{ user.post_comments_count ?? 0 }}</p>
           </div>
@@ -140,10 +140,10 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h3 class="text-lg font-semibold text-gray-900">
-              Merchants Terdaftar
+              UMKM Terdaftar
             </h3>
             <p class="text-sm text-gray-500 mt-1">
-              {{ user.merchants_count ?? (user.merchants?.length || 0) }} merchant dimiliki user ini
+              {{ user.merchants_count ?? (user.merchants?.length || 0) }} UMKM dimiliki user ini
             </p>
           </div>
         </div>
@@ -254,10 +254,10 @@
               block
             >
               <i class="pi pi-eye mr-2"></i>
-              Lihat Detail Merchant
+              Lihat Detail UMKM
             </Button>
 
-            <!-- Timeline Info -->
+            <!-- Timeline Info
             <div class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4 text-xs text-gray-500">
               <div>
                 <p class="mb-1">Registered:</p>
@@ -271,7 +271,7 @@
                   {{ new Date(merchant.response_at).toLocaleDateString("id-ID") }}
                 </p>
               </div>
-            </div>
+            </div> -->
           </div>
         </div>
       </div>
@@ -282,12 +282,12 @@
           <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <i class="pi pi-building text-3xl text-gray-400"></i>
           </div>
-          <p class="text-gray-600 font-medium mb-2">Belum ada merchant terdaftar</p>
-          <p class="text-sm text-gray-500">User ini belum memiliki merchant</p>
+          <p class="text-gray-600 font-medium mb-2">Belum ada UMKM terdaftar</p>
+          <p class="text-sm text-gray-500">Pengguna ini belum memiliki UMKM</p>
         </div>
       </div>
 
-      <!-- Timeline -->
+      <!-- Timeline
       <div class="bg-white rounded-lg shadow-sm p-6">
         <h3 class="text-lg font-semibold mb-4 text-gray-900">Timeline</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -310,7 +310,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- Approve Modal -->
@@ -367,9 +367,9 @@
               <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
                 <li>Profil lengkap user (Nama, Email, Phone, NIK, Roles)</li>
-                <li>Statistik aktivitas (Merchants, Posts, Comments)</li>
+                <li>Statistik aktivitas (UMKM, Postingan, Komentar)</li>
                 <li>Trend login (30 hari terakhir)</li>
-                <li>Daftar merchants yang dimiliki</li>
+                <li>Daftar UMKM yang dimiliki</li>
                 <li>Informasi timestamp dan verifikasi</li>
               </ul>
             </div>

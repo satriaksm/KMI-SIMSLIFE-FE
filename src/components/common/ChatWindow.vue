@@ -48,6 +48,7 @@ const offerPrice = ref("");
 const offerNote = ref("");
 const sending = ref(false);
 const sendingOffer = ref(false);
+const error = ref("");
 
 const headerTitle = computed(() => {
   if (props.title) return props.title;
@@ -77,6 +78,10 @@ const sortedMessages = computed(() => {
   });
 });
 
+const isOfferMessage = (msg) => String(msg?.type || "text") === "offer";
+
+const isPlainMessage = (msg) => !isOfferMessage(msg);
+
 function isOwnMessage(msg) {
   const user = currentUser.value;
   if (!user) return false;
@@ -97,13 +102,26 @@ function formatCurrency(value) {
 }
 
 async function initConversation() {
-  if (props.conversationId) {
-    await loadConversation(props.conversationId);
-  } else if (props.jasaId) {
-    const convo = await startConversation(props.jasaId);
-    if (convo?.id) {
-      await loadConversation(convo.id);
+  try {
+    if (props.conversationId) {
+      console.log('Loading existing conversation:', props.conversationId);
+      await loadConversation(props.conversationId);
+    } else if (props.jasaId) {
+      console.log('Starting new conversation with jasa:', props.jasaId);
+      const convo = await startConversation(props.jasaId);
+      console.log('Conversation started:', convo);
+      if (convo?.id) {
+        console.log('Loading conversation details:', convo.id);
+        await loadConversation(convo.id);
+        console.log('Conversation loaded, activeConversation:', activeConversation.value);
+      } else {
+        console.error('Failed to start conversation - no ID returned');
+        error.value = 'Gagal membuat percakapan. Silakan coba lagi.';
+      }
     }
+  } catch (err) {
+    console.error('Error initializing conversation:', err);
+    error.value = err.response?.data?.message || err.message || 'Gagal memuat percakapan. Silakan coba lagi.';
   }
 }
 
@@ -123,16 +141,21 @@ watch(
 async function handleSend() {
   if (!messageText.value.trim() || !activeConversation.value) return;
   sending.value = true;
+  error.value = '';
   try {
-    await sendMessage(activeConversation.value.id, messageText.value.trim());
+    const role = isBuyer.value ? 'buyer' : 'merchant';
+    await sendMessage(activeConversation.value.id, messageText.value.trim(), role);
     messageText.value = "";
+  } catch (err) {
+    console.error('Error sending message:', err);
+    error.value = err.response?.data?.message || err.message || 'Gagal mengirim pesan. Silakan coba lagi.';
   } finally {
     sending.value = false;
   }
 }
 
 async function handleOffer() {
-  if (!offerPrice.value || !activeConversation.value || !isMerchant.value) return;
+  if (!offerPrice.value || !activeConversation.value) return;
 
   // Normalisasi angka rupiah (buang karakter non-digit)
   const raw =
@@ -144,7 +167,23 @@ async function handleOffer() {
 
   sendingOffer.value = true;
   try {
-    await makeOffer(activeConversation.value.id, price, offerNote.value.trim());
+    if (isMerchant.value) {
+      await makeOffer(activeConversation.value.id, price, offerNote.value.trim());
+    } else {
+      const offerTextLines = [
+        `💰 Penawaran harga dari pembeli: ${formatCurrency(price)}`,
+      ];
+      if (offerNote.value?.trim()) {
+        offerTextLines.push(`📝 ${offerNote.value.trim()}`);
+      }
+
+      await sendMessage(
+        activeConversation.value.id,
+        offerTextLines.join("\n"),
+        "buyer"
+      );
+    }
+
     offerPrice.value = "";
     offerNote.value = "";
   } finally {
@@ -160,15 +199,15 @@ async function handleRespondOffer(messageId, accept) {
 
 <template>
   <div
-    class="flex flex-col h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+    class="flex flex-col h-full min-h-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
   >
     <!-- Header -->
     <div
-      class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50"
+      class="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-gray-200 bg-white"
     >
-      <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center gap-2.5 min-w-0">
         <div
-          class="w-9 h-9 rounded-full bg-merchant-primary/10 flex items-center justify-center text-merchant-primary"
+          class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-merchant-primary/10 flex items-center justify-center text-merchant-primary"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -186,23 +225,23 @@ async function handleRespondOffer(messageId, accept) {
           </svg>
         </div>
         <div class="min-w-0">
-          <p class="text-sm font-semibold text-gray-900 truncate">
+          <p class="text-sm sm:text-[15px] font-semibold text-gray-900 truncate">
             {{ headerTitle }}
           </p>
-          <p class="text-xs text-gray-500 truncate">
-            <span v-if="isBuyer">Anda sebagai Pembeli</span>
-            <span v-else-if="isMerchant">Anda sebagai Penjual</span>
+          <p class="text-[11px] sm:text-xs text-gray-500 truncate">
+            <span v-if="isBuyer">Mode Pembeli</span>
+            <span v-else-if="isMerchant">Mode Penjual</span>
             <span v-else>Memuat percakapan...</span>
           </p>
         </div>
       </div>
-      <span v-if="loading" class="text-xs text-gray-500"> Memuat... </span>
+      <span v-if="loading" class="text-[11px] sm:text-xs text-gray-500">Memuat...</span>
     </div>
 
     <!-- Messages -->
-    <div class="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-white">
+    <div class="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-3 space-y-2.5 bg-gray-50/50">
       <div v-if="sortedMessages.length === 0" class="h-full flex items-center">
-        <div class="w-full text-center text-xs text-gray-500">
+        <div class="w-full text-center text-xs text-gray-500 px-3">
           Belum ada pesan. Mulai percakapan dengan mengirim pesan pertama.
         </div>
       </div>
@@ -213,23 +252,23 @@ async function handleRespondOffer(messageId, accept) {
           :key="msg.id"
           :class="['flex w-full', isOwnMessage(msg) ? 'justify-end' : 'justify-start']"
         >
-          <div class="max-w-[75%] flex flex-col gap-0.5">
+          <div class="max-w-[88%] sm:max-w-[78%] lg:max-w-[70%] flex flex-col gap-0.5">
             <!-- Bubble -->
             <div
               :class="[
-                'rounded-2xl px-3 py-2 text-xs sm:text-sm break-words',
+                'rounded-2xl px-3 py-2 text-xs sm:text-sm break-words border',
                 isOwnMessage(msg)
-                  ? 'bg-merchant-primary text-white rounded-br-sm'
-                  : 'bg-gray-100 text-gray-900 rounded-bl-sm',
+                  ? 'bg-merchant-primary text-white border-merchant-primary rounded-br-sm'
+                  : 'bg-white text-gray-900 border-gray-200 rounded-bl-sm',
               ]"
             >
               <!-- Pesan biasa -->
-              <p v-if="msg.type === 'message'">
+              <p v-if="isPlainMessage(msg)">
                 {{ msg.body }}
               </p>
 
               <!-- Penawaran -->
-              <div v-else class="space-y-1">
+              <div v-else class="space-y-1.5">
                 <p class="font-semibold flex items-center gap-1.5">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -305,35 +344,45 @@ async function handleRespondOffer(messageId, accept) {
     </div>
 
     <!-- Footer: form pesan + offer -->
-    <div class="border-t border-gray-200 bg-gray-50 px-3 py-2 space-y-2">
+    <div class="border-t border-gray-200 bg-white px-3 py-2.5 pb-[max(env(safe-area-inset-bottom),0.625rem)] space-y-2 shrink-0">
+      <!-- Error message -->
+      <div v-if="error" class="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+        {{ error }}
+      </div>
+      
       <!-- Input pesan -->
       <div class="flex items-end gap-2">
         <textarea
           v-model="messageText"
           rows="1"
           placeholder="Tulis pesan untuk konsultasi..."
-          class="flex-1 resize-none text-xs sm:text-sm px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-white"
+          class="flex-1 resize-none text-xs sm:text-sm px-3 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-white"
           @keyup.enter.exact.prevent="handleSend"
         ></textarea>
         <Button
           variant="merchant"
           size="sm"
-          :loading="sending"
-          :disabled="!messageText.trim() || !activeConversation"
+          :loading="sending || loading"
+          :disabled="!messageText.trim() || !activeConversation || loading"
           @click="handleSend"
+          title="Klik untuk mengirim pesan"
         >
-          Kirim
+          {{ loading ? 'Memuat...' : 'Kirim' }}
         </Button>
       </div>
 
-      <!-- Area penawaran khusus penjual -->
+      <!-- Area penawaran harga -->
       <div
-        v-if="isMerchant"
-        class="rounded-lg border border-dashed border-merchant-primary/40 bg-white px-3 py-2 space-y-1.5"
+        v-if="isMerchant || isBuyer"
+        class="rounded-xl border border-dashed border-merchant-primary/35 bg-merchant-primary/5 px-3 py-2 space-y-1.5"
       >
         <div class="flex items-center justify-between gap-2">
-          <p class="text-xs font-medium text-gray-800">
-            Buat penawaran harga ke pembeli
+          <p class="text-[11px] sm:text-xs font-medium text-gray-800">
+            {{
+              isMerchant
+                ? 'Buat penawaran harga ke pembeli'
+                : 'Ajukan penawaran harga ke penjual'
+            }}
           </p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -342,7 +391,7 @@ async function handleRespondOffer(messageId, accept) {
             type="text"
             inputmode="numeric"
             placeholder="Contoh: 150000 (tanpa titik)"
-            class="flex-1 text-xs sm:text-sm px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary"
+            class="flex-1 text-xs sm:text-sm px-3 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-white"
           />
           <Button
             variant="merchant-outline"
@@ -357,8 +406,12 @@ async function handleRespondOffer(messageId, accept) {
         <textarea
           v-model="offerNote"
           rows="1"
-          placeholder="Catatan (opsional), misal: sudah termasuk ongkos kirim"
-          class="w-full resize-none text-xs sm:text-sm px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-gray-50"
+          :placeholder="
+            isMerchant
+              ? 'Catatan (opsional), misal: sudah termasuk ongkos kirim'
+              : 'Catatan (opsional), misal: bisa nego di harga ini'
+          "
+          class="w-full resize-none text-xs sm:text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-white"
         ></textarea>
       </div>
     </div>

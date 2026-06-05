@@ -64,15 +64,17 @@ jobs:
       - name: Deploy to FTPS
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ secrets.FTP_IP }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASS }}
-          port: ${{ secrets.FTP_PORT || 21 }}
+          port: ${{ secrets.FTP_PORT}}
           protocol: ftp
           passive: true
           local-dir: dist/
-          server-dir: ${{ secrets.FTP_PATH_FRONTEND }}/
+          server-dir: ./
           dangerous-clean-slate: false
+          log-level: verbose
+          security: loose
           exclude: |
             **/.git*
             **/.git*/**
@@ -85,6 +87,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Server:** ${{ secrets.FTP_SERVER }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Server:** ${{ secrets.FTP_IP }}" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed to:** ${{ secrets.FTP_PATH_FRONTEND }}" >> $GITHUB_STEP_SUMMARY
           echo "**Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY

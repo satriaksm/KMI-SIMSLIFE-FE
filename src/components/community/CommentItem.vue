@@ -1,10 +1,8 @@
 <template>
   <div class="flex gap-3 text-[11px] sm:text-sm">
-    <img
-      :src="comment.user?.profile_picture || '/storage/profilepicdefault.png'"
-      class="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover mt-1 shrink-0"
-      alt="avatar"
-      loading="lazy"
+    <UserAvatar 
+      :user="comment.user" 
+      size="md"
     />
 
     <div class="flex-1">
@@ -32,10 +30,15 @@
           </div>
 
           <!-- actions -->
-          <div class="text-sm text-gray-400 ml-2 shrink-0">
+          <div class="flex flex-col items-end gap-1 ml-2 shrink-0">
+            <ReportButton
+              reportable-type="post_comment"
+              :reportable-id="comment.id"
+              :reportable-name="`Komentar oleh ${comment.user?.name || 'User'}`"
+            />
             <button 
               @click="requestReply" 
-              class="text-[11px] sm:text-sm px-2 py-1 rounded hover:bg-gray-100 transition"
+              class="text-[11px] sm:text-sm px-2 py-1 text-gray-400 rounded hover:bg-gray-100 transition"
             >
               Balas
             </button>
@@ -69,6 +72,8 @@
 <script setup>
 import { ref, computed } from 'vue'
 import CommentItem from './CommentItem.vue'
+import UserAvatar from '@/components/common/UserAvatar.vue'
+import ReportButton from '@/components/ReportButton.vue'
 
 const props = defineProps({
   comment: { type: Object, required: true },

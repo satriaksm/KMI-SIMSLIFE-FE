@@ -130,7 +130,7 @@ onMounted(async () => {
     <div v-else-if="stats">
       <!-- Header with Export Button -->
       <div class="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 class="text-2xl sm:text-3xl font-bold text-merchant-primary">Admin Dashboard Summary</h1>
+        <h1 class="text-2xl sm:text-3xl font-bold text-merchant-primary">Admin Dashboard</h1>
         
         <Button
           @click="openExportModal"

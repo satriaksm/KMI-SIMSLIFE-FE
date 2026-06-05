@@ -30,7 +30,11 @@ Events:
 - update:modelValue => emit saat nilai berubah
 */
 import { Field, ErrorMessage } from "vee-validate";
+<<<<<<< HEAD
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
+=======
+import { computed, getCurrentInstance } from "vue";
+>>>>>>> staging-ta
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -44,8 +48,15 @@ const props = defineProps({
   skeleton: { type: Boolean, default: true },
   variant: { type: String, default: "primary" },
   required: { type: Boolean, default: false },
+<<<<<<< HEAD
+=======
+  autocomplete: { type: String, default: "" },
+  id: { type: String, default: "" },
+>>>>>>> staging-ta
 });
 const emit = defineEmits(["update:modelValue"]);
+const instanceUid = getCurrentInstance()?.uid;
+const selectId = computed(() => props.id || `${props.name}-${instanceUid}`);
 
 const isOpen = ref(false);
 const searchQuery = ref("");
@@ -121,8 +132,13 @@ onUnmounted(() => {
   <div ref="containerRef">
     <label
       v-if="label"
+<<<<<<< HEAD
       :for="name"
       class="block mb-2 text-sm font-bold text-black"
+=======
+      :for="selectId"
+      class="block text-sm font-bold text-black mb-2"
+>>>>>>> staging-ta
     >
       {{ label }}
       <span v-if="required" class="text-danger-foreground">*</span>
@@ -141,12 +157,22 @@ onUnmounted(() => {
         :modelValue="modelValue"
         v-slot="{ field, meta, errors }"
       >
+<<<<<<< HEAD
         <!-- Display Button -->
         <button
           type="button"
           :id="name"
           @click="toggleDropdown"
+=======
+        <select
+          :id="selectId"
+          :name="field.name"
+          :value="field.value"
+          @change="field.onChange"
+          @blur="field.onBlur"
+>>>>>>> staging-ta
           :disabled="disabled || loading"
+          :autocomplete="autocomplete || undefined"
           :class="selectClasses(meta.touched && errors.length)"
         >
           <span

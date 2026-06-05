@@ -33,6 +33,10 @@ const props = defineProps({
   readonly: { type: Boolean, default: false },
   variant: { type: String, default: "primary" }, // primary | merchant
   showMyLocation: { type: Boolean, default: false },
+  // Optional: parent can provide explicit my-location coords so map
+  // will display both markers and fit bounds deterministically.
+  myLat: { type: [Number, String, null], default: null },
+  myLng: { type: [Number, String, null], default: null },
 });
 
 const emit = defineEmits(["update:lat", "update:lng"]);
@@ -63,17 +67,17 @@ function createMyLocationIcon() {
 
 /* ================= STYLE COMPUTED ================= */
 const borderColorClass = computed(() =>
-  props.variant === "merchant" ? "border-merchant-primary" : "border-primary"
+  props.variant === "merchant" ? "border-merchant-primary" : "border-primary",
 );
 
 const buttonTextClass = computed(() =>
   props.variant === "merchant"
     ? "text-merchant-primary hover:bg-merchant-primary/5"
-    : "text-primary hover:bg-primary/5"
+    : "text-primary hover:bg-primary/5",
 );
 
 const buttonBorderClass = computed(() =>
-  props.variant === "merchant" ? "border-merchant-primary" : "border-primary"
+  props.variant === "merchant" ? "border-merchant-primary" : "border-primary",
 );
 
 /* ================= TILE CONFIG ================= */
@@ -94,7 +98,7 @@ function setMarker(latlng) {
   if (!map) return;
 
   const storeIcon = getUmkmStoreIcon(
-    getUmkmMarkerColorByVariant(props.variant)
+    getUmkmMarkerColorByVariant(props.variant),
   );
 
   if (!marker) {
@@ -135,16 +139,28 @@ function resetMarker() {
   emit("update:lng", null);
 }
 
-function invalidateMapSize() {
+function invalidateMapSize(refitAfter = false) {
   if (!map) return;
   nextTick(() => {
     requestAnimationFrame(() => {
       map?.invalidateSize(true);
+      // Re-apply fit after the map knows its real dimensions.
+      if (refitAfter && (marker || myMarker)) {
+        setTimeout(() => fitToMarkers(), 80);
+      }
     });
   });
 }
 
 async function getMyCoordinates() {
+  // If parent explicitly provided coordinates, use them and skip
+  // profile / browser geolocation.
+  if (props.myLat != null && props.myLng != null) {
+    const lat = normalize(props.myLat);
+    const lng = normalize(props.myLng);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+
   // 1) Prefer saved address from profile if user is logged in.
   try {
     const res = await api.get("api/profile/address");
@@ -174,7 +190,7 @@ async function getMyCoordinates() {
         }
       },
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   });
 }
@@ -192,7 +208,7 @@ function setMyMarker(latlng) {
             <div class="popup-me__badge">Anda</div>
             <div class="popup-me__title">Alamat Anda</div>
           </div>
-        </div>`
+        </div>`,
       );
   } else {
     myMarker.setLatLng(latlng);
@@ -246,11 +262,11 @@ function locateMe() {
         err.code === 1
           ? "Akses lokasi ditolak."
           : err.code === 2
-          ? "Lokasi tidak tersedia."
-          : "Gagal mengambil lokasi.";
+            ? "Lokasi tidak tersedia."
+            : "Gagal mengambil lokasi.";
       isLocating.value = false;
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: true, timeout: 10000 },
   );
 }
 
@@ -261,15 +277,15 @@ onMounted(async () => {
   // FIX ICON PATH (Vite)
   const iconRetinaUrl = new URL(
     "leaflet/dist/images/marker-icon-2x.png",
-    import.meta.url
+    import.meta.url,
   ).toString();
   const iconUrl = new URL(
     "leaflet/dist/images/marker-icon.png",
-    import.meta.url
+    import.meta.url,
   ).toString();
   const shadowUrl = new URL(
     "leaflet/dist/images/marker-shadow.png",
-    import.meta.url
+    import.meta.url,
   ).toString();
 
   L.Marker.prototype.options.icon = L.icon({
@@ -292,6 +308,7 @@ onMounted(async () => {
   }
 
   if (props.showMyLocation) {
+    // If parent passed myLat/myLng they will be preferred inside getMyCoordinates().
     const coords = await getMyCoordinates();
     if (coords) {
       setMyMarker(L.latLng(coords.lat, coords.lng));
@@ -312,16 +329,16 @@ onMounted(async () => {
   // 🔥 FIX: when mounted in hidden container (e.g. v-show tab), tiles can render grey.
   // Invalidate once, and again whenever the container becomes visible/resizes.
   setTimeout(() => {
-    invalidateMapSize();
+    invalidateMapSize(true);
   }, 300);
 
   if (typeof ResizeObserver !== "undefined" && wrapperEl.value) {
     resizeObserver = new ResizeObserver((entries) => {
       const rect = entries?.[0]?.contentRect;
       if (!rect) return;
-      // Only invalidate when the container has real size.
+      // Only invalidate when the container has real size (e.g. tab just became visible).
       if (rect.width > 0 && rect.height > 0) {
-        invalidateMapSize();
+        invalidateMapSize(true);
       }
     });
 
@@ -342,7 +359,25 @@ watch(
         fitToMarkers();
       }
     }
-  }
+  },
+);
+
+// Watch for parent-provided my-location coordinates and render myMarker accordingly.
+watch(
+  () => [props.myLat, props.myLng],
+  ([mLat, mLng]) => {
+    const latNum = normalize(mLat);
+    const lngNum = normalize(mLng);
+    if (latNum != null && lngNum != null && map) {
+      setMyMarker(L.latLng(latNum, lngNum));
+      // Ensure both markers are visible when both exist.
+      fitToMarkers();
+    } else if (map && myMarker) {
+      // remove myMarker if coords cleared
+      map.removeLayer(myMarker);
+      myMarker = null;
+    }
+  },
 );
 
 watch(
@@ -352,7 +387,7 @@ watch(
     const nextZoom = Number(z);
     if (!Number.isFinite(nextZoom)) return;
     map.setZoom(nextZoom);
-  }
+  },
 );
 
 onBeforeUnmount(() => {

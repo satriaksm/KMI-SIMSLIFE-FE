@@ -1,13 +1,14 @@
 import { ref } from "vue";
 import api from "@/libs/axios";
 
-// Simple chat composable for buyer <-> merchant consultations
+// Chat composable for buyer <-> merchant conversations
 export function useChat() {
   const conversations = ref([]);
   const messages = ref([]);
   const activeConversation = ref(null);
   const loading = ref(false);
 
+  // Fetch all conversations for authenticated user (used by merchant)
   async function fetchConversations(params = {}) {
     loading.value = true;
     try {
@@ -19,54 +20,103 @@ export function useChat() {
     }
   }
 
-  // Start or get a conversation for a jasa (buyer side)
-  async function startConversation(jasaId) {
-    const { data } = await api.post("/api/chats/start", { jasa_id: jasaId });
-    const convo = data.data || data;
-    activeConversation.value = convo;
-    return convo;
-  }
-
+  // Load a specific conversation with all messages
   async function loadConversation(conversationId) {
     loading.value = true;
     try {
+      console.log('useChat: Loading conversation', conversationId);
       const { data } = await api.get(`/api/chats/${conversationId}`);
+      console.log('useChat: Response received', data);
       const payload = data.data || data;
       activeConversation.value = payload.conversation || payload;
       messages.value = payload.messages || [];
+      console.log('useChat: activeConversation set to', activeConversation.value);
       return { conversation: activeConversation.value, messages: messages.value };
+    } catch (err) {
+      console.error('useChat: Error loading conversation', err);
+      throw err;
     } finally {
       loading.value = false;
     }
   }
 
-  async function sendMessage(conversationId, body) {
-    const { data } = await api.post(`/api/chats/${conversationId}/messages`, { body });
+  // Start a new conversation as a buyer (by jasa_id)
+  async function startConversation(jasaId) {
+    loading.value = true;
+    try {
+      console.log('useChat: Starting conversation with jasa', jasaId);
+      const { data } = await api.post(`/api/chats/start`, { jasa_id: jasaId });
+      console.log('useChat: Start response received', data);
+      const payload = data.data || data;
+      activeConversation.value = payload.conversation || payload;
+      messages.value = payload.messages || [];
+      console.log('useChat: activeConversation set to', activeConversation.value);
+      return activeConversation.value;
+    } catch (err) {
+      console.error('useChat: Error starting conversation', err);
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Send a message to a conversation (works for both buyer and merchant)
+  async function sendMessage(conversationId, body, senderRole = null) {
+    // Determine sender role - if explicitly passed, use it; otherwise check who's the buyer/merchant
+    let role = senderRole;
+    
+    // If not explicitly specified and we have an active conversation, determine based on context
+    if (!role && activeConversation.value) {
+      // This will be determined by the component using this function
+      // For now, we'll default to checking if this is called from chat detail (merchant) or chat window (buyer)
+      role = 'merchant'; // default
+    }
+
+    // Use buyer endpoint if this is from a buyer, merchant endpoint otherwise
+    const endpoint = role === 'buyer' 
+      ? `/api/chats/${conversationId}/buyer-messages`
+      : `/api/chats/${conversationId}/messages`;
+
+    const { data } = await api.post(endpoint, { body });
     const msg = data.data || data;
-    messages.value.push(msg);
+    if (messages.value) {
+      messages.value.push(msg);
+    }
     return msg;
   }
 
-  async function makeOffer(conversationId, offerPrice, note = "") {
-    const { data } = await api.post(`/api/chats/${conversationId}/offers`, {
-      offer_price: offerPrice,
-      body: note || null,
+  // Make a price offer for a conversation (merchant only)
+  async function makeOffer(conversationId, price, note = "") {
+    const { data } = await api.post(`/api/chats/${conversationId}/offer`, {
+      price,
+      note: note || null,
     });
-    const msg = data.data || data;
-    messages.value.push(msg);
-    return msg;
+    return data.data || data;
   }
 
-  async function respondOffer(conversationId, messageId, accept = true) {
-    const url = accept
-      ? `/api/chats/${conversationId}/offers/${messageId}/accept`
-      : `/api/chats/${conversationId}/offers/${messageId}/reject`;
-    const { data } = await api.post(url);
-    const updated = data.data || data;
-    // Update local messages array
-    const idx = messages.value.findIndex((m) => m.id === updated.id);
-    if (idx !== -1) messages.value[idx] = updated;
-    return updated;
+  // Accept an offer on a conversation (merchant only)
+  async function acceptOffer(conversationId) {
+    const { data } = await api.put(`/api/chats/${conversationId}/offer/accept`);
+    if (activeConversation.value) {
+      activeConversation.value.status = 'deal_accepted';
+    }
+    return data.data || data;
+  }
+
+  // Update conversation status (merchant only)
+  async function updateConversationStatus(conversationId, status) {
+    const { data } = await api.put(`/api/chats/${conversationId}/status`, { status });
+    if (activeConversation.value) {
+      activeConversation.value.status = status;
+    }
+    return data.data || data;
+  }
+
+  // Delete/archive a conversation
+  async function deleteConversation(conversationId) {
+    const { data } = await api.delete(`/api/chats/${conversationId}`);
+    conversations.value = conversations.value.filter(c => c.id !== conversationId);
+    return data;
   }
 
   return {
@@ -75,10 +125,13 @@ export function useChat() {
     activeConversation,
     loading,
     fetchConversations,
-    startConversation,
     loadConversation,
+    startConversation,
     sendMessage,
     makeOffer,
-    respondOffer,
+    acceptOffer,
+    updateConversationStatus,
+    deleteConversation,
   };
 }
+

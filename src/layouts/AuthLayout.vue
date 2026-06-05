@@ -20,9 +20,6 @@
               />
             </svg>
           </span> -->
-          <span class="text-2xl font-bold tracking-tight text-primary">{{
-            brandName
-          }}</span>
         </RouterLink>
 
         <div v-if="$slots['header-actions']" class="flex items-center gap-3">

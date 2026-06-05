@@ -1,28 +1,79 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useToast } from "vue-toastification";
 import { Form, Field } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import InputDateField from "@/components/forms/InputDateField.vue";
-import SelectField from "@/components/forms/SelectField.vue";
 import Button from "@/components/common/Button.vue";
+import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import { useEvents } from "@/composables/useEvents";
+import api from "@/libs/axios";
 
 const router = useRouter();
 const toast = useToast();
 const { createEvent, loading } = useEvents();
 
-const breadcrumbItems = [
-  { label: "Events", to: { name: "Admin - Events" } },
-  { label: "Buat Event Baru" },
-];
+const loadingData = ref(false);
+const availableMerchants = ref([]);
+const availableVouchers = ref([]);
+const selectedMerchantIds = ref([]);
+const selectedVoucherIds = ref([]);
+
+// Search queries for modals
+const searchMerchantModal = ref("");
+const searchVoucherModal = ref("");
+
+// Modal visibility
+const showMerchantModal = ref(false);
+const showVoucherModal = ref(false);
+
+const fetchInitialData = async () => {
+  loadingData.value = true;
+  try {
+    const [merchantsRes, vouchersRes] = await Promise.all([
+      api.get("/api/admin/merchants"),
+      api.get("/api/admin/vouchers")
+    ]);
+    availableMerchants.value = merchantsRes.data.data || [];
+    availableVouchers.value = vouchersRes.data.data || [];
+  } catch (error) {
+    console.error("Failed to fetch data:", error);
+  } finally {
+    loadingData.value = false;
+  }
+};
+
+const filteredMerchants = computed(() => {
+  if (!searchMerchantModal.value) return availableMerchants.value;
+  return availableMerchants.value.filter(m => 
+    m.name.toLowerCase().includes(searchMerchantModal.value.toLowerCase())
+  );
+});
+
+const filteredVouchers = computed(() => {
+  if (!searchVoucherModal.value) return availableVouchers.value;
+  return availableVouchers.value.filter(v => 
+    v.voucher_name.toLowerCase().includes(searchVoucherModal.value.toLowerCase()) ||
+    v.voucher_code.toLowerCase().includes(searchVoucherModal.value.toLowerCase())
+  );
+});
+
+const selectedMerchants = computed(() => {
+  return availableMerchants.value.filter(m => selectedMerchantIds.value.includes(m.id));
+});
+
+const selectedVouchers = computed(() => {
+  return availableVouchers.value.filter(v => selectedVoucherIds.value.includes(v.id));
+});
 
 // Form state
 const bannerPreview = ref(null);
 const bannerFile = ref(null);
 const formValues = ref({
+  event_name: "",
+  event_description: "",
   event_start_date: "",
   event_end_date: "",
   status: "draft",
@@ -45,7 +96,7 @@ const allowedStatus = computed(() => {
     return {
       status: "draft",
       options: [{ value: "draft", label: "Draft" }],
-      message: "Tanggal mulai tidak boleh di masa lalu. Pilih hari ini atau di masa depan.",
+      message: "Tanggal mulai tidak boleh di masa lalu.",
       messageColor: "text-red-600",
       isError: true,
       disabled: true,
@@ -56,7 +107,7 @@ const allowedStatus = computed(() => {
     return {
       status: "archived",
       options: [{ value: "archived", label: "Archived" }],
-      message: "Event sudah melewati tanggal selesai. Status otomatis diset ke Archived.",
+      message: "Event sudah melewati tanggal selesai.",
       messageColor: "text-blue-600",
       isError: false,
     };
@@ -69,7 +120,7 @@ const allowedStatus = computed(() => {
         { value: "draft", label: "Draft" },
         { value: "published", label: "Published" },
       ],
-      message: "Event dimulai hari ini. Anda dapat memilih Draft atau Published.",
+      message: "Event dimulai hari ini.",
       messageColor: "text-green-600",
       isError: false,
     };
@@ -79,49 +130,13 @@ const allowedStatus = computed(() => {
     return {
       status: "draft",
       options: [{ value: "draft", label: "Draft" }],
-      message: "Event belum memasuki tanggal mulai. Status hanya dapat diset Draft untuk saat ini.",
+      message: "Event belum memasuki tanggal mulai.",
       messageColor: "text-blue-600",
       isError: false,
     };
   }
 
-  // Default
-  return {
-    status: "draft",
-    options: statusOptions,
-    message: "",
-    isError: false,
-  };
-});
-
-// Watch dates to auto-update status
-watch(
-  () => [formValues.value.event_start_date, formValues.value.event_end_date],
-  () => {
-    formValues.value.status = allowedStatus.value.status;
-  }
-);
-
-// Validation schema with banner required
-const schema = yup.object({
-  event_name: yup
-    .string()
-    .required("Nama event wajib diisi")
-    .min(3, "Minimal 3 karakter")
-    .max(255, "Maksimal 255 karakter"),
-  event_description: yup
-    .string()
-    .required("Deskripsi event wajib diisi")
-    .min(10, "Minimal 10 karakter"),
-  event_start_date: yup
-    .date()
-    .required("Tanggal mulai wajib diisi")
-    .typeError("Format tanggal tidak valid"),
-  event_end_date: yup
-    .date()
-    .required("Tanggal selesai wajib diisi")
-    .min(yup.ref("event_start_date"), "Tanggal selesai harus setelah tanggal mulai")
-    .typeError("Format tanggal tidak valid"),
+  return { status: "draft", options: statusOptions, message: "", isError: false };
 });
 
 const statusOptions = [
@@ -130,28 +145,24 @@ const statusOptions = [
   { value: "archived", label: "Archived" },
 ];
 
-// Handle banner upload
+watch(
+  () => [formValues.value.event_start_date, formValues.value.event_end_date],
+  () => { formValues.value.status = allowedStatus.value.status; }
+);
+
+const schema = yup.object({
+  event_name: yup.string().required("Nama event wajib diisi").min(3).max(255),
+  event_description: yup.string().required("Deskripsi event wajib diisi").min(10),
+  event_start_date: yup.date().required("Tanggal mulai wajib diisi"),
+  event_end_date: yup.date().required("Tanggal selesai wajib diisi").min(yup.ref("event_start_date")),
+});
+
 const handleBannerChange = (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-
-  const validTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/svg+xml"];
-  if (!validTypes.includes(file.type)) {
-    toast.error("Format file harus JPG, PNG, WebP, atau SVG");
-    return;
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    toast.error("Ukuran file maksimal 5MB");
-    return;
-  }
-
   bannerFile.value = file;
-
   const reader = new FileReader();
-  reader.onload = (e) => {
-    bannerPreview.value = e.target?.result;
-  };
+  reader.onload = (e) => { bannerPreview.value = e.target?.result; };
   reader.readAsDataURL(file);
 };
 
@@ -160,14 +171,18 @@ const removeBanner = () => {
   bannerPreview.value = null;
 };
 
-// Submit handler with banner validation
+const toggleSelection = (list, id) => {
+  const index = list.value.indexOf(id);
+  if (index > -1) list.value.splice(index, 1);
+  else list.value.push(id);
+};
+
 const handleSubmit = async (values) => {
   try {
     if (allowedStatus.value.isError) {
-      toast.error("Tidak dapat membuat event dengan tanggal yang sudah terlewat");
+      toast.error("Tanggal tidak valid");
       return;
     }
-
     if (!bannerFile.value) {
       toast.error("Banner event wajib diupload");
       return;
@@ -181,193 +196,245 @@ const handleSubmit = async (values) => {
     formData.append("status", allowedStatus.value.status);
     formData.append("banner_img", bannerFile.value);
 
+    selectedMerchantIds.value.forEach(id => formData.append("merchant_ids[]", id));
+    selectedVoucherIds.value.forEach(id => formData.append("voucher_ids[]", id));
+
     await createEvent(formData);
     toast.success("Event berhasil dibuat");
     router.push({ name: "Admin - Events" });
   } catch (error) {
     console.error("Create event failed:", error);
-    
-    if (error.response?.data?.errors?.event_name) {
-      toast.error(error.response.data.errors.event_name[0] || "Nama event sudah digunakan");
-    } else if (error.response?.data?.message) {
-      toast.error(error.response.data.message);
-    }
+    toast.error(error.response?.data?.message || "Gagal membuat event");
   }
 };
 
 const goBack = () => router.push({ name: "Admin - Events" });
+
+onMounted(fetchInitialData);
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Form -->
-    <div class="px-4 sm:px-6 py-6">
-      <div class="bg-white rounded-lg shadow-sm p-6 max-w-4xl mx-auto">
-        <Form
-          @submit="handleSubmit"
-          :validation-schema="schema"
-          v-slot="{ errors, setFieldValue }"
-        >
-          <!-- Event Name -->
-          <div class="mb-6">
-            <Field name="event_name" v-slot="{ field }">
+  <div class="p-4 sm:p-6 bg-gray-50/50 min-h-screen">
+    <div class="max-w-4xl mx-auto">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6 sm:p-8">
+          <Form
+            @submit="handleSubmit"
+            :validation-schema="schema"
+            :initial-values="formValues"
+            v-slot="{ errors, setFieldValue }"
+          >
+            <!-- Basic Info -->
+            <div class="space-y-6">
               <TextField
+                name="event_name"
                 variant="merchant"
-                v-bind="field"
                 label="Nama Event"
                 placeholder="Contoh: Promo Ramadan 2025"
-                :error="errors.event_name"
                 required
               />
-            </Field>
-            <!-- Unique validation hint -->
-            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
-              <i class="pi pi-info-circle"></i>
-              <span>Nama event tidak boleh sama dengan event lain</span>
-            </p>
-          </div>
 
-          <!-- Event Description -->
-          <div class="mb-6">
-            <Field name="event_description" v-slot="{ field }">
               <TextField
+                name="event_description"
                 variant="merchant"
                 label="Deskripsi Event"
-                v-bind="field"
-                :error="errors.event_description"
                 placeholder="Deskripsi lengkap tentang event..."
                 required
+                as="textarea"
+                rows="4"
               />
-            </Field>
-          </div>
 
-          <!-- Date Range -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-            <Field name="event_start_date" v-slot="{ field }">
-              <InputDateField
-                v-model="formValues.event_start_date"
-                @update:modelValue="(v) => { formValues.event_start_date = v; setFieldValue('event_start_date', v); }"
-                variant="merchant"
-                label="Tanggal Mulai"
-                :error="errors.event_start_date"
-                required
-              />
-            </Field>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <Field name="event_start_date" v-slot="{ field }">
+                  <InputDateField
+                    v-bind="field"
+                    v-model="formValues.event_start_date"
+                    @update:modelValue="(v) => { formValues.event_start_date = v; setFieldValue('event_start_date', v); }"
+                    variant="merchant"
+                    label="Tanggal Mulai"
+                    :error="errors.event_start_date"
+                    required
+                  />
+                </Field>
 
-            <Field name="event_end_date" v-slot="{ field }">
-              <InputDateField
-                v-model="formValues.event_end_date"
-                @update:modelValue="(v) => { formValues.event_end_date = v; setFieldValue('event_end_date', v); }"
-                variant="merchant"
-                label="Tanggal Selesai"
-                :error="errors.event_end_date"
-                required
-              />
-            </Field>
-          </div>
+                <Field name="event_end_date" v-slot="{ field }">
+                  <InputDateField
+                    v-bind="field"
+                    v-model="formValues.event_end_date"
+                    @update:modelValue="(v) => { formValues.event_end_date = v; setFieldValue('event_end_date', v); }"
+                    variant="merchant"
+                    label="Tanggal Selesai"
+                    :error="errors.event_end_date"
+                    required
+                  />
+                </Field>
+              </div>
 
-          <!-- Status (Auto-determined) -->
-          <div class="mb-6">
-            <label class="block text-sm font-bold text-black mb-2">
-              Status <span class="text-red-500">*</span>
-            </label>
-            
-            <select
-              v-model="formValues.status"
-              :disabled="allowedStatus.options.length === 1 || allowedStatus.disabled"
-              :class="[
-                'w-full px-4 py-2.5 text-sm border rounded-xl bg-white text-black focus:ring-2 focus:ring-merchant-primary focus:outline-none',
-                allowedStatus.disabled ? 'bg-gray-100 cursor-not-allowed border-red-300' : 'border-merchant-primary',
-                allowedStatus.isError ? 'border-red-500' : ''
-              ]"
-            >
-              <option 
-                v-for="opt in allowedStatus.options" 
-                :key="opt.value" 
-                :value="opt.value"
-              >
-                {{ opt.label }}
-              </option>
-            </select>
-
-            <!-- Info/Error Message -->
-            <p 
-              v-if="allowedStatus.message" 
-              :class="['text-xs mt-2 flex items-start gap-2', allowedStatus.messageColor]"
-            >
-              <i :class="allowedStatus.isError ? 'pi pi-times-circle' : 'pi pi-info-circle'" class="mt-0.5"></i>
-              <span>{{ allowedStatus.message }}</span>
-            </p>
-          </div>
-
-          <!-- Banner Upload -->
-          <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Banner Event <span class="text-red-500">*</span>
-            </label>
-
-            <!-- Upload Area -->
-            <div
-              v-if="!bannerPreview"
-              class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-merchant-primary transition-colors cursor-pointer"
-            >
-              <input
-                type="file"
-                @change="handleBannerChange"
-                accept="image/jpeg,image/png,image/jpg,image/webp,image/svg+xml"
-                class="hidden"
-                id="banner-upload"
-              />
-              <label for="banner-upload" class="cursor-pointer">
-                <i class="pi pi-cloud-upload text-4xl text-gray-400 mb-3"></i>
-                <p class="text-sm text-gray-600">
-                  Klik untuk upload banner (JPG, PNG, WebP, SVG)
+              <!-- Status Display -->
+              <div class="p-4 rounded-xl border border-gray-100" :class="allowedStatus.isError ? 'bg-red-50 border-red-100' : 'bg-gray-50'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm font-bold text-gray-700">Status Event</span>
+                  <span class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" 
+                    :class="formValues.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'">
+                    {{ formValues.status }}
+                  </span>
+                </div>
+                <p v-if="allowedStatus.message" class="text-xs italic" :class="allowedStatus.messageColor">
+                  <i class="pi pi-info-circle mr-1"></i> {{ allowedStatus.message }}
                 </p>
-                <p class="text-xs text-gray-400 mt-1">
-                  Format: JPG, PNG, WebP, SVG | Rekomendasi: 1920x480px (4:1) | Max 5MB
-                </p>
-              </label>
+              </div>
+
+              <!-- Banner -->
+              <div class="space-y-3">
+                <label class="block text-sm font-bold text-gray-700">Banner Event <span class="text-red-500">*</span></label>
+                <div v-if="!bannerPreview" class="relative">
+                  <input type="file" @change="handleBannerChange" class="hidden" id="banner-input" accept="image/*" />
+                  <label for="banner-input" class="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-2xl p-10 hover:border-merchant-primary hover:bg-merchant-primary/5 transition-all cursor-pointer">
+                    <i class="pi pi-image text-4xl text-gray-300 mb-4"></i>
+                    <span class="text-sm font-medium text-gray-600">Klik untuk upload banner</span>
+                    <span class="text-xs text-gray-400 mt-1">Rekomendasi 4:1 (Max 5MB)</span>
+                  </label>
+                </div>
+                <div v-else class="relative group rounded-2xl overflow-hidden border border-gray-200">
+                  <img :src="bannerPreview" class="w-full aspect-[4/1] object-cover transition-transform group-hover:scale-105 duration-700" />
+                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button type="button" @click="removeBanner" class="w-12 h-12 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all scale-75 group-hover:scale-100">
+                      <i class="pi pi-trash text-xl"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Selections (Merchants & Vouchers) -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-6 border-t border-gray-100">
+                <!-- Merchants -->
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-gray-900 flex items-center gap-2">
+                      <i class="pi pi-shop text-merchant-primary"></i> Merchant
+                    </h3>
+                    <button type="button" @click="showMerchantModal = true" class="text-xs font-bold text-merchant-primary hover:underline">
+                      + Pilih Merchant
+                    </button>
+                  </div>
+                  <div class="flex flex-wrap gap-2 min-h-[40px] p-3 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div v-if="selectedMerchants.length === 0" class="text-xs text-gray-400 italic">Belum ada merchant dipilih</div>
+                    <div v-for="m in selectedMerchants" :key="m.id" class="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
+                      <img v-if="m.logo_path" :src="api.defaults.baseURL + '/api/merchant-logo/' + m.id" class="w-4 h-4 rounded-full object-cover" />
+                      <span class="truncate max-w-[100px]">{{ m.name }}</span>
+                      <button @click="toggleSelection(selectedMerchantIds, m.id)" class="text-gray-400 hover:text-red-500 transition-colors">
+                        <i class="pi pi-times text-[8px]"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Vouchers -->
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-gray-900 flex items-center gap-2">
+                      <i class="pi pi-ticket text-merchant-primary"></i> Voucher
+                    </h3>
+                    <button type="button" @click="showVoucherModal = true" class="text-xs font-bold text-merchant-primary hover:underline">
+                      + Pilih Voucher
+                    </button>
+                  </div>
+                  <div class="flex flex-wrap gap-2 min-h-[40px] p-3 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <div v-if="selectedVouchers.length === 0" class="text-xs text-gray-400 italic">Belum ada voucher dipilih</div>
+                    <div v-for="v in selectedVouchers" :key="v.id" class="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 shadow-sm">
+                      <span class="truncate max-w-[100px]">{{ v.voucher_code }}</span>
+                      <button @click="toggleSelection(selectedVoucherIds, v.id)" class="text-gray-400 hover:text-red-500 transition-colors">
+                        <i class="pi pi-times text-[8px]"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <!-- Preview -->
-            <div v-else class="relative">
-              <img
-                :src="bannerPreview"
-                alt="Banner preview"
-                class="w-full aspect-4/1 object-cover rounded-lg"
-              />
-              <button
-                @click="removeBanner"
-                type="button"
-                class="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition"
-              >
-                <i class="pi pi-times"></i>
-              </button>
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-end gap-3 mt-10 pt-8 border-t border-gray-100">
+              <Button @click="goBack" variant="ghost" type="button" size="md">Batal</Button>
+              <Button type="submit" variant="merchant" size="md" :loading="loading" :disabled="loading || allowedStatus.isError">
+                {{ loading ? 'Menyimpan...' : 'Buat Event' }}
+              </Button>
             </div>
-
-            <!-- ✅ REQUIRED ERROR MESSAGE -->
-            <p v-if="!bannerFile" class="text-xs text-red-500 mt-2 flex items-center gap-1">
-              <i class="pi pi-exclamation-circle"></i>
-              <span>Banner event wajib diupload sebelum menyimpan</span>
-            </p>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex gap-3 justify-end pt-4 border-t">
-            <Button @click="goBack" variant="secondary" type="button">
-              Batal
-            </Button>
-            <Button 
-              type="submit" 
-              variant="merchant" 
-              :disabled="loading || allowedStatus.isError || !bannerFile"
-            >
-              <i class="pi pi-check mr-2"></i>
-              {{ loading ? "Menyimpan..." : "Simpan Event" }}
-            </Button>
-          </div>
-        </Form>
+          </Form>
+        </div>
       </div>
     </div>
+
+    <!-- Merchant Modal -->
+    <ResponsiveModal :show="showMerchantModal" @close="showMerchantModal = false" title="Pilih Merchant" size="lg">
+      <div class="space-y-4 p-1">
+        <TextField name="modal_search_m" v-model="searchMerchantModal" placeholder="Cari nama merchant..." icon="pi pi-search" hide-label />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+          <label v-for="m in filteredMerchants" :key="m.id" 
+            class="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-all"
+            :class="selectedMerchantIds.includes(m.id) ? 'border-merchant-primary bg-merchant-primary/5' : ''">
+            <input type="checkbox" :value="m.id" v-model="selectedMerchantIds" class="hidden" />
+            <div class="w-10 h-10 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+              <img v-if="m.logo_path" :src="api.defaults.baseURL + '/api/merchant-logo/' + m.id" class="w-full h-full object-cover" />
+              <i v-else class="pi pi-shop text-gray-400"></i>
+            </div>
+            <div class="ml-3 min-w-0 flex-1">
+              <p class="text-sm font-bold text-gray-900 truncate">{{ m.name }}</p>
+              <p class="text-[10px] text-gray-500 truncate">@{{ m.slug }}</p>
+            </div>
+            <i v-if="selectedMerchantIds.includes(m.id)" class="pi pi-check-circle text-merchant-primary ml-2"></i>
+          </label>
+        </div>
+      </div>
+      <template #footer>
+        <Button @click="showMerchantModal = false" variant="merchant" block>Selesai</Button>
+      </template>
+    </ResponsiveModal>
+
+    <!-- Voucher Modal -->
+    <ResponsiveModal :show="showVoucherModal" @close="showVoucherModal = false" title="Pilih Voucher" size="lg">
+      <div class="space-y-4 p-1">
+        <TextField name="modal_search_v" v-model="searchVoucherModal" placeholder="Cari kode atau nama voucher..." icon="pi pi-search" hide-label />
+        <div class="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+          <label v-for="v in filteredVouchers" :key="v.id" 
+            class="flex items-center p-4 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-all"
+            :class="selectedVoucherIds.includes(v.id) ? 'border-merchant-primary bg-merchant-primary/5' : ''">
+            <input type="checkbox" :value="v.id" v-model="selectedVoucherIds" class="hidden" />
+            <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+              <i class="pi pi-ticket text-orange-500"></i>
+            </div>
+            <div class="ml-4 min-w-0 flex-1">
+              <p class="text-sm font-bold text-gray-900 truncate">{{ v.voucher_code }}</p>
+              <p class="text-xs text-gray-500 truncate">{{ v.voucher_name }}</p>
+            </div>
+            <div class="text-right ml-4">
+              <p class="text-xs font-black text-merchant-primary">
+                {{ v.voucher_type === 'percent' ? v.value + '%' : 'Rp ' + Number(v.value).toLocaleString('id-ID') }}
+              </p>
+            </div>
+            <i v-if="selectedVoucherIds.includes(v.id)" class="pi pi-check-circle text-merchant-primary ml-4"></i>
+          </label>
+        </div>
+      </div>
+      <template #footer>
+        <Button @click="showVoucherModal = false" variant="merchant" block>Selesai</Button>
+      </template>
+    </ResponsiveModal>
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+</style>

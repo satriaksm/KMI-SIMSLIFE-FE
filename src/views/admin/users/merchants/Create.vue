@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { Form, Field } from "vee-validate";
+import { Form, Field, ErrorMessage } from "vee-validate";
 import * as yup from "yup";
 import {
   getProvinces,
@@ -280,7 +280,6 @@ watch(districtId, async (val) => {
 
 // Submit pakai endpoint admin
 const handleRegister = async (values) => {
-  // ✅ IMPROVED: Better validation
   if (!selectedUserId.value) {
     toast.error("User wajib dipilih");
     return;
@@ -595,6 +594,31 @@ const selectedUser = computed(() =>
                 v-model:lat="latitude"
                 v-model:lng="longitude"
                 :zoom="15"
+              />
+
+              <!-- Bind map coords into vee-validate values (required by schema) -->
+              <Field
+                name="address.latitude"
+                :modelValue="latitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="latitude ?? ''" />
+              </Field>
+              <Field
+                name="address.longitude"
+                :modelValue="longitude"
+                v-slot="{ field }"
+              >
+                <input type="hidden" v-bind="field" :value="longitude ?? ''" />
+              </Field>
+
+              <ErrorMessage
+                name="address.latitude"
+                class="mt-1 text-xs text-danger-foreground"
+              />
+              <ErrorMessage
+                name="address.longitude"
+                class="text-xs text-danger-foreground"
               />
             </div>
 

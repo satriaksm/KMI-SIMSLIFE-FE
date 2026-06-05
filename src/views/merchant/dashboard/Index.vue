@@ -160,11 +160,17 @@ const fetchDashboard = async () => {
       `/api/merchant/${currentMerchantSlug.value}/dashboard`,
     );
 
+<<<<<<< HEAD
     const data = response?.data?.data || {};
     const voucherStats = data.voucher_stats || {};
     
     orderStats.value = data.order_stats || null;
     walletStats.value = data.wallet || null;
+=======
+    const data = response?.data?.data ?? response?.data ?? {};
+    const statsData = data.stats ?? {};
+    const voucherStats = data.voucher_stats ?? {};
+>>>>>>> staging-ta
 
     const label = catalogLabel.value;
     const catalogIcon = isJasaMerchant.value ? "pi pi-briefcase" : "pi pi-box";
@@ -172,25 +178,25 @@ const fetchDashboard = async () => {
     const stats = [
       {
         title: `Total ${label}`,
-        value: data.stats.total,
+        value: statsData.total ?? 0,
         icon: catalogIcon,
         color: "bg-blue-100 text-blue-600",
       },
       {
         title: `${label} Dipublish`,
-        value: data.stats.published,
+        value: statsData.published ?? 0,
         icon: "pi pi-check-circle",
         color: "bg-green-100 text-green-600",
       },
       {
         title: `${label} Draft`,
-        value: data.stats.draft,
+        value: statsData.draft ?? 0,
         icon: "pi pi-file-edit",
         color: "bg-yellow-100 text-yellow-600",
       },
       {
         title: `${label} Diarsipkan`,
-        value: data.stats.archived,
+        value: statsData.archived ?? 0,
         icon: "pi pi-folder-open",
         color: "bg-red-100 text-red-600",
       },
@@ -201,13 +207,13 @@ const fetchDashboard = async () => {
       stats.push(
         {
           title: "Stok Menipis",
-          value: data.stats.low_stock,
+          value: statsData.low_stock ?? 0,
           icon: "pi pi-exclamation-triangle",
           color: "bg-yellow-100 text-yellow-600",
         },
         {
           title: "Stok Habis",
-          value: data.stats.out_of_stock,
+          value: statsData.out_of_stock ?? 0,
           icon: "pi pi-exclamation-triangle",
           color: "bg-red-100 text-red-600",
         },

@@ -353,11 +353,11 @@ const goToEdit = () => {
               <span v-if="!hasCover">Banner belum diisi. </span>
               <span v-if="!hasCover && (!hasLogo || !hasDescription)"> </span>
               <span v-if="!hasLogo && !hasDescription"> </span>
-              <span v-if="!hasDescription">Tentang toko belum diisi. </span>
+              <span v-if="!hasDescription">Tentang UMKM belum diisi. </span>
               <span v-if="allDaysClosed"
                 >Jam operasional belum diatur atau semua hari tutup.
               </span>
-              <span> Lengkapi agar toko terlihat lebih meyakinkan.</span>
+              <span> Lengkapi agar UMKM terlihat lebih meyakinkan.</span>
             </div>
           </div>
         </div>
@@ -421,19 +421,19 @@ const goToEdit = () => {
         >
           <!-- Title tanpa background (sama seperti "Produk") -->
           <h2 class="text-xl font-bold sm:text-2xl text-merchant-primary">
-            Informasi Toko
+            Informasi UMKM
           </h2>
 
           <!-- Grid Layout for Desktop -->
           <div
             class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-6"
           >
-            <!-- Nama Toko -->
+            <!-- Nama UMKM -->
             <div>
               <label
                 class="block mb-2 text-sm font-medium sm:text-base text-merchant-primary"
               >
-                Nama Toko
+                Nama UMKM
               </label>
               <div
                 class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"

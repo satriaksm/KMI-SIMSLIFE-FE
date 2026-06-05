@@ -59,6 +59,7 @@
               name="name"
               label="Nama Usaha"
               placeholder="Masukkan nama usaha"
+              autocomplete="organization"
               class="sm:col-span-2"
               required
             />
@@ -68,6 +69,7 @@
               name="phone"
               label="Nomor Telepon"
               placeholder="Contoh: 081234567890"
+              autocomplete="tel"
               class="sm:col-span-2"
               required
             />
@@ -185,6 +187,7 @@
               name="address.detail"
               label="Alamat Lengkap"
               placeholder="Nama jalan, RT/RW, patokan, dsb (opsional)"
+              autocomplete="address-line1"
               class="sm:col-span-2"
             />
 
@@ -478,6 +481,31 @@ const handleRegister = async (values) => {
   isLoading.value = true;
   errorMessage.value = "";
 
+  // Validate coordinates from MapPicker
+  if (latitude.value === null || longitude.value === null) {
+    errorMessage.value =
+      "Lokasi wajib dipilih. Gunakan peta untuk menentukan titik lokasi UMKM.";
+    isLoading.value = false;
+    return;
+  }
+
+  const lat = Number(latitude.value);
+  const lng = Number(longitude.value);
+
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+    errorMessage.value =
+      "Latitude tidak valid. Gunakan peta untuk memilih lokasi.";
+    isLoading.value = false;
+    return;
+  }
+
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+    errorMessage.value =
+      "Longitude tidak valid. Gunakan peta untuk memilih lokasi.";
+    isLoading.value = false;
+    return;
+  }
+
   try {
     const payload = {
       name: values.name,
@@ -494,16 +522,18 @@ const handleRegister = async (values) => {
         district_id: Number(values.address.district_id),
         village_id: Number(values.address.village_id),
         detail: values.address.detail || null,
-        latitude: Number(values.address.latitude),
-        longitude: Number(values.address.longitude),
+        latitude: lat,
+        longitude: lng,
       },
     };
+
+    console.log("Submitting merchant registration:", payload);
     await registerMerchant(payload);
 
     toast.success("Pendaftaran UMKM dikirim. Menunggu persetujuan admin.", {
       timeout: 3000,
-    }); // NEW
-    router.push("/dashboard");
+    });
+    router.push("/");
   } catch (error) {
     console.error("Register merchant error:", error);
     if (error.response?.data?.errors) {

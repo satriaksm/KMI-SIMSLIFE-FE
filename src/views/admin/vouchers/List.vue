@@ -11,7 +11,14 @@ import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import api from "@/libs/axios";
 
 const router = useRouter();
-const { vouchers, loading, pagination, fetchVouchers, activateVoucher, deactivateVoucher } = useVouchers();
+const {
+  vouchers,
+  loading,
+  pagination,
+  fetchVouchers,
+  activateVoucher,
+  deactivateVoucher,
+} = useVouchers();
 
 const searchQuery = ref("");
 const currentPage = ref(1);
@@ -165,7 +172,8 @@ const goToPage = (page) => {
 };
 
 // Format helpers
-const formatVoucherType = (type) => (type === "percent" ? "Persentase" : "Nominal");
+const formatVoucherType = (type) =>
+  type === "percent" ? "Persentase" : "Nominal";
 
 const formatVoucherValue = (item) =>
   item.voucher_type === "percent"
@@ -173,24 +181,27 @@ const formatVoucherValue = (item) =>
     : formatCurrency(item.value);
 
 const formatCurrency = (value) => {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
     minimumFractionDigits: 0,
   }).format(value);
 };
 
 const formatDate = (date) =>
-  date ? new Date(date).toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }) : "-";
+  date
+    ? new Date(date).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "-";
 
 const getUsage = (item) =>
   `${item.usages_count || 0} / ${item.usage_limit || "∞"}`;
 
-const goToDetail = (item) => router.push({ name: "Admin - Voucher Detail", params: { id: item.id } });
+const goToDetail = (item) =>
+  router.push({ name: "Admin - Voucher Detail", params: { id: item.id } });
 
 // Status toggle state
 const showStatusModal = ref(false);
@@ -207,7 +218,7 @@ const handleToggleStatus = async () => {
   if (!voucherToToggle.value) return;
 
   try {
-    if (voucherToToggle.value.voucher_status === 'active') {
+    if (voucherToToggle.value.voucher_status === "active") {
       await deactivateVoucher(voucherToToggle.value.id);
     } else {
       await activateVoucher(voucherToToggle.value.id);
@@ -216,7 +227,7 @@ const handleToggleStatus = async () => {
     voucherToToggle.value = null;
     await loadVouchers();
   } catch (error) {
-    console.error('Failed to toggle voucher status:', error);
+    console.error("Failed to toggle voucher status:", error);
   }
 };
 
@@ -226,7 +237,7 @@ const exportLoading = ref(false); // ✅ NEW
 
 // ✅ Export Modal methods
 const openExportModal = () => {
-  console.log('openExportModal called in List.vue');
+  console.log("openExportModal called in List.vue");
   showExportModal.value = true;
 };
 
@@ -236,7 +247,7 @@ const closeExportModal = () => {
 
 // ✅ Export PDF method
 const exportPDF = async () => {
-  console.log('exportPDF called');
+  console.log("exportPDF called");
   exportLoading.value = true;
   try {
     const response = await api.get("/api/admin/vouchers/export-pdf", {
@@ -251,7 +262,10 @@ const exportPDF = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `vouchers-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    link.setAttribute(
+      "download",
+      `vouchers-report-${new Date().toISOString().split("T")[0]}.pdf`,
+    );
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -267,23 +281,31 @@ const exportPDF = async () => {
 };
 
 // ✅ Inject the register function from parent
-const registerExportModal = inject('registerExportModal', null);
+const registerExportModal = inject("registerExportModal", null);
 
 // ✅ Expose openExportModal to parent via register callback
 onMounted(() => {
   // Register the export modal function with parent
-  if (registerExportModal && typeof registerExportModal === 'function') {
-    console.log('Registering export modal callback for vouchers list');
+  if (registerExportModal && typeof registerExportModal === "function") {
+    console.log("Registering export modal callback for vouchers list");
     registerExportModal(openExportModal);
   } else {
-    console.warn('registerExportModal not provided by parent');
+    console.warn("registerExportModal not provided by parent");
   }
 });
 
-watch([searchQuery, sortBy], () => {
-  currentPage.value = 1;
-  loadVouchers();
-}, { immediate: true });
+let searchDebounceTimer = null;
+watch(
+  [searchQuery, sortBy],
+  () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      currentPage.value = 1;
+      loadVouchers();
+    }, 400);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -309,12 +331,14 @@ watch([searchQuery, sortBy], () => {
           class="w-full sm:w-auto mb-2 sm:mb-0"
           @click="toggleStatusFilter"
         >
-          <i 
-            :class=" [
+          <i
+            :class="[
               'mr-2',
-              filterStatus === 'active' ? 'pi pi-check-circle' :
-              filterStatus === 'inactive' ? 'pi pi-times-circle' :
-              'pi pi-circle'
+              filterStatus === 'active'
+                ? 'pi pi-check-circle'
+                : filterStatus === 'inactive'
+                  ? 'pi pi-times-circle'
+                  : 'pi pi-circle',
             ]"
           ></i>
           {{ getStatusLabel }}
@@ -327,12 +351,14 @@ watch([searchQuery, sortBy], () => {
           class="w-full sm:w-auto mb-2 sm:mb-0"
           @click="toggleTypeFilter"
         >
-          <i 
-            :class=" [
+          <i
+            :class="[
               'mr-2',
-              filterType === 'percent' ? 'pi pi-percentage' :
-              filterType === 'fixed' ? 'pi pi-money-bill' :
-              'pi pi-tag'
+              filterType === 'percent'
+                ? 'pi pi-percentage'
+                : filterType === 'fixed'
+                  ? 'pi pi-money-bill'
+                  : 'pi pi-tag',
             ]"
           ></i>
           {{ getTypeLabel }}
@@ -351,47 +377,54 @@ watch([searchQuery, sortBy], () => {
       </div>
 
       <!-- Active Filters Indicator -->
-      <div v-if="hasActiveFilters" class="flex items-center justify-between pt-2 border-t sm:border-0 sm:pt-0">
+      <div
+        v-if="hasActiveFilters"
+        class="flex items-center justify-between pt-2 border-t sm:border-0 sm:pt-0"
+      >
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-sm text-gray-600">
             {{ activeFiltersCount }} filter aktif:
           </span>
-          
+
           <!-- Status Badge -->
-          <span 
+          <span
             v-if="filterStatus.value"
             class="inline-flex items-center gap-1.5 px-3 py-1 bg-merchant-primary/10 text-merchant-primary rounded-full text-xs font-medium"
           >
-            <i 
-              :class=" [
+            <i
+              :class="[
                 'text-xs',
-                filterStatus.value === 'active' ? 'pi pi-check-circle' : 'pi pi-times-circle'
+                filterStatus.value === 'active'
+                  ? 'pi pi-check-circle'
+                  : 'pi pi-times-circle',
               ]"
             ></i>
-            {{ filterStatus.value === 'active' ? 'Aktif' : 'Nonaktif' }}
+            {{ filterStatus.value === "active" ? "Aktif" : "Nonaktif" }}
           </span>
 
           <!-- Type Badge -->
-          <span 
+          <span
             v-if="filterType.value"
             class="inline-flex items-center gap-1.5 px-3 py-1 bg-merchant-primary/10 text-merchant-primary rounded-full text-xs font-medium"
           >
-            <i 
-              :class=" [
+            <i
+              :class="[
                 'text-xs',
-                filterType.value === 'percent' ? 'pi pi-percentage' : 'pi pi-money-bill'
+                filterType.value === 'percent'
+                  ? 'pi pi-percentage'
+                  : 'pi pi-money-bill',
               ]"
             ></i>
-            {{ filterType.value === 'percent' ? 'Persentase' : 'Nominal' }}
+            {{ filterType.value === "percent" ? "Persentase" : "Nominal" }}
           </span>
 
           <!-- Sort Badge -->
-          <span 
+          <span
             v-if="sortBy.value"
             class="inline-flex items-center gap-1.5 px-3 py-1 bg-merchant-primary/10 text-merchant-primary rounded-full text-xs font-medium"
           >
             <i class="pi pi-sort-alt text-xs"></i>
-            {{ sortOptions.find(o => o.value === sortBy.value)?.label }}
+            {{ sortOptions.find((o) => o.value === sortBy.value)?.label }}
           </span>
         </div>
 
@@ -410,21 +443,33 @@ watch([searchQuery, sortBy], () => {
       <!-- Loading State -->
       <div v-if="loading" class="flex justify-center py-20">
         <div class="text-center">
-          <i class="pi pi-spin pi-spinner text-5xl text-merchant-primary mb-4"></i>
+          <i
+            class="pi pi-spin pi-spinner text-5xl text-merchant-primary mb-4"
+          ></i>
           <p class="text-gray-600">Memuat voucher...</p>
         </div>
       </div>
 
       <!-- Empty State -->
       <div v-else-if="vouchers.length === 0" class="text-center py-20">
-        <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div
+          class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"
+        >
           <i class="pi pi-ticket text-4xl text-gray-400"></i>
         </div>
         <p class="text-gray-600 font-medium mb-2">
-          {{ searchQuery || filterStatus || filterType ? 'Tidak ada voucher yang sesuai' : 'Belum ada voucher' }}
+          {{
+            searchQuery || filterStatus || filterType
+              ? "Tidak ada voucher yang sesuai"
+              : "Belum ada voucher"
+          }}
         </p>
         <p class="text-sm text-gray-500 mb-6">
-          {{ searchQuery || filterStatus || filterType ? 'Coba ubah filter pencarian' : 'Tambahkan voucher pertama Anda' }}
+          {{
+            searchQuery || filterStatus || filterType
+              ? "Coba ubah filter pencarian"
+              : "Tambahkan voucher pertama Anda"
+          }}
         </p>
         <Button
           v-if="!searchQuery && !filterStatus && !filterType"
@@ -447,67 +492,90 @@ watch([searchQuery, sortBy], () => {
             class="relative overflow-hidden border border-gray-200 rounded-xl hover:border-merchant-primary hover:shadow-lg transition-all cursor-pointer group bg-white"
           >
             <!-- Header with Gradient Background -->
-            <div 
-              :class=" [
+            <div
+              :class="[
                 'relative p-4 mb-3',
-                voucher.voucher_status === 'active' 
+                voucher.voucher_status === 'active'
                   ? 'bg-linear-to-br from-green-100 to-emerald-50/30'
-                  : 'bg-linear-to-br from-slate-100 to-gray-50/30'
+                  : 'bg-linear-to-br from-slate-100 to-gray-50/30',
               ]"
             >
               <div class="flex items-start justify-between">
                 <div class="flex-1 flex items-start gap-3">
-                  <div 
+                  <div
                     :class="[
                       'p-2.5 rounded-xl',
-                      voucher.voucher_status === 'active' 
+                      voucher.voucher_status === 'active'
                         ? 'bg-green-100'
                         : voucher.voucher_status === 'inactive'
-                        ? 'bg-slate-100'
-                        : 'bg-red-100'
+                          ? 'bg-slate-100'
+                          : 'bg-red-100',
                     ]"
                   >
-                    <i 
+                    <i
                       :class="[
                         'pi pi-ticket text-lg',
-                        voucher.voucher_status === 'active' 
+                        voucher.voucher_status === 'active'
                           ? 'text-green-600'
                           : voucher.voucher_status === 'inactive'
-                          ? 'text-slate-600'
-                          : 'text-red-600'
+                            ? 'text-slate-600'
+                            : 'text-red-600',
                       ]"
                     ></i>
                   </div>
                   <div class="flex-1 min-w-0">
-                    <h4 class="font-mono font-bold text-gray-900 truncate text-base mb-1.5" :title="voucher.voucher_code">
+                    <h4
+                      class="font-mono font-bold text-gray-900 truncate text-base mb-1.5"
+                      :title="voucher.voucher_code"
+                    >
                       {{ voucher.voucher_code }}
                     </h4>
-                    <div 
+                    <div
                       :class="[
                         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold',
-                        voucher.voucher_status === 'active' 
+                        voucher.voucher_status === 'active'
                           ? 'bg-green-600 text-white'
                           : voucher.voucher_status === 'inactive'
-                          ? 'bg-slate-600 text-white'
-                          : 'bg-red-600 text-white'
+                            ? 'bg-slate-600 text-white'
+                            : 'bg-red-600 text-white',
                       ]"
                     >
                       <span class="w-1 h-1 bg-white rounded-full"></span>
-                      {{ voucher.voucher_status === 'active' ? 'AKTIF' : voucher.voucher_status === 'inactive' ? 'NONAKTIF' : 'KADALUARSA' }}
+                      {{
+                        voucher.voucher_status === "active"
+                          ? "AKTIF"
+                          : voucher.voucher_status === "inactive"
+                            ? "NONAKTIF"
+                            : "KADALUARSA"
+                      }}
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- Toggle Status Button -->
                 <Button
                   v-if="voucher.voucher_status !== 'expired'"
                   @click.stop="openStatusToggleModal(voucher)"
-                  :variant="voucher.voucher_status === 'active' ? 'secondary' : 'merchant'"
+                  :variant="
+                    voucher.voucher_status === 'active'
+                      ? 'secondary'
+                      : 'merchant'
+                  "
                   size="sm"
                   class="opacity-0 group-hover:opacity-100 transition-opacity"
-                  :title="voucher.voucher_status === 'active' ? 'Nonaktifkan' : 'Aktifkan'"
+                  :title="
+                    voucher.voucher_status === 'active'
+                      ? 'Nonaktifkan'
+                      : 'Aktifkan'
+                  "
                 >
-                  <i :class="voucher.voucher_status === 'active' ? 'pi pi-times' : 'pi pi-check'"></i>
+                  <i
+                    :class="
+                      voucher.voucher_status === 'active'
+                        ? 'pi pi-times'
+                        : 'pi pi-check'
+                    "
+                  ></i>
                 </Button>
               </div>
             </div>
@@ -516,19 +584,24 @@ watch([searchQuery, sortBy], () => {
             <div class="px-4 pb-4">
               <!-- Event Badge -->
               <div v-if="voucher.event" class="mb-3">
-                <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-medium">
+                <div
+                  class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-medium"
+                >
                   <i class="pi pi-calendar text-blue-600"></i>
-                  <span class="truncate max-w-[200px]" :title="voucher.event.event_name">
+                  <span
+                    class="truncate max-w-[200px]"
+                    :title="voucher.event.event_name"
+                  >
                     {{ voucher.event.event_name }}
                   </span>
                 </div>
               </div>
-              
+
               <!-- Description -->
               <p class="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[40px]">
-                {{ voucher.voucher_description || 'Tidak ada deskripsi' }}
+                {{ voucher.voucher_description || "Tidak ada deskripsi" }}
               </p>
-              
+
               <!-- Info Grid -->
               <div class="grid grid-cols-2 gap-3 mb-4">
                 <div class="bg-gray-50 border border-gray-100 rounded-lg p-3">
@@ -537,8 +610,12 @@ watch([searchQuery, sortBy], () => {
                     {{ formatVoucherType(voucher.voucher_type) }}
                   </p>
                 </div>
-                <div class="bg-merchant-primary/5 border border-merchant-primary/10 rounded-lg p-3">
-                  <p class="text-xs text-merchant-primary/70 mb-1 font-medium">Nilai</p>
+                <div
+                  class="bg-merchant-primary/5 border border-merchant-primary/10 rounded-lg p-3"
+                >
+                  <p class="text-xs text-merchant-primary/70 mb-1 font-medium">
+                    Nilai
+                  </p>
                   <p class="text-sm font-bold text-merchant-primary">
                     {{ formatVoucherValue(voucher) }}
                   </p>
@@ -547,7 +624,9 @@ watch([searchQuery, sortBy], () => {
 
               <!-- Stats -->
               <div class="pt-3 border-t border-gray-100">
-                <div class="flex items-center justify-between text-xs text-gray-600 mb-2.5">
+                <div
+                  class="flex items-center justify-between text-xs text-gray-600 mb-2.5"
+                >
                   <span class="flex items-center gap-1.5 font-medium">
                     <i class="pi pi-shopping-cart text-gray-400"></i>
                     {{ formatCurrency(voucher.min_purchase_amount || 0) }}
@@ -559,9 +638,13 @@ watch([searchQuery, sortBy], () => {
                 </div>
                 <div class="flex items-center gap-2 text-xs text-gray-500">
                   <i class="pi pi-calendar text-gray-400"></i>
-                  <span class="font-medium">{{ formatDate(voucher.voucher_start_date) }}</span>
+                  <span class="font-medium">{{
+                    formatDate(voucher.voucher_start_date)
+                  }}</span>
                   <span>-</span>
-                  <span class="font-medium">{{ formatDate(voucher.voucher_end_date) }}</span>
+                  <span class="font-medium">{{
+                    formatDate(voucher.voucher_end_date)
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -571,8 +654,14 @@ watch([searchQuery, sortBy], () => {
         <!-- Desktop Pagination -->
         <div class="flex items-center justify-between pt-4 border-t">
           <div class="text-sm text-gray-600">
-            Menampilkan {{ ((pagination.current_page - 1) * pagination.per_page) + 1 }} 
-            - {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} 
+            Menampilkan
+            {{ (pagination.current_page - 1) * pagination.per_page + 1 }} -
+            {{
+              Math.min(
+                pagination.current_page * pagination.per_page,
+                pagination.total,
+              )
+            }}
             dari {{ pagination.total }} voucher
           </div>
           <div class="flex items-center gap-2">
@@ -605,21 +694,33 @@ watch([searchQuery, sortBy], () => {
       <!-- Loading -->
       <div v-if="loading" class="flex justify-center py-12">
         <div class="text-center">
-          <i class="pi pi-spin pi-spinner text-4xl text-merchant-primary mb-3"></i>
+          <i
+            class="pi pi-spin pi-spinner text-4xl text-merchant-primary mb-3"
+          ></i>
           <p class="text-sm text-gray-600">Memuat voucher...</p>
         </div>
       </div>
 
       <!-- Empty State for Mobile -->
       <div v-else-if="vouchers.length === 0" class="text-center py-12">
-        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div
+          class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"
+        >
           <i class="pi pi-ticket text-3xl text-gray-400"></i>
         </div>
         <p class="text-gray-600 font-medium mb-2">
-          {{ searchQuery || filterStatus || filterType ? 'Tidak ada voucher yang sesuai' : 'Belum ada voucher' }}
+          {{
+            searchQuery || filterStatus || filterType
+              ? "Tidak ada voucher yang sesuai"
+              : "Belum ada voucher"
+          }}
         </p>
         <p class="text-sm text-gray-500">
-          {{ searchQuery || filterStatus || filterType ? 'Coba ubah filter pencarian' : 'Tambahkan voucher pertama Anda' }}
+          {{
+            searchQuery || filterStatus || filterType
+              ? "Coba ubah filter pencarian"
+              : "Tambahkan voucher pertama Anda"
+          }}
         </p>
       </div>
 
@@ -632,36 +733,36 @@ watch([searchQuery, sortBy], () => {
           class="relative overflow-hidden border border-gray-200 rounded-xl hover:border-merchant-primary hover:shadow-lg transition-all cursor-pointer group bg-white"
         >
           <!-- Header with Gradient Background -->
-          <div 
-            :class=" [
+          <div
+            :class="[
               'relative p-4 mb-3',
-              voucher.voucher_status === 'active' 
+              voucher.voucher_status === 'active'
                 ? 'bg-linear-to-br from-green-50 to-emerald-50/30'
                 : voucher.voucher_status === 'inactive'
-                ? 'bg-linear-to-br from-slate-50 to-gray-50/30'
-                : 'bg-linear-to-br from-red-50 to-rose-50/30'
+                  ? 'bg-linear-to-br from-slate-50 to-gray-50/30'
+                  : 'bg-linear-to-br from-red-50 to-rose-50/30',
             ]"
           >
             <div class="flex items-start justify-between gap-3">
               <div class="flex items-start gap-3 flex-1 min-w-0">
-                <div 
+                <div
                   :class="[
                     'p-2.5 rounded-xl',
-                    voucher.voucher_status === 'active' 
+                    voucher.voucher_status === 'active'
                       ? 'bg-green-100'
                       : voucher.voucher_status === 'inactive'
-                      ? 'bg-slate-100'
-                      : 'bg-red-100'
+                        ? 'bg-slate-100'
+                        : 'bg-red-100',
                   ]"
                 >
-                  <i 
+                  <i
                     :class="[
                       'pi pi-ticket',
-                      voucher.voucher_status === 'active' 
+                      voucher.voucher_status === 'active'
                         ? 'text-green-600'
                         : voucher.voucher_status === 'inactive'
-                        ? 'text-slate-600'
-                        : 'text-red-600'
+                          ? 'text-slate-600'
+                          : 'text-red-600',
                     ]"
                   ></i>
                 </div>
@@ -669,28 +770,46 @@ watch([searchQuery, sortBy], () => {
                   <p class="font-mono font-bold text-gray-900 truncate mb-1.5">
                     {{ voucher.voucher_code }}
                   </p>
-                  <div 
+                  <div
                     :class="[
                       'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold',
-                      voucher.voucher_status === 'active' 
+                      voucher.voucher_status === 'active'
                         ? 'bg-green-600 text-white'
                         : voucher.voucher_status === 'inactive'
-                        ? 'bg-slate-600 text-white'
-                        : 'bg-red-600 text-white'
+                          ? 'bg-slate-600 text-white'
+                          : 'bg-red-600 text-white',
                     ]"
                   >
                     <span class="w-1 h-1 bg-white rounded-full"></span>
-                    {{ voucher.voucher_status === 'active' ? 'AKTIF' : voucher.voucher_status === 'inactive' ? 'NONAKTIF' : 'KADALUARSA' }}
+                    {{
+                      voucher.voucher_status === "active"
+                        ? "AKTIF"
+                        : voucher.voucher_status === "inactive"
+                          ? "NONAKTIF"
+                          : "KADALUARSA"
+                    }}
                   </div>
                 </div>
               </div>
               <Button
                 @click.stop="openStatusToggleModal(voucher)"
-                :variant="voucher.voucher_status === 'active' ? 'secondary' : 'merchant'"
+                :variant="
+                  voucher.voucher_status === 'active' ? 'secondary' : 'merchant'
+                "
                 size="sm"
-                :title="voucher.voucher_status === 'active' ? 'Nonaktifkan' : 'Aktifkan'"
+                :title="
+                  voucher.voucher_status === 'active'
+                    ? 'Nonaktifkan'
+                    : 'Aktifkan'
+                "
               >
-                <i :class="voucher.voucher_status === 'active' ? 'pi pi-times' : 'pi pi-check'"></i>
+                <i
+                  :class="
+                    voucher.voucher_status === 'active'
+                      ? 'pi pi-times'
+                      : 'pi pi-check'
+                  "
+                ></i>
               </Button>
             </div>
           </div>
@@ -699,34 +818,57 @@ watch([searchQuery, sortBy], () => {
           <div class="px-4 pb-4">
             <!-- Event Badge -->
             <div v-if="voucher.event" class="mb-3">
-              <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-medium">
+              <div
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-lg text-xs font-medium"
+              >
                 <i class="pi pi-calendar text-blue-600"></i>
-                <span class="truncate max-w-[200px]">{{ voucher.event.event_name }}</span>
+                <span class="truncate max-w-[200px]">{{
+                  voucher.event.event_name
+                }}</span>
               </div>
             </div>
 
             <!-- Info -->
             <div class="space-y-2 mb-3">
-              <div class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg">
+              <div
+                class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg"
+              >
                 <span class="text-xs text-gray-600 font-medium">Nilai:</span>
                 <span class="font-bold text-sm text-merchant-primary">
                   {{ formatVoucherValue(voucher) }}
                 </span>
               </div>
-              <div class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg">
-                <span class="text-xs text-gray-600 font-medium">Penggunaan:</span>
-                <span class="text-sm font-semibold">{{ getUsage(voucher) }}</span>
+              <div
+                class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg"
+              >
+                <span class="text-xs text-gray-600 font-medium"
+                  >Penggunaan:</span
+                >
+                <span class="text-sm font-semibold">{{
+                  getUsage(voucher)
+                }}</span>
               </div>
-              <div class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg">
-                <span class="text-xs text-gray-600 font-medium">Min. Pembelian:</span>
-                <span class="text-sm font-semibold">{{ formatCurrency(voucher.min_purchase_amount || 0) }}</span>
+              <div
+                class="flex justify-between items-center p-2 bg-gray-50 border border-gray-100 rounded-lg"
+              >
+                <span class="text-xs text-gray-600 font-medium"
+                  >Min. Pembelian:</span
+                >
+                <span class="text-sm font-semibold">{{
+                  formatCurrency(voucher.min_purchase_amount || 0)
+                }}</span>
               </div>
             </div>
 
             <!-- Period -->
-            <div class="text-xs text-gray-500 pt-3 border-t flex items-center gap-1.5">
+            <div
+              class="text-xs text-gray-500 pt-3 border-t flex items-center gap-1.5"
+            >
               <i class="pi pi-calendar text-gray-400"></i>
-              <span class="font-medium">{{ formatDate(voucher.voucher_start_date) }} - {{ formatDate(voucher.voucher_end_date) }}</span>
+              <span class="font-medium"
+                >{{ formatDate(voucher.voucher_start_date) }} -
+                {{ formatDate(voucher.voucher_end_date) }}</span
+              >
             </div>
           </div>
         </div>
@@ -747,91 +889,115 @@ watch([searchQuery, sortBy], () => {
       :show="showStatusModal"
       variant="merchant"
       @close="showStatusModal = false"
-      :title="voucherToToggle?.voucher_status === 'active' ? 'Nonaktifkan Voucher' : 'Aktifkan Voucher'"
+      :title="
+        voucherToToggle?.voucher_status === 'active'
+          ? 'Nonaktifkan Voucher'
+          : 'Aktifkan Voucher'
+      "
     >
       <div class="space-y-4">
-        <div 
-          :class=" [
+        <div
+          :class="[
             'flex items-start gap-3 p-4 border rounded-xl',
             voucherToToggle?.voucher_status === 'active'
               ? 'bg-warning-background/10 border-warning-foreground/20'
-              : 'bg-green-50 border-green-200'
+              : 'bg-green-50 border-green-200',
           ]"
         >
-          <i 
-            :class=" [
+          <i
+            :class="[
               'text-xl shrink-0 mt-0.5',
-              voucherToToggle?.voucher_status === 'active' 
+              voucherToToggle?.voucher_status === 'active'
                 ? 'pi pi-exclamation-triangle text-warning-foreground'
-                : 'pi pi-check-circle text-green-600'
+                : 'pi pi-check-circle text-green-600',
             ]"
           ></i>
           <div>
-            <h4 
-              :class=" [
+            <h4
+              :class="[
                 'mb-1 text-sm font-semibold',
                 voucherToToggle?.voucher_status === 'active'
                   ? 'text-warning-foreground'
-                  : 'text-green-700'
+                  : 'text-green-700',
               ]"
             >
-              {{ voucherToToggle?.voucher_status === 'active' ? 'Perhatian!' : 'Konfirmasi Aktivasi' }}
+              {{
+                voucherToToggle?.voucher_status === "active"
+                  ? "Perhatian!"
+                  : "Konfirmasi Aktivasi"
+              }}
             </h4>
-            <p 
-              :class=" [
+            <p
+              :class="[
                 'text-xs',
                 voucherToToggle?.voucher_status === 'active'
                   ? 'text-warning-foreground/80'
-                  : 'text-green-600'
+                  : 'text-green-600',
               ]"
             >
-              {{ voucherToToggle?.voucher_status === 'active' 
-                ? 'Voucher tidak akan dapat digunakan oleh customer setelah dinonaktifkan.' 
-                : 'Voucher akan dapat digunakan oleh customer setelah diaktifkan.'
+              {{
+                voucherToToggle?.voucher_status === "active"
+                  ? "Voucher tidak akan dapat digunakan oleh customer setelah dinonaktifkan."
+                  : "Voucher akan dapat digunakan oleh customer setelah diaktifkan."
               }}
             </p>
           </div>
         </div>
 
         <p class="text-sm text-gray-600">
-          Apakah Anda yakin ingin 
-          <strong>{{ voucherToToggle?.voucher_status === 'active' ? 'menonaktifkan' : 'mengaktifkan' }}</strong> 
-          voucher <strong class="font-mono">{{ voucherToToggle?.voucher_code }}</strong>?
+          Apakah Anda yakin ingin
+          <strong>{{
+            voucherToToggle?.voucher_status === "active"
+              ? "menonaktifkan"
+              : "mengaktifkan"
+          }}</strong>
+          voucher
+          <strong class="font-mono">{{ voucherToToggle?.voucher_code }}</strong
+          >?
         </p>
 
         <!-- Voucher Info Card -->
         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <div class="flex items-start gap-3">
-            <div 
-              :class=" [
+            <div
+              :class="[
                 'p-2 rounded-lg',
-                voucherToToggle?.voucher_status === 'active' 
+                voucherToToggle?.voucher_status === 'active'
                   ? 'bg-green-100'
-                  : 'bg-slate-100'
+                  : 'bg-slate-100',
               ]"
             >
-              <i 
-                :class=" [
+              <i
+                :class="[
                   'pi pi-ticket',
                   voucherToToggle?.voucher_status === 'active'
                     ? 'text-green-600'
-                    : 'text-slate-600'
+                    : 'text-slate-600',
                 ]"
               ></i>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-semibold text-gray-900 mb-1">{{ voucherToToggle?.voucher_code }}</p>
+              <p class="font-semibold text-gray-900 mb-1">
+                {{ voucherToToggle?.voucher_code }}
+              </p>
               <p class="text-sm text-gray-600 line-clamp-2">
-                {{ voucherToToggle?.voucher_description || 'Tidak ada deskripsi' }}
+                {{
+                  voucherToToggle?.voucher_description || "Tidak ada deskripsi"
+                }}
               </p>
               <div class="flex items-center gap-4 mt-2 text-xs text-gray-500">
                 <span class="flex items-center gap-1">
                   <i class="pi pi-tag"></i>
-                  {{ voucherToToggle?.voucher_type === 'percent' ? 'Persentase' : 'Nominal' }}
+                  {{
+                    voucherToToggle?.voucher_type === "percent"
+                      ? "Persentase"
+                      : "Nominal"
+                  }}
                 </span>
                 <span class="flex items-center gap-1">
                   <i class="pi pi-chart-bar"></i>
-                  {{ voucherToToggle?.usages_count || 0 }} / {{ voucherToToggle?.usage_limit || '∞' }}
+                  {{ voucherToToggle?.usages_count || 0 }} /
+                  {{ voucherToToggle?.usage_limit || "∞" }}
                 </span>
               </div>
             </div>
@@ -841,20 +1007,28 @@ watch([searchQuery, sortBy], () => {
 
       <template #footer>
         <div class="flex gap-3 justify-end">
-          <Button 
-            @click="showStatusModal = false" 
-            variant="secondary"
-          >
+          <Button @click="showStatusModal = false" variant="secondary">
             Batal
           </Button>
-          <Button 
-            @click="handleToggleStatus" 
+          <Button
+            @click="handleToggleStatus"
             variant="merchant"
             :disabled="loading"
           >
             <i v-if="loading" class="pi pi-spin pi-spinner mr-2"></i>
-            <i v-else :class="voucherToToggle?.voucher_status === 'active' ? 'pi pi-times mr-2' : 'pi pi-check mr-2'"></i>
-            {{ voucherToToggle?.voucher_status === 'active' ? 'Nonaktifkan' : 'Aktifkan' }}
+            <i
+              v-else
+              :class="
+                voucherToToggle?.voucher_status === 'active'
+                  ? 'pi pi-times mr-2'
+                  : 'pi pi-check mr-2'
+              "
+            ></i>
+            {{
+              voucherToToggle?.voucher_status === "active"
+                ? "Nonaktifkan"
+                : "Aktifkan"
+            }}
           </Button>
         </div>
       </template>
@@ -872,7 +1046,9 @@ watch([searchQuery, sortBy], () => {
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
-              <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
+              <p class="text-sm text-blue-900 font-medium mb-1">
+                Laporan akan mencakup:
+              </p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
                 <li>Data lengkap vouchers (Kode, Deskripsi, Tipe, Nilai)</li>
                 <li>Status dan periode berlaku voucher</li>

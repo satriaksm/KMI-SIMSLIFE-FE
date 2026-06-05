@@ -35,7 +35,7 @@ Events:
 - update:modelValue => emit saat nilai berubah (opsional jika ingin two-way binding)
 */
 import { Field, ErrorMessage } from "vee-validate";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, getCurrentInstance } from "vue";
 const inputRef = ref(null);
 
 const toDigits = (value) => {
@@ -101,8 +101,11 @@ const props = defineProps({
   wrapperClass: { type: String, default: "" }, // NEW: class untuk wrapper utama
   min: { type: [String, Number], default: 0 }, // NEW: nilai minimum untuk input number
   max: { type: [String, Number], default: null }, // NEW: nilai maksimum untuk input number
+  id: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
+const instanceUid = getCurrentInstance()?.uid;
+const inputId = computed(() => props.id || `${props.name}-${instanceUid}`);
 
 const isNumberInput = computed(
   () => props.type === "number" && !props.textarea,
@@ -267,7 +270,7 @@ const inputClasses = (invalid, isTextarea) => {
   <div :class="wrapperClass">
     <!-- Terapkan wrapperClass di sini -->
     <!-- Label - Always render for accessibility, hide visually if hideLabel=true -->
-    <label v-if="label || hideLabel" :for="name" :class="labelClasses">
+    <label v-if="label || hideLabel" :for="inputId" :class="labelClasses">
       {{ label || name }}
       <span v-if="required && !hideLabel" class="text-danger-foreground"
         >*</span
@@ -295,7 +298,7 @@ const inputClasses = (invalid, isTextarea) => {
           :is="textarea ? 'textarea' : 'input'"
           v-bind="field"
           ref="inputRef"
-          :id="name"
+          :id="inputId"
           :type="textarea ? undefined : props.type === 'number' ? 'text' : type"
           :placeholder="placeholder"
           :autocomplete="!textarea && autocomplete ? autocomplete : undefined"

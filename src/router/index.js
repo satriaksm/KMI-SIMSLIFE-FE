@@ -80,10 +80,60 @@ const routes = [
         },
       },
       {
-        path: "jasa/:id",
+        path: "jasa/:slug",
         name: "JasaDetail",
         component: () => import("@/views/customer/JasaDetail.vue"),
         meta: { title: "Detail Jasa | SUMILIR" },
+        beforeEnter: async (to, from, next) => {
+          const slug = String(to.params.slug || "").trim();
+          if (!slug) {
+            return next({ name: "Beranda" });
+          }
+
+          const api = (await import("@/libs/axios.js")).default;
+
+          // Check if slug is numeric (old ID-based URL)
+          if (/^\d+$/.test(slug)) {
+            try {
+              // Fetch jasa by ID to get the proper slug
+              const { data } = await api.get(`/api/public/jasas/${slug}`);
+
+              if (data?.slug) {
+                // Redirect to proper slug URL
+                next({
+                  name: "JasaDetail",
+                  params: { slug: data.slug },
+                  replace: true,
+                });
+              } else {
+                next();
+              }
+            } catch (e) {
+              console.warn("[Router] Could not fetch jasa by ID:", slug);
+              next();
+            }
+          } else {
+            try {
+              // Validate slug really belongs to a jasa to avoid hard 404 in view
+              await api.get(`/api/public/jasas/${encodeURIComponent(slug)}`);
+              return next();
+            } catch (e) {
+              try {
+                // If this slug belongs to a merchant, redirect to merchant detail page
+                await api.get(
+                  `/api/public/merchants/${encodeURIComponent(slug)}`,
+                );
+                return next({
+                  name: "Merchant Detail",
+                  params: { slug },
+                  replace: true,
+                });
+              } catch (_) {
+                return next();
+              }
+            }
+          }
+        },
       },
       {
         path: "search:keyword?",
@@ -133,6 +183,24 @@ const routes = [
         component: CommunityDetailView,
         props: true,
         meta: { title: "Detail Komunitas | SUMILIR" },
+      },
+      {
+        path: "profile/:id",
+        name: "Public Profile",
+        component: () => import("@/views/PublicProfileView.vue"),
+        meta: { title: "Profil Pengguna | SUMILIR" },
+      },
+      {
+        path: "events",
+        name: "Event List",
+        component: () => import("@/views/customer/events/EventIndexView.vue"),
+        meta: { title: "Daftar Event | SUMILIR" },
+      },
+      {
+        path: "events/:id",
+        name: "Event Detail",
+        component: () => import("@/views/customer/events/EventDetailView.vue"),
+        meta: { title: "Detail Event | SUMILIR" },
       },
 
       // ===========================
@@ -237,6 +305,26 @@ const routes = [
             meta: { title: "Ubah Kata Sandi | SUMILIR" }, // ← dari kodemu
           },
         ],
+      },
+      {
+        path: "reports",
+        name: "MyReports",
+        component: () => import("@/views/reports/MyReports.vue"),
+        meta: {
+          requiresAuth: true,
+          denyRoles: ["admin"],
+          title: "Laporan Saya | SUMILIR",
+        },
+      },
+      {
+        path: "reports/:id",
+        name: "Report Detail",
+        component: () => import("@/views/reports/UserReportDetail.vue"),
+        meta: {
+          requiresAuth: true,
+          denyRoles: ["admin"],
+          title: "Detail Laporan | SUMILIR",
+        },
       },
     ],
   },
@@ -361,6 +449,24 @@ const routes = [
             name: "Admin - Merchant Detail",
             component: () => import("@/views/admin/users/merchants/Detail.vue"),
             meta: { title: "Merchant Detail | Admin SUMILIR" },
+          },
+          {
+            path: "admin-system",
+            name: "Admin - Admin System List",
+            component: () => import("@/views/admin/users/admin-system/Index.vue"),
+            meta: { requiresSystemAdmin: true },
+          },
+          {
+            path: "admin-system/create",
+            name: "Admin - Admin System Create",
+            component: () => import("@/views/admin/users/admin-system/Create.vue"),
+            meta: { requiresSystemAdmin: true },
+          },
+          {
+            path: "admin-system/:id",
+            name: "Admin - Admin System Detail",
+            component: () => import("@/views/admin/users/admin-system/Detail.vue"),
+            meta: { requiresSystemAdmin: true },
           },
         ],
       },
@@ -674,6 +780,27 @@ const routes = [
       // ===========================
       // Profil UMKM
       // ===========================
+      // ===========================
+      // ✅ EVENTS (UNDANGAN & MANAJEMEN)
+      // ===========================
+      {
+        path: "events",
+        children: [
+          {
+            path: "",
+            name: "Merchant - Event Index",
+            component: () => import("@/views/merchant/events/EventIndex.vue"),
+            meta: { title: "Daftar Event & Undangan | SUMILIR" },
+          },
+          {
+            path: ":id",
+            name: "Merchant - Event Detail",
+            component: () => import("@/views/merchant/events/EventDetail.vue"),
+            meta: { title: "Manajemen Event | SUMILIR" },
+          }
+        ]
+      },
+
       {
         path: "profile",
         children: [
@@ -715,29 +842,22 @@ const routes = [
         component: () => import("@/views/CustomerOrder/MyOrderView.vue"),
         meta: { title: "My Order | SUMILIR" }, // ← dari kodemu
       },
-      {
-        path: "give-review/:orderId?",
-        name: "GiveReview",
-        component: () => import("@/views/CustomerOrder/GiveReviewView.vue"),
-        meta: { title: "Beri Nilai | SUMILIR" }, // ← dari kodemu
-      },
-      {
-        path: "review",
-        name: "Review",
-        component: () => import("@/views/CustomerOrder/ReviewView.vue"),
-        meta: { title: "Lihat Penilaian | SUMILIR" }, // ← dari kodemu
-      },
-      {
-        path: "review/edit-review",
-        name: "EditReview",
-        component: () => import("@/views/CustomerOrder/EditReviewView.vue"),
-        meta: { title: "Edit Penilaian | SUMILIR" }, // ← dari kodemu
-      },
     ],
   },
 
-  // Fallback
-  { path: "/:pathMatch(.*)*", redirect: "/" },
+  // Fallback — uses beforeEnter so /backend/ paths are NOT redirected to "/".
+  // The inline <head> script sets window.__BACKEND_REDIRECT and handles hard-nav.
+  {
+    path: "/:pathMatch(.*)*",
+    beforeEnter: (to, from, next) => {
+      if (window.__BACKEND_REDIRECT || to.path.startsWith("/backend/")) {
+        // Abort Vue navigation — the inline script handles the redirect.
+        return;
+      }
+      next("/");
+    },
+    component: { render: () => null },
+  },
 ];
 
 const router = createRouter({
@@ -778,6 +898,14 @@ let lastNavigationPath = null;
 let authInitialized = false;
 
 router.beforeEach(async (to, from, next) => {
+  // Backend API routes should NEVER be handled by Vue.
+  // If the Service Worker served index.html for a /backend/ URL,
+  // force a full-page navigation so the server handles it.
+  if (to.path.startsWith("/backend/")) {
+    window.location.href = to.fullPath;
+    return;
+  }
+
   const authStore = useAuthStore();
   // Basic SEO for all routes (can be overridden by page-level dynamic SEO)
   try {

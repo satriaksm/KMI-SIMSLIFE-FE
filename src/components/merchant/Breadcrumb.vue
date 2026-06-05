@@ -21,7 +21,7 @@ const processedItems = computed(() => {
   return props.items.map((item) => {
     if (!item.path) return item;
 
-    // Pastikan path adalah string sebelum pakai startsWith/includes
+    // If path is a route object, pass through as-is
     if (typeof item.path !== "string") {
       return item;
     }
@@ -52,6 +52,7 @@ const processedItems = computed(() => {
 
 const navigateTo = (path) => {
   if (path) {
+    // Supports both string paths and route objects { name, params, query }
     router.push(path);
   }
 };

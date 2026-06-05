@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
+<<<<<<< HEAD
     <MerchantMobileHeader
       title="Edit Informasi Toko"
       :backRoute="
@@ -9,6 +10,25 @@
           : '/merchant-profile'
       "
     />
+=======
+    <div
+      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
+    >
+      <button
+        @click="
+          router.push(
+            merchantSlug
+              ? `/merchant-center/${merchantSlug}/profile`
+              : '/merchant-profile',
+          )
+        "
+        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
+      >
+        <i class="text-xl pi pi-arrow-left"></i>
+      </button>
+      <h1 class="text-lg font-semibold">Edit Informasi UMKM</h1>
+    </div>
+>>>>>>> staging-ta
 
     <!-- Desktop Header with Breadcrumb -->
     <div class="hidden py-6 sm:block bg-gray-50">
@@ -20,7 +40,7 @@
             <!-- Breadcrumb Component -->
             <Breadcrumb :items="breadcrumbItems" :merchantId="merchantSlug" />
             <p class="mt-1 text-xs text-muted-foreground lg:text-sm">
-              Perbarui informasi toko Anda.
+              Perbarui informasi UMKM Anda.
             </p>
           </div>
 
@@ -63,16 +83,16 @@
               Informasi Penting
             </h4>
             <ul class="pl-4 space-y-1 text-xs list-disc text-merchant-primary">
-              <li>Kontak toko harus aktif dan dapat dihubungi.</li>
-              <li>Lengkapi deskripsi untuk memperkenalkan toko Anda.</li>
-              <li>Pastikan alamat dan lokasi toko sudah benar dan lengkap.</li>
+              <li>Kontak UMKM harus aktif dan dapat dihubungi.</li>
+              <li>Lengkapi deskripsi untuk memperkenalkan UMKM Anda.</li>
+              <li>Pastikan alamat dan lokasi UMKM sudah benar dan lengkap.</li>
               <li>
                 Unggah logo dan cover dengan ukuran maksimal 5 MB (format
                 JPG/PNG).
               </li>
-              <li>Atur jam operasional sesuai waktu buka toko Anda.</li>
+              <li>Atur jam operasional sesuai waktu buka UMKM Anda.</li>
               <li>
-                Data yang valid akan memudahkan pelanggan menemukan toko Anda.
+                Data yang valid akan memudahkan pelanggan menemukan UMKM Anda.
               </li>
             </ul>
           </div>
@@ -267,15 +287,15 @@
           class="p-4 mx-4 mb-2 space-y-5 bg-white shadow-sm sm:hidden rounded-2xl"
         >
           <h2 class="text-lg font-bold text-merchant-primary">
-            Informasi Toko
+            Informasi UMKM
           </h2>
 
-          <!-- Nama Toko -->
+          <!-- Nama UMKM -->
           <div>
             <label
               class="block mb-2 text-sm font-semibold text-merchant-primary"
             >
-              Nama Toko
+              Nama UMKM
             </label>
             <input
               v-model="form.name"
@@ -454,33 +474,56 @@
             <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
+<<<<<<< HEAD
             <div class="space-y-3">
+=======
+            <div class="space-y-2">
+>>>>>>> staging-ta
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
                 class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
                 <!-- Header row -->
+<<<<<<< HEAD
                 <div class="flex items-center justify-between p-4">
                   <div class="flex items-center gap-4">
                     <span
                       class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
+=======
+                <div class="flex items-center justify-between p-3">
+                  <div class="flex items-center gap-3">
+                    <span
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold min-w-[75px] text-center transition-colors"
+>>>>>>> staging-ta
                       :class="
                         day.isOpen
                           ? 'bg-merchant-primary text-white'
                           : 'bg-gray-200 text-gray-500'
                       "
                     >
+<<<<<<< HEAD
                       {{ day.name }}
+=======
+                      {{ day.shortName }}
+>>>>>>> staging-ta
                     </span>
                     <div>
                       <span
                         v-if="day.isOpen"
+<<<<<<< HEAD
                         class="text-base font-medium text-gray-700"
                       >
                         {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
                       </span>
                       <span v-else class="text-base font-medium text-gray-400">
+=======
+                        class="text-sm font-medium text-gray-700"
+                      >
+                        {{ day.open || "06:00" }} - {{ day.close || "18:00" }}
+                      </span>
+                      <span v-else class="text-sm font-medium text-gray-400">
+>>>>>>> staging-ta
                         Tutup
                       </span>
                     </div>
@@ -502,12 +545,21 @@
                 </div>
 
                 <!-- Inline time inputs (shown when open) -->
+<<<<<<< HEAD
                 <div v-if="day.isOpen" class="px-4 pb-4">
                   <div class="flex items-center gap-3">
                     <div class="flex-1">
                       <label
                         class="block mb-1.5 text-xs font-medium text-gray-500"
                         >Jam Buka</label
+=======
+                <div v-if="day.isOpen" class="px-3 pb-3">
+                  <div class="flex items-center gap-2">
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1 text-[10px] font-medium text-gray-500"
+                        >Buka</label
+>>>>>>> staging-ta
                       >
                       <input
                         type="time"
@@ -516,6 +568,7 @@
                           day.open = $event.target.value;
                           updateDayHours(index);
                         "
+<<<<<<< HEAD
                         class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
                       />
                     </div>
@@ -524,6 +577,16 @@
                       <label
                         class="block mb-1.5 text-xs font-medium text-gray-500"
                         >Jam Tutup</label
+=======
+                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                      />
+                    </div>
+                    <span class="mt-5 text-xs text-gray-400">—</span>
+                    <div class="flex-1">
+                      <label
+                        class="block mb-1 text-[10px] font-medium text-gray-500"
+                        >Tutup</label
+>>>>>>> staging-ta
                       >
                       <input
                         type="time"
@@ -532,7 +595,11 @@
                           day.close = $event.target.value;
                           updateDayHours(index);
                         "
+<<<<<<< HEAD
                         class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+=======
+                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+>>>>>>> staging-ta
                       />
                     </div>
                   </div>
@@ -547,25 +614,25 @@
           class="hidden p-6 mb-4 space-y-8 bg-white shadow-sm sm:block rounded-xl"
         >
           <h2 class="text-2xl font-bold text-merchant-primary">
-            Informasi Toko
+            Informasi UMKM
           </h2>
 
           <!-- Grid Layout for Desktop -->
           <div
             class="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-8 md:gap-y-6"
           >
-            <!-- Nama Toko -->
+            <!-- Nama UMKM -->
             <div>
               <label
                 class="block mb-2 text-base font-medium text-merchant-primary"
               >
-                Nama Toko
+                Nama UMKM
               </label>
               <input
                 v-model="form.name"
                 type="text"
                 class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-                placeholder="Masukkan nama toko"
+                placeholder="Masukkan nama UMKM"
               />
             </div>
 
@@ -595,7 +662,7 @@
                 v-model="form.description"
                 rows="4"
                 class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-                placeholder="Ceritakan tentang toko Anda..."
+                placeholder="Ceritakan tentang UMKM Anda..."
               ></textarea>
             </div>
 
@@ -945,13 +1012,62 @@ const form = ref({
   bank_account_number: "",
   bank_account_name: "",
   operationalHours: [
-    { name: "Monday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Tuesday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Wednesday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Thursday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Friday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Saturday", hours: "[06:00 - 18:00]", isOpen: false },
-    { name: "Sunday", hours: "[06:00 - 18:00]", isOpen: false },
+    {
+      key: "monday",
+      name: "Senin",
+      shortName: "Sen",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "tuesday",
+      name: "Selasa",
+      shortName: "Sel",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "wednesday",
+      name: "Rabu",
+      shortName: "Rab",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "thursday",
+      name: "Kamis",
+      shortName: "Kam",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "friday",
+      name: "Jumat",
+      shortName: "Jum",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "saturday",
+      name: "Sabtu",
+      shortName: "Sab",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
+    {
+      key: "sunday",
+      name: "Minggu",
+      shortName: "Min",
+      isOpen: false,
+      open: null,
+      close: null,
+    },
   ],
 });
 
@@ -1127,13 +1243,13 @@ async function loadVillages(did) {
 }
 
 const DAYS = [
-  { key: "monday", label: "Monday" },
-  { key: "tuesday", label: "Tuesday" },
-  { key: "wednesday", label: "Wednesday" },
-  { key: "thursday", label: "Thursday" },
-  { key: "friday", label: "Friday" },
-  { key: "saturday", label: "Saturday" },
-  { key: "sunday", label: "Sunday" },
+  { key: "monday", label: "Senin", short: "Sen" },
+  { key: "tuesday", label: "Selasa", short: "Sel" },
+  { key: "wednesday", label: "Rabu", short: "Rab" },
+  { key: "thursday", label: "Kamis", short: "Kam" },
+  { key: "friday", label: "Jumat", short: "Jum" },
+  { key: "saturday", label: "Sabtu", short: "Sab" },
+  { key: "sunday", label: "Minggu", short: "Min" },
 ];
 
 onMounted(async () => {
@@ -1200,20 +1316,20 @@ onMounted(async () => {
         return {
           key: day.key,
           name: day.label,
+          shortName: day.short,
           isOpen: false,
           open: null,
           close: null,
-          hours: "Tutup",
         };
       }
 
       return {
         key: day.key,
         name: day.label,
+        shortName: day.short,
         isOpen: true,
         open: item.open,
         close: item.close,
-        hours: `[${item.open} - ${item.close}]`,
       };
     });
     isLoading.value = false;
@@ -1268,6 +1384,7 @@ const handleUploadLogo = () => {
 
 const onDayToggle = (index) => {
   const day = form.value.operationalHours[index];
+<<<<<<< HEAD
   if (!day) return;
 
   if (day.isOpen) {
@@ -1278,10 +1395,16 @@ const onDayToggle = (index) => {
     day.open = null;
     day.close = null;
     day.hours = "Tutup";
+=======
+  if (day.isOpen && !day.open) {
+    day.open = "06:00";
+    day.close = "18:00";
+>>>>>>> staging-ta
   }
 };
 
 const updateDayHours = (index) => {
+<<<<<<< HEAD
   const day = form.value.operationalHours[index];
   if (!day) return;
 
@@ -1292,6 +1415,10 @@ const updateDayHours = (index) => {
   day.close = close;
   day.isOpen = true;
   day.hours = `[${open} - ${close}]`;
+=======
+  // No-op — time inputs directly mutate day.open / day.close via @input
+  // Kept as hook for future validation if needed
+>>>>>>> staging-ta
 };
 
 const buildOperationalHoursPayload = () => {

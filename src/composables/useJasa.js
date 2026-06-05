@@ -1,5 +1,53 @@
 import { ref } from "vue";
 import api from "@/libs/axios";
+import { getImageUrl } from "@/libs/getImageUrl";
+
+const normalizeJasaImagePayload = (jasa) => {
+  if (!jasa || typeof jasa !== "object") return jasa;
+
+  const normalized = { ...jasa };
+
+  if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    normalized.cover_img = {
+      ...normalized.cover_img,
+      src_url: normalized.cover_img.src_url
+        ? getImageUrl(normalized.cover_img.src_url)
+        : normalized.cover_img.url
+          ? getImageUrl(normalized.cover_img.url)
+          : normalized.cover_img.id
+            ? getImageUrl(normalized.cover_img.id)
+            : normalized.cover_img.src_url,
+    };
+  }
+
+  if (Array.isArray(normalized.images)) {
+    normalized.images = normalized.images.map((image) => {
+      if (!image || typeof image !== "object") return image;
+
+      const resolvedUrl = image.url
+        ? getImageUrl(image.url)
+        : image.src_url
+          ? getImageUrl(image.src_url)
+          : image.image_path
+            ? getImageUrl(image.image_path)
+            : image.id
+              ? getImageUrl(image.id)
+              : "";
+
+      return {
+        ...image,
+        url: resolvedUrl || image.url,
+        src_url: resolvedUrl || image.src_url,
+      };
+    });
+  }
+
+  if (normalized.image) {
+    normalized.image = getImageUrl(normalized.image);
+  }
+
+  return normalized;
+};
 
 export function useJasa() {
   const jasas = ref([]);
@@ -79,7 +127,8 @@ export function useJasa() {
       // Dukung dua bentuk response:
       // 1) Array langsung: [ {...}, {...} ]
       // 2) Paginated: { data: [...], meta: {...} }
-      jasas.value = Array.isArray(data) ? data : data.data || [];
+      const rawItems = Array.isArray(data) ? data : data.data || [];
+      jasas.value = rawItems.map(normalizeJasaImagePayload);
 
       if (data.meta) {
         pagination.value = {

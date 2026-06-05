@@ -1,13 +1,7 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-export const getImageUrl = (imageId) => {
-  if (!imageId) return "";
-  const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-  return `${baseURL}/api/images/${encodeURIComponent(imageId)}`;
-};
-
-export const getImageUrlJasa = (imageIdOrPath) => {
+const resolveApiImageUrl = (imageIdOrPath) => {
   if (!imageIdOrPath) return "";
 
   const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -17,32 +11,69 @@ export const getImageUrlJasa = (imageIdOrPath) => {
     let path = imageIdOrPath.trim();
 
     if (path.startsWith("http")) {
+      try {
+        const parsedUrl = new URL(path);
+        const pathname = parsedUrl.pathname || "";
+
+        if (pathname.startsWith("/api/images/")) {
+          return path;
+        }
+
+        if (pathname.includes("/storage/")) {
+          const [, storagePathRaw = ""] = pathname.split("/storage/");
+          const storagePath = decodeURIComponent(storagePathRaw);
+          if (storagePath) {
+            return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+          }
+        }
+      } catch {
+        return path;
+      }
+
       return path;
     }
 
     path = path.replace(/\\/g, "/");
 
-    if (path.startsWith("/storage/")) {
+    if (path.startsWith("/api/images/")) {
       return `${backendBase}${path}`;
     }
-    if (path.startsWith("storage/")) {
+    if (path.startsWith("api/images/")) {
       return `${backendBase}/${path}`;
     }
 
+    if (path.startsWith("/storage/")) {
+      const storagePath = path.replace(/^\/storage\//, "");
+      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+    }
+    if (path.startsWith("storage/")) {
+      const storagePath = path.replace(/^storage\//, "");
+      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+    }
+
     if (path.startsWith("/jasa/")) {
-      return `${backendBase}/storage${path}`;
+      const jasaPath = path.replace(/^\//, "");
+      return `${apiBase}/api/images/${encodeURIComponent(jasaPath)}`;
     }
 
     if (path.startsWith("jasa/")) {
-      return `${backendBase}/storage/${path}`;
+      return `${apiBase}/api/images/${encodeURIComponent(path)}`;
     }
 
     if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(path)) {
-      return `${backendBase}/storage/jasa/${path}`;
+      return `${apiBase}/api/images/${encodeURIComponent(path)}`;
     }
   }
 
-  return `${backendBase}/images/${encodeURIComponent(imageIdOrPath)}`;
+  return `${apiBase}/api/images/${encodeURIComponent(imageIdOrPath)}`;
+};
+
+export const getImageUrl = (imageIdOrPath) => {
+  return resolveApiImageUrl(imageIdOrPath);
+};
+
+export const getImageUrlJasa = (imageIdOrPath) => {
+  return resolveApiImageUrl(imageIdOrPath);
 };
 
 /**
@@ -51,7 +82,12 @@ export const getImageUrlJasa = (imageIdOrPath) => {
  * @returns {string} Event banner URL
  */
 export function getEventBannerUrl(event) {
-  if (!event?.id || !event?.banner_img_path) {
+  if (!event?.id) {
+    return null;
+  }
+
+  // Support both banner_img_path (raw) and banner_url (transformed by API)
+  if (!event.banner_img_path && !event.banner_url) {
     return null;
   }
 

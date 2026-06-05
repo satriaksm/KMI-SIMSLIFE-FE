@@ -10,7 +10,7 @@ import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
-import { getImageUrlJasa } from "@/libs/getImageUrl.js";
+import { getImageUrl } from "@/libs/getImageUrl.js";
 import { useJasa } from "@/composables/useJasa";
 import { useAuthStore } from "@/stores/auth";
 
@@ -49,7 +49,7 @@ const breadcrumbItems = computed(() => [
 
 const loading = ref(false);
 const jasa = ref(null);
-const currentImageIndex = ref(0);
+const currentImageIndex = ref(-1);
 const showAddOnsModal = ref(false);
 
 // Lock body scroll when modal is open
@@ -65,6 +65,7 @@ const coverImage = computed(() => {
 
 const currentImage = computed(() => {
   if (!jasa.value?.images) return null;
+  if (currentImageIndex.value < 0) return null;
   return jasa.value.images[currentImageIndex.value];
 });
 
@@ -137,18 +138,33 @@ const addOnPriceRange = computed(() => {
   return `+${formatPrice(min)} - ${formatPrice(max)}`;
 });
 
-// Main image src: pakai relasi images dulu, fallback ke field legacy `image`
+const resolveJasaImageSrc = (image) => {
+  // Prioritas: API URL terlebih dahulu (sama seperti produk)
+  if (image?.url) return getImageUrl(image.url);
+  if (image?.src_url) return getImageUrl(image.src_url);
+  if (image?.id) return getImageUrl(image.id);
+  return "";
+};
+
+// Main image src: pakai relasi images dengan API URL
 const mainImageSrc = computed(() => {
   if (!jasa.value) return "";
 
-  const images = jasa.value.images || [];
-  if (images.length) {
-    const img = images[currentImageIndex.value] || images[0];
-    return getImageUrlJasa(img?.path || img?.id || jasa.value.image);
+  // Prioritas 1: cover_img.src_url dari backend (sama seperti produk)
+  if (jasa.value.cover_img?.src_url) {
+    return getImageUrl(jasa.value.cover_img.src_url);
   }
 
-  if (jasa.value.image) {
-    return getImageUrlJasa(jasa.value.image);
+  const images = jasa.value.images || [];
+
+  if (images.length && currentImageIndex.value >= 0) {
+    const img = images[currentImageIndex.value] || images[0];
+    return resolveJasaImageSrc(img);
+  }
+
+  if (images.length) {
+    const coverImage = images.find((img) => img?.is_cover) || images[0];
+    return resolveJasaImageSrc(coverImage);
   }
 
   return "";
@@ -178,16 +194,20 @@ const formatPrice = (price) => {
 
 const nextImage = () => {
   if (!jasa.value?.images) return;
+  if (!jasa.value.images.length) return;
+  const baseIndex = currentImageIndex.value < 0 ? 0 : currentImageIndex.value;
   currentImageIndex.value =
-    (currentImageIndex.value + 1) % jasa.value.images.length;
+    (baseIndex + 1) % jasa.value.images.length;
 };
 
 const prevImage = () => {
   if (!jasa.value?.images) return;
+  if (!jasa.value.images.length) return;
+  const baseIndex = currentImageIndex.value < 0 ? 0 : currentImageIndex.value;
   currentImageIndex.value =
-    currentImageIndex.value === 0
+    baseIndex === 0
       ? jasa.value.images.length - 1
-      : currentImageIndex.value - 1;
+      : baseIndex - 1;
 };
 
 const selectImage = (index) => {
@@ -226,9 +246,8 @@ const loadDetail = async () => {
     );
     jasa.value = data;
 
-    if (jasa.value?.images && jasa.value.images.length > 0) {
-      currentImageIndex.value = 0;
-    }
+    // Default tampilan gunakan cover_img.src_url dari API
+    currentImageIndex.value = -1;
 
     console.log("[Detail] Jasa loaded", jasa.value);
   } catch (err) {
@@ -355,7 +374,7 @@ const getSelectionTypeLabel = (group) => {
         <!-- Left Column (Images + Basic Info) -->
         <div class="space-y-2 lg:col-span-1 sm:space-y-4">
           <!-- Image Gallery Card -->
-          <div v-if="(jasa.images && jasa.images.length > 0) || jasa.image">
+          <div v-if="(jasa.images && jasa.images.length > 0) || jasa.cover_img">
             <!-- Main Image -->
             <div
               class="relative flex items-center justify-center max-w-2xl mx-auto mb-4 -mt-4 overflow-hidden bg-gray-100 shadow-sm aspect-square sm:mt-0 sm:rounded-2xl"
@@ -402,8 +421,8 @@ const getSelectionTypeLabel = (group) => {
                 class="relative flex items-center justify-center overflow-hidden transition border rounded-lg aspect-square bg-gray-50"
               >
                 <img
-                  v-if="image.id || image.path"
-                  :src="getImageUrlJasa(image.path || image.id)"
+                  v-if="resolveJasaImageSrc(image)"
+                  :src="resolveJasaImageSrc(image)"
                   :alt="`${jasa.title} ${index + 1}`"
                   class="object-contain max-w-full max-h-full"
                   @error="(e) => (e.target.style.display = 'none')"

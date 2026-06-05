@@ -1,72 +1,124 @@
 <script setup>
 import { ref, computed, watch, onMounted, provide } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import Button from "@/components/common/Button.vue";
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 const emit = defineEmits(["toggle-sidebar"]);
 
-// ✅ Create callback ref that child components will populate
+// Create callback ref that child components will populate
 const exportModalCallback = ref(null);
 
-// ✅ Provide method to children to register their export function
+// Provide method to children to register their export function
 provide('registerExportModal', (callback) => {
   console.log('Child registered export modal callback');
   exportModalCallback.value = callback;
 });
 
-// Tabs: sync with query (?tab=customers|merchants)
-const activeTab = computed(() => {
-  if (route.name === "Admin - Merchants List") return "merchants";
-  return "customers";
-});
+const isSuperAdmin = computed(() => !!authStore.user?.is_super_admin);
+
+// sync with route
+const activeTab = ref("customers");
+
+// Sync activeTab with route and tab click
+const syncTabWithRoute = () => {
+  if (route.name === "Admin - Merchants List") activeTab.value = "merchants";
+  else if (
+    route.name === "Admin - Super Admin List" ||
+    route.name === "Admin - Admin System List" 
+  ) activeTab.value = "super-admin";
+  else activeTab.value = "customers";
+};
+watch(() => route.name, syncTabWithRoute, { immediate: true });
+
+// Tabs: sync with query (?tab=customers|merchants|super-admin)
+const activeTabQuery = ref("customers");
+watch(
+  () => route.name,
+  (name) => {
+    if (name === "Admin - Merchants List") activeTabQuery.value = "merchants";
+    else if (name === "Admin - Super Admin List") activeTabQuery.value = "super-admin";
+    else activeTabQuery.value = "customers";
+  },
+  { immediate: true }
+);
 
 const isDetailRoute = computed(
-  () => route.name === "Admin - Customer Detail" || route.name === "Admin - Merchant Detail"
+  () => route.name === "Admin - Customer Detail" || 
+       route.name === "Admin - Merchant Detail" ||
+       route.name === "Admin - Super Admin Detail"
 );
 
 const effectiveTab = computed(() => {
   if (!isDetailRoute.value) return activeTab.value;
-  return route.name === "Admin - Merchant Detail" ? "merchants" : "customers";
+  if (route.name === "Admin - Merchant Detail") return "merchants";
+  if (route.name === "Admin - Super Admin Detail") return "super-admin";
+  return "customers";
 });
 
 const isCreateRoute = computed(() => 
-  route.name === "Admin - Customer Create" || route.name === "Admin - Merchant Create"
+  route.name === "Admin - Customer Create" || 
+  route.name === "Admin - Merchant Create" ||
+  route.name === "Admin - Super Admin Create"
 );
 
 const breadcrumbItems = computed(() => {
   const items = [
     {
-      label: "Users",
+      label: "Pengguna",
       path: effectiveTab.value === "merchants" 
         ? { name: "Admin - Merchants List" }
+        : effectiveTab.value === "super-admin"
+        ? { name: "Admin - Super Admin List" }
         : { name: "Admin - Customers List" }
     }
   ];
 
   if (isDetailRoute.value) {
     items.push({
-      label: effectiveTab.value === "merchants" ? "Merchants" : "Customers",
+      label: effectiveTab.value === "merchants" 
+        ? "UMKM" 
+        : effectiveTab.value === "super-admin"
+        ? "Admin"
+        : "Customers",
       path: effectiveTab.value === "merchants"
         ? { name: "Admin - Merchants List" }
+        : effectiveTab.value === "super-admin"
+        ? { name: "Admin - Super Admin List" }
         : { name: "Admin - Customers List" }
     });
     items.push({ label: "Detail" });
   } else if (isCreateRoute.value) {
     items.push({
-      label: effectiveTab.value === "merchants" ? "Merchants" : "Customers",
+      label: effectiveTab.value === "merchants" 
+        ? "UMKM" 
+        : effectiveTab.value === "super-admin"
+        ? "Admin"
+        : "Customers",
       path: effectiveTab.value === "merchants"
         ? { name: "Admin - Merchants List" }
+        : effectiveTab.value === "super-admin"
+        ? { name: "Admin - Super Admin List" }
         : { name: "Admin - Customers List" }
     });
     items.push({ 
-      label: effectiveTab.value === "merchants" ? "Tambah Merchant" : "Tambah Customer"
+      label: effectiveTab.value === "merchants" 
+        ? "Tambah UMKM" 
+        : effectiveTab.value === "super-admin"
+        ? "Tambah Admin"
+        : "Tambah Customer"
     });
   } else {
     items.push({
-      label: effectiveTab.value === "merchants" ? "Merchants" : "Customers"
+      label: effectiveTab.value === "merchants" 
+        ? "UMKM" 
+        : effectiveTab.value === "super-admin"
+        ? "Admin"
+        : "Customers"
     });
   }
 
@@ -75,36 +127,40 @@ const breadcrumbItems = computed(() => {
 
 const headerSubtitle = computed(() => {
   if (isDetailRoute.value) {
-    return effectiveTab.value === "merchants" ? "Detail merchant" : "Detail customer";
+    return effectiveTab.value === "merchants" 
+      ? "Detail UMKM" 
+      : effectiveTab.value === "super-admin"
+      ? "Detail admin"
+      : "Detail customer";
   }
-  return effectiveTab.value === "merchants" ? "Kelola data merchant" : "Kelola data customer";
+  return effectiveTab.value === "merchants" 
+    ? "Kelola data UMKM" 
+    : effectiveTab.value === "super-admin"
+    ? "Kelola data admin"
+    : "Kelola data customer";
 });
 
-const addLabel = computed(() => 
-  effectiveTab.value === "merchants" ? "Tambah Merchant" : "Tambah Customer"
+const addLabel = computed(() =>
+  activeTab.value === "merchants"
+    ? "Tambah UMKM"
+    : activeTab.value === "super-admin"
+    ? "Tambah Admin"
+    : "Tambah Customer"
 );
 
 const setTab = (tab) => {
+  
+  activeTab.value = tab;
   if (tab === "merchants") {
     router.push({ name: "Admin - Merchants List" });
+  } else if (tab === "super-admin") {
+    router.push({ name: "Admin - Admin System List" });
   } else {
     router.push({ name: "Admin - Customers List" });
   }
 };
 
-watch(
-  () => route.query.tab,
-  (tab) => {
-    if (tab === "merchants" || tab === "customers") activeTab.value = tab;
-  }
-);
-
-onMounted(() => {
-  const tab = route.query.tab;
-  if (tab === "merchants" || tab === "customers") activeTab.value = tab;
-});
-
-// ✅ Trigger export using callback
+// Trigger export using callback
 const triggerExport = () => {
   console.log('triggerExport called, tab:', effectiveTab.value);
   console.log('exportModalCallback exists:', !!exportModalCallback.value);
@@ -123,22 +179,23 @@ const triggerCreate = () => {
 };
 
 const goToCreate = () => {
-  if (effectiveTab.value === "merchants") {
+  // Use activeTab for create action 
+  if (activeTab.value === "merchants") {
     router.push({ name: "Admin - Merchant Create" });
+  } else if (activeTab.value === "super-admin") {
+    router.push({ name: "Admin - Admin System Create" });
   } else {
     router.push({ name: "Admin - Customer Create" });
   }
 };
 
-const goToDetail = (user) => {
-  router.push({ name: "Admin - Customer Detail", params: { id: user.id } });
-};
-
 const isListRoute = computed(() =>
-  route.name === "Admin - Customers List" || route.name === "Admin - Merchants List"
+  route.name === "Admin - Customers List" || 
+  route.name === "Admin - Merchants List" ||
+  route.name === "Admin - Admin System List" 
 );
 
-// ✅ Clear callback when route changes (to prevent stale references)
+// Clear callback when route changes (to prevent stale references)
 watch(() => route.name, () => {
   exportModalCallback.value = null;
 });
@@ -172,8 +229,10 @@ watch(() => route.name, () => {
       <div class="flex gap-2 sm:gap-3">
         <!-- Tambah: hide saat detail -->
         <template v-if="!isDetailRoute">
-          <Button @click="triggerCreate" variant="merchant" size="sm" customClass="!hidden sm:!inline">
-            <i class="pi pi-plus"></i>
+          <Button v-if="effectiveTab === 'super-admin'" @click="triggerCreate" variant="merchant" size="sm" customClass="!hidden sm:!inline">
+            <span class="hidden sm:inline ml-2">{{ addLabel }}</span>
+          </Button>
+          <Button v-else @click="triggerCreate" variant="merchant" size="sm" customClass="!hidden sm:!inline">
             <span class="hidden sm:inline ml-2">{{ addLabel }}</span>
           </Button>
 
@@ -209,15 +268,16 @@ watch(() => route.name, () => {
     <div class="px-4 p-4 sm:px-6">
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <!-- Tabs -->
-        <template v-if="isListRoute">
+        <template v-if="isListRoute && activeTab">
           <div class="sm:hidden p-3">
             <select
-              v-model="activeTab"
-              @change="setTab(activeTab)"
+              :value="activeTab"
+              @change="setTab($event.target.value)"
               class="block w-full px-4 py-2.5 bg-white border border-muted-foreground text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-merchant-primary focus:border-merchant-primary shadow-sm"
             >
               <option value="customers">Customers</option>
               <option value="merchants">Merchants</option>
+              <option v-if="isSuperAdmin" value="super-admin">Admin</option>
             </select>
           </div>
 
@@ -232,7 +292,6 @@ watch(() => route.name, () => {
               @click="setTab('customers')"
               type="button"
             >
-              <i class="pi pi-users mr-2"></i>
               Customers
             </button>
 
@@ -246,8 +305,21 @@ watch(() => route.name, () => {
               @click="setTab('merchants')"
               type="button"
             >
-              <i class="pi pi-building mr-2"></i>
-              Merchants
+              UMKM
+            </button>
+
+            <button
+              v-if="isSuperAdmin"
+              class="flex-1 px-4 py-3 text-sm font-semibold border-b-2 transition-colors"
+              :class="
+                activeTab === 'super-admin'
+                  ? 'border-merchant-primary text-merchant-primary bg-merchant-primary/5'
+                  : 'border-transparent text-muted-foreground hover:text-black hover:border-gray-300'
+              "
+              @click="setTab('super-admin')"
+              type="button"
+            >
+              Admin
             </button>
           </div>
         </template>

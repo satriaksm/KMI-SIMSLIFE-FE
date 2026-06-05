@@ -1,36 +1,35 @@
 <template>
-  <div
-    class="relative sm:max-w-none max-w-xs bg-white border border-gray-200 rounded-[10px] overflow-hidden box-border w-full aspect-[437/257] sm:w-[437px] sm:h-[257px] sm:aspect-auto transition duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_10px_25px_rgba(0,0,0,0.06)]"
-  >
-    <div class="overflow-hidden w-full h-[60%] sm:h-[159px]">
-      <img
-        src="https://www.shutterstock.com/shutterstock/photos/2260606417/display_1500/stock-vector-editable-text-effect-food-festival-d-traditional-cartoon-template-style-premium-vector-2260606417.jpg"
-        alt="Gambar event"
-        class="w-full h-full object-cover transition-transform duration-300 motion-safe:hover:scale-105"
+  <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow">
+    <!-- Header with Report Button -->
+    <div class="p-4 flex items-start justify-between">
+      <div class="flex-1">
+        <h3 class="font-semibold text-gray-900 dark:text-white">{{ post.post_title }}</h3>
+      </div>
+      
+      <!-- Report Button -->
+      <ReportButton
+        reportable-type="post"
+        :reportable-id="post.id"
+        :reportable-name="post.post_title"
       />
     </div>
+    
+    <!-- Content -->
     <div class="px-2 sm:px-2.5 pt-2 sm:pt-4">
-      <h3 class="text-sm sm:text-base font-semibold truncate">
-        Event Saat Ini
-      </h3>
       <p class="mt-2 sm:mt-4 text-xs sm:text-sm text-gray-600 line-clamp-2">
-        Deskripsi event saat ini
+        {{ post.post_content }}
       </p>
     </div>
   </div>
 </template>
 
 <script setup>
+import ReportButton from '@/components/ReportButton.vue';
+
 defineProps({
-  event: {
+  post: {
     type: Object,
-    default: () => ({
-      id: 1,
-      image:
-        "https://www.shutterstock.com/shutterstock/photos/2260606417/display_1500/stock-vector-editable-text-effect-food-festival-d-traditional-cartoon-template-style-premium-vector-2260606417.jpg",
-      title: "Event Saat Ini",
-      description: "Deskripsi event saat ini",
-    }),
+    required: true,
   },
 });
 </script>

@@ -437,7 +437,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted } from "vue";
-import { useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
@@ -473,6 +473,7 @@ const schema = yup.object({
 
 const auth = useAuthStore();
 const router = useRouter();
+const route = useRoute();
 const checkout = useCheckoutStore();
 const isSubmitting = ref(false);
 
@@ -486,6 +487,7 @@ const checkoutItems = computed(() => {
           ? item.image
           : (item.image?.src_url ?? item.image?.url ?? ""),
       quantity: item.quantity,
+      stock: Number(item.stock || 0),
       price: item.unitPrice,
       addons: item.addons || [],
       variant: item.variant || null,
@@ -497,6 +499,7 @@ const checkoutItems = computed(() => {
       name: checkout.productTitle,
       image: checkout.productImage,
       quantity: checkout.qty,
+      stock: Number(checkout.combination?.stock || 0),
       price: checkout.unitPrice,
       addons: checkout.selectedAddons,
       variant: checkout.selectedVariantName,

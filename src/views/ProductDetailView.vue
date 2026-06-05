@@ -2084,6 +2084,23 @@ function buyNow() {
   const store = product.value?.merchant || product.value?.store || {};
   const merchantAddress =
     product.value?.merchant_address ?? store.address ?? "";
+  const merchantPhone =
+    store.phone ||
+    store.phone_number ||
+    store.phoneNumber ||
+    store.whatsapp ||
+    store.whatsapp_number ||
+    store.whatsappNumber ||
+    store.mobile ||
+    store.mobile_phone ||
+    store.mobilePhone ||
+    store.no_hp ||
+    store.noHp ||
+    store.telp ||
+    store.telepon ||
+    store.user?.phone ||
+    store.user?.phone_number ||
+    "";
   const checkout = useCheckoutStore();
 
   // ✅ HITUNG matchedCombo DULU
@@ -2112,7 +2129,7 @@ function buyNow() {
       slug: store.slug ?? null,
       name: store.name ?? "",
       address: merchantAddress,
-      phone: store.phone ?? "",
+      phone: merchantPhone,
     },
     qty,
     sizeId,

@@ -32,7 +32,8 @@ export function useSearch() {
       }
       productsMeta.value = data.meta.products_meta ?? {};
 
-      // Also hydrate jasa results if present
+      // Also hydrate jasa results if present (nested under meta by ApiResponse)
+      const meta = data.meta ?? {};
       if (append) {
         jasas.value.push(...(data.data.jasas ?? []));
       } else {

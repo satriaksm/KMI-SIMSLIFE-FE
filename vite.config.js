@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
       vue(),
       tailwindcss(),
       VitePWA({
+        // Emergency recovery mode: generate a self-destroying SW so clients
+        // with a stale worker stop intercepting /backend verification URLs.
+        // Re-enable normal PWA behavior after affected clients have recovered.
+        selfDestroying: true,
         registerType: "autoUpdate",
         devOptions: { enabled: mode === "development" },
         strategies: "injectManifest",

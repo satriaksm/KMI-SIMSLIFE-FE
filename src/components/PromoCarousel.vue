@@ -25,7 +25,7 @@
       <div
         v-for="(item, i) in renderItems"
         :key="i"
-        class="rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition snap-start bg-white w-full aspect-[17/8] sm:w-[510px] sm:h-[240px] sm:aspect-auto"
+        class="rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition snap-start bg-white w-full aspect-17/8 sm:w-[510px] sm:h-60 sm:aspect-auto"
       >
         <slot name="item" :item="item" :index="i">
           <img

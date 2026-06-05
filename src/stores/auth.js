@@ -72,6 +72,10 @@ export const useAuthStore = defineStore("auth", () => {
         typeof data?.profile_picture === "string" ? data.profile_picture : null,
       roles: data.roles,
       merchants: data.merchants || [],
+      // ✅ Robust boolean conversion for super admin
+      is_super_admin: !!(data.is_super_admin === true || data.is_super_admin === 1 || data.is_super_admin === "1"),
+      // Optionally add is_system_admin if needed
+      is_system_admin: !!(data.is_system_admin === true || data.is_system_admin === 1 || data.is_system_admin === "1"),
     };
 
     user.value = minimal;

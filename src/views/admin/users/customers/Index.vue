@@ -35,12 +35,11 @@ const activeFilters = ref({
 
 // Cycle through role filters
 const toggleRoleFilter = () => {
+  // ✅ Cycle only between customer and umkm-owner, never admin
   if (activeFilters.value.role === "") {
     activeFilters.value.role = "customer";
   } else if (activeFilters.value.role === "customer") {
     activeFilters.value.role = "umkm-owner";
-  } else if (activeFilters.value.role === "umkm-owner") {
-    activeFilters.value.role = "admin";
   } else {
     activeFilters.value.role = "";
   }
@@ -56,27 +55,60 @@ const onStatusChange = () => {
 const getRoleLabel = computed(() => {
   if (activeFilters.value.role === "customer") return "Hanya Customer";
   if (activeFilters.value.role === "umkm-owner") return "Hanya UMKM";
-  if (activeFilters.value.role === "admin") return "Hanya Admin";
   return "Semua Role";
 });
 
 const getRoleIcon = computed(() => {
   if (activeFilters.value.role === "customer") return "pi-user";
   if (activeFilters.value.role === "umkm-owner") return "pi-building";
-  if (activeFilters.value.role === "admin") return "pi-shield";
   return "pi-users";
 });
 
-const isAnyModalOpen = computed(() => showExportModal.value);
+// Status change modal state
+const showStatusModal = ref(false);
+const selectedUser = ref(null);
+const newStatus = ref('');
+const statusChangeLoading = ref(false);
+
+const isAnyModalOpen = computed(() => showExportModal.value || showStatusModal.value);
 useBodyScrollLock(isAnyModalOpen);
+
+const statusChangeOptions = [
+  { value: 'active', label: 'Aktif', color: 'text-green-700 bg-green-50 border-green-200' },
+  { value: 'suspended', label: 'Dibekukan', color: 'text-red-700 bg-red-50 border-red-200' },
+  { value: 'inactive', label: 'Tidak Aktif', color: 'text-gray-700 bg-gray-50 border-gray-200' },
+  { value: 'watchlist', label: 'Watchlist', color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+];
+
+const openStatusModal = (user) => {
+  selectedUser.value = user;
+  newStatus.value = user.status;
+  showStatusModal.value = true;
+};
+
+const confirmStatusChange = async () => {
+  if (!selectedUser.value || !newStatus.value) return;
+  statusChangeLoading.value = true;
+  try {
+    await api.patch(`/api/admin/users/${selectedUser.value.id}/status`, { status: newStatus.value });
+    toast.success(`Status pengguna berhasil diubah menjadi ${newStatus.value}`);
+    showStatusModal.value = false;
+    selectedUser.value = null;
+    loadUsers();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Gagal mengubah status');
+  } finally {
+    statusChangeLoading.value = false;
+  }
+};
 
 const tableColumns = [
   { key: "photo", label: "Foto", sortable: false },
   { key: "name", label: "Username", sortable: true },
-  { key: "phone", label: "Phone", sortable: false },
+  { key: "phone", label: "No HP", sortable: false },
   { key: "nik", label: "NIK", sortable: false },
   { key: "roles", label: "Roles", sortable: false },
-  { key: "merchants", label: "Merchants", sortable: false },
+  { key: "merchants", label: "UMKM", sortable: false },
   { key: "status", label: "Status", sortable: true },
 ];
 
@@ -96,16 +128,32 @@ const tableActions = [
     handler: (user) => goToDetail(user),
     class: "hover:bg-muted-foreground/20 text-muted-foreground",
   },
+  {
+    icon: "pi-pencil",
+    label: "Ubah Status",
+    handler: (user) => openStatusModal(user),
+    class: "hover:bg-blue-100 text-blue-600",
+  },
 ];
 
 const totalPages = computed(() => pagination.value?.last_page ?? 1);
 const totalItems = computed(() => pagination.value?.total ?? 0);
-const currentPageFromApi = computed(() => pagination.value?.current_page ?? currentPage.value);
-const perPageFromApi = computed(() => pagination.value?.per_page ?? perPage.value);
+const currentPageFromApi = computed(
+  () => pagination.value?.current_page ?? currentPage.value,
+);
+const perPageFromApi = computed(
+  () => pagination.value?.per_page ?? perPage.value,
+);
 
 const paginationInfo = computed(() => {
-  const start = totalItems.value === 0 ? 0 : (currentPageFromApi.value - 1) * perPageFromApi.value + 1;
-  const end = Math.min(currentPageFromApi.value * perPageFromApi.value, totalItems.value);
+  const start =
+    totalItems.value === 0
+      ? 0
+      : (currentPageFromApi.value - 1) * perPageFromApi.value + 1;
+  const end = Math.min(
+    currentPageFromApi.value * perPageFromApi.value,
+    totalItems.value,
+  );
 
   return {
     start,
@@ -126,10 +174,11 @@ const activeFilterCount = computed(() => {
 const loadUsers = async () => {
   try {
     await fetchUsers({
-      exclude_admin: false,
+      exclude_admin: true, // ⬅️ pastikan admin tidak ditampilkan
       search: searchQuery.value,
       status: activeFilters.value.status,
-      role: activeFilters.value.role,
+      // ✅ Filter: never show admin in customer list
+      role: activeFilters.value.role === "admin" ? "" : activeFilters.value.role,
       page: currentPage.value,
       per_page: perPage.value,
     });
@@ -139,9 +188,9 @@ const loadUsers = async () => {
 };
 
 const roleNameMap = {
-  'admin': 'Admin',
-  'customer': 'Pelanggan',
-  'umkm-owner': 'Pemilik UMKM',
+  admin: "Admin",
+  customer: "Pelanggan",
+  "umkm-owner": "Pemilik UMKM",
 };
 
 const formatRoleName = (roleName) => {
@@ -157,12 +206,15 @@ function highlightText(text) {
   if (!searchQuery.value.trim() || !text) return text;
   const q = searchQuery.value.trim();
   const re = new RegExp(`(${q})`, "gi");
-  return String(text).replace(re, '<span class="bg-merchant-primary/20 text-merchant-primary font-bold px-1 rounded">$1</span>');
+  return String(text).replace(
+    re,
+    '<span class="bg-merchant-primary/20 text-merchant-primary font-bold px-1 rounded">$1</span>',
+  );
 }
 
 // Modal methods
 const openExportModal = () => {
-  console.log('openExportModal called in customers/Index.vue');
+  console.log("openExportModal called in customers/Index.vue");
   showExportModal.value = true;
 };
 const closeExportModal = () => (showExportModal.value = false);
@@ -170,14 +222,18 @@ const closeExportModal = () => (showExportModal.value = false);
 const getMerchantSummary = (merchants) => {
   const list = Array.isArray(merchants) ? merchants : [];
   const firstName = list[0]?.name || "-";
-  const truncatedName = firstName.length > 10 ? firstName.substring(0, 15) + "..." : firstName;
+  const truncatedName =
+    firstName.length > 10 ? firstName.substring(0, 15) + "..." : firstName;
   const extra = Math.max(0, list.length - 1);
-  
-  return { 
+
+  return {
     first: truncatedName,
-    fullName: firstName, 
-    extra, 
-    extraNames: list.slice(1).map((m) => m?.name).filter(Boolean) 
+    fullName: firstName,
+    extra,
+    extraNames: list
+      .slice(1)
+      .map((m) => m?.name)
+      .filter(Boolean),
   };
 };
 
@@ -196,7 +252,10 @@ const exportPDF = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `users-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    link.setAttribute(
+      "download",
+      `users-report-${new Date().toISOString().split("T")[0]}.pdf`,
+    );
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -241,27 +300,31 @@ const goToCreate = () => {
 };
 
 // ✅ Inject the register function from parent
-const registerExportModal = inject('registerExportModal', null);
+const registerExportModal = inject("registerExportModal", null);
 
 // ✅ Register export modal callback with parent on mount
 onMounted(() => {
   loadUsers();
-  
+
   // Register the export modal function with parent
   if (registerExportModal) {
-    console.log('Registering export modal callback for customers');
+    console.log("Registering export modal callback for customers");
     registerExportModal(openExportModal);
   } else {
-    console.warn('registerExportModal not provided by parent');
+    console.warn("registerExportModal not provided by parent");
   }
 });
 
 watch(currentPage, () => loadUsers());
-watch(searchQuery, () => {
-  currentPage.value = 1;
-  loadUsers();
-});
 
+let searchDebounceTimer = null;
+watch(searchQuery, () => {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    loadUsers();
+  }, 400);
+});
 </script>
 
 <template>
@@ -320,17 +383,25 @@ watch(searchQuery, () => {
         @prev-page="prevPage"
       >
         <template #cell-photo="{ item }">
-          <div class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center overflow-hidden">
-            <img 
+          <div
+            class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center overflow-hidden"
+          >
+            <img
               v-if="item.profile_picture_path"
-              :src="getUserProfileUrl(item)" 
+              :src="getUserProfileUrl(item)"
               :alt="item.name"
               class="w-full h-full object-cover"
-              @error="(e) => { 
-                console.error('Image load error for user:', item.id, item.name);
-                e.target.style.display = 'none'; 
-                e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold text-sm'>${item.name?.charAt(0)?.toUpperCase() || 'U'}</span>`;
-              }"
+              @error="
+                (e) => {
+                  console.error(
+                    'Image load error for user:',
+                    item.id,
+                    item.name,
+                  );
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold text-sm'>${item.name?.charAt(0)?.toUpperCase() || 'U'}</span>`;
+                }
+              "
             />
             <span v-else class="text-merchant-primary font-semibold text-sm">
               {{ item.name?.charAt(0)?.toUpperCase() || "U" }}
@@ -340,13 +411,22 @@ watch(searchQuery, () => {
 
         <template #cell-name="{ item }">
           <div class="min-w-0">
-            <p class="text-sm font-semibold text-black truncate" v-html="highlightText(item.name || '-')"></p>
-            <p class="text-xs text-muted-foreground truncate" v-html="highlightText(item.email || '-')"></p>
+            <p
+              class="text-sm font-semibold text-black truncate"
+              v-html="highlightText(item.name || '-')"
+            ></p>
+            <p
+              class="text-xs text-muted-foreground truncate"
+              v-html="highlightText(item.email || '-')"
+            ></p>
           </div>
         </template>
 
         <template #cell-nik="{ item }">
-          <span class="text-sm text-black" v-html="highlightText(item.nik || '-')"></span>
+          <span
+            class="text-sm text-black"
+            v-html="highlightText(item.nik || '-')"
+          ></span>
         </template>
 
         <template #cell-roles="{ item }">
@@ -358,13 +438,20 @@ watch(searchQuery, () => {
             >
               {{ formatRoleName(roleName) }}
             </span>
-            <span v-if="!item.roles || item.roles.length === 0" class="text-xs text-muted-foreground">-</span>
+            <span
+              v-if="!item.roles || item.roles.length === 0"
+              class="text-xs text-muted-foreground"
+              >-</span
+            >
           </div>
         </template>
- 
+
         <template #cell-merchants="{ item }">
           <div class="min-w-0">
-            <div v-if="item.merchants && item.merchants.length" class="flex items-center gap-1 min-w-0">
+            <div
+              v-if="item.merchants && item.merchants.length"
+              class="flex items-center gap-1 min-w-0"
+            >
               <span
                 class="inline-flex items-center px-2.5 py-1 bg-merchant-primary/10 text-merchant-primary rounded-md text-xs font-medium truncate max-w-[180px]"
                 :title="getMerchantSummary(item.merchants).first"
@@ -376,7 +463,9 @@ watch(searchQuery, () => {
               <span
                 v-if="getMerchantSummary(item.merchants).extra > 0"
                 class="text-xs text-muted-foreground font-medium"
-                :title="getMerchantSummary(item.merchants).extraNames.join(', ')"
+                :title="
+                  getMerchantSummary(item.merchants).extraNames.join(', ')
+                "
               >
                 +{{ getMerchantSummary(item.merchants).extra }}
               </span>
@@ -390,7 +479,11 @@ watch(searchQuery, () => {
         </template>
 
         <template #cell-actions="{ item }">
-          <Button @click.stop="goToDetail(item)" variant="muted-outline" size="sm">
+          <Button
+            @click.stop="goToDetail(item)"
+            variant="muted-outline"
+            size="sm"
+          >
             <i class="pi pi-eye"></i>
           </Button>
         </template>
@@ -416,17 +509,21 @@ watch(searchQuery, () => {
           class="bg-white rounded-lg shadow-sm p-4 active:bg-gray-50 transition"
         >
           <div class="flex items-start gap-3 mb-3">
-            <div class="w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
-              <img 
+            <div
+              class="w-12 h-12 rounded-full bg-merchant-primary/10 flex items-center justify-center shrink-0 overflow-hidden"
+            >
+              <img
                 v-if="u.profile_picture_path"
-                :src="getUserProfileUrl(u)" 
+                :src="getUserProfileUrl(u)"
                 :alt="u.name"
                 class="w-full h-full object-cover"
-                @error="(e) => { 
-                  console.error('Image load error for user:', u.id, u.name);
-                  e.target.style.display = 'none'; 
-                  e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold'>${u.name?.charAt(0)?.toUpperCase() || 'U'}</span>`;
-                }"
+                @error="
+                  (e) => {
+                    console.error('Image load error for user:', u.id, u.name);
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<span class='text-merchant-primary font-semibold'>${u.name?.charAt(0)?.toUpperCase() || 'U'}</span>`;
+                  }
+                "
               />
               <span v-else class="text-merchant-primary font-semibold">
                 {{ u.name?.charAt(0)?.toUpperCase() || "U" }}
@@ -434,9 +531,18 @@ watch(searchQuery, () => {
             </div>
 
             <div class="flex-1 min-w-0">
-              <p class="font-semibold text-gray-900 truncate" v-html="highlightText(u.name)"></p>
-              <p class="text-sm text-gray-600 truncate" v-html="highlightText(u.email)"></p>
-              <p class="text-xs text-gray-500 truncate" v-html="highlightText(u.phone || '-')"></p>
+              <p
+                class="font-semibold text-gray-900 truncate"
+                v-html="highlightText(u.name)"
+              ></p>
+              <p
+                class="text-sm text-gray-600 truncate"
+                v-html="highlightText(u.email)"
+              ></p>
+              <p
+                class="text-xs text-gray-500 truncate"
+                v-html="highlightText(u.phone || '-')"
+              ></p>
             </div>
 
             <StatusLabel :status="u.status" variant="user" size="sm" />
@@ -478,11 +584,13 @@ watch(searchQuery, () => {
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
-              <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
+              <p class="text-sm text-blue-900 font-medium mb-1">
+                Laporan akan mencakup:
+              </p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
                 <li>Data lengkap users (Nama, Email, Phone, NIK)</li>
                 <li>Role dan status users</li>
-                <li>Informasi merchants yang dimiliki</li>
+                <li>Informasi UMKM yang dimiliki</li>
                 <li>Filter yang diterapkan (Status, Role, Pencarian)</li>
                 <li>Informasi waktu download dan user yang mendownload</li>
               </ul>
@@ -500,6 +608,70 @@ watch(searchQuery, () => {
           <i class="pi pi-download mr-2"></i>
           <span>Download Laporan PDF</span>
         </Button>
+      </div>
+    </ResponsiveModal>
+
+    <!-- Status Change Modal -->
+    <ResponsiveModal
+      :show="showStatusModal"
+      @close="showStatusModal = false"
+      title="Ubah Status Pengguna"
+      :subtitle="selectedUser ? `${selectedUser.name} · ${selectedUser.email}` : ''"
+    >
+      <div class="space-y-4" v-if="selectedUser">
+        <!-- Current Status Info -->
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <i class="pi pi-user text-gray-500"></i>
+          <div>
+            <p class="text-xs text-gray-500">Status saat ini</p>
+            <StatusLabel :status="selectedUser.status" variant="user" size="sm" />
+          </div>
+        </div>
+
+        <!-- Status Options -->
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-3">Pilih status baru:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="opt in statusChangeOptions"
+              :key="opt.value"
+              @click="newStatus = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                newStatus === opt.value
+                  ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              ]"
+            >
+              <i :class="['pi', newStatus === opt.value ? 'pi-check-circle' : 'pi-circle', 'text-sm']"></i>
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Warning for suspend -->
+        <div v-if="newStatus === 'suspended'" class="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <i class="pi pi-exclamation-triangle text-red-500 text-sm mt-0.5"></i>
+          <p class="text-xs text-red-700">Pengguna yang dibekukan akan langsung logout dan tidak bisa login kembali sampai statusnya diubah.</p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-3 pt-2">
+          <button
+            @click="showStatusModal = false"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmStatusChange"
+            :disabled="statusChangeLoading || newStatus === selectedUser.status"
+            class="flex-1 px-4 py-2 bg-merchant-primary text-white rounded-lg text-sm font-medium hover:bg-merchant-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <i v-if="statusChangeLoading" class="pi pi-spin pi-spinner text-sm"></i>
+            {{ statusChangeLoading ? 'Menyimpan...' : 'Simpan Perubahan' }}
+          </button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>

@@ -20,7 +20,7 @@ export async function getPublicMerchantProducts(merchantSlug, params = {}) {
  * ADMIN MERCHANT PRODUCTS
  * ===================================================== */
 export async function getProducts(merchantSlug, params = {}) {
-  const { data } = await api.get(`/api/merchant/${merchantSlug}/products/`, {
+  const { data } = await api.get(`/api/merchant/${merchantSlug}/products`, {
     params,
   });
   return data;
@@ -35,7 +35,7 @@ export async function getProductDetail(merchantSlug, slug) {
 
 export async function createProduct(merchantSlug, payload) {
   const { data } = await api.post(
-    `/api/merchant/${merchantSlug}/products/`,
+    `/api/merchant/${merchantSlug}/products`,
     payload,
     {
       headers: {

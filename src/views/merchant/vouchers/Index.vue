@@ -454,11 +454,6 @@ const prevPage = () => {
   }
 };
 
-onMounted(() => {
-  if (currentMerchantSlug.value) {
-    loadVouchers();
-  }
-});
 watch(
   currentMerchantSlug,
   (newVal) => {

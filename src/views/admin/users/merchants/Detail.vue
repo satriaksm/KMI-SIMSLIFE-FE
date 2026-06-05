@@ -883,7 +883,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Timeline -->
+      <!-- Timeline
       <div class="bg-white rounded-lg shadow-sm p-6">
         <h3 class="text-lg font-semibold mb-4">Timeline</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -896,7 +896,7 @@ onMounted(async () => {
             <p class="font-medium">{{ new Date(merchant.response_at).toLocaleString("id-ID") }}</p>
           </div>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- Export Modal -->

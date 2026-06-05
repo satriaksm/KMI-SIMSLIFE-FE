@@ -533,6 +533,7 @@ watch(
         </RouterLink>
       </div>
     </nav>
+<<<<<<< HEAD
 
     <!-- Footer Desktop -->
     <!-- <footer
@@ -540,5 +541,7 @@ watch(
     >
       <p>&copy; {{ new Date().getFullYear() }} SUMILIR. All rights reserved.</p>
     </footer> -->
+=======
+>>>>>>> staging-ta
   </div>
 </template>

@@ -1382,13 +1382,19 @@ const checkoutFromCart = (storeId) => {
       slug: store.slug ?? null,
       name: store.name,
       address: store.address,
-      phone: store.phone,
+      phone:
+        store.phone ||
+        store.phone_number ||
+        store.whatsapp ||
+        store.whatsapp_number ||
+        "",
     },
     items: selectedStoreItems.map((item) => ({
       id: item.id,
       name: item.name,
       image: item.image,
       quantity: item.quantity,
+      stock: item.stock,
       unitPrice: item.unitPrice,
       addonTotalPrice: item.addonTotalPrice,
       size: item.size ?? "",

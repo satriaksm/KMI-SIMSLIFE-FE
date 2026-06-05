@@ -1,0 +1,36 @@
+# ─── Vue SPA + Laravel Backend (.htaccess for public_html/) ─────────────────
+
+# Block access to sensitive files
+<FilesMatch "(\.env|\.env\..*|composer\.json|composer\.lock|package\.json|pnpm-lock\.yaml|\.git)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Force fresh fetch for SPA shell and Service Worker entry files.
+# This prevents stale PWA behavior from intercepting backend verification URLs.
+<IfModule mod_headers.c>
+    <FilesMatch "^(index\.html|sw\.js|registerSW\.js|manifest\.json|workbox-.*\.js)$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ─── Skip /backend routes (handled by Laravel's own .htaccess) ──────────
+    RewriteRule ^backend(/.*)?$ - [L]
+
+    # FIX: jangan ganggu file PWA
+    RewriteRule ^manifest\.json$ - [L]
+    RewriteRule ^sw\.js$ - [L]
+    RewriteRule ^registerSW\.js$ - [L]
+    RewriteRule ^workbox-.*\.js$ - [L]
+
+    # ─── Vue SPA fallback ───────────────────────────────────────────────────
+    # If the request is not an existing file or directory, serve index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>

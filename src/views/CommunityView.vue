@@ -266,14 +266,9 @@
           >
             <!-- header -->
             <div class="flex items-start gap-4 mb-4">
-              <img
-                :src="
-                  post.author?.profile_picture ||
-                  '/storage/profilepicdefault.png'
-                "
-                alt="avatar"
-                class="object-cover w-12 h-12 rounded-full"
-                loading="lazy"
+              <UserAvatar 
+                :user="post.author" 
+                size="lg"
               />
               <div class="flex-1">
                 <div class="flex items-center justify-between">
@@ -291,21 +286,12 @@
                     </div>
                   </div>
 
-                  <div class="text-gray-400">
-                    <button
-                      class="p-2 rounded hover:bg-gray-100"
-                      aria-label="menu"
-                    >
-                      <svg
-                        class="w-5 h-5"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <circle cx="5" cy="12" r="2" />
-                        <circle cx="12" cy="12" r="2" />
-                        <circle cx="19" cy="12" r="2" />
-                      </svg>
-                    </button>
+                  <div class="text-gray-400" @click.stop>
+                    <ReportButton
+                      reportable-type="post"
+                      :reportable-id="post.id"
+                      :reportable-name="post.post_title || 'Postingan Komunitas'"
+                    />
                   </div>
                 </div>
               </div>
@@ -346,7 +332,7 @@
                     class="object-cover w-full h-48 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
-                    @error="(e) => { console.error('Image load error:', post.images[0]); e.target.src = '/placeholder.png'; }"
+                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                 </div>
 
@@ -359,7 +345,7 @@
                     class="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-48 md:h-56"
                     loading="lazy"
                     @click="openLightbox(post.images, i)"
-                    @error="(e) => { e.target.src = '/placeholder.png'; }"
+                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                 </div>
 
@@ -371,7 +357,7 @@
                     class="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
-                    @error="(e) => { e.target.src = '/placeholder.png'; }"
+                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                   <div class="grid grid-cols-2 gap-2">
                     <img
@@ -381,7 +367,7 @@
                       class="object-cover w-full h-32 rounded-md cursor-pointer sm:h-40 md:h-44"
                       loading="lazy"
                       @click="openLightbox(post.images, i + 1)"
-                      @error="(e) => { e.target.src = '/placeholder.png'; }"
+                      @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                     />
                   </div>
                 </div>
@@ -394,7 +380,7 @@
                     class="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
-                    @error="(e) => { e.target.src = '/placeholder.png'; }"
+                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                   <div class="gap-2">
                     <div class="grid grid-cols-3 gap-2 md:hidden">
@@ -408,7 +394,7 @@
                           class="object-cover w-full h-24 rounded-md cursor-pointer"
                           loading="lazy"
                           @click="openLightbox(post.images, i + 1)"
-                          @error="(e) => { e.target.src = '/placeholder.png'; }"
+                          @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                         />
                         <div
                           v-if="i === 2 && post.images.length > 4"
@@ -431,7 +417,7 @@
                           class="object-cover w-full h-40 rounded-md cursor-pointer md:h-44 lg:h-48"
                           loading="lazy"
                           @click="openLightbox(post.images, i + 1)"
-                          @error="(e) => { e.target.src = '/placeholder.png'; }"
+                          @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                         />
                         <div
                           v-if="i === 2 && post.images.length > 4"
@@ -634,7 +620,7 @@
             class="max-h-[80vh] object-contain rounded-md"
             @touchstart="onTouchStart"
             @touchend="onTouchEnd"
-            @error="(e) => { e.target.src = '/placeholder.png'; }"
+            @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
           />
         </div>
 
@@ -660,6 +646,8 @@ import api from "@/libs/axios";
 import bannerImg from "@/assets/banner-community.png";
 import { setMeta } from "@/router/seo";
 import { getCommunityImageUrl } from '@/libs/getImageUrl'; // ✅ ADD
+import UserAvatar from "@/components/common/UserAvatar.vue";
+import ReportButton from "@/components/ReportButton.vue";
 
 /* STATE */
 const posts = ref([]);

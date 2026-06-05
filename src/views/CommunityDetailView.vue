@@ -1,48 +1,53 @@
 <template>
   <div class="max-w-3xl px-3 py-4 mx-auto sm:py-6 sm:px-6 md:px-8">
-    <!-- back button -->
-    <router-link
-      to="/community"
-      class="absolute z-20 flex items-center gap-2 px-3 py-2 transition rounded-full shadow left-8 top-8 bg-white/80 hover:bg-white"
-    >
-      <svg
-        class="w-5 h-5 text-secondary"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-      <span class="text-sm font-semibold text-secondary"></span>
-    </router-link>
+    <!-- No back button here, moving it inside the post card for better alignment -->
+
 
     <div v-if="loading" class="py-8 text-center">Loading...</div>
 
     <div v-else-if="post">
       <!-- Post card -->
-      <div class="p-3 mb-5 bg-white rounded-lg shadow sm:p-5 md:p-6 sm:mb-6">
-        <div class="flex flex-col items-start gap-3 sm:flex-row sm:gap-4">
+      <div class="p-3 mb-5 bg-white rounded-lg shadow sm:p-5 md:p-6 sm:mb-6 relative">
+        <div class="flex items-start gap-3 sm:gap-4">
           <!-- avatar -->
-          <img
-            :src="
-              post.author?.profile_picture || '/storage/profilepicdefault.png'
-            "
-            alt="avatar"
-            class="object-cover rounded-full w-9 h-9 sm:w-11 sm:h-11 md:w-14 md:h-14 shrink-0"
-            loading="lazy"
+          <UserAvatar 
+            :user="post.author" 
+            size="lg"
           />
 
           <div class="flex-1">
-            <!-- author + date -->
-            <div class="flex flex-col gap-0.5">
-              <div class="text-[10px] sm:text-xs text-gray-500">
-                oleh
-                <span class="ml-1 font-medium text-gray-800">
-                  {{ post.author?.name }}
-                </span>
+            <div class="flex justify-between items-start w-full">
+              <!-- author + date -->
+              <div class="flex flex-col gap-0.5">
+                <div class="text-[10px] sm:text-xs text-gray-500">
+                  oleh
+                  <span class="ml-1 font-medium text-gray-800">
+                    {{ post.author?.name }}
+                  </span>
+                </div>
+                <div class="mt-1 text-xs text-gray-500">
+                  {{ formatDateTime(post.created_at) }}
+                </div>
               </div>
-              <div class="mt-1 text-xs text-gray-500">
-                {{ formatDateTime(post.created_at) }}
+
+              <!-- Action icons (Report & Back) -->
+              <div class="flex items-center gap-3">
+                <ReportButton
+                  reportable-type="post"
+                  :reportable-id="post.id"
+                  :reportable-name="post.post_title || 'Postingan Komunitas'"
+                />
+                
+                <!-- NEW Back Button aligned with user photo -->
+                <router-link
+                  to="/community"
+                  class="text-secondary hover:text-secondary/80 transition-colors"
+                  title="Kembali ke Komunitas"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 sm:w-7 sm:h-7">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                  </svg>
+                </router-link>
               </div>
             </div>
 
@@ -71,7 +76,7 @@
                 :src="post.images[0]"
                 class="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
                 @click="openLightbox(post.images, 0)"
-                @error="(e) => { console.error('Image load error:', post.images[0]); e.target.src = '/placeholder.png'; }"
+                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
             </div>
 
@@ -83,7 +88,7 @@
                 :src="imgUrl"
                 class="object-cover w-full h-32 rounded-lg cursor-pointer sm:h-40 md:h-56"
                 @click="openLightbox(post.images, i)"
-                @error="(e) => { e.target.src = '/placeholder.png'; }"
+                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
             </div>
 
@@ -93,7 +98,7 @@
                 :src="post.images[0]"
                 class="object-cover w-full h-40 mb-2 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
                 @click="openLightbox(post.images, 0)"
-                @error="(e) => { e.target.src = '/placeholder.png'; }"
+                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
 
               <div class="grid grid-cols-3 gap-2">
@@ -106,7 +111,7 @@
                     :src="imgUrl"
                     class="object-cover w-full rounded-md cursor-pointer h-18 sm:h-24 md:h-32"
                     @click="openLightbox(post.images, i + 1)"
-                    @error="(e) => { e.target.src = '/placeholder.png'; }"
+                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                   <div
                     v-if="i === 2 && post.images.length > 4"
@@ -125,7 +130,7 @@
       <!-- Comment section -->
       <section
         v-if="post"
-        class="p-3 bg-white rounded-lg shadow mb-15 sm:p-5 md:p-6"
+        class="p-3 bg-white rounded-lg shadow mb-24 sm:p-5 md:p-6"
       >
         <div class="flex items-center justify-between mb-3 sm:mb-4">
           <h2 class="text-sm font-semibold sm:text-base">
@@ -180,7 +185,7 @@
 
             <div
               v-if="showCommentSort"
-              class="absolute right-0 z-50 py-2 bg-white border border-gray-100 shadow-lg top-12 rounded-xl w-28 sm:w-32"
+              class="absolute right-0 z-[1001] py-2 bg-white border border-gray-100 shadow-lg top-12 rounded-xl w-28 sm:w-32"
             >
               <button
                 class="block w-full px-3 py-2 text-xs text-left transition sm:px-4 hover:bg-gray-100 sm:text-sm"
@@ -317,7 +322,7 @@
             class="max-h-[65vh] sm:max-h-[75vh] object-contain rounded-md"
             @touchstart="onTouchStart"
             @touchend="onTouchEnd"
-            @error="(e) => { e.target.src = '/placeholder.png'; }"
+            @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
           />
         </div>
 
@@ -336,6 +341,8 @@ import api from "@/libs/axios";
 import CommentForm from "@/components/community/CommentForm.vue";
 import CommentThread from "@/components/community/CommentThread.vue";
 import { getCommunityImageUrl } from '@/libs/getImageUrl'; // ✅ ADD
+import UserAvatar from "@/components/common/UserAvatar.vue";
+import ReportButton from "@/components/ReportButton.vue";
 
 const route = useRoute();
 const post = ref(null);

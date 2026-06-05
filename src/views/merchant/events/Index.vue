@@ -143,6 +143,67 @@ const goToPage = (page) => {
   currentPage.value = page;
   loadEvents();
 };
+
+// Product settings modal
+const showProductSettingsModal = ref(false);
+const selectedEventForProducts = ref(null);
+const merchantProducts = ref([]);
+const loadingProducts = ref(false);
+const voucherRestrictions = ref({}); // { voucherId: [productIds] }
+
+const openProductSettingsModal = async (event) => {
+  selectedEventForProducts.value = event;
+  showProductSettingsModal.value = true;
+  loadingProducts.value = true;
+  
+  try {
+    // 1. Fetch merchant products
+    const productsRes = await api.get(`/api/merchant/${currentMerchantSlug.value}/products`, {
+        params: { per_page: 100 }
+    });
+    merchantProducts.value = productsRes.data.data || [];
+
+    // 2. Fetch current restrictions for each voucher in this event
+    for (const voucher of event.vouchers) {
+        const res = await api.get(`/api/merchant/vouchers/${voucher.id}/restricted-products`);
+        voucherRestrictions.value[voucher.id] = res.data.data.map(p => p.id);
+    }
+  } catch (error) {
+    console.error("Failed to load product settings:", error);
+    toast.error("Gagal memuat data produk");
+  } finally {
+    loadingProducts.value = false;
+  }
+};
+
+const closeProductSettingsModal = () => {
+  showProductSettingsModal.value = false;
+  selectedEventForProducts.value = null;
+  merchantProducts.value = [];
+  voucherRestrictions.value = {};
+};
+
+const saveProductSettings = async () => {
+  try {
+    loadingProducts.value = true;
+    for (const voucherId in voucherRestrictions.value) {
+        await api.post(`/api/merchant/vouchers/${voucherId}/restricted-products`, {
+            product_ids: voucherRestrictions.value[voucherId]
+        });
+    }
+    toast.success("Pengaturan produk berhasil disimpan");
+    closeProductSettingsModal();
+  } catch (error) {
+    console.error("Failed to save product settings:", error);
+    toast.error("Gagal menyimpan pengaturan produk");
+  } finally {
+    loadingProducts.value = false;
+  }
+};
+
+import api from "@/libs/axios";
+import { useToast } from "vue-toastification";
+const toast = useToast();
 const nextPage = () => {
   if (currentPage.value < totalPages.value) {
     currentPage.value += 1;
@@ -502,6 +563,65 @@ watch(invitationStatus, () => {
           </Button>
         </div>
       </div>
+    </ResponsiveModal>
+
+    <!-- Product Settings Modal -->
+    <ResponsiveModal
+      v-model="showProductSettingsModal"
+      title="Pengaturan Produk Voucher"
+      max-width="max-w-2xl"
+    >
+      <div v-if="loadingProducts" class="flex flex-col items-center justify-center py-12">
+        <div class="w-10 h-10 border-4 border-gray-200 border-t-merchant-primary rounded-full animate-spin mb-4"></div>
+        <p class="text-sm text-gray-500">Memuat data produk...</p>
+      </div>
+      <div v-else-if="selectedEventForProducts" class="space-y-6">
+        <div class="p-4 bg-merchant-primary/5 rounded-xl border border-merchant-primary/10">
+          <h4 class="font-bold text-merchant-primary">{{ selectedEventForProducts.event_name }}</h4>
+          <p class="text-xs text-gray-600 mt-1">Pilih produk mana saja yang dapat menggunakan voucher dari event ini. Jika tidak ada produk yang dipilih, voucher berlaku untuk semua produk.</p>
+        </div>
+
+        <div v-for="voucher in selectedEventForProducts.vouchers" :key="voucher.id" class="space-y-3">
+          <div class="flex items-center gap-2 pb-2 border-b">
+            <div class="w-8 h-8 bg-merchant-primary/10 rounded-lg flex items-center justify-center">
+              <i class="pi pi-ticket text-merchant-primary"></i>
+            </div>
+            <div>
+              <span class="text-sm font-bold text-gray-900">{{ voucher.voucher_name }}</span>
+              <span class="ml-2 text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 uppercase">{{ voucher.voucher_code }}</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <label 
+              v-for="product in merchantProducts" 
+              :key="product.id"
+              class="flex items-center p-2 rounded-lg border border-gray-100 hover:border-merchant-primary/30 cursor-pointer transition-colors"
+              :class="{'bg-merchant-primary/5 border-merchant-primary/30': voucherRestrictions[voucher.id]?.includes(product.id)}"
+            >
+              <input 
+                type="checkbox" 
+                :value="product.id" 
+                v-model="voucherRestrictions[voucher.id]"
+                class="w-4 h-4 text-merchant-primary rounded border-gray-300 focus:ring-merchant-primary"
+              />
+              <span class="ml-3 text-xs font-medium text-gray-700 truncate">{{ product.name }}</span>
+            </label>
+          </div>
+          <div v-if="merchantProducts.length === 0" class="text-center py-4 text-gray-500 text-xs">
+            Belum ada produk yang tersedia
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3 justify-end">
+          <Button variant="secondary" @click="closeProductSettingsModal">Batal</Button>
+          <Button variant="merchant" @click="saveProductSettings" :disabled="loadingProducts">
+            Simpan Pengaturan
+          </Button>
+        </div>
+      </template>
     </ResponsiveModal>
   </div>
 </template>

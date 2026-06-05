@@ -130,10 +130,20 @@ const menuItems = computed(() => {
       route: `/merchant-center/${currentMerchantSlug.value}/vouchers`,
     },
     // {
-    //   label: "Events",
-    //   icon: "pi-calendar",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/events`,
+    //   label: "Review & Ulasan",
+    //   icon: "pi-star",
+    //   route: `/merchant-center/${currentMerchantSlug.value}/reviews`,
     // },
+    // {
+    //   label: "Chat dengan Pembeli",
+    //   icon: "pi-comments",
+    //   route: `/merchant-center/${currentMerchantSlug.value}/chats`,
+    // },
+    {
+      label: "Events",
+      icon: "pi-calendar",
+      route: `/merchant-center/${currentMerchantSlug.value}/events`,
+    },
   ];
 });
 

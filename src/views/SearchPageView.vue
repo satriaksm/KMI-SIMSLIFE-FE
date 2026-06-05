@@ -185,15 +185,15 @@ const goToProductDetail = (product) => {
 };
 
 const goToJasaDetail = (jasa) => {
-  const id = jasa?.jasa_id ?? jasa?.id;
-  if (!id) {
-    console.warn("[Search] Invalid jasa id:", jasa);
+  const slug = jasa?.slug || String(jasa?.id);
+  if (!slug) {
+    console.warn("[Search] Invalid jasa:", jasa);
     return;
   }
 
   router.push({
     name: "JasaDetail",
-    params: { id },
+    params: { slug },
   });
 };
 

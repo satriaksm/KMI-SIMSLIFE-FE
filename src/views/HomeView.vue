@@ -10,6 +10,10 @@ import {
 import { Carousel, Slide } from "vue3-carousel";
 import "vue3-carousel/dist/carousel.css";
 
+import InfoteknoIcon from "@/assets/images/infotekno.png";
+import SekolahVokasiUNSIcon from "@/assets/images/LOGO SV BIRU.png";
+import PemkotSurakartaIcon from "@/assets/images/surakarta.png";
+
 import TextField from "@/components/forms/TextField.vue";
 import CategoryCard from "@/components/Card/CategoryCard.vue";
 import MerchantCard from "@/components/Card/MerchantCard.vue";
@@ -96,7 +100,16 @@ watch(
 
 // Banner carousel
 const { events: eventBanners, fetchPublicEvents } = usePublicEvents();
-const eventBannersProcessed = ref([]);
+const eventBannersProcessed = computed(() => {
+  return (eventBanners.value || []).map((event) => ({
+    ...event,
+    bannerUrl: event.banner_url || getEventBannerUrl(event),
+  }));
+});
+
+const goToEvent = () => {
+  router.push({ name: "Event List" });
+};
 
 // Statistics with animated counter
 const {
@@ -177,11 +190,6 @@ onMounted(async () => {
   try {
     isLoadingBanner.value = true;
     await fetchPublicEvents();
-
-    eventBannersProcessed.value = eventBanners.value.map((event) => ({
-      ...event,
-      bannerUrl: getEventBannerUrl(event),
-    }));
   } catch (e) {
     console.error("Failed to load event banners:", e);
   } finally {
@@ -199,6 +207,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("scroll", onMobileScroll);
+  // Load statistics (uses 5-min cache)
+  fetchStatistics();
 });
 </script>
 
@@ -273,7 +283,8 @@ onBeforeUnmount(() => {
         >
           <Slide v-for="event in eventBannersProcessed" :key="event.id">
             <div
-              class="relative w-full h-full cursor-grab group active:cursor-grabbing"
+              @click="goToEvent()"
+              class="relative w-full h-full cursor-pointer group"
             >
               <img
                 :src="event.bannerUrl"
@@ -546,6 +557,27 @@ onBeforeUnmount(() => {
             </p>
 
             <div class="flex items-center gap-3 mt-6">
+              <img
+                :src="InfoteknoIcon"
+                alt="Infotekno"
+                class="flex items-center justify-center h-16 p-2 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Infotekno"
+              />
+              <img
+                :src="SekolahVokasiUNSIcon"
+                alt="Sekolah Vokasi UNS"
+                class="flex items-center justify-center h-16 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Sekolah Vokasi UNS"
+              />
+              <img
+                :src="PemkotSurakartaIcon"
+                alt="Pemkot Surakarta"
+                class="flex items-center justify-center h-16 p-2 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Pemkot Surakarta"
+              />
+            </div>
+
+            <!-- <div class="flex items-center gap-3 mt-6">
               <a
                 href="https://www.facebook.com/pages/Kantor-Kelurahan-Banyuanyar"
                 target="_blank"
@@ -567,7 +599,7 @@ onBeforeUnmount(() => {
             <p class="mt-4 text-xs text-white/60">
               Informasi & pembaruan kegiatan dapat diikuti melalui kanal resmi
               di atas.
-            </p>
+            </p> -->
           </div>
 
           <div>
@@ -575,20 +607,38 @@ onBeforeUnmount(() => {
             <ul class="mt-4 space-y-3 text-sm">
               <li>
                 <router-link
-                  to="/explore"
+                  to="/explore?mode=UMKM"
                   class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
                 >
-                  <i class="text-xs pi pi-angle-right opacity-80"></i> Daftar
+                  <i class="text-xs pi pi-angle-right opacity-80"></i> Semua
                   UMKM
                 </router-link>
               </li>
               <li>
                 <router-link
-                  to="/explore"
+                  to="/explore?mode=toko"
                   class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
                 >
-                  <i class="text-xs pi pi-angle-right opacity-80"></i> Semua
-                  Produk
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Produk Toko
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/explore?mode=kuliner"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Produk Kuliner
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/explore?mode=jasa"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Layanan Jasa
                 </router-link>
               </li>
               <li>
@@ -615,12 +665,51 @@ onBeforeUnmount(() => {
             <div class="mt-4 space-y-4">
               <div class="flex gap-3 text-sm text-white/80">
                 <i class="pi pi-map-marker mt-0.5 shrink-0 opacity-80"></i>
-                <p>
+                <a
+                  href="https://maps.google.com/?q=Jl.+Adi+Sumarmo+No.163,+Banyuanyar,+Kec.+Banjarsari,+Kota+Surakarta,+Jawa+Tengah+57137"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="transition hover:text-white"
+                >
                   Kelurahan Banyuanyar, Surakarta, Jawa Tengah
                   <span class="block mt-1 text-xs text-white/60">
                     Jl. Adi Sumarmo No.163, Banyuanyar, Kec. Banjarsari, Kota
                     Surakarta, Jawa Tengah 57137
                   </span>
+                </a>
+              </div>
+              <div class="flex gap-3 text-sm text-white/80">
+                <i class="pi pi-phone mt-0.5 shrink-0 opacity-80"></i>
+                <p>
+                  <a
+                    href="tel:+62882003634666"
+                    class="transition hover:text-white"
+                  >
+                    0882-0036-34666 (Kelurahan Banyuanyar)
+                  </a>
+                  <br />
+                  <a
+                    href="tel:+6281931966044"
+                    class="transition hover:text-white"
+                  >
+                    0819-3196-6044 (Fasilitator Pemerintahan)
+                  </a>
+
+                  <!-- <span class="block mt-1 text-xs text-white/60">
+                  </span> -->
+                </p>
+              </div>
+              <div class="flex gap-3 text-sm text-white/80">
+                <i class="pi pi-envelope mt-0.5 shrink-0 opacity-80"></i>
+                <p>
+                  <a
+                    href="mailto:kelh.banyuanyar@gmail.com"
+                    class="transition hover:text-white"
+                  >
+                    kelh.banyuanyar@gmail.com
+                  </a>
+                  <!-- <span class="block mt-1 text-xs text-white/60">
+                  </span> -->
                 </p>
               </div>
 

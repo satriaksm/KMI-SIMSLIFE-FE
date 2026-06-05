@@ -1,37 +1,25 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-blue-500 text-white p-4 sticky top-0 z-10 shadow-md">
-      <div class="flex items-center max-w-4xl mx-auto">
-        <button @click="goBack" class="mr-3">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-        <h1 class="text-xl font-bold">Beri Nilai</h1>
-      </div>
-    </header>
-
-    <!-- Content -->
-    <div class="max-w-4xl mx-auto p-4 pb-24">
-      <div class="bg-white rounded-lg shadow-md overflow-hidden">
+  <div class="pb-8 px-4 py-4 mx-auto max-w-6xl">
+      <div class="p-4 space-y-4 bg-white border border-gray-200 rounded-xl">
         <!-- Product Info -->
-        <div class="p-4 flex gap-4 border-b">
-          <img src="https://via.placeholder.com/120x120/D2B48C/FFFFFF?text=CemalCemil" 
-               alt="CemalCemil" 
-               class="w-24 h-24 rounded-lg object-cover">
+        <div class="flex gap-3">
+          <img 
+            src="https://via.placeholder.com/100x100/D2B48C/FFFFFF?text=CemalCemil" 
+            alt="CemalCemil" 
+            class="w-20 h-20 rounded-lg object-cover"
+          />
           <div class="flex-1">
-            <h3 class="font-bold text-lg">CemalCemil</h3>
-            <p class="text-blue-600 font-semibold text-lg mt-1">Rp 21.000</p>
-            <div class="flex gap-1 my-2">
+            <h3 class="text-sm font-semibold text-gray-900">CemalCemil</h3>
+            <p class="mt-1 text-sm text-gray-600">Pentol Juara</p>
+            <div class="flex gap-1 mt-2">
               <button 
                 v-for="star in 5" 
                 :key="star"
                 @click="rating = star"
-                class="focus:outline-none transition-transform hover:scale-110">
+                class="focus:outline-none transition-transform">
                 <svg 
-                  class="w-7 h-7 transition-colors"
-                  :class="star <= rating ? 'text-yellow-400' : 'text-gray-300'"
+                  class="w-5 h-5 transition-colors"
+                  :class="star <= rating ? 'text-amber-400 fill-current' : 'text-gray-300'"
                   fill="currentColor" 
                   viewBox="0 0 20 20">
                   <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
@@ -41,54 +29,50 @@
           </div>
         </div>
 
-        <!-- Add Images Section -->
-        <div class="p-4 border-b">
-          <h4 class="font-semibold mb-3">Tambahkan Gambar</h4>
-          <div class="flex gap-3">
-            <!-- Existing Image -->
-            <div class="relative">
+        <!-- Images Section -->
+        <div>
+          <h4 class="text-sm font-medium text-gray-900 mb-2">Tambahkan Gambar</h4>
+          <div class="flex gap-2">
+            <div v-for="(img, idx) in images" :key="idx" class="relative">
               <img 
-                src="https://via.placeholder.com/80x80/FFA500/FFFFFF?text=Foto" 
+                :src="img" 
                 alt="Review" 
-                class="w-20 h-20 rounded-lg object-cover">
+                class="w-16 h-16 rounded-lg object-cover"
+              />
               <button 
-                @click="removeImage(0)"
-                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-md hover:bg-red-600 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
+                @click="removeImage(idx)"
+                class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600">
+                ×
               </button>
             </div>
 
-            <!-- Add Image Button -->
-            <label class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors">
+            <label v-if="images.length < 5" class="w-16 h-16 border border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-colors">
               <input type="file" class="hidden" accept="image/*" multiple @change="handleFileUpload">
-              <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
             </label>
           </div>
+          <p class="mt-1 text-xs text-gray-500">Maks 5 gambar</p>
         </div>
 
         <!-- Opinion Section -->
-        <div class="p-4">
-          <h4 class="font-semibold mb-3">Bagikan Pendapat Anda</h4>
+        <div>
+          <h4 class="text-sm font-medium text-gray-900 mb-2">Bagikan Pendapat</h4>
           <textarea 
             v-model="reviewText"
-            placeholder="Pentolnya muanteeeep poll"
-            class="w-full border border-gray-300 rounded-lg p-3 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            placeholder="Tulis pendapatmu tentang produk ini..."
+            class="w-full text-sm border border-gray-300 rounded-lg p-2 min-h-[100px] focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-transparent resize-none"
           ></textarea>
         </div>
       </div>
 
-      <!-- Submit Button -->
       <button 
         @click="submitReview"
         :disabled="rating === 0 || !reviewText.trim()"
-        class="w-full mt-6 bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-md">
+        class="w-full mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg bg-merchant-primary hover:bg-merchant-primary/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
         Kirim
       </button>
-    </div>
   </div>
 </template>
 
@@ -101,10 +85,6 @@ const router = useRouter();
 const rating = ref(0);
 const reviewText = ref('');
 const images = ref([]);
-
-const goBack = () => {
-  router.back();
-};
 
 const handleFileUpload = (event) => {
   const files = Array.from(event.target.files);

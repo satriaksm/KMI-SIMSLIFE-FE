@@ -1,8 +1,16 @@
 <template>
   <!-- fixed bottom single bar -->
-  <div class="fixed left-1/2 -translate-x-1/2 bottom-4 z-50 w-full max-w-2xl px-4">
-    <div class="bg-white/95 backdrop-blur-sm shadow-lg rounded-full p-2 flex items-center gap-3">
-      <img :src="userAvatar" alt="avatar" class="w-9 h-9 rounded-full object-cover shrink-0" />
+  <div class="fixed left-1/2 -translate-x-1/2 bottom-20 sm:bottom-6 z-[100] w-full max-w-2xl px-4">
+    <div class="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-3 flex items-center gap-3 border border-gray-100">
+      <UserAvatar 
+        v-if="user"
+        :user="user" 
+        size="md" 
+        :clickable="false"
+      />
+      <div v-else class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+        <i class="pi pi-user text-gray-400"></i>
+      </div>
 
       <div class="flex-1">
         <textarea
@@ -37,6 +45,11 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 import api from '@/libs/axios'
+import { useAuthStore } from '@/stores/auth'
+import UserAvatar from '@/components/common/UserAvatar.vue'
+
+const authStore = useAuthStore()
+const user = computed(() => authStore.user)
 
 const props = defineProps({
   postId: { type: [String, Number], required: true },
@@ -52,7 +65,6 @@ const ta = ref(null)
 
 const isReply = computed(() => !!props.parentId)
 const placeholderText = computed(() => isReply.value ? `Balas ke ${props.parentLabel || 'User'}...` : 'Tulis komentar...')
-const userAvatar = computed(() => props.userAvatarUrl || '/storage/profilepicdefault.png')
 
 watch(() => props.parentId, (v) => {
   if (v) nextTick(() => ta.value?.focus())

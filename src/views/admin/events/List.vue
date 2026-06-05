@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch, inject } from "vue"; 
+import { ref, computed, onMounted, watch, inject } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
-import api from "@/libs/axios"; 
+import api from "@/libs/axios";
 import AdminTable from "@/components/common/AdminTable.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
@@ -30,34 +30,32 @@ const exportLoading = ref(false);
 
 const selectedEvent = ref(null);
 
-const selectedEvents = ref([]); 
+const selectedEvents = ref([]);
 const selectAll = ref(false);
 
 const activeFilters = ref({
   status: "",
 });
 
-const {
-  events,
-  loading,
-  pagination,
-  fetchEvents,
-  deleteEvent,
-} = useEvents();
+const { events, loading, pagination, fetchEvents, deleteEvent } = useEvents();
 
 const tableColumns = [
   { key: "banner_img_path", label: "Banner", sortable: false },
   { key: "event_name", label: "Event", sortable: true },
+  { key: "merchants_count", label: "UMKM", sortable: true },
+  { key: "vouchers_count", label: "Voucher", sortable: true },
   { key: "event_start_date", label: "Periode", sortable: true },
   { key: "status", label: "Status", sortable: true },
   { key: "actions", label: "Aksi", sortable: false },
 ];
 
 const paginationInfo = computed(() => ({
-  start: (pagination.value?.current_page - 1) * (pagination.value?.per_page || 10) + 1,
+  start:
+    (pagination.value?.current_page - 1) * (pagination.value?.per_page || 10) +
+    1,
   end: Math.min(
     (pagination.value?.current_page || 1) * (pagination.value?.per_page || 10),
-    pagination.value?.total || 0
+    pagination.value?.total || 0,
   ),
   total: pagination.value?.total || 0,
 }));
@@ -107,7 +105,7 @@ function highlightText(text) {
     re,
     '<span class="bg-merchant-primary/20 text-merchant-primary font-bold px-1 rounded">' +
       "$1" +
-      "</span>"
+      "</span>",
   );
 }
 
@@ -162,14 +160,18 @@ const prevPage = () => {
   }
 };
 
+let searchDebounceTimer = null;
 watch([searchQuery, () => activeFilters.value.status], () => {
-  currentPage.value = 1;
-  loadEvents();
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    loadEvents();
+  }, 400);
 });
 
 // Modal methods
 const openExportModal = () => {
-  console.log('openExportModal called in List.vue');
+  console.log("openExportModal called in List.vue");
   showExportModal.value = true;
 };
 
@@ -179,7 +181,7 @@ const closeExportModal = () => {
 
 // ✅ Export PDF method
 const exportPDF = async () => {
-  console.log('exportPDF called'); // ✅ ADD debug log
+  console.log("exportPDF called"); // ✅ ADD debug log
   exportLoading.value = true;
   try {
     const response = await api.get("/api/admin/events/export-pdf", {
@@ -193,7 +195,10 @@ const exportPDF = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `events-report-${new Date().toISOString().split('T')[0]}.pdf`);
+    link.setAttribute(
+      "download",
+      `events-report-${new Date().toISOString().split("T")[0]}.pdf`,
+    );
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -209,259 +214,355 @@ const exportPDF = async () => {
 };
 
 // ✅ Inject the register function from parent
-const registerExportModal = inject('registerExportModal', null);
+const registerExportModal = inject("registerExportModal", null);
 
 // ✅ Expose openExportModal to parent via register callback
 onMounted(() => {
   loadEvents();
-  
+
   // Register the export modal function with parent
-  if (registerExportModal && typeof registerExportModal === 'function') {
-    console.log('Registering export modal callback for events list');
+  if (registerExportModal && typeof registerExportModal === "function") {
+    console.log("Registering export modal callback for events list");
     registerExportModal(openExportModal);
   } else {
-    console.warn('registerExportModal not provided by parent');
+    console.warn("registerExportModal not provided by parent");
   }
 });
-
 </script>
 
 <template>
-  <div class="p-4 sm:p-6">
-    <!-- Filters -->
-    <div class="space-y-2 sm:space-y-4 mb-4 bg-white">
-      <div class="sm:flex sm:items-center sm:gap-4 pb-1">
-        <div class="flex-1 mb-2 sm:mb-0">
-          <TextField
-            name="search"
-            variant="merchant"
-            v-model="searchQuery"
-            placeholder="Cari event"
-            icon="pi pi-search"
-            @keyup.enter="handleSearch"
-          />
+  <div class="min-h-screen bg-gray-50/50">
+    <!-- Header & Filters Section -->
+    <div class="bg-white border-b border-gray-200">
+      <div class="p-4 sm:px-6 sm:py-6">
+        <Form>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <!-- Search -->
+            <div class="flex-1">
+              <div class="relative group">
+                <TextField
+                  name="search"
+                  variant="merchant"
+                  v-model="searchQuery"
+                  placeholder="Cari nama event atau deskripsi..."
+                  custom-class="pl-11"
+                  :hide-label="true"
+                  @keyup.enter="handleSearch"
+                />
+                <div class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-merchant-primary transition-colors">
+                  <i class="pi pi-search"></i>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="w-full sm:w-48">
+              <SelectField
+                name="filter-status"
+                v-model="activeFilters.status"
+                :options="statusOptions"
+                variant="merchant"
+                placeholder="Semua Status"
+                :hide-label="true"
+                @change="onStatusChange"
+              />
+            </div>
+          </div>
+        </Form>
+      </div>
+    </div>
+
+    <!-- Content Section -->
+    <div class="p-4 sm:p-6 max-w-[1600px] mx-auto">
+      <!-- Desktop Table -->
+      <div class="hidden sm:block">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <AdminTable
+            :items="events"
+            :columns="tableColumns"
+            :loading="loading"
+            :current-page="currentPage"
+            :total-pages="pagination?.last_page || 1"
+            :pagination-info="paginationInfo"
+            :show-checkbox="true"
+            :selected-items="selectedEvents"
+            :select-all="selectAll"
+            @update:selected-items="selectedEvents = $event"
+            @update:select-all="selectAll = $event; toggleSelectAll()"
+            empty-message="Belum ada event yang dibuat. Klik 'Tambah Event' untuk memulai."
+            @row-click="goToDetail"
+            @page-change="goToPage"
+            @next-page="nextPage"
+            @prev-page="prevPage"
+          >
+            <!-- Banner column -->
+            <template #cell-banner_img_path="{ item }">
+              <div class="py-2">
+                <div class="w-24 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm group relative">
+                  <img
+                    v-if="item.banner_img_path"
+                    :src="getEventBannerUrl(item)"
+                    :alt="item.event_name"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    @error="(e) => (e.target.src = '/placeholder.png')"
+                  />
+                  <div v-else class="flex flex-col items-center justify-center gap-1">
+                    <i class="pi pi-image text-gray-300 text-lg"></i>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Event Name column -->
+            <template #cell-event_name="{ item }">
+              <div class="py-2 min-w-0 max-w-xs lg:max-w-md">
+                <p class="font-bold text-gray-900 text-base mb-0.5 truncate group-hover:text-merchant-primary transition-colors" v-html="highlightText(item.event_name)"></p>
+                <p class="text-xs text-gray-500 line-clamp-2 leading-relaxed" v-html="highlightText(item.event_description)"></p>
+              </div>
+            </template>
+
+            <!-- Merchant count column -->
+            <template #cell-merchants_count="{ item }">
+              <div class="py-2 text-center">
+                <span class="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold">
+                  {{ item.merchants_count || 0 }}
+                </span>
+              </div>
+            </template>
+
+            <!-- Voucher count column -->
+            <template #cell-vouchers_count="{ item }">
+              <div class="py-2 text-center">
+                <span class="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-bold">
+                  {{ item.vouchers_count || 0 }}
+                </span>
+              </div>
+            </template>
+
+            <!-- Periode column -->
+            <template #cell-event_start_date="{ item }">
+              <div class="py-2 whitespace-nowrap">
+                <div class="flex items-center gap-2 text-gray-700">
+                  <i class="pi pi-calendar text-xs text-merchant-primary"></i>
+                  <span class="text-sm font-medium">{{ new Date(item.event_start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-gray-400 mt-1">
+                  <i class="pi pi-arrow-right text-[10px]"></i>
+                  <span class="text-xs">{{ new Date(item.event_end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) }}</span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Status column -->
+            <template #cell-status="{ item }">
+              <div class="py-2">
+                <StatusLabel v-if="item && item.status" :status="item.status" variant="event" />
+                <span v-else class="text-gray-300">-</span>
+              </div>
+            </template>
+
+            <!-- Actions column -->
+            <template #cell-actions="{ item }">
+              <div class="py-2 flex items-center justify-end gap-1">
+                <button 
+                  @click.stop="goToDetail(item)" 
+                  class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-merchant-primary hover:bg-merchant-primary/10 rounded-lg transition-all"
+                  title="Lihat Detail"
+                >
+                  <i class="pi pi-eye text-sm"></i>
+                </button>
+                <button 
+                  @click.stop="goToEdit(item)" 
+                  class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                  title="Edit Event"
+                >
+                  <i class="pi pi-pencil text-sm"></i>
+                </button>
+                <button 
+                  @click.stop="confirmDelete(item)" 
+                  class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                  title="Hapus Event"
+                >
+                  <i class="pi pi-trash text-sm"></i>
+                </button>
+              </div>
+            </template>
+          </AdminTable>
+        </div>
+      </div>
+
+      <!-- Mobile Cards -->
+      <div class="sm:hidden space-y-4 pb-20">
+        <!-- Loading -->
+        <div v-if="loading" class="flex flex-col items-center justify-center py-20">
+          <div class="w-12 h-12 border-4 border-gray-100 border-t-merchant-primary rounded-full animate-spin mb-4"></div>
+          <p class="text-sm text-gray-500 font-medium animate-pulse">Memuat data event...</p>
         </div>
 
-        <!-- Dropdown status -->
-        <SelectField
-          placeholder="Status"
-          name="filter-status"
-          v-model="activeFilters.status"
-          :options="statusOptions"
-          variant="merchant"
-          class="ml-2 w-[100px]"
-          @change="onStatusChange"
-        />
-      </div>
-    </div>
-
-    <!-- Desktop Table -->
-    <div class="hidden sm:block">
-      <AdminTable
-        :items="events"
-        :columns="tableColumns"
-        :loading="loading"
-        :current-page="currentPage"
-        :total-pages="pagination?.last_page || 1"
-        :pagination-info="paginationInfo"
-        :show-checkbox="true"
-        :selected-items="selectedEvents"
-        :select-all="selectAll"
-        @update:selected-items="selectedEvents = $event"
-        @update:select-all="selectAll = $event; toggleSelectAll()"
-        empty-message="Belum ada event. Klik tombol 'Tambah Event' untuk memulai."
-        @row-click="goToDetail"
-        @page-change="goToPage"
-        @next-page="nextPage"
-        @prev-page="prevPage"
-      >
-        <!-- Banner column -->
-        <template #cell-banner_img_path="{ item }">
-          <div class="w-16 h-10 rounded bg-gray-100 flex items-center justify-center overflow-hidden">
-            <img
-              v-if="item.banner_img_path"
-              :src="getEventBannerUrl(item)"
-              :alt="item.event_name"
-              class="w-full h-full object-cover"
-              @error="(e) => (e.target.style.display = 'none')"
-            />
-            <i v-else class="pi pi-image text-gray-300 text-xl"></i>
+        <!-- Empty State for Mobile -->
+        <div v-else-if="events.length === 0" class="bg-white rounded-2xl p-10 text-center border border-gray-200 shadow-sm">
+          <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="pi pi-calendar-plus text-4xl text-gray-300"></i>
           </div>
-        </template>
+          <h3 class="text-gray-900 font-bold mb-2">Belum Ada Event</h3>
+          <p class="text-gray-500 text-sm mb-6">Mulai buat event pertama Anda untuk menjangkau lebih banyak customer.</p>
+          <Button @click="goToCreate" variant="merchant" block>
+            <i class="pi pi-plus mr-2"></i>
+            Tambah Event
+          </Button>
+        </div>
 
-        <!-- Event Name column -->
-        <template #cell-event_name="{ item }">
-          <div class="min-w-0">
-            <p class="font-semibold text-gray-900 truncate" v-html="highlightText(item.event_name)"></p>
-            <p class="text-xs text-muted-foreground truncate" v-html="highlightText(item.event_description)"></p>
-          </div>
-        </template>
+        <!-- Cards List -->
+        <div v-else class="space-y-4">
+          <div
+            v-for="event in events"
+            :key="event.id"
+            class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden active:scale-[0.98] transition-transform"
+            @click="goToDetail(event)"
+          >
+            <!-- Banner Section -->
+            <div class="relative h-32 w-full bg-gray-100">
+              <img
+                v-if="event.banner_img_path"
+                :src="getEventBannerUrl(event)"
+                class="w-full h-full object-cover"
+                @error="(e) => (e.target.src = '/placeholder.png')"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <i class="pi pi-image text-gray-300 text-3xl"></i>
+              </div>
+              <div class="absolute top-3 right-3">
+                <StatusLabel :status="event.status" variant="event" size="xs" />
+              </div>
+            </div>
 
-        <!-- Periode column -->
-        <template #cell-event_start_date="{ item }">
-          <div class="text-sm">
-            <p class="font-medium">
-              {{ new Date(item.event_start_date).toLocaleDateString('id-ID') }}
-            </p>
-            <p class="text-xs text-muted-foreground">
-              s/d {{ new Date(item.event_end_date).toLocaleDateString('id-ID') }}
-            </p>
-          </div>
-        </template>
-
-        <!-- Status column -->
-        <template #cell-status="{ item }">
-          <StatusLabel v-if="item && item.status" :status="item.status" variant="event" />
-          <span v-else>-</span>
-        </template>
-
-        <!-- Actions column -->
-        <template #cell-actions="{ item }">
-          <div class="flex items-center gap-2">
-            <Button @click.stop="goToDetail(item)" variant="admin-outline" size="sm">
-              <i class="pi pi-eye"></i>
-            </Button>
-            <Button @click.stop="goToEdit(item)" variant="admin-outline" size="sm">
-              <i class="pi pi-pencil"></i>
-            </Button>
-            <Button @click.stop="confirmDelete(item)" variant="danger-outline" size="sm">
-              <i class="pi pi-trash"></i>
-            </Button>
-          </div>
-        </template>
-      </AdminTable>
-    </div>
-
-    <!-- Mobile Cards -->
-    <div class="sm:hidden">
-      <!-- Loading -->
-      <div v-if="loading" class="flex justify-center py-12">
-        <i class="pi pi-spin pi-spinner text-4xl text-admin-primary"></i>
-      </div>
-
-      <!-- Empty State for Mobile -->
-      <div v-else-if="events.length === 0" class="text-center py-12">
-        <i class="pi pi-calendar text-6xl text-gray-300 mb-4"></i>
-        <p class="text-gray-500 mb-4">Belum ada event</p>
-        <Button @click="goToCreate" variant="admin">
-          <i class="pi pi-plus mr-2"></i>
-          Tambah Event
-        </Button>
-      </div>
-
-      <!-- Cards List -->
-      <div v-else class="space-y-4">
-        <div
-          v-for="event in events"
-          :key="event.id"
-          class="bg-white rounded-lg shadow p-4"
-        >
-          <div class="flex gap-3">
-            <img
-              v-if="event.banner_img_path"
-              :src="getEventBannerUrl(event)"
-              class="w-20 h-20 object-cover rounded-lg shrink-0"
-              @error="(e) => (e.target.style.display = 'none')"
-            />
-            <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-gray-900 line-clamp-2 mb-1">
-                {{ event.event_name }}
-              </h3>
-              <p class="text-xs text-muted-foreground line-clamp-2 mb-2">
+            <!-- Content Section -->
+            <div class="p-4">
+              <div class="flex justify-between items-start mb-2 gap-2">
+                <h3 class="font-bold text-gray-900 line-clamp-1 flex-1 leading-tight">
+                  {{ event.event_name }}
+                </h3>
+              </div>
+              
+              <p class="text-xs text-gray-500 line-clamp-2 mb-4 min-h-[32px] leading-relaxed">
                 {{ event.event_description }}
               </p>
-              <div class="flex items-center justify-between">
-                <StatusLabel v-if="event && event.status" :status="event.status" variant="event" size="xs" />
-                <span v-else>-</span>
-                <span class="text-xs text-muted-foreground">
-                  {{ new Date(event.event_start_date).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' }) }}
-                </span>
+
+              <div class="flex items-center gap-4 py-3 border-y border-gray-50 mb-4">
+                <div class="flex-1">
+                  <p class="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">Mulai</p>
+                  <p class="text-xs font-bold text-gray-800">
+                    {{ new Date(event.event_start_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }}
+                  </p>
+                </div>
+                <div class="w-px h-6 bg-gray-100"></div>
+                <div class="flex-1">
+                  <p class="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">Selesai</p>
+                  <p class="text-xs font-bold text-gray-800">
+                    {{ new Date(event.event_end_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <button 
+                  @click.stop="goToEdit(event)" 
+                  class="flex-1 bg-gray-50 text-gray-700 font-bold py-2.5 rounded-xl text-xs hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <i class="pi pi-pencil text-[10px]"></i>
+                  Edit
+                </button>
+                <button 
+                  @click.stop="confirmDelete(event)" 
+                  class="w-11 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-100 transition-colors"
+                >
+                  <i class="pi pi-trash text-sm"></i>
+                </button>
               </div>
             </div>
           </div>
 
-          <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-            <Button @click.stop="goToEdit(event)" variant="admin-outline" size="sm" class="flex-1">
-              <i class="pi pi-pencil mr-1"></i>
-              Edit
-            </Button>
-            <Button @click.stop="confirmDelete(event)" variant="danger-outline" size="sm">
-              <i class="pi pi-trash"></i>
-            </Button>
-          </div>
+          <!-- Mobile Pagination -->
+          <MobilePagination
+            :current-page="currentPage"
+            :total-pages="pagination?.last_page || 1"
+            @prev="prevPage"
+            @next="nextPage"
+            @go-to="goToPage"
+          />
         </div>
-
-        <!-- Mobile Pagination -->
-        <MobilePagination
-          :current-page="currentPage"
-          :total-pages="pagination?.last_page || 1"
-          @prev="prevPage"
-          @next="nextPage"
-          @go-to="goToPage"
-        />
       </div>
     </div>
 
+    <!-- Modals -->
     <!-- Delete Modal -->
     <ResponsiveModal
       :show="showDeleteModal"
       @close="showDeleteModal = false"
-      title="Konfirmasi Hapus Event"
+      title="Hapus Event"
     >
-      <div class="text-center py-4">
-        <i class="pi pi-exclamation-triangle text-4xl text-red-500 mb-3"></i>
-        <p class="text-lg font-semibold mb-2">Yakin ingin menghapus event ini?</p>
-        <p class="text-gray-500 mb-2">
-          Event <strong>{{ selectedEvent?.event_name }}</strong> akan dihapus dari sistem.
+      <div class="text-center py-6">
+        <div class="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="pi pi-exclamation-triangle text-4xl text-red-500 animate-bounce"></i>
+        </div>
+        <h3 class="text-xl font-bold text-gray-900 mb-2">Konfirmasi Hapus</h3>
+        <p class="text-gray-600 px-4">
+          Apakah Anda yakin ingin menghapus event <span class="font-bold text-gray-900">"{{ selectedEvent?.event_name }}"</span>?
         </p>
-        <p class="text-xs text-muted-foreground">
-          Tindakan ini tidak dapat dibatalkan.
+        <p class="text-xs text-red-500 mt-4 bg-red-50 p-3 rounded-lg inline-block border border-red-100">
+          <i class="pi pi-info-circle mr-1"></i>
+          Tindakan ini tidak dapat dibatalkan dan semua data terkait akan hilang.
         </p>
       </div>
       <template #footer>
-        <div class="flex gap-3 justify-end">
-          <Button @click="showDeleteModal = false" variant="secondary">Batal</Button>
-          <Button @click="handleDelete" variant="danger">
-            <i class="pi pi-trash mr-2"></i> Hapus
+        <div class="flex gap-3 px-2 pb-2">
+          <Button @click="showDeleteModal = false" variant="secondary" block>Batal</Button>
+          <Button @click="handleDelete" variant="danger" block>
+            <i class="pi pi-trash mr-2"></i> Hapus Sekarang
           </Button>
         </div>
       </template>
     </ResponsiveModal>
 
-    <!-- ✅ Export Modal -->
+    <!-- Export Modal -->
     <ResponsiveModal
       :show="showExportModal"
       @close="closeExportModal"
       title="Export Laporan Events"
-      subtitle="Unduh laporan data events dalam format PDF"
     >
-      <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div class="flex items-start gap-3">
-            <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
-            <div class="flex-1">
-              <p class="text-sm text-blue-900 font-medium mb-1">Laporan akan mencakup:</p>
-              <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Data lengkap events (Nama, Tanggal, Status)</li>
-                <li>Jumlah merchants dan vouchers yang terlibat</li>
-                <li>Deskripsi event dan pembuat event</li>
-                <li>Filter yang diterapkan (Status, Pencarian)</li>
-                <li>Informasi waktu download dan admin yang mendownload</li>
-              </ul>
+      <div class="p-2">
+        <div class="bg-gradient-to-br from-merchant-primary/5 to-merchant-primary/10 border border-merchant-primary/10 rounded-2xl p-6 mb-6">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+              <i class="pi pi-file-pdf text-2xl text-red-500"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-900">Format PDF</h4>
+              <p class="text-xs text-gray-500">Laporan ringkasan event KMI</p>
             </div>
           </div>
+          
+          <ul class="space-y-2.5">
+            <li v-for="(item, i) in ['Statistik partisipasi merchant', 'Ringkasan voucher aktif', 'Timeline pelaksanaan event', 'Detail deskripsi & status']" :key="i" class="flex items-center gap-3 text-sm text-gray-700">
+              <i class="pi pi-check-circle text-merchant-primary text-xs"></i>
+              {{ item }}
+            </li>
+          </ul>
         </div>
 
         <Button
           @click="exportPDF"
           variant="merchant"
           size="lg"
-          custom-class="w-full justify-center"
+          block
           :loading="exportLoading"
         >
           <i class="pi pi-download mr-2"></i>
-          <span>Download Laporan PDF</span>
+          <span>Unduh Laporan Sekarang</span>
         </Button>
+        <p class="text-[10px] text-center text-gray-400 mt-4">
+          Laporan akan diunduh secara otomatis setelah proses selesai.
+        </p>
       </div>
     </ResponsiveModal>
   </div>
