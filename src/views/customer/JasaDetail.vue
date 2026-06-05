@@ -299,19 +299,6 @@
             <span class="text-gray-600 flex items-center gap-1.5"><i class="text-gray-500 pi pi-wallet"></i> Metode Pembayaran</span>
             <p class="mt-1 font-medium text-gray-900">{{ formatPaymentMethods(jasa?.payment_methods) }}</p>
           </div>
-          <div>
-            <span class="text-gray-600 flex items-center gap-1.5"><i class="text-gray-500 pi pi-whatsapp"></i> WhatsApp</span>
-            <a
-              v-if="whatsappLink"
-              :href="whatsappLink"
-              target="_blank"
-              class="inline-flex items-center gap-1.5 text-[#25D366] font-medium hover:underline mt-1"
-            >
-              <span>Hubungi via WhatsApp</span>
-              <i class="text-xs pi pi-external-link"></i>
-            </a>
-            <p v-else class="mt-1 font-medium text-gray-900">Belum tersedia</p>
-          </div>
         </div>
       </div>
     </section>
@@ -494,17 +481,7 @@
               Konsultasi Gratis
             </button>
 
-            <!-- Tombol WhatsApp -->
-            <button
-              v-if="whatsappLink"
-              type="button"
-              @click="openConsultationContact"
-              class="px-5 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition shadow-md"
-              title="Hubungi via WhatsApp"
-            >
-              <i class="pi pi-whatsapp text-xl"></i>
-            </button>
-          </div>
+                      </div>
         </template>
         <template v-else-if="isCartMode">
           <router-link

@@ -20,6 +20,11 @@ const orders = ref([]);
 const loading = ref(false);
 const activeFilter = ref("all");
 
+// Lightbox state
+const lightboxOpen = ref(false);
+const lightboxCurrentIndex = ref(0);
+const lightboxEvidences = ref([]);
+
 // Filter options
 const filters = [
   { key: "all", label: "Semua" },
@@ -462,6 +467,67 @@ const isEvidenceVideo = (media) => {
   if (!media) return false;
   return media?.file_type === 'video'
     || (media?.mime_type && media.mime_type.startsWith('video/'));
+};
+
+// Helper to check if media is document (non-image, non-video)
+const isEvidenceDocument = (media) => {
+  if (!media) return false;
+  if (isEvidenceImage(media) || isEvidenceVideo(media)) return false;
+  return true;
+};
+
+// Get filename from media object
+const getEvidenceFilename = (media) => {
+  return media?.file_name || media?.original_name || media?.name || 'Dokumen';
+};
+
+// Get file extension
+const getEvidenceExt = (media) => {
+  const filename = getEvidenceFilename(media);
+  const parts = filename.split('.');
+  return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
+};
+
+// Open lightbox at specific index
+const openLightbox = (evidences, index) => {
+  lightboxEvidences.value = evidences;
+  lightboxCurrentIndex.value = index;
+  lightboxOpen.value = true;
+};
+
+// Close lightbox
+const closeLightbox = () => {
+  lightboxOpen.value = false;
+};
+
+// Navigate lightbox
+const nextLightbox = () => {
+  if (lightboxCurrentIndex.value < lightboxEvidences.value.length - 1) {
+    lightboxCurrentIndex.value++;
+  }
+};
+
+const prevLightbox = () => {
+  if (lightboxCurrentIndex.value > 0) {
+    lightboxCurrentIndex.value--;
+  }
+};
+
+// Get current lightbox media
+const currentLightboxMedia = computed(() => {
+  return lightboxEvidences.value[lightboxCurrentIndex.value] || null;
+});
+
+// Get visible evidences (max 3)
+const getVisibleEvidences = (order) => {
+  const ev = getCompletionEvidences(order);
+  return ev.slice(0, 3);
+};
+
+// Get extra count
+const getExtraEvidencesCount = (order) => {
+  const ev = getCompletionEvidences(order);
+  return Math.max(0, ev.length - 3);
 };
 
 // Get service image URL (for order service image)
@@ -929,9 +995,97 @@ onMounted(async () => {
                 </div>
               </div>
 
+              <!-- Bukti Pengerjaan - for review-before context -->
+              <div
+                v-if="canReview(order) && getCompletionEvidences(order).length > 0"
+                class="mb-4"
+              >
+                <!-- Section Header -->
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                    <i class="pi pi-images text-purple-500"></i>
+                    Bukti Pengerjaan
+                  </p>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-600 font-medium">
+                    {{ getCompletionEvidences(order).length }} file
+                  </span>
+                </div>
+
+                <!-- Thumbnail Grid (horizontal scroll on mobile, grid on desktop) -->
+                <div class="flex gap-2 overflow-x-auto pb-1 sm:overflow-x-visible sm:grid sm:grid-cols-3 sm:pb-0">
+                  <template
+                    v-for="(evidence, idx) in getVisibleEvidences(order)"
+                    :key="evidence.id || idx"
+                  >
+                    <!-- Image thumbnail -->
+                    <div
+                      v-if="isEvidenceImage(evidence)"
+                      class="relative rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition shrink-0 w-20 h-20 sm:w-full sm:aspect-square"
+                      @click="openLightbox(getCompletionEvidences(order), idx)"
+                    >
+                      <img
+                        :src="getMediaUrlFromMedia(evidence)"
+                        class="w-full h-full object-cover"
+                        @error="(e) => { e.target.style.display='none'; }"
+                      />
+                    </div>
+                    <!-- Video thumbnail -->
+                    <div
+                      v-else-if="isEvidenceVideo(evidence)"
+                      class="relative rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition shrink-0 w-20 h-20 sm:w-full sm:aspect-square"
+                      @click="openLightbox(getCompletionEvidences(order), idx)"
+                    >
+                      <img
+                        v-if="evidence.thumbnail_url"
+                        :src="evidence.thumbnail_url"
+                        class="w-full h-full object-cover"
+                      />
+                      <video
+                        v-else
+                        :src="getMediaUrlFromMedia(evidence)"
+                        class="w-full h-full object-cover"
+                      />
+                      <!-- Play icon overlay -->
+                      <div class="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow">
+                          <i class="pi pi-play text-xs text-gray-700 ml-0.5"></i>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Document thumbnail -->
+                    <div
+                      v-else-if="isEvidenceDocument(evidence)"
+                      class="relative rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition shrink-0 w-20 h-20 sm:w-full sm:aspect-square flex flex-col items-center justify-center"
+                      @click="openLightbox(getCompletionEvidences(order), idx)"
+                    >
+                      <i class="pi pi-file-pdf text-2xl text-red-400 mb-1"></i>
+                      <span class="text-[9px] text-gray-500 text-center leading-tight px-1 truncate w-full">{{ getEvidenceFilename(evidence) }}</span>
+                    </div>
+                  </template>
+
+                  <!-- Extra count badge -->
+                  <div
+                    v-if="getExtraEvidencesCount(order) > 0"
+                    class="relative rounded-xl bg-gray-100 border border-gray-200 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-200 transition shrink-0 w-20 h-20 sm:w-full sm:aspect-square"
+                    @click="openLightbox(getCompletionEvidences(order), 3)"
+                  >
+                    <div class="text-center">
+                      <p class="text-sm font-bold text-gray-600">+{{ getExtraEvidencesCount(order) }}</p>
+                      <p class="text-[9px] text-gray-400">lainnya</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Lightbox hint -->
+                <p class="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">
+                  <i class="pi pi-info-circle"></i>
+                  Ketuk untuk memperbesar
+                </p>
+              </div>
+
               <!-- Can Review Button -->
               <button
-                v-else-if="canReview(order)"
+                v-if="canReview(order)"
                 @click="goToReview(order)"
                 class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm hover:from-amber-600 hover:to-orange-600 transition shadow-md"
               >
@@ -943,6 +1097,86 @@ onMounted(async () => {
         </div>
       </div>
     </main>
+
+    <!-- Lightbox Modal for Evidence Preview -->
+    <Teleport to="body">
+      <div
+        v-if="lightboxOpen"
+        class="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center"
+        @click.self="closeLightbox"
+      >
+        <!-- Close button -->
+        <button
+          @click="closeLightbox"
+          class="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
+        >
+          <i class="pi pi-times text-lg"></i>
+        </button>
+
+        <!-- Prev button -->
+        <button
+          v-if="lightboxEvidences.length > 1 && lightboxCurrentIndex > 0"
+          @click="prevLightbox"
+          class="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
+        >
+          <i class="pi pi-chevron-left text-lg"></i>
+        </button>
+
+        <!-- Next button -->
+        <button
+          v-if="lightboxEvidences.length > 1 && lightboxCurrentIndex < lightboxEvidences.length - 1"
+          @click="nextLightbox"
+          class="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition"
+        >
+          <i class="pi pi-chevron-right text-lg"></i>
+        </button>
+
+        <!-- Media display -->
+        <div class="max-w-4xl max-h-[85vh] w-full mx-4 flex flex-col items-center">
+          <img
+            v-if="isEvidenceImage(currentLightboxMedia)"
+            :src="getMediaUrlFromMedia(currentLightboxMedia)"
+            class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+            @click.stop
+          />
+          <video
+            v-else-if="isEvidenceVideo(currentLightboxMedia)"
+            :src="getMediaUrlFromMedia(currentLightboxMedia)"
+            controls
+            class="max-w-full max-h-[80vh] object-contain rounded-xl shadow-2xl"
+            @click.stop
+          />
+          <!-- Document preview -->
+          <div
+            v-else-if="isEvidenceDocument(currentLightboxMedia)"
+            class="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full text-center"
+            @click.stop
+          >
+            <div class="w-16 h-20 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4 border border-gray-200">
+              <i class="pi pi-file-pdf text-3xl text-red-500"></i>
+            </div>
+            <p class="text-sm font-medium text-gray-800 truncate">{{ getEvidenceFilename(currentLightboxMedia) }}</p>
+            <p class="text-xs text-gray-400 mt-1">{{ getEvidenceExt(currentLightboxMedia) }}</p>
+            <a
+              :href="getMediaUrlFromMedia(currentLightboxMedia)"
+              target="_blank"
+              class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition"
+            >
+              <i class="pi pi-download"></i>
+              Lihat File
+            </a>
+          </div>
+        </div>
+
+        <!-- Counter -->
+        <div
+          v-if="lightboxEvidences.length > 1"
+          class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/20 text-white text-xs px-3 py-1 rounded-full"
+        >
+          {{ lightboxCurrentIndex + 1 }} / {{ lightboxEvidences.length }}
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
