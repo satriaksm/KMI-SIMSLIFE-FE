@@ -107,8 +107,8 @@ const confirmStatusChange = async () => {
 const tableColumns = [
   { key: "photo", label: "Foto", sortable: false },
   { key: "name", label: "Username", sortable: true },
-  { key: "phone", label: "No HP", sortable: false },
-  { key: "nik", label: "NIK", sortable: false },
+  { key: "phone", label: "No HP", sortable: true },
+  { key: "nik", label: "NIK", sortable: true },
   { key: "roles", label: "Roles", sortable: false },
   { key: "merchants", label: "UMKM", sortable: false },
   { key: "status", label: "Status", sortable: true },
