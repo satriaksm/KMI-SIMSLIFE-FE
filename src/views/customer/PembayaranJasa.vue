@@ -238,43 +238,39 @@
 
           <div class="space-y-3">
             <div class="text-sm text-gray-600">Metode Pembayaran</div>
-            <div class="flex items-center gap-2 text-xs sm:gap-3 sm:text-sm">
-              <label
-                class="flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition text-xs sm:text-sm"
-                :class="
-                  pay.method === 'COD'
-                    ? 'bg-merchant-primary text-white border-merchant-primary shadow-sm'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-merchant-primary/70'
-                "
-              >
-                <input
-                  type="radio"
-                  value="COD"
-                  v-model="pay.method"
-                  class="accent-merchant-primary"
-                />
-                <span>COD</span>
-              </label>
-              <label
-                v-if="
-                  order.paymentMethods.includes('qris') ||
-                  order.paymentMethods.includes('QRIS')
-                "
-                class="flex items-center gap-2 px-3 py-1.5 rounded-full border cursor-pointer transition text-xs sm:text-sm"
-                :class="
-                  pay.method === 'QRIS'
-                    ? 'bg-merchant-primary text-white border-merchant-primary shadow-sm'
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-merchant-primary/70'
-                "
-              >
-                <input
-                  type="radio"
-                  value="QRIS"
-                  v-model="pay.method"
-                  class="accent-merchant-primary"
-                />
-                <span>QRIS</span>
-              </label>
+
+            <!-- Loading State -->
+            <div v-if="paymentFeesLoading" class="space-y-2">
+              <div v-for="n in 2" :key="n" class="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
+            </div>
+
+            <!-- Payment Methods Grid -->
+            <div v-else class="space-y-3">
+              <div v-for="group in groupedPaymentMethods" :key="group.type">
+                <div class="mb-1.5 text-xs font-semibold text-gray-500 uppercase">{{ group.title }}</div>
+                <div class="grid grid-cols-2 gap-2">
+                  <label
+                    v-for="method in group.items"
+                    :key="method.id"
+                    class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition text-xs"
+                    :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300'"
+                    @click="pay.method = method.id"
+                  >
+                    <div
+                      class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition"
+                      :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                    >
+                      <svg v-if="pay.method === method.id" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-gray-800 truncate">{{ method.name }}</div>
+                      <div class="text-[10px] text-gray-500 truncate">{{ method.description }}</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div class="pt-2 space-y-1 text-sm text-gray-700">
@@ -282,9 +278,13 @@
                 <span>Harga Jasa</span>
                 <span>Rp {{ formatIDR(amounts.jasa) }}</span>
               </div>
-              <div class="flex justify-between">
+              <div v-if="amounts.ongkir > 0" class="flex justify-between">
                 <span>Biaya Pengantaran</span>
                 <span>Rp {{ formatIDR(amounts.ongkir) }}</span>
+              </div>
+              <div v-if="amounts.platformFee > 0" class="flex justify-between text-xs text-gray-500">
+                <span>Biaya Admin</span>
+                <span>Rp {{ formatIDR(amounts.platformFee) }}</span>
               </div>
               <div class="flex justify-between">
                 <span>
@@ -467,13 +467,40 @@
                     <!-- Metode Bayar -->
                     <div class="p-3 bg-gray-50 rounded-xl">
                       <label class="block text-xs font-medium text-gray-600 mb-2">Metode Pembayaran</label>
-                      <div class="flex gap-2">
-                        <button type="button" class="flex-1 py-2 text-sm rounded-xl border-2 transition" :class="pay.method === 'COD' ? 'bg-merchant-primary text-white border-merchant-primary font-semibold' : 'bg-white text-gray-600 border-gray-200 hover:border-merchant-primary'" @click="pay.method = 'COD'">
-                          COD
-                        </button>
-                        <button v-if="order.paymentMethods.includes('qris') || order.paymentMethods.includes('QRIS')" type="button" class="flex-1 py-2 text-sm rounded-xl border-2 transition" :class="pay.method === 'QRIS' ? 'bg-merchant-primary text-white border-merchant-primary font-semibold' : 'bg-white text-gray-600 border-gray-200 hover:border-merchant-primary'" @click="pay.method = 'QRIS'">
-                          QRIS
-                        </button>
+
+                      <!-- Loading State -->
+                      <div v-if="paymentFeesLoading" class="space-y-2">
+                        <div class="h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                        <div class="h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                      </div>
+
+                      <!-- Payment Methods (same as mobile) -->
+                      <div v-else class="space-y-2">
+                        <div v-for="group in groupedPaymentMethods" :key="group.type">
+                          <div class="mb-1 text-[10px] font-semibold text-gray-400 uppercase">{{ group.title }}</div>
+                          <div class="grid grid-cols-2 gap-1.5">
+                            <label
+                              v-for="method in group.items"
+                              :key="method.id"
+                              class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-xs"
+                              :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300 bg-white'"
+                              @click="pay.method = method.id"
+                            >
+                              <div
+                                class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0"
+                                :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                              >
+                                <svg v-if="pay.method === method.id" class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                              <div class="flex-1 min-w-0">
+                                <div class="font-medium text-gray-700 truncate">{{ method.name }}</div>
+                                <div class="text-[9px] text-gray-400 truncate">{{ method.description }}</div>
+                              </div>
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -542,7 +569,9 @@
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Pembayaran</span>
-                      <span class="px-2 py-0.5 rounded-full bg-merchant-primary/10 text-merchant-primary text-xs font-semibold">{{ pay.method }}</span>
+                      <span class="px-2 py-0.5 rounded-full bg-merchant-primary/10 text-merchant-primary text-xs font-semibold">
+                        {{ selectedPaymentMethodName }}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -683,9 +712,49 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
 import api from "@/libs/axios.js";
+import { usePaymentMethods } from "@/composables/usePaymentMethods";
 
 const route = useRoute();
 const router = useRouter();
+
+// ===== Payment Methods =====
+const {
+  paymentMethodsList,
+  paymentFeesLoading,
+  fetchPaymentFees,
+  getFilteredPaymentMethods,
+  calculatePlatformFee,
+  isCodMethod,
+  isXenditEnabled,
+  isCodEnabled,
+} = usePaymentMethods();
+
+// Get filtered payment methods based on jasa's enabled methods
+const availablePaymentMethods = computed(() => {
+  return getFilteredPaymentMethods(order.paymentMethods);
+});
+
+// Group filtered methods by type
+const groupedPaymentMethods = computed(() => {
+  const enabledMethods = availablePaymentMethods.value;
+  if (!enabledMethods.length) return [];
+
+  const groups = [
+    { title: 'Bayar Tunai', type: 'cod', items: [] },
+    { title: 'QRIS', type: 'qris', items: [] },
+    { title: 'Transfer Bank', type: 'va', items: [] },
+    { title: 'E-Wallet', type: 'ewallet', items: [] },
+    { title: 'Gerai Retail', type: 'retail', items: [] },
+  ];
+
+  enabledMethods.forEach(m => {
+    const group = groups.find(g => g.type === m.type);
+    if (group) group.items.push(m);
+  });
+
+  return groups.filter(g => g.items.length > 0);
+});
+
 // ===== Data dari query =====
 const order = {
   jasaSlug: route.query.jasa_slug || "",
@@ -852,11 +921,13 @@ const amounts = ref({
   jasa: Number(order.price || 0),
   ongkir: 0,
   diskon: 0,
+  platformFee: 0,
 });
 
-const total = computed(() =>
-  Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon),
-);
+const total = computed(() => {
+  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
+  return gross + amounts.value.platformFee;
+});
 
 // Label tipe harga untuk menandai harga tetap vs harga mulai
 const orderPriceTypeLabel = computed(() => {
@@ -865,14 +936,43 @@ const orderPriceTypeLabel = computed(() => {
   if (order.priceType === "cart") return "Keranjang (Tanpa Jadwal)";
   return "";
 });
-// Default metode: jika jasa hanya punya 1 metode, pakai itu; kalau tidak, COD.
-const pay = ref({
-  method:
-    order.paymentMethods.length === 1 &&
-    ["COD", "cod", "QRIS", "qris"].includes(order.paymentMethods[0])
-      ? order.paymentMethods[0].toUpperCase()
-      : "COD",
+
+// Get human-readable name for selected payment method
+const selectedPaymentMethodName = computed(() => {
+  const allMethods = paymentMethodsList.value;
+  const method = allMethods.find(m => m.id === pay.method);
+  return method?.name || pay.method || '-';
 });
+
+// Default metode: COD if enabled, else first available
+const defaultPaymentMethod = computed(() => {
+  if (isCodEnabled(order.paymentMethods)) return "cod";
+  const methods = availablePaymentMethods.value;
+  return methods.length > 0 ? methods[0].id : "cod";
+});
+
+// pay - declare first with default value, update later
+const pay = ref({ method: "cod" });
+
+// Watch for defaultPaymentMethod changes to update pay
+watch(defaultPaymentMethod, (newMethod) => {
+  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
+    pay.method = newMethod;
+  }
+}, { immediate: true });
+
+// Watch for order.paymentMethods changes to update default
+watch(() => order.paymentMethods, () => {
+  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
+    pay.method = defaultPaymentMethod.value;
+  }
+});
+
+// Platform fee based on selected payment method - declare AFTER pay
+watch(() => pay.method, (methodId) => {
+  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
+  amounts.value.platformFee = calculatePlatformFee(methodId, gross);
+}, { immediate: true });
 
 // Pesan error / sukses untuk ditampilkan di layar (bukan alert browser)
 const errorMessage = ref("");
@@ -1208,6 +1308,9 @@ const merchantAddress = ref("");
 
 // Ambil info jasa (WhatsApp link, merchant info, service type) saat halaman dibuka
 onMounted(async () => {
+  // Fetch payment fees from backend
+  fetchPaymentFees();
+
   if (order.merchantSlug) {
     await loadVouchersForJasa(order.merchantSlug);
   }
@@ -1367,25 +1470,13 @@ const sendToChat = async () => {
     // Keranjang/tanpa jadwal: tidak perlu validasi tanggal dan jam
 
     // ===== Helpers =====
-    const paymentMethodMap = {
-      // Backend accepts: COD, MANUAL, cod, manual (case-insensitive)
-      // Map UI display labels → backend accepted values
-      "COD": "COD",
-      "Bayar di Tempat": "MANUAL",
-      "cash": "MANUAL",
-      "cod": "COD",
-      "qris": "MANUAL",  // QRIS treated as manual bank transfer
-      "manual": "MANUAL",
-    };
-    const getBackendPaymentMethod = (uiMethod) => paymentMethodMap[uiMethod] || "COD";
-
     const cleanValue = (val) => {
       if (val === null || val === undefined || val === "") return null;
       if (val === "—" || val === "-" || val === "null" || val === "undefined") return null;
       return val;
     };
 
-    // ===== Ambil jasa_id dari API =====
+    // ===== Kirim ke backend — WAJIB SUKSES =====
     let jasaId = null;
     let jasaDataForLog = null;
     let fetchedJasaData = null;
@@ -1435,7 +1526,7 @@ const sendToChat = async () => {
       booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
       mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
-      payment_method: getBackendPaymentMethod(pay.method),
+      payment_method: pay.method, // Use actual method ID (cod, QRIS, BCA, etc.)
       total_price: total.value || order.price || 0,
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
@@ -1473,6 +1564,20 @@ const sendToChat = async () => {
     const orderId = createdOrder.id;
     const backendStatus = createdOrder.status || 'menunggu_konfirmasi_merchant';
 
+    // ===== Handle NON-COD: redirect ke invoice Xendit =====
+    if (!isCodMethod(pay.method)) {
+      // Cek apakah backend sudah membuat invoice dan mengembalikan invoice_url
+      const invoiceUrl = res?.data?.invoice_url || createdOrder?.invoice_url;
+      if (invoiceUrl) {
+        // Redirect langsung ke halaman pembayaran Xendit
+        window.location.href = invoiceUrl;
+        return;
+      }
+      // Jika backend belum membuat invoice, tampilkan pesan
+      errorMessage.value = "Metode pembayaran online belum tersedia. Silakan pilih metode lain.";
+      return;
+    }
+
     // ===== Simpan ke localStorage sebagai backup =====
     const localBooking = {
       id: orderId,
@@ -1488,7 +1593,7 @@ const sendToChat = async () => {
       booking_date: createdOrder.booking_date || form.value.tanggalISO || null,
       booking_time: createdOrder.booking_time || form.value.waktu || null,
       booking_note: createdOrder.booking_note || form.value.catatan || '',
-      payment_method: createdOrder.payment_method || pay.method || 'COD',
+      payment_method: createdOrder.payment_method || pay.method || 'cod',
       total_price: createdOrder.total_price || total.value || order.price || 0,
       latitude: createdOrder.customer_latitude ?? deviceCoordinates.value?.latitude ?? null,
       longitude: createdOrder.customer_longitude ?? deviceCoordinates.value?.longitude ?? null,

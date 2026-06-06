@@ -3,10 +3,63 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import api from '@/libs/axios';
+import { usePaymentMethods } from '@/composables/usePaymentMethods';
+import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
+const authStore = useAuthStore();
+
+// ===== Payment Methods =====
+const {
+  paymentMethodsList,
+  paymentFeesLoading,
+  fetchPaymentFees,
+  getFilteredPaymentMethods,
+  isCodMethod,
+  isXenditEnabled,
+} = usePaymentMethods();
+
+// Get payment methods from consultation data
+const consultationPaymentMethods = computed(() => {
+  // Try different field paths for payment_methods
+  const jasa = consultation.value?.jasa;
+  if (!jasa) return [];
+
+  // payment_methods as array
+  if (Array.isArray(jasa.payment_methods)) {
+    return jasa.payment_methods;
+  }
+
+  // payment_methods as comma-separated string
+  if (typeof jasa.payment_methods === 'string') {
+    return jasa.payment_methods.split(',').map(m => m.trim()).filter(Boolean);
+  }
+
+  // Check if there's a different field name
+  if (jasa.paymentMethod) {
+    return Array.isArray(jasa.paymentMethod)
+      ? jasa.paymentMethod
+      : jasa.paymentMethod.split(',').map(m => m.trim()).filter(Boolean);
+  }
+
+  return [];
+});
+
+// Filtered payment methods for this consultation
+const availablePaymentMethods = computed(() => {
+  return getFilteredPaymentMethods(consultationPaymentMethods.value);
+});
+
+// Debug available methods
+const debugInfo = computed(() => {
+  return {
+    jasaHasPaymentMethods: !!consultation.value?.jasa?.payment_methods,
+    paymentMethodsString: consultation.value?.jasa?.payment_methods,
+    filteredCount: availablePaymentMethods.value.length,
+  };
+});
 
 const consultationId = computed(() => route.params.consultationId);
 
@@ -23,7 +76,7 @@ const form = ref({
   booking_date: '',
   booking_time: '',
   booking_note: '',
-  payment_method: 'COD',
+  payment_method: 'cod', // Default to cod
 });
 
 // Address fields (separate from form for flexibility)
@@ -33,10 +86,61 @@ const addressData = ref({
   customer_longitude: null,
 });
 
-const paymentMethods = [
-  { value: 'COD', label: 'COD (Bayar di Tempat)' },
-  { value: 'MANUAL', label: 'Transfer Manual' },
-];
+// Set default payment method when availablePaymentMethods is ready
+const setDefaultPaymentMethod = () => {
+  if (availablePaymentMethods.value.length > 0) {
+    // Prefer COD if available
+    const codMethod = availablePaymentMethods.value.find(m => m.id === 'cod');
+    form.value.payment_method = codMethod ? 'cod' : availablePaymentMethods.value[0].id;
+  } else {
+    // Fallback to COD if no methods available
+    form.value.payment_method = 'cod';
+  }
+};
+
+// Watch for availablePaymentMethods changes
+import { watch } from 'vue';
+watch(availablePaymentMethods, (methods) => {
+  if (methods.length > 0) {
+    setDefaultPaymentMethod();
+  }
+}, { immediate: true });
+
+// Watch for consultation loading
+watch(consultation, () => {
+  if (consultation.value) {
+    setDefaultPaymentMethod();
+  }
+}, { deep: true });
+
+// ===== Use Profile Button =====
+const useProfileContact = () => {
+  const user = authStore.user;
+
+  if (!user) {
+    toast.error('Silakan login terlebih dahulu');
+    return;
+  }
+
+  // Get name
+  const name = user.name || user.full_name || user.profile?.name || '';
+  // Get phone
+  const phone = user.phone || user.no_telp || user.profile?.phone || '';
+
+  if (!name && !phone) {
+    toast.warning('Data profil belum lengkap. Silakan lengkapi profil terlebih dahulu.');
+    return;
+  }
+
+  if (name) {
+    form.value.customer_name = name;
+  }
+  if (phone) {
+    form.value.customer_phone = phone;
+  }
+
+  toast.success('Data berhasil diambil dari profil');
+};
 
 // Service type helpers
 const getServiceType = () => {
@@ -121,6 +225,9 @@ const fetchConsultation = async () => {
   try {
     const response = await api.get(`/api/service-consultations/${consultationId.value}`);
     consultation.value = response.data.data;
+
+    // Set default payment method after consultation loads
+    setDefaultPaymentMethod();
   } catch (error) {
     console.error('Error fetching consultation:', error);
     toast.error('Gagal memuat data konsultasi');
@@ -151,14 +258,15 @@ const submitCheckout = async () => {
   submitting.value = true;
 
   try {
-    // Prepare payload
+    // Prepare payload - always use COD for consultation bookings
+    // Backend only supports COD/MANUAL for consultation bookings
     const payload = {
       customer_name: form.value.customer_name,
       customer_phone: form.value.customer_phone,
       booking_date: form.value.booking_date || null,
       booking_time: form.value.booking_time || null,
       booking_note: form.value.booking_note || null,
-      payment_method: form.value.payment_method,
+      payment_method: 'COD', // Always use COD for consultation
     };
 
     // Add address based on service type
@@ -167,9 +275,6 @@ const submitCheckout = async () => {
       payload.customer_latitude = addressData.value.customer_latitude;
       payload.customer_longitude = addressData.value.customer_longitude;
     }
-
-    // For online and di_tempat_umkm, don't send customer_address
-    // Backend will handle it based on service_type
 
     console.log('[Checkout] Mengirim request book consultation...');
 
@@ -180,30 +285,36 @@ const submitCheckout = async () => {
 
     console.log('[Checkout] Response received:', data);
 
-    // ApiResponse::success returns { message, data } — NOT { success, data }
-    // Check data.data for order info
+    // Extract order info from response
     const responseData = data?.data ?? data;
-    const orderId = responseData?.service_order?.id;
+    const serviceOrder = responseData?.service_order;
 
-    toast.success(data?.message || 'Pesanan konsultasi berhasil dibuat!');
-
-    // Open WhatsApp if URL is available
-    if (responseData?.whatsapp_url) {
-      window.open(responseData.whatsapp_url, '_blank');
+    if (!serviceOrder?.id) {
+      throw new Error('Order tidak ditemukan dalam response');
     }
 
-    // Redirect to Service History — NOT pembayaran-jasa
-    // Konsultasi langsung jadi pesanan COD/manual, tidak perlu halaman pembayaran
-    router.push('/service-history');
+    const orderId = serviceOrder.id;
+
+    // Show success message
+    toast.success(data?.message || 'Pesanan konsultasi berhasil dibuat!');
+
+    // Redirect to booking confirmation page
+    router.push(`/booking-confirmation?order_id=${orderId}`);
   } catch (error) {
     console.error('[Checkout] Error:', error.response?.data || error);
-    toast.error(error.response?.data?.message || 'Gagal membuat pesanan');
+    const errorMessage = error.response?.data?.message ||
+                        error.response?.data?.errors?.payment_method?.[0] ||
+                        'Gagal membuat pesanan';
+    toast.error(errorMessage);
   } finally {
     submitting.value = false;
   }
 };
 
-onMounted(fetchConsultation);
+onMounted(() => {
+  fetchPaymentFees();
+  fetchConsultation();
+});
 </script>
 
 <template>
@@ -262,7 +373,17 @@ onMounted(fetchConsultation);
       <!-- Checkout Form -->
       <div class="mx-4 mt-4 space-y-3">
         <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <h3 class="text-sm font-semibold text-gray-800 mb-3">Data Diri</h3>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-gray-800">Data Diri</h3>
+            <button
+              type="button"
+              @click="useProfileContact"
+              class="px-3 py-1.5 text-xs font-medium rounded-full border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition flex items-center gap-1.5"
+            >
+              <i class="pi pi-user"></i>
+              Gunakan Profil
+            </button>
+          </div>
 
           <div class="space-y-3">
             <div>
@@ -367,20 +488,40 @@ onMounted(fetchConsultation);
         <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
           <h3 class="text-sm font-semibold text-gray-800 mb-3">Metode Pembayaran</h3>
 
-          <div class="space-y-2">
+          <div v-if="paymentFeesLoading" class="space-y-2">
+            <div v-for="n in 2" :key="n" class="h-12 bg-gray-100 rounded-xl animate-pulse"></div>
+          </div>
+
+          <div v-else-if="availablePaymentMethods.length === 0" class="p-4 bg-gray-50 rounded-xl text-center">
+            <p class="text-sm text-gray-500">
+              <i class="pi pi-info-circle mr-1"></i>
+              Tidak ada metode pembayaran yang tersedia untuk jasa ini.
+            </p>
+            <p class="text-xs text-gray-400 mt-1">
+              Konsultasi akan dibuat dengan metode COD.
+            </p>
+          </div>
+
+          <div v-else class="space-y-2">
             <label
-              v-for="method in paymentMethods"
-              :key="method.value"
+              v-for="method in availablePaymentMethods"
+              :key="method.id"
               class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition"
-              :class="form.payment_method === method.value ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'"
+              :class="form.payment_method === method.id ? 'border-purple-400 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'"
+              @click="form.payment_method = method.id"
             >
-              <input
-                v-model="form.payment_method"
-                type="radio"
-                :value="method.value"
-                class="text-purple-600 focus:ring-purple-500"
-              />
-              <span class="text-sm text-gray-700">{{ method.label }}</span>
+              <div
+                class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0"
+                :class="form.payment_method === method.id ? 'border-purple-500 bg-purple-500' : 'border-gray-300'"
+              >
+                <svg v-if="form.payment_method === method.id" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <span class="text-sm text-gray-700 font-medium">{{ method.name }}</span>
+                <p class="text-xs text-gray-500">{{ method.description }}</p>
+              </div>
             </label>
           </div>
         </div>

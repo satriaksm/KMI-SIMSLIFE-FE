@@ -740,18 +740,23 @@ const getStatusLabel = (status) => {
 };
 
 const getServiceTypeLabel = (serviceType) => {
-  if (serviceType === "at_location") return "Di Tempat Saya";
-  if (serviceType === "on_site") return "Ke Lokasi Pelanggan";
-  if (serviceType === "online") return "Online";
+  if (!serviceType) return "-";
+  const type = String(serviceType).toLowerCase();
+  if (type === "online") return "Online";
+  if (type === "di_tempat_umkm" || type === "at_location") return "Di Tempat UMKM";
+  if (type === "ke_rumah_pelanggan" || type === "on_site") return "Ke Rumah Pelanggan";
   return "-";
 };
 
 const getDisplayServiceAddress = (jasa) => {
   if (!jasa) return "-";
-  if (jasa.service_type === "online") return "Tidak memerlukan alamat";
-  if (jasa.service_type === "on_site") {
-    return jasa.service_area || "Alamat akan diisi customer saat pembayaran";
+  const serviceType = String(jasa.service_type || "").toLowerCase();
+
+  if (serviceType === "online") return "Tidak memerlukan alamat";
+  if (serviceType === "ke_rumah_pelanggan" || serviceType === "on_site") {
+    return jasa.service_area || "Area layanan sesuai alamat customer";
   }
+  // For di_tempat_umkm or at_location, show merchant address
   return jasa.location_address || currentMerchantAddress.value || "-";
 };
 

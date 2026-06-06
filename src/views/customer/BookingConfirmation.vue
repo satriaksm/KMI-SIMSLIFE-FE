@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import api from "@/libs/axios.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -9,8 +10,71 @@ const bookingData = ref(null);
 const loading = ref(true);
 const isPending = ref(false);
 const isConfirmed = ref(false);
+const error = ref(null);
 
-// Format tanggal ke "DD MMMM YYYY" bahasa Indonesia
+// Payment method display mapping
+const paymentMethodLabels = {
+  cod: "Bayar di Tempat (COD)",
+  COD: "Bayar di Tempat (COD)",
+  ONLINE_XENDIT: "Online (Xendit)",
+  QRIS: "QRIS",
+  qris: "QRIS",
+  BCA_VA: "BCA Virtual Account",
+  bca_va: "BCA Virtual Account",
+  BCA: "BCA Virtual Account",
+  BNI_VA: "BNI Virtual Account",
+  bni_va: "BNI Virtual Account",
+  BNI: "BNI Virtual Account",
+  BRI_VA: "BRI Virtual Account",
+  bri_va: "BRI Virtual Account",
+  BRI: "BRI Virtual Account",
+  MANDIRI_VA: "Mandiri Virtual Account",
+  mandiri_va: "Mandiri Virtual Account",
+  MANDIRI: "Mandiri Virtual Account",
+  OVO: "OVO",
+  ovo: "OVO",
+  DANA: "DANA",
+  dana: "DANA",
+  SHOPEEPAY: "ShopeePay",
+  shopeepay: "ShopeePay",
+  ALFAMART: "Alfamart / Alfamidi",
+  alfamart: "Alfamart / Alfamidi",
+};
+
+// Payment status display mapping
+const paymentStatusLabels = {
+  UNPAID: "Belum Bayar",
+  PAID: "Lunas / Sudah Dibayar",
+  WAITING_CONFIRMATION: "Menunggu Konfirmasi",
+  PENDING: "Menunggu Pembayaran",
+};
+
+// Get human-readable payment method
+function getPaymentMethodDisplay(method) {
+  if (!method) return "-";
+  const normalized = String(method).toUpperCase();
+  return paymentMethodLabels[normalized] || paymentMethodLabels[method] || method;
+}
+
+// Get human-readable payment status
+function getPaymentStatusDisplay(status) {
+  if (!status) return "-";
+  return paymentStatusLabels[status] || status;
+}
+
+// Check if payment is completed (PAID or COD)
+function isPaymentCompleted(paymentMethod, paymentStatus) {
+  const method = String(paymentMethod || "").toUpperCase();
+  const status = String(paymentStatus || "").toUpperCase();
+
+  // COD is considered paid upon order creation
+  if (method === "COD") return true;
+
+  // For other methods, check payment_status
+  return status === "PAID";
+}
+
+// Format date to "DD MMMM YYYY" in Indonesian
 function formatDateID(iso) {
   if (!iso) return "—";
   try {
@@ -24,6 +88,16 @@ function formatDateID(iso) {
   } catch {
     return iso;
   }
+}
+
+// Format booking date if it's just a date string
+function formatBookingDate(date) {
+  if (!date) return "Belum dipilih";
+  // If it's a date only (YYYY-MM-DD), format it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return formatDateID(date);
+  }
+  return formatDateID(date);
 }
 
 // Get service type label
@@ -50,12 +124,6 @@ function getBookingTypeLabel(type) {
   return labels[type] || (type ? type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Booking (Pilih Tanggal & Jam)");
 }
 
-// Safe payment method display
-function getPaymentMethodDisplay(method) {
-  if (!method || method === "undefined" || method === "null" || method === "undefined") return "Bayar di Tempat";
-  return method;
-}
-
 // Safe address display
 function getAddressDisplay(address, serviceType) {
   if (serviceType === "online") return "Online";
@@ -71,74 +139,181 @@ function getAddressLabel(serviceType) {
   return "Lokasi";
 }
 
-onMounted(() => {
-  const q = route.query;
-  const serviceType = q.service_type || q.serviceType || "on_site";
-  // Accept both mekanisme_pemesanan and booking_type for compatibility
-  const bookingType = q.mekanisme_pemesanan || q.booking_type || "booking";
-  const merchantName = q.merchant_name || q.merchant || q.merchant_slug || "Merchant";
-  const merchantAddr = q.merchant_address || q.merchantAddress || "";
-  const formattedDate = formatDateID(q.tanggal);
-  const paymentMethod = getPaymentMethodDisplay(q.payment_method);
-  const customerAddress = getAddressDisplay(q.alamat, serviceType);
+// Check if service uses booking (has schedule)
+const usesBooking = computed(() => {
+  if (!bookingData.value) return false;
+  const type = bookingData.value.mekanisme_pemesanan || bookingData.value.booking_type || "";
+  return ["booking", "jadwal", "scheduled"].some(kw => type.toLowerCase().includes(kw));
+});
 
-  if (q.order_id === "pending") {
+// Fetch order from backend
+async function fetchOrderFromBackend(orderId) {
+  try {
+    const response = await api.get(`/api/service-orders/${orderId}`);
+    return response.data?.data || response.data;
+  } catch (err) {
+    console.error("[BookingConfirmation] Failed to fetch order:", err);
+    return null;
+  }
+}
+
+// Build bookingData from backend response
+function buildFromBackendOrder(order) {
+  if (!order) return null;
+
+  const serviceType = order.service_type || "on_site";
+  const bookingType = order.mekanisme_pemesanan || order.service_type_booking || "booking";
+  const paymentMethod = getPaymentMethodDisplay(order.payment_method);
+  const paymentStatus = getPaymentStatusDisplay(order.payment_status);
+  const isPaid = isPaymentCompleted(order.payment_method, order.payment_status);
+
+  // Get merchant name
+  const merchantName = order.merchant?.name || order.merchant_name || "UMKM";
+
+  // Get service title
+  const serviceTitle = order.service_name || order.jasa?.title || "Layanan";
+
+  // Get service image - handle nested jasa.image object
+  let serviceImage = order.service_image || "";
+  if (!serviceImage && order.jasa?.image) {
+    if (typeof order.jasa.image === 'string') {
+      serviceImage = order.jasa.image;
+    } else if (order.jasa.image?.image_path) {
+      serviceImage = order.jasa.image.image_path;
+    }
+  }
+
+  // Use display_address from backend if available, otherwise compute
+  const displayAddress = order.display_address || getAddressDisplay(order.customer_address, serviceType);
+  const addressLabel = order.address_label || getAddressLabel(serviceType);
+
+  // Check order status
+  const isPendingOrder = order.status === "menunggu_konfirmasi_merchant" || order.status === "pending";
+  const isConfirmedOrder = !isPendingOrder;
+
+  return {
+    id: order.id,
+    merchant_name: merchantName,
+    merchant_address: order.merchant?.address || "",
+    service_title: serviceTitle,
+    service_image: serviceImage,
+    price: parseFloat(order.total_price || 0),
+    date: formatBookingDate(order.booking_date),
+    booking_date: order.booking_date,
+    time: order.booking_time || "—",
+    booking_time: order.booking_time,
+    customer_name: order.customer_name || "-",
+    customer_phone: order.customer_phone || "-",
+    customer_address: displayAddress,
+    address_label: addressLabel,
+    service_type: serviceType,
+    service_type_label: getServiceTypeLabel(serviceType),
+    booking_type: bookingType,
+    booking_type_label: getBookingTypeLabel(bookingType),
+    payment_method: paymentMethod,
+    payment_method_raw: order.payment_method,
+    payment_status: paymentStatus,
+    payment_status_raw: order.payment_status,
+    is_paid: isPaid,
+    catatan: order.booking_note || "-",
+    status: order.status,
+    status_label: order.status_label || order.status,
+    created_at: order.created_at,
+  };
+}
+
+// Build bookingData from query parameters (fallback)
+function buildFromQuery(q) {
+  const serviceType = q.service_type || q.serviceType || "on_site";
+  const bookingType = q.mekanisme_pemesanan || q.booking_type || "booking";
+  const paymentMethod = getPaymentMethodDisplay(q.payment_method);
+
+  return {
+    id: q.order_id,
+    merchant_name: q.merchant_name || q.merchant || q.merchant_slug || "Merchant",
+    merchant_address: q.merchant_address || "",
+    service_title: q.jasa_title || q.service || "Layanan",
+    service_image: q.service_image || "",
+    price: parseFloat(q.total) || parseFloat(q.price) || 0,
+    date: formatBookingDate(q.tanggal),
+    booking_date: q.tanggal,
+    time: q.waktu && q.waktu !== "undefined" ? q.waktu : "—",
+    booking_time: q.waktu,
+    customer_name: q.nama || "-",
+    customer_phone: q.tel || "-",
+    customer_address: getAddressDisplay(q.alamat, serviceType),
+    service_type: serviceType,
+    service_type_label: getServiceTypeLabel(serviceType),
+    booking_type: bookingType,
+    booking_type_label: getBookingTypeLabel(bookingType),
+    payment_method: paymentMethod,
+    payment_method_raw: q.payment_method,
+    payment_status: q.payment_status || "-",
+    payment_status_raw: q.payment_status,
+    is_paid: q.payment_status === "PAID",
+    catatan: q.catatan || "-",
+    status: q.status || "confirmed",
+    status_label: q.status_label || "Confirmed",
+    created_at: q.created_at,
+  };
+}
+
+onMounted(async () => {
+  const q = route.query;
+  const orderId = q.order_id;
+
+  // Special case: pending order (redirected from payment page)
+  if (orderId === "pending") {
     isPending.value = true;
     isConfirmed.value = false;
-    bookingData.value = {
-      id: "pending",
-      merchant_name: merchantName,
-      merchant_address: merchantAddr,
-      service_title: q.jasa_title || q.service || "-",
-      price: parseFloat(q.total) || 0,
-      date: formattedDate,
-      time: q.waktu && q.waktu !== "undefined" ? q.waktu : "Tanpa jadwal",
-      customer_name: q.nama || "-",
-      customer_phone: q.tel || "-",
-      customer_address: customerAddress,
-      service_type: serviceType,
-      service_type_label: getServiceTypeLabel(serviceType),
-      booking_type: bookingType,
-      booking_type_label: getBookingTypeLabel(bookingType),
-      payment_method: paymentMethod,
-      catatan: q.catatan || "-",
-      service_image: q.service_image || "",
-      status: "menunggu_konfirmasi_merchant",
-    };
-  } else if (q.order_id && q.order_id !== "pending") {
-    isPending.value = false;
-    isConfirmed.value = true;
-    bookingData.value = {
-      id: q.order_id,
-      merchant_name: merchantName,
-      merchant_address: merchantAddr,
-      service_title: q.jasa_title || q.service || "Layanan",
-      price: parseFloat(q.total) || parseFloat(q.price) || 0,
-      date: formattedDate,
-      time: q.waktu || "—",
-      customer_name: q.nama || q.customer_name || "-",
-      customer_phone: q.tel || "-",
-      customer_address: customerAddress,
-      service_type: serviceType,
-      service_type_label: getServiceTypeLabel(serviceType),
-      booking_type: bookingType,
-      booking_type_label: getBookingTypeLabel(bookingType),
-      payment_method: paymentMethod,
-      service_image: q.service_image || "",
-      status: "confirmed",
-    };
+    bookingData.value = buildFromQuery(q);
+    loading.value = false;
+    return;
+  }
+
+  // Try to fetch from backend first
+  if (orderId && orderId !== "pending") {
+    const backendOrder = await fetchOrderFromBackend(orderId);
+
+    if (backendOrder) {
+      // Successfully fetched from backend
+      bookingData.value = buildFromBackendOrder(backendOrder);
+      isPending.value = bookingData.value.status === "menunggu_konfirmasi_merchant";
+      isConfirmed.value = !isPending.value;
+    } else {
+      // Fallback to query parameters
+      bookingData.value = buildFromQuery(q);
+      isPending.value = q.status === "pending" || q.status === "pending_confirmation";
+      isConfirmed.value = !isPending.value;
+    }
   } else {
+    // No order_id, try session storage
     const stored = sessionStorage.getItem("pending_booking");
     if (stored) {
-      bookingData.value = JSON.parse(stored);
-      // Normalize stored data
-      const st = bookingData.value.service_type || "on_site";
-      bookingData.value.service_type_label = getServiceTypeLabel(st);
-      bookingData.value.booking_type_label = getBookingTypeLabel(bookingData.value.booking_type || "booking");
-      bookingData.value.payment_method = getPaymentMethodDisplay(bookingData.value.payment_method);
-      bookingData.value.customer_address = getAddressDisplay(bookingData.value.customer_address, st);
-      isPending.value = bookingData.value.status === "pending_confirmation";
-      isConfirmed.value = bookingData.value.status === "confirmed";
+      try {
+        const parsed = JSON.parse(stored);
+        bookingData.value = buildFromQuery({
+          order_id: parsed.id,
+          merchant_name: parsed.merchant_name,
+          merchant_address: parsed.merchant_address,
+          jasa_title: parsed.service_name,
+          service_image: parsed.service_image,
+          total: parsed.total_price,
+          tanggal: parsed.booking_date,
+          waktu: parsed.booking_time,
+          nama: parsed.customer_name,
+          tel: parsed.customer_phone,
+          alamat: parsed.customer_address,
+          service_type: parsed.service_type,
+          payment_method: parsed.payment_method,
+          catatan: parsed.booking_note,
+          status: parsed.status,
+        });
+        isPending.value = parsed.status === "pending_confirmation";
+        isConfirmed.value = parsed.status === "confirmed";
+      } catch (e) {
+        console.error("[BookingConfirmation] Failed to parse stored booking:", e);
+      }
     }
   }
 
@@ -217,20 +392,33 @@ const viewBooking = () => router.push("/service-history");
               <span class="font-medium text-gray-800">{{ bookingData.customer_phone }}</span>
             </div>
             <div class="flex justify-between items-start text-sm py-0.5">
-              <span class="text-gray-500 flex-shrink-0 w-24">{{ getAddressLabel(bookingData.service_type) }}</span>
+              <span class="text-gray-500 flex-shrink-0 w-24">{{ bookingData.address_label || getAddressLabel(bookingData.service_type) }}</span>
               <span class="font-medium text-gray-800 text-right max-w-[60%] line-clamp-2">{{ bookingData.customer_address || '-' }}</span>
             </div>
-            <div class="flex justify-between items-center text-sm py-0.5">
+            <!-- Tanggal - only show for booking services -->
+            <div v-if="usesBooking" class="flex justify-between items-center text-sm py-0.5">
               <span class="text-gray-500 flex-shrink-0 w-24">Tanggal</span>
               <span class="font-medium text-gray-800">{{ bookingData.date }}</span>
             </div>
-            <div class="flex justify-between items-center text-sm py-0.5">
+            <!-- Jam - only show for booking services -->
+            <div v-if="usesBooking" class="flex justify-between items-center text-sm py-0.5">
               <span class="text-gray-500 flex-shrink-0 w-24">Jam</span>
               <span class="font-medium text-gray-800">{{ bookingData.time }}</span>
             </div>
+            <!-- Pembayaran -->
             <div class="flex justify-between items-center text-sm py-0.5">
               <span class="text-gray-500 flex-shrink-0 w-24">Pembayaran</span>
               <span class="font-medium text-gray-800">{{ bookingData.payment_method }}</span>
+            </div>
+            <!-- Status Pembayaran - only show for non-COD -->
+            <div v-if="bookingData.payment_method_raw && bookingData.payment_method_raw.toUpperCase() !== 'COD'" class="flex justify-between items-center text-sm py-0.5">
+              <span class="text-gray-500 flex-shrink-0 w-24">Status Bayar</span>
+              <span
+                class="font-medium px-2 py-0.5 rounded-full text-xs"
+                :class="bookingData.is_paid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+              >
+                {{ bookingData.payment_status }}
+              </span>
             </div>
             <div v-if="bookingData.catatan && bookingData.catatan !== '-'" class="flex justify-between items-start text-sm py-0.5">
               <span class="text-gray-500 flex-shrink-0 w-24">Catatan</span>
@@ -349,20 +537,32 @@ const viewBooking = () => router.push("/service-history");
                 <span class="font-medium text-gray-800">{{ bookingData.customer_phone }}</span>
               </div>
               <div class="flex justify-between items-start text-sm py-1">
-                <span class="text-gray-500 flex-shrink-0 w-32">{{ getAddressLabel(bookingData.service_type) }}</span>
+                <span class="text-gray-500 flex-shrink-0 w-32">{{ bookingData.address_label || getAddressLabel(bookingData.service_type) }}</span>
                 <span class="font-medium text-gray-800 text-right max-w-[55%] line-clamp-2">{{ bookingData.customer_address || '-' }}</span>
               </div>
-              <div class="flex justify-between items-center text-sm py-1">
+              <!-- Tanggal - only show for booking services -->
+              <div v-if="usesBooking" class="flex justify-between items-center text-sm py-1">
                 <span class="text-gray-500 flex-shrink-0 w-32">Tanggal</span>
                 <span class="font-medium text-gray-800">{{ bookingData.date }}</span>
               </div>
-              <div class="flex justify-between items-center text-sm py-1">
+              <!-- Jam - only show for booking services -->
+              <div v-if="usesBooking" class="flex justify-between items-center text-sm py-1">
                 <span class="text-gray-500 flex-shrink-0 w-32">Jam</span>
                 <span class="font-medium text-gray-800">{{ bookingData.time }}</span>
               </div>
               <div class="flex justify-between items-center text-sm py-1">
                 <span class="text-gray-500 flex-shrink-0 w-32">Pembayaran</span>
                 <span class="font-medium text-gray-800">{{ bookingData.payment_method }}</span>
+              </div>
+              <!-- Status Pembayaran - only show for non-COD -->
+              <div v-if="bookingData.payment_method_raw && bookingData.payment_method_raw.toUpperCase() !== 'COD'" class="flex justify-between items-center text-sm py-1">
+                <span class="text-gray-500 flex-shrink-0 w-32">Status Bayar</span>
+                <span
+                  class="font-medium px-2 py-0.5 rounded-full text-xs"
+                  :class="bookingData.is_paid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                >
+                  {{ bookingData.payment_status }}
+                </span>
               </div>
               <div v-if="bookingData.catatan && bookingData.catatan !== '-'" class="flex justify-between items-start text-sm py-1">
                 <span class="text-gray-500 flex-shrink-0 w-32">Catatan</span>
@@ -423,17 +623,30 @@ const viewBooking = () => router.push("/service-history");
                   <span class="text-gray-500">Nama</span>
                   <span class="text-gray-700 text-right max-w-[55%] line-clamp-1">{{ bookingData.customer_name }}</span>
                 </div>
-                <div class="flex justify-between text-xs">
-                  <span class="text-gray-500">Tanggal</span>
-                  <span class="text-gray-700">{{ bookingData.date }}</span>
-                </div>
-                <div class="flex justify-between text-xs">
-                  <span class="text-gray-500">Waktu</span>
-                  <span class="text-gray-700">{{ bookingData.time }}</span>
-                </div>
+                <!-- Tanggal & Jam - only show for booking services -->
+                <template v-if="usesBooking">
+                  <div class="flex justify-between text-xs">
+                    <span class="text-gray-500">Tanggal</span>
+                    <span class="text-gray-700">{{ bookingData.date }}</span>
+                  </div>
+                  <div class="flex justify-between text-xs">
+                    <span class="text-gray-500">Waktu</span>
+                    <span class="text-gray-700">{{ bookingData.time }}</span>
+                  </div>
+                </template>
                 <div v-if="bookingData.payment_method" class="flex justify-between text-xs">
                   <span class="text-gray-500">Pembayaran</span>
                   <span class="text-gray-700">{{ bookingData.payment_method }}</span>
+                </div>
+                <!-- Status Bayar - only show for non-COD -->
+                <div v-if="bookingData.payment_method_raw && bookingData.payment_method_raw.toUpperCase() !== 'COD'" class="flex justify-between text-xs">
+                  <span class="text-gray-500">Status Bayar</span>
+                  <span
+                    class="px-1.5 py-0.5 rounded-full text-[10px]"
+                    :class="bookingData.is_paid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                  >
+                    {{ bookingData.payment_status }}
+                  </span>
                 </div>
                 <div class="flex justify-between items-center text-xs pt-1.5 mt-1 border-t border-gray-100">
                   <span class="text-gray-700 font-semibold">Total</span>
