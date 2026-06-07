@@ -20,10 +20,11 @@ export function getCustomerOrders(params = {}) {
 }
 
 /**
- * Detail of a single order (customer)
+ * Detail of a single service order (customer) — uses orders.id as primary ID
+ * Endpoint: GET /api/service-orders/{id}
  */
 export function getCustomerOrderDetail(orderId) {
-  return api.get(`/api/orders/${orderId}`);
+  return api.get(`/api/service-orders/${orderId}`);
 }
 
 /**

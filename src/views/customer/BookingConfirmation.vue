@@ -62,6 +62,49 @@ function getPaymentStatusDisplay(status) {
   return paymentStatusLabels[status] || status;
 }
 
+// Get human-readable payment channel from Xendit
+function getPaymentChannelDisplay(channel) {
+  if (!channel) return "-";
+  const normalized = String(channel).toUpperCase();
+
+  // Xendit channel mapping
+  const channelLabels = {
+    // Virtual Accounts
+    'BCA': 'BCA Virtual Account',
+    'BCA_VA': 'BCA Virtual Account',
+    'BNI': 'BNI Virtual Account',
+    'BNI_VA': 'BNI Virtual Account',
+    'BRI': 'BRI Virtual Account',
+    'BRI_VA': 'BRI Virtual Account',
+    'MANDIRI': 'Mandiri Virtual Account',
+    'MANDIRI_VA': 'Mandiri Virtual Account',
+    'PERMATA': 'Permata Virtual Account',
+    'PERMATA_VA': 'Permata Virtual Account',
+
+    // E-Wallets
+    'OVO': 'OVO',
+    'DANA': 'DANA',
+    'SHOPEEPAY': 'ShopeePay',
+    'SHOPEE': 'ShopeePay',
+    'LINKAJA': 'LinkAja',
+    'GOPAY': 'GoPay',
+
+    // QRIS
+    'QRIS': 'QRIS',
+
+    // Retail
+    'ALFAMART': 'Alfamart',
+    'ALFAMIDI': 'Alfamidi',
+    'INDOMARET': 'Indomaret',
+
+    // Credit Card
+    'CREDIT_CARD': 'Kartu Kredit',
+    'CARD': 'Kartu Kredit',
+  };
+
+  return channelLabels[normalized] || channelLabels[channel] || channel;
+}
+
 // Check if payment is completed (PAID or COD)
 function isPaymentCompleted(paymentMethod, paymentStatus) {
   const method = String(paymentMethod || "").toUpperCase();
@@ -146,13 +189,28 @@ const usesBooking = computed(() => {
   return ["booking", "jadwal", "scheduled"].some(kw => type.toLowerCase().includes(kw));
 });
 
-// Fetch order from backend
-async function fetchOrderFromBackend(orderId) {
+// Fetch order detail from backend using orders.id
+async function fetchOrderDetail(orderId) {
   try {
     const response = await api.get(`/api/service-orders/${orderId}`);
+    // ApiResponse::success → { message, data: { ... } }
     return response.data?.data || response.data;
   } catch (err) {
-    console.error("[BookingConfirmation] Failed to fetch order:", err);
+    console.error('[BookingConfirmation] Failed to fetch order detail:', err);
+    return null;
+  }
+}
+
+// Refresh payment status from Xendit (best-effort, non-blocking)
+// Does NOT block booking detail display even if it fails
+async function refreshPaymentStatus(orderId) {
+  try {
+    const response = await api.get(`/api/payment/xendit/refresh/${orderId}`);
+    console.log('[BookingConfirmation] Payment status refreshed:', response.data);
+    return response.data;
+  } catch (refreshErr) {
+    // Non-critical: booking detail still shows even if refresh fails
+    console.warn('[BookingConfirmation] Refresh failed (non-critical, webhook may have already updated):', refreshErr);
     return null;
   }
 }
@@ -161,61 +219,98 @@ async function fetchOrderFromBackend(orderId) {
 function buildFromBackendOrder(order) {
   if (!order) return null;
 
-  const serviceType = order.service_type || "on_site";
-  const bookingType = order.mekanisme_pemesanan || order.service_type_booking || "booking";
-  const paymentMethod = getPaymentMethodDisplay(order.payment_method);
-  const paymentStatus = getPaymentStatusDisplay(order.payment_status);
-  const isPaid = isPaymentCompleted(order.payment_method, order.payment_status);
+  const serviceType = order.service_type || 'on_site';
+  const bookingType = order.mekanisme_pemesanan || order.service_type_booking || 'booking';
 
-  // Get merchant name
-  const merchantName = order.merchant?.name || order.merchant_name || "UMKM";
+  // Get actual payment channel from Xendit webhook
+  const actualChannel = order.paid_channel || order.payment_channel || null;
+  const paymentMethodRaw = order.payment_method || '';
+  const paymentStatus = order.payment_status || '';
+  const isPaid = paymentStatus === 'PAID';
+  const isCod = String(paymentMethodRaw).toUpperCase() === 'COD';
 
-  // Get service title
-  const serviceTitle = order.service_name || order.jasa?.title || "Layanan";
+  // Determine payment method display:
+  // 1. COD: "COD (Bayar Tunai)"
+  // 2. Xendit unpaid: "Xendit / Menunggu Pembayaran"
+  // 3. Xendit paid with channel: "Xendit - {channel}"
+  // 4. Xendit paid no channel: "Xendit"
+  let paymentMethodDisplay;
+  if (isCod) {
+    paymentMethodDisplay = 'COD (Bayar Tunai)';
+  } else if (!isPaid) {
+    paymentMethodDisplay = 'Xendit / Menunggu Pembayaran';
+  } else if (isPaid && actualChannel) {
+    paymentMethodDisplay = `Xendit - ${getPaymentChannelDisplay(actualChannel)}`;
+  } else {
+    paymentMethodDisplay = 'Xendit';
+  }
 
-  // Get service image - handle nested jasa.image object
-  let serviceImage = order.service_image || "";
+  const paymentStatusDisplay = getPaymentStatusDisplay(paymentStatus);
+
+  // Get merchant info
+  const merchantName = order.merchant?.name || order.merchant_name || 'UMKM';
+  const merchantAddress = order.merchant?.address || order.merchant_address || '';
+
+  // Get service info
+  const serviceTitle = order.service_name || order.jasa?.title || order.service_title || 'Layanan';
+
+  // Get service image
+  let serviceImage = order.service_image || '';
   if (!serviceImage && order.jasa?.image) {
     if (typeof order.jasa.image === 'string') {
       serviceImage = order.jasa.image;
     } else if (order.jasa.image?.image_path) {
       serviceImage = order.jasa.image.image_path;
+    } else if (order.jasa.image?.cover_image) {
+      serviceImage = order.jasa.image.cover_image;
     }
   }
 
-  // Use display_address from backend if available, otherwise compute
-  const displayAddress = order.display_address || getAddressDisplay(order.customer_address, serviceType);
+  // Determine display address based on service type
+  // Priority: display_address from backend > computed from service_type > order address
+  let displayAddress;
+  if (order.display_address) {
+    displayAddress = order.display_address;
+  } else if (serviceType === 'online') {
+    displayAddress = 'Online';
+  } else if (serviceType === 'di_tempat_umkm' || serviceType === 'at_location') {
+    displayAddress = merchantAddress || order.service_location_address || 'Lokasi UMKM';
+  } else {
+    // ke_rumah_pelanggan / on_site → customer address
+    displayAddress = order.customer_address || order.alamat || '-';
+  }
+
   const addressLabel = order.address_label || getAddressLabel(serviceType);
 
   // Check order status
-  const isPendingOrder = order.status === "menunggu_konfirmasi_merchant" || order.status === "pending";
-  const isConfirmedOrder = !isPendingOrder;
+  const isPendingOrder = order.status === 'menunggu_konfirmasi_merchant' || order.status === 'pending';
 
   return {
     id: order.id,
     merchant_name: merchantName,
-    merchant_address: order.merchant?.address || "",
+    merchant_address: merchantAddress,
     service_title: serviceTitle,
     service_image: serviceImage,
     price: parseFloat(order.total_price || 0),
-    date: formatBookingDate(order.booking_date),
-    booking_date: order.booking_date,
-    time: order.booking_time || "—",
-    booking_time: order.booking_time,
-    customer_name: order.customer_name || "-",
-    customer_phone: order.customer_phone || "-",
+    date: formatBookingDate(order.booking_date || order.tanggal),
+    booking_date: order.booking_date || order.tanggal,
+    time: order.booking_time || order.waktu || '—',
+    booking_time: order.booking_time || order.waktu,
+    customer_name: order.nama || order.customer_name || '-',
+    customer_phone: order.tel || order.customer_phone || '-',
     customer_address: displayAddress,
     address_label: addressLabel,
     service_type: serviceType,
     service_type_label: getServiceTypeLabel(serviceType),
     booking_type: bookingType,
     booking_type_label: getBookingTypeLabel(bookingType),
-    payment_method: paymentMethod,
+    payment_method: paymentMethodDisplay,
     payment_method_raw: order.payment_method,
-    payment_status: paymentStatus,
-    payment_status_raw: order.payment_status,
+    payment_channel: actualChannel,
+    payment_status: paymentStatusDisplay,
+    payment_status_raw: paymentStatus,
     is_paid: isPaid,
-    catatan: order.booking_note || "-",
+    catatan: order.booking_note || order.catatan || '-',
     status: order.status,
     status_label: order.status_label || order.status,
     created_at: order.created_at,
@@ -262,59 +357,44 @@ onMounted(async () => {
   const q = route.query;
   const orderId = q.order_id;
 
-  // Special case: pending order (redirected from payment page)
-  if (orderId === "pending") {
-    isPending.value = true;
-    isConfirmed.value = false;
+  // Special case: pending order (redirected from payment page with no order_id yet)
+  if (orderId === 'pending' || !orderId) {
+    isPending.value = q.status === 'pending' || q.status === 'pending_confirmation';
+    isConfirmed.value = !isPending.value;
     bookingData.value = buildFromQuery(q);
     loading.value = false;
     return;
   }
 
-  // Try to fetch from backend first
-  if (orderId && orderId !== "pending") {
-    const backendOrder = await fetchOrderFromBackend(orderId);
+  // Fetch order detail from backend using orders.id (primary)
+  const backendOrder = await fetchOrderDetail(orderId);
 
-    if (backendOrder) {
-      // Successfully fetched from backend
-      bookingData.value = buildFromBackendOrder(backendOrder);
-      isPending.value = bookingData.value.status === "menunggu_konfirmasi_merchant";
-      isConfirmed.value = !isPending.value;
-    } else {
-      // Fallback to query parameters
-      bookingData.value = buildFromQuery(q);
-      isPending.value = q.status === "pending" || q.status === "pending_confirmation";
-      isConfirmed.value = !isPending.value;
-    }
-  } else {
-    // No order_id, try session storage
-    const stored = sessionStorage.getItem("pending_booking");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        bookingData.value = buildFromQuery({
-          order_id: parsed.id,
-          merchant_name: parsed.merchant_name,
-          merchant_address: parsed.merchant_address,
-          jasa_title: parsed.service_name,
-          service_image: parsed.service_image,
-          total: parsed.total_price,
-          tanggal: parsed.booking_date,
-          waktu: parsed.booking_time,
-          nama: parsed.customer_name,
-          tel: parsed.customer_phone,
-          alamat: parsed.customer_address,
-          service_type: parsed.service_type,
-          payment_method: parsed.payment_method,
-          catatan: parsed.booking_note,
-          status: parsed.status,
-        });
-        isPending.value = parsed.status === "pending_confirmation";
-        isConfirmed.value = parsed.status === "confirmed";
-      } catch (e) {
-        console.error("[BookingConfirmation] Failed to parse stored booking:", e);
+  if (backendOrder) {
+    // Successfully fetched from backend — display immediately
+    bookingData.value = buildFromBackendOrder(backendOrder);
+    isPending.value = bookingData.value.status === 'menunggu_konfirmasi_merchant' || bookingData.value.status === 'pending';
+    isConfirmed.value = !isPending.value;
+
+    // Non-blocking: refresh Xendit status in background
+    // Even if this fails, booking detail already displayed
+    refreshPaymentStatus(orderId).then((refreshResult) => {
+      if (refreshResult?.success && refreshResult.payment_status) {
+        // Update payment status in displayed data
+        bookingData.value.payment_status_raw = refreshResult.payment_status;
+        bookingData.value.payment_status = getPaymentStatusDisplay(refreshResult.payment_status);
+        bookingData.value.is_paid = refreshResult.payment_status === 'PAID';
+        if (refreshResult.payment_channel) {
+          bookingData.value.payment_channel = refreshResult.payment_channel;
+          bookingData.value.payment_method = `Xendit - ${getPaymentChannelDisplay(refreshResult.payment_channel)}`;
+        }
       }
-    }
+    });
+  } else {
+    // Backend fetch failed — fallback to query params
+    console.warn('[BookingConfirmation] Backend fetch failed, using query params as fallback');
+    isPending.value = q.status === 'pending' || q.status === 'pending_confirmation';
+    isConfirmed.value = !isPending.value;
+    bookingData.value = buildFromQuery(q);
   }
 
   loading.value = false;
@@ -329,7 +409,7 @@ const formatCurrency = (value) => {
 };
 
 const goToHome = () => router.push("/");
-const viewBooking = () => router.push("/service-history");
+const viewBooking = () => router.push("/orders");
 </script>
 
 <template>

@@ -253,14 +253,14 @@
                     v-for="method in group.items"
                     :key="method.id"
                     class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition text-xs"
-                    :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300'"
-                    @click="pay.method = method.id"
+                    :class="selectedPayment === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300'"
+                    @click="selectedPayment = method.id"
                   >
                     <div
                       class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition"
-                      :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                      :class="selectedPayment === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
                     >
-                      <svg v-if="pay.method === method.id" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg v-if="selectedPayment === method.id" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
@@ -483,14 +483,14 @@
                               v-for="method in group.items"
                               :key="method.id"
                               class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-xs"
-                              :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300 bg-white'"
-                              @click="pay.method = method.id"
+                              :class="selectedPayment === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300 bg-white'"
+                              @click="selectedPayment = method.id"
                             >
                               <div
                                 class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0"
-                                :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                                :class="selectedPayment === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
                               >
-                                <svg v-if="pay.method === method.id" class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg v-if="selectedPayment === method.id" class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                                 </svg>
                               </div>
@@ -725,9 +725,58 @@ const {
   getFilteredPaymentMethods,
   calculatePlatformFee,
   isCodMethod,
-  isXenditEnabled,
   isCodEnabled,
 } = usePaymentMethods();
+
+const XENDIT_CHANNELS = ['QRIS', 'BCA', 'BNI', 'BRI', 'MANDIRI', 'OVO', 'DANA', 'SHOPEEPAY', 'ALFAMART'];
+
+// selectedPayment: variabel utama yang berubah saat user klik metode
+const selectedPayment = ref(null);
+
+// paymentMethod: abstrak untuk backend (COD vs XENDIT)
+const paymentMethod = computed(() => {
+  const val = selectedPayment.value;
+  if (!val) return 'COD';
+  const upper = String(val).toUpperCase();
+  return upper === 'COD' ? 'COD' : 'XENDIT';
+});
+
+// paymentChannel: channel aktual yang dikirim ke backend
+const paymentChannel = computed(() => {
+  const val = selectedPayment.value;
+  if (!val) return null;
+  const upper = String(val).toUpperCase();
+  if (upper === 'COD') return null;
+  return XENDIT_CHANNELS.includes(upper) ? upper : null;
+});
+
+// isXendit / isCod
+const isXenditPayment = computed(() => paymentMethod.value === 'XENDIT');
+const isCodPayment = computed(() => paymentMethod.value === 'COD');
+
+// Inisialisasi: pilih metode pertama yang tersedia (COD didahulukan jika enabled)
+onMounted(() => {
+  if (selectedPayment.value !== null) return; // sudah diset oleh user
+  if (isCodEnabled(order.paymentMethods)) {
+    selectedPayment.value = 'cod';
+  } else {
+    const first = availablePaymentMethods.value[0];
+    selectedPayment.value = first ? first.id : 'cod';
+  }
+});
+
+// Watch: hanya set default jika user belum memilih apa pun
+watch(selectedPayment, (val) => {
+  console.log('[PembayaranJasa] selectedPayment changed to:', val);
+  console.log('[PembayaranJasa] paymentMethod:', paymentMethod.value);
+  console.log('[PembayaranJasa] paymentChannel:', paymentChannel.value);
+});
+
+// Platform fee
+watch(selectedPayment, (methodId) => {
+  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
+  amounts.value.platformFee = calculatePlatformFee(methodId, gross);
+});
 
 // Get filtered payment methods based on jasa's enabled methods
 const availablePaymentMethods = computed(() => {
@@ -940,39 +989,9 @@ const orderPriceTypeLabel = computed(() => {
 // Get human-readable name for selected payment method
 const selectedPaymentMethodName = computed(() => {
   const allMethods = paymentMethodsList.value;
-  const method = allMethods.find(m => m.id === pay.method);
-  return method?.name || pay.method || '-';
+  const method = allMethods.find(m => m.id === selectedPayment);
+  return method?.name || selectedPayment || '-';
 });
-
-// Default metode: COD if enabled, else first available
-const defaultPaymentMethod = computed(() => {
-  if (isCodEnabled(order.paymentMethods)) return "cod";
-  const methods = availablePaymentMethods.value;
-  return methods.length > 0 ? methods[0].id : "cod";
-});
-
-// pay - declare first with default value, update later
-const pay = ref({ method: "cod" });
-
-// Watch for defaultPaymentMethod changes to update pay
-watch(defaultPaymentMethod, (newMethod) => {
-  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
-    pay.method = newMethod;
-  }
-}, { immediate: true });
-
-// Watch for order.paymentMethods changes to update default
-watch(() => order.paymentMethods, () => {
-  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
-    pay.method = defaultPaymentMethod.value;
-  }
-});
-
-// Platform fee based on selected payment method - declare AFTER pay
-watch(() => pay.method, (methodId) => {
-  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
-  amounts.value.platformFee = calculatePlatformFee(methodId, gross);
-}, { immediate: true });
 
 // Pesan error / sukses untuk ditampilkan di layar (bukan alert browser)
 const errorMessage = ref("");
@@ -1526,14 +1545,15 @@ const sendToChat = async () => {
       booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
       mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
-      payment_method: pay.method, // Use actual method ID (cod, QRIS, BCA, etc.)
+      payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
+      payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
       total_price: total.value || order.price || 0,
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
     };
 
-    console.log("[PembayaranJasa] Service Order Payload:", orderPayload);
-    console.log("[PembayaranJasa] Payload fields:", {
+    console.log('[PembayaranJasa] Service Order Payload:', orderPayload);
+    console.log('[PembayaranJasa] Payload fields:', {
       jasa_id: orderPayload.jasa_id,
       service_type: orderPayload.service_type,
       customer_name: orderPayload.customer_name,
@@ -1543,132 +1563,90 @@ const sendToChat = async () => {
       booking_time: orderPayload.booking_time,
       mekanisme_pemesanan: orderPayload.mekanisme_pemesanan,
       payment_method: orderPayload.payment_method,
+      payment_channel: orderPayload.payment_channel,
       total_price: orderPayload.total_price,
     });
 
+    // ===== Debug: log semua info yang diperlukan =====
+    console.log('[PembayaranJasa] selectedPayment (channel):', selectedPayment.value);
+    console.log('[PembayaranJasa] paymentMethod (abstract):', paymentMethod.value);
+    console.log('[PembayaranJasa] paymentChannel (for backend):', paymentChannel.value);
+    console.log('[PembayaranJasa] Available methods:', availablePaymentMethods.value.map(m => m.id));
+
     // ===== Kirim ke backend — WAJIB SUKSES =====
     const response = await api.post("/api/service-orders", orderPayload);
-    console.log("[PembayaranJasa] Response service order:", response.data);
+    console.log('[PembayaranJasa] Full response:', response);
+    console.log('[PembayaranJasa] Response.data:', response.data);
 
-    // ApiResponse::success → { message, data: { id, merchant_id, ... } }
-    const res = response.data;
-    const createdOrder = res?.data;
+    // ApiResponse::success → { message, data: { success, order_id, invoice_url, ... } }
+    // response.data = { message: "...", data: { ... } }
+    const responseData = response.data?.data || response.data;
+    console.log('[PembayaranJasa] Normalized responseData:', responseData);
 
-    // Jika backend tidak mengembalikan id, anggap gagal total
-    if (!createdOrder?.id) {
-      errorMessage.value = res?.message || "Gagal membuat pesanan. Silakan coba lagi.";
-      console.error("Response tanpa id dari backend:", res);
+    // ===== 1. Cek invoice_url DULU — Xendit redirect =====
+    const invoiceUrl =
+      responseData?.invoice_url ||
+      responseData?.payment_url ||
+      responseData?.invoiceUrl ||
+      responseData?.paymentUrl;
+
+    if (invoiceUrl) {
+      console.log('[PembayaranJasa] Redirecting to Xendit invoice:', invoiceUrl);
+      window.location.href = invoiceUrl;
       return;
     }
 
-    const orderId = createdOrder.id;
-    const backendStatus = createdOrder.status || 'menunggu_konfirmasi_merchant';
-
-    // ===== Handle NON-COD: redirect ke invoice Xendit =====
-    if (!isCodMethod(pay.method)) {
-      // Cek apakah backend sudah membuat invoice dan mengembalikan invoice_url
-      const invoiceUrl = res?.data?.invoice_url || createdOrder?.invoice_url;
-      if (invoiceUrl) {
-        // Redirect langsung ke halaman pembayaran Xendit
-        window.location.href = invoiceUrl;
-        return;
-      }
-      // Jika backend belum membuat invoice, tampilkan pesan
-      errorMessage.value = "Metode pembayaran online belum tersedia. Silakan pilih metode lain.";
+    // ===== 2. Xendit dipilih tapi invoice_url kosong =====
+    const paymentMethodResponse = responseData?.payment_method;
+    if (paymentMethodResponse === 'XENDIT' || paymentMethodResponse === 'ONLINE_XENDIT') {
+      console.error('[PembayaranJasa] Xendit selected but invoice_url missing:', responseData);
+      errorMessage.value = 'Gagal membuka halaman pembayaran Xendit. Invoice URL tidak ditemukan.';
       return;
     }
 
-    // ===== Simpan ke localStorage sebagai backup =====
-    const localBooking = {
-      id: orderId,
-      service_name: createdOrder.service_name || order.title,
-      service_type: createdOrder.service_type || serviceType.value || 'on_site',
-      mekanisme_pemesanan: createdOrder.mekanisme_pemesanan || (isKeranjangCheckout.value ? 'keranjang' : 'booking'),
-      merchant_name: createdOrder.merchant_name || order.merchantName || '',
-      merchant_slug: order.merchantSlug || '',
-      merchant_address: merchantAddress.value || createdOrder.merchant?.primary_address?.detail || '',
-      customer_name: createdOrder.customer_name || form.value.nama,
-      customer_phone: createdOrder.customer_phone || form.value.tel,
-      customer_address: createdOrder.customer_address || form.value.alamat || '',
-      booking_date: createdOrder.booking_date || form.value.tanggalISO || null,
-      booking_time: createdOrder.booking_time || form.value.waktu || null,
-      booking_note: createdOrder.booking_note || form.value.catatan || '',
-      payment_method: createdOrder.payment_method || pay.method || 'cod',
-      total_price: createdOrder.total_price || total.value || order.price || 0,
-      latitude: createdOrder.customer_latitude ?? deviceCoordinates.value?.latitude ?? null,
-      longitude: createdOrder.customer_longitude ?? deviceCoordinates.value?.longitude ?? null,
-      service_image: createdOrder.service_image || order.image || '',
-      status: backendStatus,
-      created_at: createdOrder.created_at || new Date().toISOString(),
-    };
-    saveLocalBooking(localBooking);
+    // ===== 3. Ambil order_id (untuk COD atau fallback) =====
+    const orderId =
+      responseData?.order_id ||
+      responseData?.id ||
+      responseData?.service_order_id;
 
-    console.log("Data service order (customer):", localBooking);
-
-    // ===== Bangun pesan WhatsApp =====
-    const message = buildWhatsappMessage();
-    if (!message) return;
-
-    // Cek apakah backend punya redirect WhatsApp — jika tidak, tetap buka WhatsApp manual
-    let whatsappRedirectUrl = null;
-    try {
-      const { data: waData } = await api.post(
-        `/api/service-orders/${orderId}/redirect-whatsapp`,
-        { order_id: orderId }
-      ).catch(() => null);
-      // Jika endpoint tidak ada (404), waData akan null — tidak masalah
-      if (waData?.data?.redirect_url) {
-        whatsappRedirectUrl = waData.data.redirect_url;
-      }
-    } catch {
-      // Gagal fetch redirect — abaikan, tetap pakai nomor manual
-    }
-
-    let url = whatsappRedirectUrl || jasaWhatsappLink.value;
-
-    if (!url) {
-      errorMessage.value = "Nomor atau link WhatsApp penjual belum tersedia. Silakan hubungi penjual secara manual.";
+    if (!orderId) {
+      console.error('[PembayaranJasa] Response tanpa order_id:', response.data);
+      errorMessage.value = response.data?.message || 'Gagal membuat pesanan. ID pesanan tidak ditemukan.';
       return;
     }
 
-    if (!url.startsWith("http") && !url.startsWith("wa.me")) {
-      const phone = url.replace(/[^0-9]/g, "");
-      url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    } else if (url.startsWith("http")) {
-      url += url.includes("?") ? `&text=${encodeURIComponent(message)}` : `?text=${encodeURIComponent(message)}`;
-    }
-
-    window.open(url, "_blank");
-
-    // ===== Redirect ke halaman konfirmasi =====
+    // ===== 4. COD: redirect ke BookingConfirmation =====
+    console.log('[PembayaranJasa] COD payment - redirecting to BookingConfirmation');
     const params = new URLSearchParams({
       order_id: orderId,
-      jasa_id: route.query.jasa_id || "",
-      merchant_slug: order.merchantSlug || "",
-      merchant_name: order.merchantName || "",
-      merchant_address: merchantAddress.value || "",
+      jasa_id: route.query.jasa_id || '',
+      merchant_slug: order.merchantSlug || '',
+      merchant_name: order.merchantName || '',
+      merchant_address: merchantAddress.value || '',
       jasa_title: order.title,
-      service_type: serviceType.value || order.serviceType || "on_site",
+      service_type: serviceType.value || order.serviceType || 'on_site',
       mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
       nama: form.value.nama,
       tel: form.value.tel,
-      alamat: form.value.alamat || "",
+      alamat: form.value.alamat || '',
       tanggal: form.value.tanggalISO || order.tglISO,
       waktu: form.value.waktu,
-      payment_method: pay.method || "Bayar di Tempat",
+      payment_method: selectedPayment.value || 'Bayar di Tempat',
       total: total.value || order.price,
-      catatan: form.value.catatan || "",
-      service_image: order.image || "",
+      catatan: form.value.catatan || '',
+      service_image: order.image || '',
     });
 
     if (order.jasaSlug) {
-      params.set("jasa_slug", order.jasaSlug);
+      params.set('jasa_slug', order.jasaSlug);
     }
 
     router.push({
-      path: "/booking-confirmation",
+      path: '/booking-confirmation',
       query: Object.fromEntries(params),
     });
+    return;
 
   } catch (err) {
     console.error("[PembayaranJasa] Error checkout:", err);

@@ -20,10 +20,13 @@ const loading = ref(false);
 const page = ref(1);
 const hasMore = ref(true);
 
-// Get reviewer display name and avatar — respects is_anonymous flag
+// Get reviewer display name — uses reviewer_name from BE (BE appends reviewer_name: "Anonim" for anonymous)
 const getReviewerDisplay = (rating) => {
+  if (rating?.reviewer_name) {
+    return { name: rating.reviewer_name, initial: rating.reviewer_name?.charAt(0).toUpperCase() || 'A' };
+  }
   if (rating?.is_anonymous) {
-    return { name: 'Pengguna Anonim', initial: 'A' };
+    return { name: 'Anonim', initial: 'A' };
   }
   const name = rating?.user?.name || 'Pelanggan';
   return { name, initial: name.charAt(0).toUpperCase() || '?' };

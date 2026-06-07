@@ -41,6 +41,51 @@ const filters = [
   { key: 'selesai', label: 'Selesai' },
 ];
 
+// ============================================================
+// STATUS MAP FOR FRONTEND FILTERING
+// Maps filter tabs to allowed status values
+// ============================================================
+const statusMap = {
+  all: [],
+  semua: [],
+  menunggu_konfirmasi_merchant: ['pending', 'menunggu_konfirmasi_merchant'],
+  diterima: ['proses', 'diterima', 'accepted'],
+  ditolak: ['batal', 'ditolak', 'rejected', 'cancelled', 'dibatalkan'],
+  layanan_dikerjakan: ['proses', 'layanan_dikerjakan', 'dikerjakan', 'in_progress'],
+  menunggu_konfirmasi_selesai: ['proses', 'menunggu_konfirmasi_selesai'],
+  selesai: ['selesai', 'completed'],
+};
+
+// ============================================================
+// COMPUTED: Frontend Filter - No API call needed
+// ============================================================
+const filteredOrders = computed(() => {
+  // If 'all' filter, return all orders
+  if (activeFilter.value === 'all' || activeFilter.value === 'semua') {
+    console.log('[Filter] Semua - returning', orders.value.length, 'orders');
+    return orders.value;
+  }
+
+  const allowed = statusMap[activeFilter.value] || [];
+  console.log('[Filter]', activeFilter.value, '- allowed statuses:', allowed);
+
+  const filtered = orders.value.filter(order => {
+    // Check all possible status fields
+    const statuses = [
+      order.order_status,
+      order.service_status,
+      order.status,
+    ].filter(Boolean);
+
+    const matches = statuses.some(status => allowed.includes(status));
+    console.log('[Filter] Order', order.id || order.order_id, '- statuses:', statuses, '- matches:', matches);
+    return matches;
+  });
+
+  console.log('[Filter] Result:', filtered.length, 'orders');
+  return filtered;
+});
+
 // Status configurations for 6-state flow
 const statusConfig = {
   menunggu_konfirmasi_merchant: {
@@ -93,49 +138,61 @@ const getNextStatusOptions = (currentStatus) => {
   return options;
 };
 
-// Fetch orders
-const fetchOrders = async (status = null) => {
+// Fetch orders - always fetch all data, no status filter
+const fetchOrders = async () => {
   if (!merchantSlug.value) return;
 
   loading.value = true;
   try {
-    const params = status && status !== 'all' ? { status } : {};
+    // Always fetch all orders, no status filter
     const url = `/api/merchant/${merchantSlug.value}/service-orders`;
-    const { data } = await api.get(url, { params });
+    const { data } = await api.get(url, { params: { page: 1, per_page: 100 } });
 
-    // Check if the request was successful (accept multiple response formats)
-    console.log("Merchant service orders (raw):", data);
-    const res = data; // axios response.data — Laravel ApiResponse: { message, data: [...] }
-    console.log("res?.message:", res?.message, "| res?.data:", res?.data);
+    console.log('[fetchOrders] Raw response:', data);
+
+    // Check if the request was successful
+    const res = data;
+    console.log('[fetchOrders] Response message:', res?.message, '| data:', res?.data);
 
     // ApiResponse::success → { message: 'success', data: [...] }
-    // If res.data is undefined and res.message is not 'success', the API call may have failed
     const hasSuccessFlag = res?.status === true || res?.status === 'success' || res?.success === true;
     const hasSuccessMessage = typeof res?.message === 'string' && res.message === 'success';
     const hasDataArray = Array.isArray(res?.data);
     const hasDataObject = res?.data && typeof res?.data === 'object' && !Array.isArray(res?.data);
     const isSuccess = hasSuccessFlag || hasSuccessMessage || hasDataArray || hasDataObject;
 
-    console.log("isSuccess check:", { hasSuccessFlag, hasSuccessMessage, hasDataArray, hasDataObject }, "→", isSuccess);
+    console.log('[fetchOrders] Success check:', { hasSuccessFlag, hasSuccessMessage, hasDataArray, hasDataObject }, '→', isSuccess);
 
     if (!isSuccess) {
-      console.error("Merchant orders fetch failed — res:", JSON.stringify(res));
+      console.error('[fetchOrders] Failed - response:', JSON.stringify(res));
       toast.error(res?.message || 'Gagal memuat history pesanan');
       orders.value = [];
       return;
     }
 
     // Extract orders data
-    // ApiResponse::success → { message, data: <array or {data:[...]}> }
     let rawData = res?.data;
-    console.log("rawData:", rawData);
+    console.log('[fetchOrders] Raw data:', rawData);
     orders.value =
       Array.isArray(rawData) ? rawData :
       (rawData && typeof rawData === 'object') ? (rawData.orders || rawData.data || []) :
       [];
-    console.log("Extracted orders count:", orders.value.length, orders.value[0] ? '(first id: ' + orders.value[0].id + ')' : '');
+    console.log('[fetchOrders] Extracted orders:', orders.value.length);
+
+    // Debug: log sample statuses
+    console.log('[fetchOrders] Sample orders:');
+    orders.value.slice(0, 3).forEach(o => {
+      console.log({
+        id: o.id,
+        order_id: o.order_id,
+        order_status: o.order_status,
+        service_status: o.service_status,
+        status: o.status,
+        status_label: o.status_label
+      });
+    });
   } catch (error) {
-    console.error('Gagal memuat history:', error);
+    console.error('[fetchOrders] Error:', error);
     const errorMessage = error.response?.data?.message || error.message || 'Gagal memuat history pesanan';
     toast.error(errorMessage);
     orders.value = [];
@@ -236,21 +293,31 @@ const submitRejection = async () => {
   }
   submitting.value = true;
   try {
-    console.log('Reject payload:', {
-      id: selectedOrder.value?.id,
+    // Use id or order_id for backward compatibility
+    const orderId = selectedOrder.value?.id || selectedOrder.value?.order_id;
+    console.log('[submitRejection] Order ID:', orderId);
+    console.log('[submitRejection] Full order:', selectedOrder.value);
+
+    if (!orderId) {
+      toast.error('ID pesanan tidak ditemukan');
+      return;
+    }
+
+    console.log('[submitRejection] Payload:', {
+      id: orderId,
       status: 'ditolak',
       rejection_reason: rejectReason.value
     });
 
     const { data } = await api.patch(
-      `/api/merchant/${merchantSlug.value}/service-orders/${selectedOrder.value.id}/status`,
+      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
       {
         status: 'ditolak',
         rejection_reason: rejectReason.value,
       }
     );
 
-    console.log('Reject response:', data);
+    console.log('[submitRejection] Response:', data);
 
     // Check response with multiple formats including Indonesian message
     const isSuccess =
@@ -264,7 +331,7 @@ const submitRejection = async () => {
       toast.success('Pesanan berhasil ditolak');
       showRejectModal.value = false;
       rejectReason.value = '';
-      fetchOrders(activeFilter.value);
+      fetchOrders();
     } else {
       console.error('Reject error response:', data);
       toast.error(data?.message || 'Gagal menolak pesanan');
@@ -356,6 +423,16 @@ const submitEvidence = async () => {
   }
   submitting.value = true;
   try {
+    // Use id or order_id for backward compatibility
+    const orderId = selectedOrder.value.id || selectedOrder.value.order_id;
+    console.log('[submitEvidence] Order ID:', orderId);
+
+    if (!orderId) {
+      toast.error('ID pesanan tidak ditemukan');
+      submitting.value = false;
+      return;
+    }
+
     const formData = new FormData();
     formData.append('_method', 'PATCH');
     formData.append('status', 'completed');
@@ -366,7 +443,7 @@ const submitEvidence = async () => {
     });
 
     const { data } = await api.post(
-      `/api/merchant/${merchantSlug.value}/service-orders/${selectedOrder.value.id}/status`,
+      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
       formData
     );
 
@@ -385,7 +462,7 @@ const submitEvidence = async () => {
       completionNote.value = '';
       evidenceFiles.value = [];
       selectedOrder.value = null;
-      await fetchOrders(activeFilter.value);
+      await fetchOrders();
     } else {
       toast.error(data?.message || 'Gagal mengirim bukti pengerjaan');
     }
@@ -440,7 +517,7 @@ const acceptOrder = async (orderId) => {
       showDetailModal.value = false;
       selectedOrder.value = null;
       console.log('Updated service order:', data);
-      await fetchOrders(activeFilter.value);
+      await fetchOrders();
     } else {
       console.error('Accept error response:', data);
       toast.error(data?.message || 'Gagal menerima pesanan');
@@ -488,7 +565,7 @@ const startWorking = async (orderId) => {
       showDetailModal.value = false;
       selectedOrder.value = null;
       console.log('Updated service order:', data);
-      await fetchOrders(activeFilter.value);
+      await fetchOrders();
     } else {
       console.error('Start working error response:', data);
       toast.error(data?.message || 'Gagal memulai pekerjaan');
@@ -648,6 +725,14 @@ const getReviewComment = (order) => {
     order.review?.ulasan ||
     ''
   );
+};
+
+// Get reviewer's display name (handles anonymous reviews)
+const getReviewerName = (order) => {
+  if (order.review?.is_anonymous) {
+    return 'Anonim';
+  }
+  return order.review?.reviewer_name || order.review?.user?.name || 'Pelanggan';
 };
 
 // Get review media - only one declaration
@@ -812,10 +897,11 @@ const buildWhatsAppLink = (order) => {
   return `https://wa.me/${formatPhone(phone)}?text=${encodedMessage}`;
 };
 
-// Change filter
+// Change filter - NO API call, just change filter (frontend handles filtering)
 const changeFilter = (filter) => {
+  console.log('[changeFilter] Changing to:', filter);
   activeFilter.value = filter;
-  fetchOrders(filter);
+  console.log('[changeFilter] Active filter:', activeFilter.value);
 };
 
 // Initialize
@@ -862,21 +948,21 @@ onMounted(() => {
 
       <!-- Empty State -->
       <div
-        v-else-if="orders.length === 0"
+        v-else-if="filteredOrders.length === 0"
         class="bg-white rounded-2xl p-8 text-center"
       >
         <i class="pi pi-inbox text-5xl text-gray-300 mb-3"></i>
-        <p class="text-gray-500">Belum ada pesanan masuk</p>
+        <p class="text-gray-500">Tidak ada pesanan dengan filter ini</p>
         <p class="text-sm text-gray-400 mt-1">
-          Pesanan dari pelanggan akan muncul di sini
+          Coba filter lain atau tunggu pesanan baru
         </p>
       </div>
 
       <!-- Orders List -->
       <div v-else class="order-list space-y-4">
         <div
-          v-for="order in orders"
-          :key="order.id"
+          v-for="order in filteredOrders"
+          :key="order.id || order.order_id"
           class="order-card rounded-2xl border bg-white shadow-sm overflow-hidden"
         >
           <!-- Header -->
@@ -952,7 +1038,7 @@ onMounted(() => {
           <div v-if="order.status === 'menunggu_konfirmasi_merchant'" class="p-4 border-b border-gray-100">
             <div class="flex gap-2">
               <button
-                @click="acceptOrder(order.id)"
+                @click="acceptOrder(order.id || order.order_id)"
                 :disabled="submitting"
                 class="flex-1 py-3 rounded-xl text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition"
               >
@@ -994,7 +1080,7 @@ onMounted(() => {
             <!-- Start Working Button for Diterima status -->
             <button
               v-if="order.status === 'diterima'"
-              @click="startWorking(order.id)"
+              @click="startWorking(order.id || order.order_id)"
               :disabled="submitting"
               class="w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition"
             >
@@ -1272,11 +1358,19 @@ onMounted(() => {
               </h4>
 
               <!-- If reviewed -->
-              <div v-if="selectedOrder.is_reviewed && selectedOrder.review" class="review-box">
+              <div v-if="selectedOrder.review" class="review-box">
                 <span class="review-badge">Review Terkirim</span>
 
+                <!-- Reviewer Name -->
+                <div class="flex items-center gap-2 mt-2 mb-1">
+                  <span class="text-sm font-medium text-gray-800">
+                    {{ getReviewerName(selectedOrder) }}
+                  </span>
+                  <span v-if="selectedOrder.review.is_anonymous" class="text-xs text-gray-500">(Anonim)</span>
+                </div>
+
                 <!-- Rating Stars -->
-                <div class="flex gap-1 mt-1">
+                <div class="flex gap-1">
                   <i
                     v-for="star in 5"
                     :key="star"

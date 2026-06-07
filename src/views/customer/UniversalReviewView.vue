@@ -233,7 +233,7 @@ const submitReview = async () => {
     alreadyReviewed.value = true;
     existingReview.value = data?.data?.review || data?.data || {};
     // Redirect back to service history
-    router.push("/service-history");
+    router.push("/orders");
   } catch (error) {
     console.log("[UniversalReview] Response received:", error.response?.data || error);
 
@@ -241,7 +241,7 @@ const submitReview = async () => {
     if (error.response?.status === 409 || (error.response?.data?.message || '').includes('sudah') && (error.response?.data?.message || '').includes('review')) {
       toast.info('Pesanan ini sudah diberi review sebelumnya');
       alreadyReviewed.value = true;
-      setTimeout(() => router.push('/service-history'), 1500);
+      setTimeout(() => router.push('/orders'), 1500);
       return;
     }
 
@@ -338,7 +338,7 @@ watch(
           <p class="text-sm text-gray-600">{{ existingReview.comment || 'Tidak ada komentar' }}</p>
         </div>
         <button
-          @click="router.push('/service-history')"
+          @click="router.push('/orders')"
           class="px-6 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition"
         >
           Kembali ke Riwayat Pesanan

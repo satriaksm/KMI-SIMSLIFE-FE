@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-100">
-    <MobileHeader title="Pesanan Saya" @back="goBack" variant="primary" />
+<MobileHeader title="Pesanan Saya" @back="goBack" variant="primary" />
 
     <div class="px-4 py-4 mx-auto space-y-2 sm:space-y-4 max-w-7xl">
       <!-- Search + Filter Button -->
@@ -32,23 +32,13 @@
       </div>
 
       <!-- Active filter chips -->
-      <div
-        v-if="activeFilterCount > 0"
-        class="flex flex-wrap items-center gap-2"
-      >
+      <div v-if="activeFilterCount > 0" class="flex flex-wrap items-center gap-2">
         <span
           v-if="selectedStatus"
           class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded-full bg-primary"
         >
           {{ selectedStatusLabel }}
-          <button
-            type="button"
-            @click="
-              selectedStatus = '';
-              applyTempToActive();
-            "
-            class="ml-1"
-          >
+          <button type="button" @click="selectedStatus = ''; applyTempToActive()" class="ml-1">
             <i class="pi pi-times text-[10px]"></i>
           </button>
         </span>
@@ -57,14 +47,7 @@
           class="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold text-white rounded-full bg-primary"
         >
           {{ selectedDateLabel }}
-          <button
-            type="button"
-            @click="
-              selectedDate = '';
-              applyTempToActive();
-            "
-            class="ml-1"
-          >
+          <button type="button" @click="selectedDate = ''; applyTempToActive()" class="ml-1">
             <i class="pi pi-times text-[10px]"></i>
           </button>
         </span>
@@ -110,66 +93,44 @@
       </template>
 
       <template v-else>
-        <!-- Section: Menunggu Pembayaran -->
-        <button
-          v-if="pendingPaymentCount > 0"
-          type="button"
-          class="flex items-center justify-between w-full gap-3 p-4 bg-white border border-gray-200 cursor-pointer rounded-2xl"
-          @click="goToPendingPayment"
-        >
-          <div class="flex items-center min-w-0 gap-3">
-            <div
-              class="flex items-center justify-center px-1 sm:px-2 rounded-xl text-success-foreground"
-            >
-              <i class="text-2xl pi pi-money-bill"></i>
-            </div>
-            <div class="min-w-0 text-left">
-              <div class="text-sm font-bold text-black truncate">
-                Menunggu Pembayaran
-              </div>
-              <div class="text-xs truncate text-muted-foreground">
-                Selesaikan pembayaran untuk memproses pesanan
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            <span
-              class="flex items-center justify-center h-6 px-2 text-xs font-bold text-white rounded-full min-w-6 bg-danger-foreground"
-            >
-              {{ pendingPaymentCount }}
-            </span>
-            <i class="pi pi-chevron-right text-muted-foreground"></i>
-          </div>
-        </button>
-
         <!-- Order list -->
         <div class="grid grid-cols-1 gap-2 sm:gap-4">
-          <OrderCard
+          <ServiceOrderCard
             v-for="order in filteredOrders"
             :key="order.id"
             :order="order"
             @click="openOrder"
           >
             <template #action="{ order: o }">
+              <!-- Beri Ulasan (belum pernah review, status selesai, ada jasa_order_item_id) -->
               <Button
-                v-if="o.status === 'completed'"
-                @click.stop="$router.push({ path: `/review/product/${o.id}/${o.items[0]?.productId}`, query: { merchantId: o._raw.merchant_id } })"
+                v-if="(o.status === 'selesai' || o.status === 'completed') && !o.is_reviewed && o.jasa_order_item_id"
+                @click.stop="goToReview(o)"
                 class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
               >
+                <i class="pi pi-star mr-1"></i>
                 Beri Ulasan
               </Button>
+              <!-- Ulasan Terkirim (sudah review) - status indicator, not clickable -->
+              <div
+                v-else-if="o.is_reviewed"
+                class="inline-flex items-center gap-1.5 h-8 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 border border-green-300 cursor-default"
+              >
+                <i class="pi pi-check-circle"></i>
+                Ulasan Terkirim
+              </div>
             </template>
-          </OrderCard>
+          </ServiceOrderCard>
         </div>
 
         <!-- Empty -->
         <div
-          v-if="filteredOrders.length === 0"
+          v-if="!loading && filteredOrders.length === 0"
           class="p-8 text-center bg-white border border-gray-200 rounded-2xl"
         >
           <div class="text-lg font-bold text-black">Pesanan tidak ditemukan</div>
           <div class="mt-1 text-sm text-muted-foreground">
-            Coba ubah kata kunci atau filter pencarian.
+            {{ orders.length === 0 ? 'Belum ada pesanan layanan jasa.' : 'Coba ubah filter pencarian.' }}
           </div>
         </div>
       </template>
@@ -183,11 +144,8 @@
       @close="closeFilterModal"
     >
       <div class="space-y-6">
-        <!-- ===== FILTER SECTION ===== -->
         <div class="space-y-4">
-          <h3
-            class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase"
-          >
+          <h3 class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase">
             <i class="pi pi-filter text-primary"></i>
             Filter Data
           </h3>
@@ -241,12 +199,12 @@ import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
-import OrderCard from "@/components/customer/OrderCard.vue";
+import ServiceOrderCard from "@/components/customer/ServiceOrderCard.vue";
 import TextField from "@/components/forms/TextField.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
-import { getCustomerOrders } from "@/services/api/order";
+import api from "@/libs/axios.js";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
 import echo from "@/libs/echo";
@@ -267,7 +225,6 @@ const selectedStatus = ref("");
 const selectedDate = ref("");
 const showFilterModal = ref(false);
 
-// Temp state untuk modal (agar bisa di-cancel)
 const tempStatus = ref("");
 const tempDate = ref("");
 
@@ -290,16 +247,18 @@ function applyFilters() {
 }
 
 function applyTempToActive() {
-  // dipanggil saat chip di-X langsung dari luar modal
   tempStatus.value = selectedStatus.value;
   tempDate.value = selectedDate.value;
 }
 
 const statusOptions = [
-  { value: "pending_payment", label: "Menunggu Pembayaran" },
-  { value: "processing", label: "Diproses" },
-  { value: "completed", label: "Selesai" },
-  { value: "cancelled", label: "Dibatalkan" },
+  { value: "pending", label: "Menunggu Konfirmasi" },
+  { value: "diterima", label: "Diterima" },
+  { value: "dikerjakan", label: "Dikerjakan" },
+  { value: "menunggu_selesai", label: "Menunggu Selesai" },
+  { value: "selesai", label: "Selesai" },
+  { value: "ditolak", label: "Ditolak" },
+  { value: "dibatalkan", label: "Dibatalkan" },
 ];
 
 const dateOptions = [
@@ -339,20 +298,9 @@ function resetFilters() {
 // DATE RANGE HELPER
 // ========================
 function parseDateLabel(label) {
-  // Format: "1 Mei 2025", "2 Mar 2025", "19 Jan 2025"
   const months = {
-    Jan: 0,
-    Feb: 1,
-    Mar: 2,
-    Apr: 3,
-    Mei: 4,
-    Jun: 5,
-    Jul: 6,
-    Agt: 7,
-    Sep: 8,
-    Okt: 9,
-    Nov: 10,
-    Des: 11,
+    Jan: 0, Feb: 1, Mar: 2, Apr: 3, Mei: 4, Jun: 5,
+    Jul: 6, Agt: 7, Sep: 8, Okt: 9, Nov: 10, Des: 11,
   };
   const parts = label.trim().split(" ");
   if (parts.length < 3) return null;
@@ -368,33 +316,24 @@ function isDateInRange(dateLabel, range) {
   if (!orderDate) return true;
 
   const now = new Date();
-  const startOfDay = (d) =>
-    new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const today = startOfDay(now);
 
-  if (range === "today") {
-    return orderDate >= today;
-  }
+  if (range === "today") return orderDate >= today;
   if (range === "this_week") {
-    const dayOfWeek = now.getDay(); // 0 = Minggu
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - dayOfWeek);
+    startOfWeek.setDate(today.getDate() - now.getDay());
     return orderDate >= startOfWeek;
   }
   if (range === "this_month") {
-    return (
-      orderDate.getMonth() === now.getMonth() &&
-      orderDate.getFullYear() === now.getFullYear()
-    );
+    return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
   }
   if (range === "last_3_months") {
     const threeMonthsAgo = new Date(today);
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     return orderDate >= threeMonthsAgo;
   }
-  if (range === "this_year") {
-    return orderDate.getFullYear() === now.getFullYear();
-  }
+  if (range === "this_year") return orderDate.getFullYear() === now.getFullYear();
   return true;
 }
 
@@ -403,101 +342,33 @@ function isDateInRange(dateLabel, range) {
 // ========================
 const orders = ref([]);
 
-function mapApiStatus(beStatus, o) {
-  switch (beStatus) {
-    case "pending":
-      // Check if expired
-      if (o.payment && o.payment.expired_at) {
-        const expireTime = new Date(o.payment.expired_at).getTime();
-        if (new Date().getTime() > expireTime) return "cancelled";
-      }
-      // COD orders don't need payment → they are "processing" (waiting UMKM confirm)
-      if (o.payment_method === 'COD') return "processing";
-      return "pending_payment";
-    case "paid":
-    case "responsed":
-    case "accepted":
-      return "processing";
-    case "delivered":
-      return o.delivery_type === "pickup" ? "ready" : "shipped";
-    case "completed":
-      return "completed";
-    case "cancelled":
-      return "cancelled";
-    case "rejected":
-      return "rejected";
-    case "undelivered":
-      return "undelivered";
-    default:
-      return beStatus;
-  }
-}
-
-function formatDateLabel(dateStr) {
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function getOrderSnapshotUrl(orderItemId, path) {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
-  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
-}
-
-function mapOrder(o) {
-  return {
-    id: o.id,
-    storeName: o.merchant?.name || "Toko",
-    dateLabel: formatDateLabel(o.created_at),
-    status: mapApiStatus(o.status, o),
-    total: o.gross_amount,
-    delivery_type: o.delivery_type || "delivery",
-    items: (o.items || []).map((it) => ({
-      id: it.id,
-      productId: it.product_id,
-      title: it.product_name_snapshot || "Produk",
-      qty: it.quantity,
-      variant: it.product_variant_snapshot || "",
-      addons: (it.addons || []).map((a) => ({
-        name: a.addon_name_snapshot || a.addon?.name || "Addon",
-        price: Number(a.addon_price_snapshot || 0),
-      })),
-      price: it.unit_price_snapshot,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
-      productSlug: it.product?.slug, // Get product slug for Buy Again
-    })),
-    _raw: o,
-  };
+// Normalize: support both response.data.data and response.data
+function getOrdersList(res) {
+  if (!res) return [];
+  // Laravel paginate: { data: [...], current_page, ... }
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  // Simple array: { data: [...] }
+  if (Array.isArray(res?.data)) return res.data;
+  // Already an array
+  if (Array.isArray(res)) return res;
+  return [];
 }
 
 async function fetchOrders() {
   loading.value = true;
   try {
-    const { data: res } = await getCustomerOrders({ per_page: 100 });
-    const list = res?.data ?? res ?? [];
-    orders.value = (Array.isArray(list) ? list : []).map(mapOrder);
-
-    // Preload images
-
-
+    const { data: res } = await api.get("/api/service-orders", {
+      params: { per_page: 100 },
+    });
+    orders.value = getOrdersList(res);
   } catch (e) {
-    console.error("Gagal memuat pesanan:", e);
+    console.error("[Pesanan Saya] Gagal memuat pesanan:", e);
     toast.error("Gagal memuat pesanan");
     orders.value = [];
   } finally {
     loading.value = false;
   }
 }
-
-const pendingPaymentCount = computed(
-  () => orders.value.filter((o) => o.status === "pending_payment").length,
-);
 
 // ========================
 // FILTERED ORDERS
@@ -509,30 +380,34 @@ const filteredOrders = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (q) {
     result = result.filter((o) => {
-      const itemText = (o.items || [])
-        .map((it) => `${it.title || ""} ${it.variant || ""}`)
-        .join(" ");
-      const haystack = `${o.storeName} ${itemText} ${o.dateLabel} ${o.id}`
-        .toLowerCase()
-        .trim();
+      const haystack = [
+        o.merchant?.name || o.merchant_name || "",
+        o.service_name || o.jasa?.title || o.service_title || "",
+        o.booking_date || "",
+        o.id,
+      ].join(" ").toLowerCase();
       return haystack.includes(q);
     });
   }
 
   // Filter by status
   if (selectedStatus.value) {
-    if (selectedStatus.value === 'cancelled') {
-        result = result.filter((o) => ['cancelled', 'rejected', 'undelivered'].includes(o.status));
-    } else {
-        result = result.filter((o) => o.status === selectedStatus.value);
-    }
+    result = result.filter((o) => {
+      const s = String(o.status || o.order_status || "").toLowerCase();
+      return s === selectedStatus.value.toLowerCase();
+    });
   }
 
   // Filter by date range
   if (selectedDate.value) {
-    result = result.filter((o) =>
-      isDateInRange(o.dateLabel, selectedDate.value),
-    );
+    result = result.filter((o) => {
+      const d = o.created_at ? new Date(o.created_at) : null;
+      if (!d || isNaN(d.getTime())) return true;
+      const dateLabel = d.toLocaleDateString("id-ID", {
+        day: "2-digit", month: "short", year: "numeric",
+      });
+      return isDateInRange(dateLabel, selectedDate.value);
+    });
   }
 
   return result;
@@ -546,17 +421,28 @@ function goBack() {
 }
 
 function openOrder(order) {
-  router
-    .push({ name: "Detail Pesanan", params: { orderId: order.id } })
-    .catch(() => router.push(`/orders/${order.id}`));
+  router.push({ path: `/orders/${order.id}` }).catch(() => {
+    router.push(`/orders/${order.id}`);
+  });
 }
 
+function goToReview(order) {
+  const numericOrderId = Number(order.id);
+  const jasaItemId = order.jasa_order_item_id;
 
+  // If already reviewed, navigate to jasa detail
+  if (order.is_reviewed && order.jasa?.slug) {
+    router.push(`/jasa/${order.jasa.slug}`);
+    return;
+  }
 
-function goToPendingPayment() {
-  router
-    .push({ path: "/orders/pending-payments" })
-    .catch(() => router.push("/orders/pending-payments"));
+  if (!numericOrderId || !jasaItemId) {
+    console.warn("[Index] Cannot review: missing ids:", { numericOrderId, jasaItemId, order });
+    return;
+  }
+
+  // Navigate to /review/service/{order_id}/{jasa_order_item_id}
+  router.push(`/review/service/${numericOrderId}/${jasaItemId}`);
 }
 
 onMounted(() => {
@@ -569,28 +455,17 @@ onUnmounted(() => {
 });
 
 watch(userId, (next, prev) => {
-  if (prev) {
-    leaveOrdersChannel(prev);
-  }
-  if (next) {
-    subscribeOrdersChannel();
-  }
+  if (prev) leaveOrdersChannel(prev);
+  if (next) subscribeOrdersChannel();
 });
 
 function subscribeOrdersChannel() {
   if (!userId.value) return;
-
   ordersChannel = echo.private(`users.${userId.value}.orders`);
   ordersChannel
-    .listen(".order.created", () => {
-      fetchOrders();
-    })
-    .listen(".order.status.updated", () => {
-      fetchOrders();
-    })
-    .listen(".payment.status.updated", () => {
-      fetchOrders();
-    });
+    .listen(".order.created", () => fetchOrders())
+    .listen(".order.status.updated", () => fetchOrders())
+    .listen(".payment.status.updated", () => fetchOrders());
 }
 
 function leaveOrdersChannel(id) {
@@ -601,11 +476,6 @@ function leaveOrdersChannel(id) {
 </script>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

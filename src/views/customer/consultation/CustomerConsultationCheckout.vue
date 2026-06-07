@@ -226,8 +226,27 @@ const fetchConsultation = async () => {
     const response = await api.get(`/api/service-consultations/${consultationId.value}`);
     consultation.value = response.data.data;
 
+    // Pre-fill booking form from consultation's proposed date/time
+    if (consultation.value?.proposed_date) {
+      form.value.booking_date = consultation.value.proposed_date;
+    }
+    if (consultation.value?.proposed_time) {
+      // proposed_time is stored as HH:MM:SS, extract HH:MM
+      const timeParts = consultation.value.proposed_time.split(':');
+      form.value.booking_time = `${timeParts[0]}:${timeParts[1]}`;
+    }
+    if (consultation.value?.proposed_notes) {
+      form.value.booking_note = consultation.value.proposed_notes;
+    }
+
     // Set default payment method after consultation loads
     setDefaultPaymentMethod();
+
+    console.log('[Checkout] Consultation loaded with proposed schedule:', {
+      proposed_date: consultation.value?.proposed_date,
+      proposed_time: consultation.value?.proposed_time,
+      proposed_notes: consultation.value?.proposed_notes,
+    });
   } catch (error) {
     console.error('Error fetching consultation:', error);
     toast.error('Gagal memuat data konsultasi');
