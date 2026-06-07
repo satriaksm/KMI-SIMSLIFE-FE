@@ -163,9 +163,34 @@ const formData = ref({
   location_address: "",
   service_area: "",
   special_notes: "",
-  payment_methods: "cod",
+  payment_methods: ["cod"], // array agar konsisten dengan Editjasa.vue
   status: "draft",
 });
+
+// Helper untuk menormalisasi payment_methods - defensive approach
+const normalizePaymentMethods = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') return value.split(',').map(v => v.trim()).filter(Boolean);
+  return ['cod'];
+};
+
+// Toggle payment method - pastikan hanya satu item yang berubah
+const togglePaymentMethod = (method) => {
+  const current = normalizePaymentMethods(formData.value.payment_methods);
+  if (current.includes(method)) {
+    formData.value.payment_methods = current.filter(item => item !== method);
+  } else {
+    formData.value.payment_methods = [...current, method];
+  }
+};
+
+// Cek apakah metode pembayaran selected
+const isPaymentMethodSelected = (method) => {
+  return normalizePaymentMethods(formData.value.payment_methods).includes(method);
+};
+
+// Pastikan payment_methods selalu berupa array
+formData.value.payment_methods = normalizePaymentMethods(formData.value.payment_methods);
 
 // Validation schema
 const validationSchema = yup.object({
@@ -186,7 +211,7 @@ const validationSchema = yup.object({
   location_address: yup.string().nullable(),
   service_area: yup.string().nullable(),
   special_notes: yup.string().nullable(),
-  payment_methods: yup.string().nullable(),
+  payment_methods: yup.array().nullable(), // array agar konsisten dengan Editjasa.vue
   status: yup.string(),
 });
 
@@ -433,7 +458,7 @@ const submitForm = async () => {
     fd.set("operating_days", "1,2,3,4,5,6,7"); // Default all days
     fd.set("service_area", formData.value.service_area || "");
     fd.set("special_notes", formData.value.special_notes || "");
-    fd.set("payment_methods", formData.value.payment_methods || "cod");
+    fd.set("payment_methods", normalizePaymentMethods(formData.value.payment_methods).join(","));
     fd.set("status", "draft");
 
     console.log("[Createjasa] Price fields:", {
@@ -852,18 +877,47 @@ onBeforeUnmount(() => {
               <div class="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center">
                 <span class="text-sm font-bold text-violet-600">6</span>
               </div>
-              <h2 class="text-base font-semibold text-slate-800">Pembayaran</h2>
+              <h2 class="text-base font-semibold text-slate-800">Metode Pembayaran</h2>
             </div>
 
-            <div class="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
-              <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
-                <i class="pi pi-money-bill"></i>
-              </div>
-              <div>
-                <p class="text-sm font-semibold text-slate-700">COD (Bayar di Tempat)</p>
-                <p class="text-xs text-slate-400">Pembayaran dilakukan langsung saat layanan selesai</p>
-              </div>
+            <div class="space-y-2">
+              <label
+                class="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border transition cursor-pointer"
+                :class="isPaymentMethodSelected('cod') ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:border-violet-300'"
+                @click.prevent="togglePaymentMethod('cod')"
+              >
+                <div class="mt-0.5 w-4 h-4 border-2 rounded flex items-center justify-center transition"
+                  :class="isPaymentMethodSelected('cod') ? 'bg-violet-600 border-violet-600' : 'border-slate-300'">
+                  <svg v-if="isPaymentMethodSelected('cod')" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-slate-700">COD (Bayar di Tempat)</p>
+                  <p class="text-xs text-slate-400">Customer bayar langsung saat layanan selesai</p>
+                </div>
+              </label>
+
+              <label
+                class="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border transition cursor-pointer"
+                :class="isPaymentMethodSelected('ONLINE_XENDIT') ? 'border-violet-400 bg-violet-50' : 'border-slate-200 hover:border-violet-300'"
+                @click.prevent="togglePaymentMethod('ONLINE_XENDIT')"
+              >
+                <div class="mt-0.5 w-4 h-4 border-2 rounded flex items-center justify-center transition"
+                  :class="isPaymentMethodSelected('ONLINE_XENDIT') ? 'bg-violet-600 border-violet-600' : 'border-slate-300'">
+                  <svg v-if="isPaymentMethodSelected('ONLINE_XENDIT')" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-slate-700">Online (Xendit)</p>
+                  <p class="text-xs text-slate-400">Pembayaran via QRIS, VA, E-Wallet — otomatis terkonfirmasi</p>
+                </div>
+              </label>
             </div>
+            <p v-if="normalizePaymentMethods(formData.payment_methods).length === 0" class="text-xs text-red-500 mt-2">
+              Pilih minimal 1 metode pembayaran.
+            </p>
           </div>
 
           <!-- Info Draft -->

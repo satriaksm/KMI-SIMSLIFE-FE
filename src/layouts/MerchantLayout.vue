@@ -84,12 +84,34 @@ watch(
   { immediate: true },
 );
 
-// ✅ Menu items dengan dynamic merchantId
+// ✅ Menu items berdasarkan tipe merchant
 const menuItems = computed(() => {
   const segmentationId = Number(currentMerchant.value?.segmentation?.id);
+  const isJasaMerchant = segmentationId === 3;
 
-  const productOrServiceItem =
-    segmentationId === 3
+  return [
+    {
+      label: "Dashboard",
+      icon: "pi-chart-bar",
+      route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
+    },
+
+    // 🛒 Pesanan Masuk — hanya untuk Toko/Kuliner
+    ...(isJasaMerchant ? [] : [{
+      label: "Pesanan Masuk",
+      icon: "pi-shopping-bag",
+      route: `/merchant-center/${currentMerchantSlug.value}/orders`,
+    }]),
+
+    // 📊 Laporan — semua merchant
+    {
+      label: "Laporan",
+      icon: "pi-file",
+      route: `/merchant-center/${currentMerchantSlug.value}/reports`,
+    },
+
+    // 📦 Produk / Jasa
+    isJasaMerchant
       ? {
           label: "Jasa",
           icon: "pi-briefcase",
@@ -99,43 +121,30 @@ const menuItems = computed(() => {
           label: "Produk",
           icon: "pi-box",
           route: `/merchant-center/${currentMerchantSlug.value}/products`,
-        };
+        },
 
-  return [
-    {
-      label: "Dashboard",
-      icon: "pi-chart-bar",
-      route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
-    },
-    {
-      label: "Pesanan",
-      icon: "pi-shopping-bag",
-      route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    },
-    {
-      label: "Laporan",
-      icon: "pi-file",
-      route: `/merchant-center/${currentMerchantSlug.value}/reports`,
-    },
-
-    productOrServiceItem,
-    // 🆕 History Layanan Jasa Menu (for Jasa merchants)
-    ...(segmentationId === 3 ? [{
+    // 🔧 History Layanan Jasa — hanya untuk Jasa
+    ...(isJasaMerchant ? [{
       label: "History Layanan Jasa",
       icon: "pi-history",
       route: `/merchant-center/${currentMerchantSlug.value}/bookings`,
     }] : []),
-    // 🆕 Konsultasi Menu (for Jasa merchants)
-    ...(segmentationId === 3 ? [{
+
+    // 💬 Konsultasi — hanya untuk Jasa
+    ...(isJasaMerchant ? [{
       label: "Konsultasi",
       icon: "pi-comments",
       route: `/merchant-center/${currentMerchantSlug.value}/consultations`,
     }] : []),
+
+    // 🎫 Voucher — semua merchant
     {
       label: "Voucher",
       icon: "pi-tag",
       route: `/merchant-center/${currentMerchantSlug.value}/vouchers`,
     },
+
+    // 📅 Events — semua merchant
     {
       label: "Events",
       icon: "pi-calendar",
@@ -164,6 +173,12 @@ const closeSidebar = () => {
 };
 
 const navigateTo = (routePath) => {
+  // Guard: jangan navigasi jika routePath tidak valid
+  if (!routePath || typeof routePath !== 'string') return;
+  // Guard: jika route untuk merchant tapi slug kosong, abort
+  if (routePath.includes('/merchant-center/') && !currentMerchantSlug.value) {
+    return;
+  }
   router.push(routePath);
   if (window.innerWidth < 1024) {
     closeSidebar();

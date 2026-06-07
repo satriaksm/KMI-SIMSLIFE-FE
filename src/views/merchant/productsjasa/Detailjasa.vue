@@ -697,19 +697,16 @@ const getSelectionTypeLabel = (group) => {
             </h3>
             <div class="flex flex-wrap gap-2">
               <span
-                v-for="method in (jasa.payment_methods || '')
-                  .split(',')
-                  .filter((m) => m.trim())"
+                v-for="method in (Array.isArray(jasa.payment_methods) ? jasa.payment_methods : String(jasa.payment_methods || '').split(',')).filter((m) => m.trim())"
                 :key="method"
                 class="px-3 py-1 text-sm text-green-700 bg-green-100 rounded-full"
               >
-                <template v-if="method.trim() === 'cod'"
-                  >COD (Bayar di Tempat)</template
-                >
+                <template v-if="method.trim() === 'cod'">COD (Bayar di Tempat)</template>
+                <template v-else-if="method.trim() === 'ONLINE_XENDIT'">Online (Xendit)</template>
                 <template v-else>{{ method.trim() }}</template>
               </span>
               <span
-                v-if="!jasa.payment_methods || !jasa.payment_methods.trim()"
+                v-if="!jasa.payment_methods || !String(jasa.payment_methods).trim()"
                 class="text-sm text-gray-500"
               >
                 Tidak ada metode pembayaran

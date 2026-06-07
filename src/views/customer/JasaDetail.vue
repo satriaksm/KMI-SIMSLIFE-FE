@@ -292,25 +292,30 @@
       <div class="max-w-3xl mx-auto lg:max-w-5xl">
         <h2 class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900">
           <i class="pi pi-wallet text-merchant-primary"></i>
-          Pembayaran & Kontak
+          Metode Pembayaran
         </h2>
-        <div class="space-y-3 text-sm">
-          <div>
-            <span class="text-gray-600 flex items-center gap-1.5"><i class="text-gray-500 pi pi-wallet"></i> Metode Pembayaran</span>
-            <p class="mt-1 font-medium text-gray-900">{{ formatPaymentMethods(jasa?.payment_methods) }}</p>
+        <div class="space-y-2">
+          <!-- COD -->
+          <div v-if="hasCod" class="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 border border-emerald-100">
+            <i class="pi pi-money-bill text-emerald-600"></i>
+            <span class="text-sm font-medium text-emerald-800">COD (Bayar Tunai)</span>
+            <span class="text-xs text-emerald-600">Bayar langsung saat layanan selesai</span>
           </div>
-          <div>
-            <span class="text-gray-600 flex items-center gap-1.5"><i class="text-gray-500 pi pi-whatsapp"></i> WhatsApp</span>
-            <a
-              v-if="whatsappLink"
-              :href="whatsappLink"
-              target="_blank"
-              class="inline-flex items-center gap-1.5 text-[#25D366] font-medium hover:underline mt-1"
-            >
-              <span>Hubungi via WhatsApp</span>
-              <i class="text-xs pi pi-external-link"></i>
-            </a>
-            <p v-else class="mt-1 font-medium text-gray-900">Belum tersedia</p>
+
+          <!-- Xendit Methods -->
+          <div v-if="hasXendit" class="space-y-1.5">
+            <div class="text-xs font-semibold text-gray-500 uppercase">Online (Xendit)</div>
+            <div class="grid grid-cols-2 gap-2">
+              <div v-for="method in xenditMethodsDisplay" :key="method" class="flex items-center gap-2 p-2 rounded-lg bg-blue-50 border border-blue-100">
+                <i class="pi pi-credit-card text-blue-600 text-xs"></i>
+                <span class="text-xs text-blue-800">{{ method }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fallback if no methods found -->
+          <div v-if="!hasCod && !hasXendit" class="text-sm text-gray-500">
+            {{ formatPaymentMethods(jasa?.payment_methods) }}
           </div>
         </div>
       </div>
@@ -494,17 +499,7 @@
               Konsultasi Gratis
             </button>
 
-            <!-- Tombol WhatsApp -->
-            <button
-              v-if="whatsappLink"
-              type="button"
-              @click="openConsultationContact"
-              class="px-5 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white transition shadow-md"
-              title="Hubungi via WhatsApp"
-            >
-              <i class="pi pi-whatsapp text-xl"></i>
-            </button>
-          </div>
+                      </div>
         </template>
         <template v-else-if="isCartMode">
           <router-link
@@ -975,15 +970,96 @@ const priceDisplayMain = computed(() => {
 
 const formatIDR = (v) => Number(v || 0).toLocaleString("id-ID");
 
-const formatPaymentMethods = (methods) => {
-  if (!methods) return "COD (Bayar di Tempat)";
-  const methodsMap = { cod: "COD (Bayar di Tempat)", qris: "QRIS (Scan & Transfer)" };
-  return methods
-    .split(",")
-    .map(m => methodsMap[m.trim()])
-    .filter(Boolean)
-    .join(", ");
+// Get human-readable payment method label
+const getPaymentMethodLabel = (method) => {
+  const labels = {
+    cod: "COD (Bayar Tunai)",
+    qris: "QRIS",
+    bca: "BCA Virtual Account",
+    bni: "BNI Virtual Account",
+    bri: "BRI Virtual Account",
+    mandiri: "Mandiri Virtual Account",
+    ovo: "OVO",
+    dana: "DANA",
+    shopeepay: "ShopeePay",
+    alfamart: "Alfamart",
+  };
+  return labels[method.toLowerCase()] || method;
 };
+
+// Format payment methods array/string to readable labels
+const formatPaymentMethods = (methods) => {
+  if (!methods) return "COD (Bayar Tunai)";
+
+  let methodsArray = [];
+  if (typeof methods === 'string') {
+    methodsArray = methods.split(",").map(m => m.trim()).filter(Boolean);
+  } else if (Array.isArray(methods)) {
+    methodsArray = methods;
+  }
+
+  if (methodsArray.length === 0) return "COD (Bayar Tunai)";
+
+  // Check if it's COD only
+  const isCodOnly = methodsArray.some(m => m.toLowerCase() === 'cod') &&
+                     methodsArray.every(m => m.toLowerCase() === 'cod' || m.toLowerCase() === 'online_xendit' || m.toLowerCase() === 'xendit');
+
+  // If only COD
+  if (methodsArray.length === 1 && methodsArray[0].toLowerCase() === 'cod') {
+    return "COD (Bayar Tunai)";
+  }
+
+  // If ONLINE_XENDIT only or includes ONLINE_XENDIT with other Xendit methods
+  if (methodsArray.some(m => m.toLowerCase() === 'online_xendit' || m.toLowerCase() === 'xendit')) {
+    const result = [];
+    if (methodsArray.some(m => m.toLowerCase() === 'cod')) {
+      result.push("COD (Bayar Tunai)");
+    }
+    // Add all Xendit methods
+    result.push("QRIS, Virtual Account, E-Wallet, Alfamart");
+    return result.join(", ");
+  }
+
+  return methodsArray.map(m => getPaymentMethodLabel(m)).join(", ");
+};
+
+// Get payment methods array for display
+const paymentMethodsArray = computed(() => {
+  const methods = jasa.value?.payment_methods;
+  if (!methods) return ["cod"];
+
+  if (typeof methods === 'string') {
+    return methods.split(",").map(m => m.trim().toLowerCase()).filter(Boolean);
+  }
+  if (Array.isArray(methods)) {
+    return methods.map(m => m.toLowerCase());
+  }
+  return [];
+});
+
+// Check if COD is available
+const hasCod = computed(() => paymentMethodsArray.value.includes('cod'));
+
+// Check if Xendit methods are available
+const hasXendit = computed(() =>
+  paymentMethodsArray.value.some(m => m === 'online_xendit' || m === 'xendit')
+);
+
+// Get individual Xendit method labels for display
+const xenditMethodsDisplay = computed(() => {
+  if (!hasXendit.value) return [];
+  return [
+    "QRIS (Gopay, OVO, Dana, dll)",
+    "BCA Virtual Account",
+    "BNI Virtual Account",
+    "BRI Virtual Account",
+    "Mandiri Virtual Account",
+    "OVO",
+    "DANA",
+    "ShopeePay",
+    "Alfamart / Alfamidi",
+  ];
+});
 
 const whatsappLink = computed(() => {
   const raw =
