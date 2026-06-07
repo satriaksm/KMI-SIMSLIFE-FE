@@ -23,6 +23,8 @@ const { users, loading, pagination, fetchUsers } = useUsers();
 const searchQuery = ref("");
 const currentPage = ref(1);
 const perPage = ref(15);
+const sortBy = ref("");
+const sortDir = ref("");
 
 // Modals
 const showExportModal = ref(false);
@@ -105,8 +107,8 @@ const confirmStatusChange = async () => {
 const tableColumns = [
   { key: "photo", label: "Foto", sortable: false },
   { key: "name", label: "Username", sortable: true },
-  { key: "phone", label: "No HP", sortable: false },
-  { key: "nik", label: "NIK", sortable: false },
+  { key: "phone", label: "No HP", sortable: true },
+  { key: "nik", label: "NIK", sortable: true },
   { key: "roles", label: "Roles", sortable: false },
   { key: "merchants", label: "UMKM", sortable: false },
   { key: "status", label: "Status", sortable: true },
@@ -181,6 +183,8 @@ const loadUsers = async () => {
       role: activeFilters.value.role === "admin" ? "" : activeFilters.value.role,
       page: currentPage.value,
       per_page: perPage.value,
+      sort_by: sortBy.value,
+      sort_order: sortDir.value,
     });
   } catch (error) {
     console.error("Failed to load users:", error);
@@ -299,6 +303,13 @@ const goToCreate = () => {
   emit("create");
 };
 
+const handleSortChange = ({ key, dir }) => {
+  sortBy.value = key;
+  sortDir.value = dir;
+  currentPage.value = 1;
+  loadUsers();
+};
+
 // ✅ Inject the register function from parent
 const registerExportModal = inject("registerExportModal", null);
 
@@ -376,11 +387,14 @@ watch(searchQuery, () => {
         :total-pages="totalPages"
         :pagination-info="paginationInfo"
         :show-checkbox="false"
+        :sort-by="sortBy"
+        :sort-dir="sortDir"
         empty-message="Tidak ada user yang ditemukan"
         @row-click="goToDetail"
         @page-change="goToPage"
         @next-page="nextPage"
         @prev-page="prevPage"
+        @sort-change="handleSortChange"
       >
         <template #cell-photo="{ item }">
           <div

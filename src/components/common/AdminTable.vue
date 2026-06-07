@@ -61,6 +61,14 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  sortBy: {
+    type: String,
+    default: "",
+  },
+  sortDir: {
+    type: String,
+    default: "", // 'asc' | 'desc'
+  },
 });
 
 const emit = defineEmits([
@@ -70,6 +78,7 @@ const emit = defineEmits([
   "page-change",
   "next-page",
   "prev-page",
+  "sort-change",
 ]);
 
 // Computed
@@ -113,6 +122,18 @@ const nextPage = () => {
 
 const prevPage = () => {
   if (props.currentPage > 1) emit("prev-page");
+};
+
+const handleSort = (key) => {
+  let newDir = 'desc';
+  if (props.sortBy === key) {
+    if (props.sortDir === 'desc') newDir = 'asc';
+    else if (props.sortDir === 'asc') {
+      newDir = '';
+      key = '';
+    }
+  }
+  emit('sort-change', { key, dir: newDir });
 };
 
 // Get nested value from object by key path (e.g., 'user.name')
@@ -160,10 +181,17 @@ const getNestedValue = (obj, path) => {
               <th
                 v-for="column in columns"
                 :key="column.key"
-                class="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+                class="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none"
                 :class="column.sortable ? 'cursor-pointer hover:bg-muted-background/60 transition' : ''"
+                @click="column.sortable ? handleSort(column.key) : null"
               >
-                {{ column.label }}
+                <div class="flex items-center gap-1">
+                  <span>{{ column.label }}</span>
+                  <div v-if="column.sortable" class="flex flex-col items-center justify-center -space-y-[0.15rem]">
+                    <i class="pi pi-chevron-up text-[0.6rem]" :class="sortBy === column.key && sortDir === 'asc' ? 'text-merchant-primary' : 'text-gray-300'"></i>
+                    <i class="pi pi-chevron-down text-[0.6rem]" :class="sortBy === column.key && sortDir === 'desc' ? 'text-merchant-primary' : 'text-gray-300'"></i>
+                  </div>
+                </div>
               </th>
 
               <!-- Actions Column -->

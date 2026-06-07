@@ -25,6 +25,8 @@ const registerExportModal = inject("registerExportModal", null);
 const searchQuery = ref("");
 const currentPage = ref(1);
 const perPage = ref(10);
+const sortBy = ref("");
+const sortDir = ref("");
 
 // Modals
 const showFilterModal = ref(false);
@@ -163,6 +165,8 @@ const loadMerchants = async () => {
       segmentation_id: activeFilters.value.segmentation,
       page: currentPage.value,
       per_page: perPage.value,
+      sort_by: sortBy.value,
+      sort_order: sortDir.value,
     });
   } catch (error) {
     console.error("Failed to load merchants:", error);
@@ -309,7 +313,7 @@ const exportPDF = async () => {
     link.click();
     link.remove();
 
-    toast.success("Laporan merchant berhasil diunduh");
+    toast.success("Laporan UMKM berhasil diunduh");
     closeExportModal();
   } catch (error) {
     console.error("Export PDF failed:", error);
@@ -322,6 +326,13 @@ const exportPDF = async () => {
 // Actions
 const goToDetail = (merchant) => {
   router.push({ name: "Admin - Merchant Detail", params: { id: merchant.id } });
+};
+
+const handleSortChange = ({ key, dir }) => {
+  sortBy.value = key;
+  sortDir.value = dir;
+  currentPage.value = 1;
+  loadMerchants();
 };
 
 // Pagination methods
@@ -421,11 +432,14 @@ onMounted(() => {
         :total-pages="totalPages"
         :pagination-info="paginationInfo"
         :show-checkbox="false"
+        :sort-by="sortBy"
+        :sort-dir="sortDir"
         empty-message="Tidak ada merchant yang ditemukan"
         @row-click="goToDetail"
         @page-change="goToPage"
         @next-page="nextPage"
         @prev-page="prevPage"
+        @sort-change="handleSortChange"
       >
         <template #cell-logo="{ item }">
           <div class="flex items-center justify-center">
@@ -683,8 +697,8 @@ onMounted(() => {
     <ResponsiveModal
       :show="showExportModal"
       @close="closeExportModal"
-      title="Export Laporan Merchants"
-      subtitle="Unduh laporan data merchants dalam format PDF"
+      title="Export Laporan UMKM"
+      subtitle="Unduh laporan data UMKM dalam format PDF"
     >
       <div class="space-y-4">
         <div class="p-4 border border-blue-200 rounded-lg bg-blue-50">
@@ -695,8 +709,8 @@ onMounted(() => {
                 Laporan akan mencakup:
               </p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Data lengkap merchants (Nama, Owner, Email, Phone)</li>
-                <li>Segmentasi dan status merchants</li>
+                <li>Data lengkap UMKM (Nama, Pemilik, Email, Telepon)</li>
+                <li>Segmentasi dan status UMKM</li>
                 <li>Jumlah produk yang dimiliki</li>
                 <li>Filter yang diterapkan (Status, Segmentasi, Pencarian)</li>
                 <li>Informasi waktu download dan user yang mendownload</li>
