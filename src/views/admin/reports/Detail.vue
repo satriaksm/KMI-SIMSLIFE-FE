@@ -536,14 +536,14 @@ onMounted(() => { loadReport(); });
             </div>
 
             <!-- Sanggahan / Appeals -->
-            <div v-if="appeals.length > 0" class="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
+            <div v-if="appeals.length > 0" class="bg-white rounded-xl border border-blue-200 outline-none shadow-sm overflow-hidden">
               <div class="px-6 py-4 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
                 <i class="pi pi-envelope text-blue-600"></i>
                 <h2 class="font-semibold text-blue-900">Sanggahan dari Terlapor</h2>
               </div>
               <div class="p-6 space-y-4">
-                <div v-for="appeal in appeals" :key="appeal.id" class="border rounded-lg p-4 bg-gray-50">
-                  <div class="flex justify-between items-start mb-3">
+                <div v-for="appeal in appeals" :key="appeal.id" class="border border-gray-200 rounded-lg p-4 bg-gray-50 outline-none">
+                  <div class="flex justify-between items-start mb-3 outline-none">
                     <div>
                       <p class="font-semibold text-sm">{{ appeal.appellant?.name }}</p>
                       <p class="text-xs text-gray-500">{{ formatDate(appeal.created_at) }}</p>
@@ -557,12 +557,12 @@ onMounted(() => { loadReport(); });
                       {{ appeal.status.toUpperCase() }}
                     </span>
                   </div>
-                  <div class="bg-white border rounded p-3 text-sm text-gray-700 italic">
+                  <div class="bg-white border border-gray-200 rounded p-3 text-sm text-gray-700 italic">
                     "{{ appeal.appeal_text }}"
                   </div>
                   
-                  <div v-if="appeal.status === 'pending'" class="mt-4 flex gap-2 justify-end border-t pt-4">
-                    <Button @click="openAppealModal(appeal, 'accepted')" variant="success" size="sm">
+                  <div v-if="appeal.status === 'pending'" class="mt-4 flex gap-2 justify-end border-t border-gray-200 pt-4">
+                    <Button @click="openAppealModal(appeal, 'accepted')" variant="merchant" size="sm">
                       <i class="pi pi-check mr-1"></i> Terima Sanggahan
                     </Button>
                     <Button @click="openAppealModal(appeal, 'rejected')" variant="danger" size="sm">
@@ -727,7 +727,7 @@ onMounted(() => { loadReport(); });
       <template #footer>
         <div class="flex gap-3 justify-end">
           <Button @click="showAppealModal = false" variant="secondary">Batal</Button>
-          <Button @click="handleAppealReview" :variant="appealStatus === 'accepted' ? 'success' : 'danger'" :disabled="loading">
+          <Button @click="handleAppealReview" :variant="appealStatus === 'accepted' ? 'merchant' : 'danger'" :disabled="loading">
             <i class="pi pi-send mr-2"></i>
             {{ loading ? "Memproses..." : "Kirim Tanggapan" }}
           </Button>
