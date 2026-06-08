@@ -48,12 +48,147 @@ const filters = [
 const statusMap = {
   all: [],
   semua: [],
-  menunggu_konfirmasi_merchant: ['pending', 'menunggu_konfirmasi_merchant'],
-  diterima: ['proses', 'diterima', 'accepted'],
+  // Tab Menunggu: pending, menunggu_konfirmasi_merchant, menunggu
+  menunggu_konfirmasi_merchant: ['pending', 'menunggu_konfirmasi_merchant', 'menunggu'],
+  // Tab Diterima: service_status=diterima OR (order_status=proses AND service_status empty)
+  diterima: ['diterima', 'accepted'],
+  // Tab Ditolak: rejected statuses
   ditolak: ['batal', 'ditolak', 'rejected', 'cancelled', 'dibatalkan'],
-  layanan_dikerjakan: ['proses', 'layanan_dikerjakan', 'dikerjakan', 'in_progress'],
-  menunggu_konfirmasi_selesai: ['proses', 'menunggu_konfirmasi_selesai'],
+  // Tab Dikerjakan: service_status shows service is being worked on
+  layanan_dikerjakan: ['layanan_dikerjakan', 'dikerjakan', 'in_progress'],
+  // Tab Tunggu Selesai: waiting for customer confirmation
+  menunggu_konfirmasi_selesai: ['menunggu_konfirmasi_selesai'],
+  // Tab Selesai: completed orders
   selesai: ['selesai', 'completed'],
+};
+
+// ============================================================
+// HELPER: Get all status values from order
+// ============================================================
+const getOrderStatuses = (order) => [
+  order.order_status,
+  order.service_status,
+  order.status,
+].filter(Boolean).map(s => String(s).toLowerCase());
+
+// ============================================================
+// HELPER: Check if order is pending (needs merchant action)
+// ============================================================
+const isPendingOrder = (order) => {
+  const pendingStatuses = ['pending', 'menunggu_konfirmasi_merchant', 'menunggu'];
+  const statuses = getOrderStatuses(order);
+  return statuses.some(s => pendingStatuses.includes(s));
+};
+
+// ============================================================
+// HELPER: Can accept/reject order
+// ============================================================
+const canAccept = (order) => isPendingOrder(order);
+const canReject = (order) => isPendingOrder(order);
+
+// ============================================================
+// HELPER: Get display label for status
+// Priority:
+// 1. service_status takes precedence over order_status
+// 2. After "Terima": orders.status=proses, service_status=diterima
+//    → Should show "Diterima"
+// ============================================================
+const getDisplayStatusLabel = (order) => {
+  const orderStatus = String(order.order_status || '').toLowerCase();
+  const serviceStatus = String(order.service_status || '').toLowerCase();
+  const status = String(order.status || '').toLowerCase();
+
+  // Check for pending statuses first
+  const pendingStatuses = ['pending', 'menunggu_konfirmasi_merchant', 'menunggu'];
+  if (pendingStatuses.includes(orderStatus) || pendingStatuses.includes(serviceStatus) || pendingStatuses.includes(status)) {
+    return 'Menunggu Konfirmasi';
+  }
+
+  // Check for "Diterima" status
+  // Priority: service_status > status > order_status
+  const diterimaStatuses = ['diterima', 'accepted'];
+  if (diterimaStatuses.includes(serviceStatus) || diterimaStatuses.includes(status)) {
+    return 'Diterima';
+  }
+  // order_status = proses but service_status empty = "Diterima" (just accepted)
+  if (orderStatus === 'proses' && !serviceStatus) {
+    return 'Diterima';
+  }
+
+  // Check for "Dikerjakan" status
+  const dikerjakanStatuses = ['dikerjakan', 'in_progress', 'layanan_dikerjakan'];
+  if (dikerjakanStatuses.includes(serviceStatus)) {
+    return 'Dikerjakan';
+  }
+  // service_status empty but order_status = proses = "Diterima" (transitioning to dikerjakan)
+  if (orderStatus === 'proses' && !serviceStatus) {
+    return 'Diterima';
+  }
+
+  // Check for other statuses
+  if (['menunggu_konfirmasi_selesai'].includes(serviceStatus) || ['menunggu_konfirmasi_selesai'].includes(status)) {
+    return 'Menunggu Konfirmasi Selesai';
+  }
+  if (['selesai', 'completed'].includes(serviceStatus) || ['selesai', 'completed'].includes(status)) {
+    return 'Selesai';
+  }
+  const ditolakStatuses = ['ditolak', 'batal', 'cancelled', 'dibatalkan', 'rejected'];
+  if (ditolakStatuses.includes(orderStatus) || ditolakStatuses.includes(serviceStatus) || ditolakStatuses.includes(status)) {
+    return 'Ditolak';
+  }
+
+  return order.status_label || order.status || '-';
+};
+
+// ============================================================
+// HELPER: Get badge color for status
+// ============================================================
+const getDisplayStatusColor = (order) => {
+  const orderStatus = String(order.order_status || '').toLowerCase();
+  const serviceStatus = String(order.service_status || '').toLowerCase();
+  const status = String(order.status || '').toLowerCase();
+
+  // Check for pending statuses first
+  const pendingStatuses = ['pending', 'menunggu_konfirmasi_merchant', 'menunggu'];
+  if (pendingStatuses.includes(orderStatus) || pendingStatuses.includes(serviceStatus) || pendingStatuses.includes(status)) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+
+  // Check for "Diterima" status
+  const diterimaStatuses = ['diterima', 'accepted'];
+  if (diterimaStatuses.includes(serviceStatus) || diterimaStatuses.includes(status)) {
+    return 'bg-blue-100 text-blue-700';
+  }
+  if (orderStatus === 'proses' && !serviceStatus) {
+    return 'bg-blue-100 text-blue-700';
+  }
+
+  // Check for "Dikerjakan" status
+  const dikerjakanStatuses = ['dikerjakan', 'in_progress', 'layanan_dikerjakan'];
+  if (dikerjakanStatuses.includes(serviceStatus)) {
+    return 'bg-amber-100 text-amber-700';
+  }
+
+  // Check for other statuses
+  if (['menunggu_konfirmasi_selesai'].includes(serviceStatus) || ['menunggu_konfirmasi_selesai'].includes(status)) {
+    return 'bg-purple-100 text-purple-700';
+  }
+  if (['selesai', 'completed'].includes(serviceStatus) || ['selesai', 'completed'].includes(status)) {
+    return 'bg-green-100 text-green-700';
+  }
+  const ditolakStatuses = ['ditolak', 'batal', 'cancelled', 'dibatalkan', 'rejected'];
+  if (ditolakStatuses.includes(orderStatus) || ditolakStatuses.includes(serviceStatus) || ditolakStatuses.includes(status)) {
+    return 'bg-red-100 text-red-700';
+  }
+
+  return 'bg-gray-100 text-gray-700';
+};
+
+// ============================================================
+// HELPER: Get order ID for API calls (use orders.id, not service_order_id)
+// ============================================================
+const getOrderId = (order) => {
+  return order.order_id || order.id;
 };
 
 // ============================================================
@@ -70,15 +205,25 @@ const filteredOrders = computed(() => {
   console.log('[Filter]', activeFilter.value, '- allowed statuses:', allowed);
 
   const filtered = orders.value.filter(order => {
-    // Check all possible status fields
-    const statuses = [
-      order.order_status,
-      order.service_status,
-      order.status,
-    ].filter(Boolean);
+    const orderStatus = String(order.order_status || '').toLowerCase();
+    const serviceStatus = String(order.service_status || '').toLowerCase();
+    const status = String(order.status || '').toLowerCase();
 
-    const matches = statuses.some(status => allowed.includes(status));
-    console.log('[Filter] Order', order.id || order.order_id, '- statuses:', statuses, '- matches:', matches);
+    // Special case: "Diterima" tab should also include orders where
+    // order_status = proses AND service_status is empty (just accepted transition)
+    if (activeFilter.value === 'diterima') {
+      const diterimaStatuses = ['diterima', 'accepted'];
+      const isDiterima = diterimaStatuses.includes(serviceStatus) ||
+                         diterimaStatuses.includes(status) ||
+                         (orderStatus === 'proses' && !serviceStatus);
+      console.log('[Filter] Order', getOrderId(order), '- isDiterima:', isDiterima);
+      return isDiterima;
+    }
+
+    // For other tabs, check all status fields
+    const statuses = [orderStatus, serviceStatus, status].filter(Boolean);
+    const matches = statuses.some(s => allowed.includes(s));
+    console.log('[Filter] Order', getOrderId(order), '- statuses:', statuses, '- matches:', matches);
     return matches;
   });
 
@@ -293,21 +438,13 @@ const submitRejection = async () => {
   }
   submitting.value = true;
   try {
-    // Use id or order_id for backward compatibility
-    const orderId = selectedOrder.value?.id || selectedOrder.value?.order_id;
+    const orderId = getOrderId(selectedOrder.value);
     console.log('[submitRejection] Order ID:', orderId);
-    console.log('[submitRejection] Full order:', selectedOrder.value);
 
     if (!orderId) {
       toast.error('ID pesanan tidak ditemukan');
       return;
     }
-
-    console.log('[submitRejection] Payload:', {
-      id: orderId,
-      status: 'ditolak',
-      rejection_reason: rejectReason.value
-    });
 
     const { data } = await api.patch(
       `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
@@ -317,9 +454,6 @@ const submitRejection = async () => {
       }
     );
 
-    console.log('[submitRejection] Response:', data);
-
-    // Check response with multiple formats including Indonesian message
     const isSuccess =
       data?.status === true ||
       data?.status === 'success' ||
@@ -333,12 +467,9 @@ const submitRejection = async () => {
       rejectReason.value = '';
       fetchOrders();
     } else {
-      console.error('Reject error response:', data);
       toast.error(data?.message || 'Gagal menolak pesanan');
     }
   } catch (error) {
-    console.error('Gagal menolak pesanan:', error);
-    console.error('Reject error response:', error.response?.data);
     toast.error(
       error.response?.data?.message ||
       error.response?.data?.error ||
@@ -423,8 +554,8 @@ const submitEvidence = async () => {
   }
   submitting.value = true;
   try {
-    // Use id or order_id for backward compatibility
-    const orderId = selectedOrder.value.id || selectedOrder.value.order_id;
+    // Use orders.id as primary ID
+    const orderId = getOrderId(selectedOrder.value);
     console.log('[submitEvidence] Order ID:', orderId);
 
     if (!orderId) {
@@ -790,18 +921,45 @@ const normalizeStatus = (status) => {
 };
 
 // Check if order can perform action based on status
+// After "Terima": orders.status=proses, service_status=diterima
 const canPerformAction = (order, action) => {
   if (!order) return false;
-  const status = normalizeStatus(order.status);
+
+  const orderStatus = String(order.order_status || '').toLowerCase();
+  const serviceStatus = String(order.service_status || '').toLowerCase();
+  const status = String(order.status || '').toLowerCase();
 
   switch (action) {
     case 'accept':
     case 'reject':
-      return status === 'menunggu_konfirmasi_merchant';
+      // Accept/reject for pending orders (pending, menunggu_konfirmasi_merchant, menunggu)
+      return isPendingOrder(order);
+
     case 'start':
-      return status === 'diterima';
+      // Can start if:
+      // 1. service_status = diterima/accepted, OR
+      // 2. order_status = proses AND service_status is empty (just accepted transition), OR
+      // 3. status = diterima/accepted
+      // NOT if already in dikerjakan/layanan_dikerjakan/in_progress/selesai/completed
+      const canStartStatuses = ['diterima', 'accepted'];
+      const sedangDikerjakanStatuses = ['dikerjakan', 'layanan_dikerjakan', 'in_progress', 'selesai', 'completed'];
+
+      // Already being worked on - cannot start again
+      if (sedangDikerjakanStatuses.includes(serviceStatus) || sedangDikerjakanStatuses.includes(status)) {
+        return false;
+      }
+
+      // Can start if accepted or just transitioning (order_status=proses with no service_status)
+      return (
+        canStartStatuses.includes(serviceStatus) ||
+        canStartStatuses.includes(status) ||
+        (orderStatus === 'proses' && !serviceStatus)
+      );
+
     case 'evidence':
-      return status === 'layanan_dikerjakan';
+      return ['layanan_dikerjakan', 'dikerjakan', 'in_progress'].includes(serviceStatus) ||
+             ['layanan_dikerjakan', 'dikerjakan', 'in_progress'].includes(status);
+
     default:
       return false;
   }
@@ -969,13 +1127,13 @@ onMounted(() => {
           <div class="p-4 border-b border-gray-100">
             <div class="flex items-start justify-between mb-3">
               <span class="text-xs font-mono font-medium text-gray-400">
-                {{ order.formatted_order_number || order.order_number || `ORDER #${order.id}` }}
+                {{ order.formatted_order_number || order.order_number || `ORDER #${getOrderId(order)}` }}
               </span>
               <span
                 class="px-2.5 py-1 rounded-full text-xs font-medium"
-                :class="order.status ? (statusConfig[order.status]?.color || 'bg-gray-100 text-gray-600') : 'bg-gray-100 text-gray-600'"
+                :class="getDisplayStatusColor(order)"
               >
-                {{ order.status ? (statusConfig[order.status]?.label || order.status) : 'Unknown' }}
+                {{ getDisplayStatusLabel(order) }}
               </span>
             </div>
 
@@ -1034,11 +1192,11 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Main Action Buttons (for menunggu_konfirmasi_merchant) -->
-          <div v-if="order.status === 'menunggu_konfirmasi_merchant'" class="p-4 border-b border-gray-100">
+          <!-- Main Action Buttons (for pending orders: pending, menunggu_konfirmasi_merchant, menunggu) -->
+          <div v-if="isPendingOrder(order)" class="p-4 border-b border-gray-100">
             <div class="flex gap-2">
               <button
-                @click="acceptOrder(order.id || order.order_id)"
+                @click="acceptOrder(getOrderId(order))"
                 :disabled="submitting"
                 class="flex-1 py-3 rounded-xl text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition"
               >
@@ -1056,11 +1214,11 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- Main Action Buttons (for other statuses) -->
-          <div v-else-if="order.status === 'diterima' || order.status === 'layanan_dikerjakan' || order.status === 'menunggu_konfirmasi_selesai'" class="p-4 border-b border-gray-100">
+          <!-- Main Action Buttons (for other statuses: Diterima, Dikerjakan, Menunggu Selesai) -->
+          <div v-else-if="canPerformAction(order, 'start') || order.status === 'layanan_dikerjakan' || order.status === 'menunggu_konfirmasi_selesai'" class="p-4 border-b border-gray-100">
             <!-- Evidence Upload Button for Dikerjakan status -->
             <button
-              v-if="order.status === 'layanan_dikerjakan'"
+              v-if="order.service_status === 'layanan_dikerjakan' || order.status === 'layanan_dikerjakan'"
               @click="openEvidenceModal(order)"
               :disabled="submitting"
               class="w-full py-3 rounded-xl text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 transition"
@@ -1070,17 +1228,17 @@ onMounted(() => {
             </button>
 
             <!-- Rejection Reason Badge -->
-            <div v-if="order.status === 'ditolak' && order.rejection_reason" class="p-3 bg-red-50 border border-red-100 rounded-xl">
+            <div v-if="getDisplayStatusLabel(order) === 'Ditolak' && order.rejection_reason" class="p-3 bg-red-50 border border-red-100 rounded-xl">
               <p class="text-xs text-red-600">
                 <i class="pi pi-info-circle mr-1"></i>
                 {{ order.rejection_reason }}
               </p>
             </div>
 
-            <!-- Start Working Button for Diterima status -->
+            <!-- Start Working Button for Diterima status (show if canPerformAction allows start) -->
             <button
-              v-if="order.status === 'diterima'"
-              @click="startWorking(order.id || order.order_id)"
+              v-if="canPerformAction(order, 'start')"
+              @click="startWorking(getOrderId(order))"
               :disabled="submitting"
               class="w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition"
             >
@@ -1231,8 +1389,8 @@ onMounted(() => {
 
             <!-- Status Badges -->
             <div class="flex gap-2 flex-wrap">
-              <span class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getStatusClass(selectedOrder.status)">
-                {{ getStatusLabel(selectedOrder.status) }}
+              <span class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getDisplayStatusColor(selectedOrder)">
+                {{ getDisplayStatusLabel(selectedOrder) }}
               </span>
               <span v-if="selectedOrder.payment_status" class="inline-block px-3 py-1.5 rounded-full text-xs font-medium" :class="getPaymentStatusColor(selectedOrder)">
                 {{ getPaymentStatusLabel(selectedOrder) }}
@@ -1240,7 +1398,7 @@ onMounted(() => {
             </div>
 
             <!-- Rejection Reason -->
-            <div v-if="selectedOrder.status === 'ditolak' && selectedOrder.rejection_reason" class="mb-4">
+            <div v-if="getDisplayStatusLabel(selectedOrder) === 'Ditolak' && selectedOrder.rejection_reason" class="mb-4">
               <h4 class="text-xs font-semibold text-red-500 uppercase mb-2">
                 Alasan Penolakan
               </h4>
@@ -1293,10 +1451,10 @@ onMounted(() => {
                 Aksi
               </h4>
               <div class="space-y-2">
-                <!-- Menunggu Konfirmasi -->
+                <!-- Menunggu Konfirmasi (pending orders) -->
                 <template v-if="canPerformAction(selectedOrder, 'accept')">
                   <button
-                    @click="acceptOrder(selectedOrder.id)"
+                    @click="acceptOrder(getOrderId(selectedOrder))"
                     :disabled="submitting"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                   >
@@ -1316,7 +1474,7 @@ onMounted(() => {
                 <!-- Diterima -->
                 <template v-else-if="canPerformAction(selectedOrder, 'start')">
                   <button
-                    @click="startWorking(selectedOrder.id)"
+                    @click="startWorking(getOrderId(selectedOrder))"
                     :disabled="submitting"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                   >
