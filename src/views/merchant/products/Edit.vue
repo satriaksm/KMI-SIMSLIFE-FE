@@ -187,38 +187,76 @@ useBodyScrollLock(showCombinationsModal);
 // ======================================================
 // VEE VALIDATE (TIDAK DIUBAH)
 // ======================================================
-const schema = yup.object({
-  name: yup.string().required("Nama produk wajib diisi"),
-  description: yup.string().required("Deskripsi wajib diisi"),
-  category_id: yup.number().required("Kategori utama wajib dipilih"),
-  sku: yup
-    .string()
-    .max(100, "SKU maksimal 100 karakter")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.nullable(),
-    }),
-  price: yup
-    .number()
-    .min(0, "Harga minimal 0")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.required("Harga wajib diisi"),
-    }),
-  stock: yup
-    .number()
-    .integer("Stok harus bilangan bulat")
-    .min(0, "Stok tidak boleh negatif")
-    .max(9999, "Stok maksimal 9999")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.required("Stok wajib diisi"),
-    }),
-  min_purchase: yup
-    .number()
-    .integer("Minimal pembelian harus bilangan bulat")
-    .min(1, "Minimal pembelian minimal 1")
-    .required("Minimal pembelian wajib diisi"),
+const schema = computed(() => {
+  const baseSchema = {
+    name: yup.string().required("Nama produk wajib diisi"),
+    description: yup.string().required("Deskripsi wajib diisi"),
+    category_id: yup.number().required("Kategori utama wajib dipilih"),
+    sku: useVariants.value
+      ? yup.string().max(100, "SKU maksimal 100 karakter").nullable()
+      : yup.string().max(100, "SKU maksimal 100 karakter"),
+    price: useVariants.value
+      ? yup.number().min(0, "Harga minimal 0").nullable()
+      : yup.number().min(0, "Harga minimal 0").required("Harga wajib diisi"),
+    stock: useVariants.value
+      ? yup
+          .number()
+          .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+          .nullable()
+          .typeError("Stok harus berupa angka")
+          .integer("Stok harus bilangan bulat")
+          .min(0, "Stok tidak boleh negatif")
+          .max(9999, "Stok maksimal 9999")
+      : yup
+          .number()
+          .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+          .nullable()
+          .typeError("Stok wajib diisi")
+          .integer("Stok harus bilangan bulat")
+          .min(0, "Stok tidak boleh negatif")
+          .max(9999, "Stok maksimal 9999")
+          .required("Stok wajib diisi"),
+    min_purchase: yup
+      .number()
+      .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+      .nullable()
+      .typeError("Minimal pembelian wajib diisi")
+      .integer("Minimal pembelian harus bilangan bulat")
+      .min(1, "Minimal pembelian tidak boleh 0")
+      .required("Minimal pembelian wajib diisi"),
+    bulkStock: yup
+      .number()
+      .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+      .nullable()
+      .typeError("Stok harus berupa angka")
+      .integer("Stok harus bilangan bulat")
+      .min(0, "Stok tidak boleh negatif")
+      .max(9999, "Stok maksimal 9999"),
+  };
+
+  if (useVariants.value && combinations.value && combinations.value.length > 0) {
+    combinations.value.forEach((_, index) => {
+      baseSchema[`combination_${index}_price`] = yup
+        .number()
+        .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+        .nullable()
+        .typeError("Harga wajib diisi")
+        .min(0, "Harga minimal 0")
+        .required("Harga wajib diisi");
+
+      baseSchema[`combination_${index}_stock`] = yup
+        .number()
+        .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+        .nullable()
+        .typeError("Stok wajib diisi")
+        .integer("Stok harus bilangan bulat")
+        .min(0, "Stok tidak boleh negatif")
+        .max(9999, "Stok maksimal 9999")
+        .required("Stok wajib diisi");
+    });
+  }
+
+  return yup.object(baseSchema);
 });
 
 // ============================================================
@@ -226,6 +264,7 @@ const schema = yup.object({
 // ============================================================
 const { handleSubmit, errors, values, setFieldValue, validate } = useForm({
   validationSchema: schema,
+  keepValuesOnUnmount: true,
   initialValues: {
     name: "",
     description: "",
@@ -234,6 +273,7 @@ const { handleSubmit, errors, values, setFieldValue, validate } = useForm({
     sku: "",
     price: 0,
     stock: 0,
+    bulkStock: null,
   },
 });
 
@@ -399,10 +439,30 @@ const fetchProductData = async () => {
 };
 
 // ======================================================
+// Sync Combinations to Vee-Validate
+// ======================================================
+watch(
+  combinations,
+  (newCombos) => {
+    newCombos.forEach((combo, index) => {
+      setFieldValue(`combination_${index}_price`, combo.price);
+      setFieldValue(`combination_${index}_stock`, combo.stock);
+      setFieldValue(`combination_${index}_sku`, combo.sku);
+    });
+  },
+  { deep: true }
+);
+
+// ======================================================
 // SUBMIT (LOGIC LAMA DIPERTAHANKAN)
 // ======================================================
 const onSubmit = handleSubmit(
   async (values) => {
+    if (!useVariants.value && values.stock > 9999) {
+      toast.error("Stok tidak boleh melebihi 9999");
+      return;
+    }
+
     if (useVariants.value && totalCombinations.value > MAX_COMBINATIONS) {
       toast.error(`Kombinasi varian maksimal ${MAX_COMBINATIONS}`);
       return;
@@ -418,7 +478,7 @@ const onSubmit = handleSubmit(
     // === 1) Validasi dengan Yup langsung (deterministik, gak tergantung field registration) ===
     try {
       // validasi semua field di values berdasarkan schema
-      await schema.validate(values, { abortEarly: false });
+      await schema.value.validate(values, { abortEarly: false });
     } catch (yupError) {
       // yupError adalah ValidationError
       const messages = (yupError.inner || [])
@@ -487,6 +547,14 @@ const onSubmit = handleSubmit(
       );
       if (hasInvalidCombo) {
         toast.error("Harga dan stok tidak boleh negatif");
+        return;
+      }
+
+      const hasExcessiveStockCombo = combinations.value.some(
+        (c) => c.stock > 9999,
+      );
+      if (hasExcessiveStockCombo) {
+        toast.error("Stok variasi tidak boleh melebihi 9999");
         return;
       }
     }

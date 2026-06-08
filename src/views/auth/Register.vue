@@ -54,7 +54,7 @@
         <Form
           @submit="handleRegister"
           :validation-schema="schema"
-          v-slot="{ errors }"
+          v-slot="{ errors, meta }"
         >
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <!-- Name Field -->
@@ -374,6 +374,7 @@
               <AppButton
                 type="submit"
                 :loading="isLoading"
+                :disabled="!meta.valid || isLoading"
                 variant="primary"
                 size="md"
                 block

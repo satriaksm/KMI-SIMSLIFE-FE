@@ -139,8 +139,11 @@ const setFieldFromDigits = (digits, field) => {
     return;
   }
 
-  num = clampNumber(num);
-  field.onChange(num);
+  const next = clampNumber(num);
+  if (next !== num) {
+    numberDisplay.value = String(next);
+  }
+  field.onChange(next);
 };
 
 const handleNumberFocus = (field) => {
@@ -156,7 +159,14 @@ const handleNumberBlur = (field) => {
 const handleNumberInput = (event, field) => {
   const digits = normalizeDigits(toDigits(event.target.value));
   numberDisplay.value = digits;
+  
+  const oldNumDisplay = numberDisplay.value;
   setFieldFromDigits(digits, field);
+  
+  // Jika setFieldFromDigits mengubah numberDisplay karena auto-clamp (misal dari 10000 balik ke 9999)
+  if (numberDisplay.value !== oldNumDisplay) {
+    event.target.value = numberDisplay.value;
+  }
 };
 
 defineExpose({

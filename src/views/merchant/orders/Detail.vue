@@ -387,10 +387,10 @@ const canCancel = computed(() => {
   return s === "paid" || s === "responsed" || s === "accepted" || (s === "pending" && rawOrder.value?.payment_method === 'COD');
 });
 
-// Apakah bisa ditandai gagal kirim (undelivered)
+// Apakah bisa ditandai gagal kirim (undelivered) / tidak diambil
 const canUndelivered = computed(() => {
   const s = rawOrder.value?.status;
-  return s === "delivered" && rawOrder.value?.delivery_type !== 'pickup';
+  return s === "delivered";
 });
 
 function onFileChange(e) {
@@ -750,7 +750,7 @@ function leaveOrderChannel(id) {
           <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
           <div>
             <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
-              {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? 'Pesanan Gagal Kirim' : 'Pesanan Dibatalkan' }}
+              {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? (rawOrder?.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
             </p>
             <p v-if="order.note || order.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
               {{ order.failed_reason || order.note }}
@@ -1001,7 +1001,7 @@ function leaveOrderChannel(id) {
           :disabled="actionLoading"
           @click="handleUndelivered"
         >
-          Tandai Gagal Kirim
+          {{ rawOrder?.delivery_type === 'pickup' ? 'Tandai Tidak Diambil' : 'Tandai Gagal Kirim' }}
         </Button>
       </div>
     </div>
@@ -1020,7 +1020,7 @@ function leaveOrderChannel(id) {
           <i class="text-xl pi" :class="actionType === 'next' ? 'pi-check-circle text-merchant-primary' : (actionType === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500')"></i>
         </div>
         <p class="text-sm text-gray-600">
-          <span v-if="actionType === 'undelivered'">Tindakan ini akan menandai pesanan gagal kirim. Dana akan tetap diteruskan.</span>
+          <span v-if="actionType === 'undelivered'">Tindakan ini akan menandai pesanan {{ rawOrder?.delivery_type === 'pickup' ? 'tidak diambil' : 'gagal kirim' }}. Dana akan tetap diteruskan.</span>
           <span v-else-if="actionType === 'reject'">Tindakan ini akan menolak pesanan dan dana akan dikembalikan ke pembeli.</span>
           <span v-else>Tindakan ini akan memperbarui status pesanan dan dapat mengirimkan notifikasi ke pelanggan.</span>
         </p>
@@ -1029,15 +1029,15 @@ function leaveOrderChannel(id) {
       <!-- Upload Proof Image -->
       <div v-if="(actionType === 'next' && getNextStatus() === 'completed') || actionType === 'undelivered'" class="mt-4">
         <label class="block text-sm font-semibold text-gray-700 mb-2">
-          Bukti Foto {{ actionType === 'undelivered' ? 'Gagal Kirim (Wajib)' : (rawOrder?.delivery_type === 'pickup' ? 'Selesai (Opsional)' : 'Barang Tiba (Wajib)') }}
+          Bukti Foto {{ actionType === 'undelivered' ? (rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil (Wajib)' : 'Gagal Kirim (Wajib)') : (rawOrder?.delivery_type === 'pickup' ? 'Selesai (Opsional)' : 'Barang Tiba (Wajib)') }}
         </label>
         <input type="file" @change="onFileChange" accept="image/*" class="w-full text-sm text-gray-500 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-l-lg file:border-0 file:text-sm file:font-semibold file:bg-merchant-primary file:text-white hover:file:bg-merchant-primary/90" />
       </div>
 
       <!-- Failed Reason -->
       <div v-if="actionType === 'undelivered'" class="mt-4">
-        <label class="block text-sm font-semibold text-gray-700 mb-2">Alasan Gagal Kirim (Wajib)</label>
-        <textarea v-model="failedReason" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary" rows="3" placeholder="Contoh: Pembeli tidak dapat dihubungi dan rumah kosong..."></textarea>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Alasan {{ rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil' : 'Gagal Kirim' }} (Wajib)</label>
+        <textarea v-model="failedReason" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary" rows="3" :placeholder="rawOrder?.delivery_type === 'pickup' ? 'Contoh: Pembeli tidak datang untuk mengambil pesanan hingga toko tutup...' : 'Contoh: Pembeli tidak dapat dihubungi dan rumah kosong...'"></textarea>
       </div>
 
       <template #footer>

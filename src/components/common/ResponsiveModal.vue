@@ -84,7 +84,7 @@ const handleBackdropClick = () => {
     leave-to-class="opacity-0"
   >
     <div
-      v-if="show"
+      v-show="show"
       @click="handleBackdropClick"
       :class="[
         'fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center p-0 sm:p-4',
@@ -103,7 +103,7 @@ const handleBackdropClick = () => {
     leave-to-class="translate-y-full sm:opacity-0 sm:scale-95 sm:translate-y-0"
   >
     <div
-      v-if="show"
+      v-show="show"
       @click.stop
       :class="[
         // Mobile: Full width, bottom sheet, max 85vh

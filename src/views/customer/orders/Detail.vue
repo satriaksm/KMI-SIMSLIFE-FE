@@ -85,7 +85,7 @@
             <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
             <div>
               <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
-                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? 'Pesanan Gagal Kirim' : 'Pesanan Dibatalkan' }}
+                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? (order.meta.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
               </p>
               <p v-if="order.meta.note || order.meta.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
                 {{ order.meta.failed_reason || order.meta.note }}
@@ -419,7 +419,7 @@
             Bayar Sekarang
           </Button>
           <Button
-            v-if="order?.status === 'pending' && order?.payment_method?.toUpperCase() === 'COD'"
+            v-if="order?.status === 'pending'"
             variant="danger-outline"
             block
             :loading="cancelling"

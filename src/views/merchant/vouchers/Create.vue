@@ -80,9 +80,19 @@ const schema = yup.object({
     .matches(/^\S+$/, "Kode voucher tidak boleh mengandung spasi"),
   voucher_description: yup.string().required("Deskripsi wajib diisi"),
   voucher_type: yup.string().required(),
-  value: yup.number().required().min(1),
-  voucher_start_date: yup.string().required(),
-  voucher_end_date: yup.string().required(),
+  value: yup.number().required().min(1).when("voucher_type", ([type], schema) => {
+    return type === "percent" ? schema.max(100, "Nilai persentase tidak boleh lebih dari 100%") : schema;
+  }),
+  voucher_start_date: yup.string().required("Tanggal mulai wajib diisi"),
+  voucher_end_date: yup.string().required("Tanggal akhir wajib diisi").test(
+    "is-after",
+    "Tanggal akhir tidak boleh mendahului tanggal mulai",
+    function (value) {
+      const { voucher_start_date } = this.parent;
+      if (!voucher_start_date || !value) return true;
+      return new Date(value) >= new Date(voucher_start_date);
+    }
+  ),
   usage_limit_per_user: yup.number().required().min(1),
 });
 
@@ -142,39 +152,47 @@ watch(usage_limit_per_user, (v) => setFieldValue("usage_limit_per_user", v));
 // ============================================================
 // SUBMIT HANDLER
 // ============================================================
-const onSubmit = veeHandleSubmit(async () => {
-  if (isDev) {
-    console.log("SUBMIT TERPANGGIL");
+const onSubmit = veeHandleSubmit(
+  async () => {
+    if (isDev) {
+      console.log("SUBMIT TERPANGGIL");
+    }
+
+    if (!isValidMerchant.value) {
+      toast.error("Merchant tidak valid");
+      return;
+    }
+
+    const payload = {
+      voucher_name: voucher_name.value,
+      voucher_code: voucher_code.value,
+      voucher_description: voucher_description.value,
+      voucher_type: voucher_type.value,
+      value: value.value,
+      voucher_start_date: voucher_start_date.value,
+      voucher_end_date: voucher_end_date.value,
+      min_purchase_amount: min_purchase_amount.value,
+      usage_limit_per_user: usage_limit_per_user.value,
+      usage_limit: usage_limit.value,
+    };
+
+    // hanya kirim max_discount kalau percent
+    if (voucher_type.value === "percent") {
+      payload.max_discount_amount = max_discount_amount.value;
+    }
+
+    try {
+      await createMerchantVoucher(currentMerchantSlug.value, payload);
+      router.push(`/merchant-center/${currentMerchantSlug.value}/vouchers`);
+    } catch (err) {}
+  },
+  ({ errors }) => {
+    const firstError = Object.values(errors)[0];
+    if (firstError) {
+      toast.error(firstError);
+    }
   }
-
-  if (!isValidMerchant.value) {
-    toast.error("Merchant tidak valid");
-    return;
-  }
-
-  const payload = {
-    voucher_name: voucher_name.value,
-    voucher_code: voucher_code.value,
-    voucher_description: voucher_description.value,
-    voucher_type: voucher_type.value,
-    value: value.value,
-    voucher_start_date: voucher_start_date.value,
-    voucher_end_date: voucher_end_date.value,
-    min_purchase_amount: min_purchase_amount.value,
-    usage_limit_per_user: usage_limit_per_user.value,
-    usage_limit: usage_limit.value,
-  };
-
-  // hanya kirim max_discount kalau percent
-  if (voucher_type.value === "percent") {
-    payload.max_discount_amount = max_discount_amount.value;
-  }
-
-  try {
-    await createMerchantVoucher(currentMerchantSlug.value, payload);
-    router.push(`/merchant-center/${currentMerchantSlug.value}/vouchers`);
-  } catch (err) {}
-});
+);
 </script>
 
 <!-- Template unchanged, just ensure mobile header back button uses dynamic route -->
