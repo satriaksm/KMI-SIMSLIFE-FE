@@ -96,12 +96,13 @@ const menuItems = computed(() => {
       route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
     },
 
-    // 🛒 Pesanan Masuk — hanya untuk Toko/Kuliner
-    ...(isJasaMerchant ? [] : [{
+    // 🛒 Pesanan Masuk — SEMUA merchant (Produk, Kuliner, dan Jasa)
+    // Jasa menggunakan tab "Jasa" di dalam halaman Pesanan Masuk
+    {
       label: "Pesanan Masuk",
       icon: "pi-shopping-bag",
       route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    }]),
+    },
 
     // 📊 Laporan — semua merchant
     {

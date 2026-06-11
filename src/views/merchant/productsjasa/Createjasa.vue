@@ -158,12 +158,12 @@ const formData = ref({
   fixed_price: 0,
   base_price: 0,
   operating_times: "",
-  service_type: "di_tempat_umkm", // online | di_tempat_umkm | ke_rumah_pelanggan
-  service_type_booking: "booking",
+  service_type: "di_tempat_umkm",
+  booking_type: "keranjang", // keranjang | booking | konsultasi — SATU-SATUNYA field untuk cara pemesanan
   location_address: "",
   service_area: "",
   special_notes: "",
-  payment_methods: ["cod"], // array agar konsisten dengan Editjasa.vue
+  payment_methods: ["cod"],
   status: "draft",
 });
 
@@ -207,11 +207,11 @@ const validationSchema = yup.object({
   base_price: yup.number().transform((value) => (isNaN(value) || value === "" ? 0 : Number(value))).min(0),
   operating_times: yup.string().nullable(),
   service_type: yup.string().required("Tipe layanan wajib dipilih"),
-  service_type_booking: yup.string().required("Cara pemesanan wajib dipilih").oneOf(['keranjang', 'booking', 'konsultasi'], "Pilih 'Keranjang', 'Booking' atau 'Konsultasi'"),
+  booking_type: yup.string().required("Pilih cara pemesanan terlebih dahulu").oneOf(['keranjang', 'booking', 'konsultasi'], "Pilih 'Keranjang', 'Booking' atau 'Konsultasi'"),
   location_address: yup.string().nullable(),
   service_area: yup.string().nullable(),
   special_notes: yup.string().nullable(),
-  payment_methods: yup.array().nullable(), // array agar konsisten dengan Editjasa.vue
+  payment_methods: yup.array().nullable(),
   status: yup.string(),
 });
 
@@ -259,6 +259,9 @@ const toggleSelectAllOperatingTimes = () => {
 };
 
 const isGroupFullySelected = (groupTimes) => groupTimes.every((time) => selectedOperatingTimes.value.includes(time));
+
+// Computed: Harga Tetap disabled saat booking_type = konsultasi
+const isFixedPriceDisabled = computed(() => formData.value.booking_type === 'konsultasi');
 
 const toggleGroupOperatingTimes = (groupTimes) => {
   const current = [...selectedOperatingTimes.value];
@@ -388,7 +391,7 @@ const submitForm = async () => {
   console.log('1. currentMerchantSlug:', currentMerchantSlug.value);
   console.log('2. currentMerchantId:', currentMerchantId.value);
   console.log('3. isAuthenticated:', authStore.isAuthenticated);
-  console.log('4. service_type_booking:', formData.value.service_type_booking);
+  console.log('4. booking_type:', formData.value.booking_type);
   console.log('5. operating_times:', formData.value.operating_times);
   console.log('6. fixed_price:', formData.value.fixed_price);
   console.log('7. base_price:', formData.value.base_price);
@@ -406,26 +409,49 @@ const submitForm = async () => {
     toast.error("Silakan login terlebih dahulu."); router.push("/login"); return;
   }
 
-  if (formData.value.service_type_booking === 'booking' && !formData.value.operating_times?.trim()) {
+  // Validasi: booking_type wajib dipilih
+  if (!formData.value.booking_type) {
+    console.log('❌ Gagal: Cara pemesanan belum dipilih');
+    toast.error("Pilih cara pemesanan terlebih dahulu");
+    return;
+  }
+
+  // Validasi: booking_type = booking wajib ada jam layanan
+  if (formData.value.booking_type === 'booking' && !formData.value.operating_times?.trim()) {
     console.log('❌ Gagal: Booking tanpa jam layanan');
     toast.error("Jam layanan wajib diisi untuk Booking");
     return;
   }
 
   // IMPORTANT: Use ?? instead of || to handle 0 values (0 is falsy)
-  const fixedPrice = Number(formData.value.fixed_price ?? 0);
-  const basePrice = Number(formData.value.base_price ?? 0);
+  let fixedPrice = Number(formData.value.fixed_price ?? 0);
+  let basePrice = Number(formData.value.base_price ?? 0);
+
+  // Logic Harga untuk konsultasi: Harga Tetap disabled& dikosongkan
+  if (formData.value.booking_type === 'konsultasi') {
+    fixedPrice = 0;
+    formData.value.fixed_price = 0;
+    // base_price wajib diisi untuk konsultasi
+    if (!basePrice) {
+      console.log('❌ Gagal: Konsultasi tanpa Harga Mulai Dari');
+      toast.error("Harga Mulai Dari wajib diisi untuk Konsultasi");
+      return;
+    }
+  } else {
+    // Aturan pilih salah satu harga (keranjang/booking)
+    if (!fixedPrice && !basePrice) {
+      console.log('❌ Gagal: Tidak ada harga diisi');
+      toast.error("Pilih salah satu: Harga Tetap atau Harga Mulai Dari");
+      return;
+    }
+    if (fixedPrice && basePrice) {
+      console.log('❌ Gagal: Kedua harga terisi');
+      toast.error("Jangan isi keduanya sekaligus");
+      return;
+    }
+  }
+
   console.log("[Createjasa] Prices parsed:", { fixedPrice, basePrice });
-  if (!fixedPrice && !basePrice) {
-    console.log('❌ Gagal: Tidak ada harga diisi');
-    toast.error("Pilih salah satu: Harga Tetap atau Harga Mulai Dari");
-    return;
-  }
-  if (fixedPrice && basePrice) {
-    console.log('❌ Gagal: Kedua harga terisi');
-    toast.error("Jangan isi keduanya sekaligus");
-    return;
-  }
   console.log('✅ Semua validasi awal PASSED');
 
   isSubmitting.value = true;
@@ -442,13 +468,11 @@ const submitForm = async () => {
     // Legacy price field mirrors whichever price is set
     fd.set("price", String(fixedPrice > 0 ? fixedPrice : basePrice));
     fd.set("service_type", formData.value.service_type || "di_tempat_umkm");
-    fd.set("service_type_booking", formData.value.service_type_booking || "booking");
-    // Send cara_pemesanan — value harus sama persis dengan backend rule: in:keranjang,booking,konsultasi
-    fd.set("cara_pemesanan", formData.value.service_type_booking || "keranjang");
-    fd.set("booking_type", formData.value.service_type_booking || "booking");
+    // HANYA booking_type yang dikirim — backend yang menormalisasi
+    fd.set("booking_type", formData.value.booking_type || "keranjang");
     fd.set("location_address", formData.value.location_address || "");
     // Operating times: send as JSON array for booking, empty for others
-    if (formData.value.service_type_booking === 'booking') {
+    if (formData.value.booking_type === 'booking') {
       const times = selectedOperatingTimes.value;
       fd.set("operating_times", JSON.stringify(times));
       console.log("[Createjasa] Booking operating_times:", times);
@@ -616,11 +640,57 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Section 2: Harga -->
+          <!-- Section 2: Cara Pemesanan -->
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-9 h-9 rounded-full bg-pink-100 flex items-center justify-center">
+                <span class="text-sm font-bold text-pink-600">2</span>
+              </div>
+              <h2 class="text-base font-semibold text-slate-800">Cara Pemesanan</h2>
+            </div>
+
+            <div class="space-y-2.5">
+              <label v-for="opt in [
+                { value: 'keranjang', icon: 'pi-shopping-cart', label: 'Keranjang', desc: 'Tanpa jadwal, langsung checkout' },
+                { value: 'booking', icon: 'pi-calendar', label: 'Booking', desc: 'Pilih tanggal & jam dulu' },
+                { value: 'konsultasi', icon: 'pi-comments', label: 'Konsultasi', desc: 'Chat untuk negosiasi' }
+              ]" :key="opt.value"
+                class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition"
+                :class="formData.booking_type === opt.value ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-200'"
+                @click="formData.booking_type = opt.value">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                  :class="formData.booking_type === opt.value ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'">
+                  <i :class="['pi', opt.icon]"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-slate-700">{{ opt.label }}</p>
+                  <p class="text-xs text-slate-400">{{ opt.desc }}</p>
+                </div>
+                <div v-if="formData.booking_type === opt.value" class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                  <i class="pi pi-check text-white text-[10px]"></i>
+                </div>
+              </label>
+            </div>
+
+            <div v-if="formData.booking_type === 'booking'" class="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <p class="text-sm text-amber-700 flex items-start gap-2">
+                <i class="pi pi-info-circle mt-0.5"></i>
+                <span><strong>Booking:</strong> Jam layanan wajib diisi agar customer bisa memilih jadwal</span>
+              </p>
+            </div>
+            <div v-else-if="formData.booking_type === 'konsultasi'" class="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
+              <p class="text-sm text-purple-700 flex items-start gap-2">
+                <i class="pi pi-comments mt-0.5"></i>
+                <span><strong>Konsultasi:</strong> Customer chat untuk negosiasi harga & jadwal</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Section 3: Harga -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
             <div class="flex items-center gap-3 mb-4">
               <div class="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
-                <span class="text-sm font-bold text-emerald-600">2</span>
+                <span class="text-sm font-bold text-emerald-600">3</span>
               </div>
               <h2 class="text-base font-semibold text-slate-800">Harga Layanan</h2>
             </div>
@@ -642,10 +712,11 @@ onBeforeUnmount(() => {
                     min="0"
                     placeholder="0"
                     class="w-full pl-10 pr-4 py-3 text-sm border rounded-xl focus:outline-none transition disabled:bg-slate-50"
-                    :class="formData.base_price > 0 ? 'border-slate-200 bg-slate-50' : formData.fixed_price > 0 && formData.base_price > 0 ? 'border-red-500 focus:ring-2 focus:ring-red-500' : 'border-slate-200 focus:ring-2 focus:ring-emerald-500'"
-                    :disabled="formData.base_price > 0"
+                    :class="isFixedPriceDisabled ? 'border-slate-200 bg-slate-50' : formData.base_price > 0 ? 'border-slate-200 bg-slate-50' : formData.fixed_price > 0 && formData.base_price > 0 ? 'border-red-500 focus:ring-2 focus:ring-red-500' : 'border-slate-200 focus:ring-2 focus:ring-emerald-500'"
+                    :disabled="isFixedPriceDisabled"
                   />
                 </div>
+                <p v-if="isFixedPriceDisabled" class="mt-1 text-xs text-purple-500">Tidak berlaku untuk Konsultasi</p>
               </div>
 
               <!-- Base Price -->
@@ -659,7 +730,7 @@ onBeforeUnmount(() => {
                     id="base_price"
                     name="base_price"
                     v-model.number="formData.base_price"
-                    @input="() => { if(formData.base_price > 0) formData.fixed_price = 0; }"
+                    @input="() => { if(formData.base_price > 0 && !isFixedPriceDisabled) formData.fixed_price = 0; }"
                     type="number"
                     min="0"
                     placeholder="0"
@@ -668,21 +739,26 @@ onBeforeUnmount(() => {
                     :disabled="formData.fixed_price > 0"
                   />
                 </div>
+                <p v-if="formData.booking_type === 'konsultasi'" class="mt-1 text-xs text-purple-500">Wajib diisi untuk Konsultasi</p>
               </div>
             </div>
 
             <!-- Info -->
-            <p class="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
+            <p v-if="formData.booking_type === 'konsultasi'" class="mt-2 text-xs text-purple-600 flex items-center gap-1.5">
+              <i class="pi pi-info-circle text-purple-400"></i>
+              Konsultasi menggunakan Harga Mulai Dari saja
+            </p>
+            <p v-else class="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
               <i class="pi pi-info-circle text-slate-400"></i>
               Pilih salah satu saja
             </p>
           </div>
 
-          <!-- Section 3: Gambar -->
+          <!-- Section 4: Gambar -->
           <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
             <div class="flex items-center gap-3 mb-4">
               <div class="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center">
-                <span class="text-sm font-bold text-purple-600">3</span>
+                <span class="text-sm font-bold text-purple-600">4</span>
               </div>
               <div class="flex-1">
                 <h2 class="text-base font-semibold text-slate-800">Gambar Layanan</h2>
@@ -722,52 +798,6 @@ onBeforeUnmount(() => {
                 Belum ada gambar
               </p>
               <p class="text-xs text-slate-400">{{ imageFiles.length }}/{{ MAX_IMAGE_COUNT }} foto</p>
-            </div>
-          </div>
-
-          <!-- Section 4: Cara Pemesanan -->
-          <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-9 h-9 rounded-full bg-pink-100 flex items-center justify-center">
-                <span class="text-sm font-bold text-pink-600">4</span>
-              </div>
-              <h2 class="text-base font-semibold text-slate-800">Cara Pemesanan</h2>
-            </div>
-
-            <div class="space-y-2.5">
-              <label v-for="opt in [
-                { value: 'keranjang', icon: 'pi-shopping-cart', label: 'Keranjang', desc: 'Tanpa jadwal, langsung checkout' },
-                { value: 'booking', icon: 'pi-calendar', label: 'Booking', desc: 'Pilih tanggal & jam dulu' },
-                { value: 'konsultasi', icon: 'pi-comments', label: 'Konsultasi', desc: 'Chat untuk negosiasi' }
-              ]" :key="opt.value"
-                class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition"
-                :class="formData.service_type_booking === opt.value ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-200'"
-                @click="formData.service_type_booking = opt.value">
-                <div class="w-10 h-10 rounded-full flex items-center justify-center"
-                  :class="formData.service_type_booking === opt.value ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'">
-                  <i :class="['pi', opt.icon]"></i>
-                </div>
-                <div class="flex-1">
-                  <p class="text-sm font-semibold text-slate-700">{{ opt.label }}</p>
-                  <p class="text-xs text-slate-400">{{ opt.desc }}</p>
-                </div>
-                <div v-if="formData.service_type_booking === opt.value" class="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
-                  <i class="pi pi-check text-white text-[10px]"></i>
-                </div>
-              </label>
-            </div>
-
-            <div v-if="formData.service_type_booking === 'booking'" class="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
-              <p class="text-sm text-amber-700 flex items-start gap-2">
-                <i class="pi pi-info-circle mt-0.5"></i>
-                <span><strong>Booking:</strong> Jam layanan wajib diisi agar customer bisa memilih jadwal</span>
-              </p>
-            </div>
-            <div v-else-if="formData.service_type_booking === 'konsultasi'" class="mt-4 p-4 bg-purple-50 rounded-xl border border-purple-200">
-              <p class="text-sm text-purple-700 flex items-start gap-2">
-                <i class="pi pi-comments mt-0.5"></i>
-                <span><strong>Konsultasi:</strong> Customer chat untuk negosiasi harga & jadwal</span>
-              </p>
             </div>
           </div>
 
@@ -827,7 +857,7 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- Jam Layanan (khusus booking) -->
-              <div v-if="formData.service_type_booking === 'booking'" class="mt-2">
+              <div v-if="formData.booking_type === 'booking'" class="mt-2">
                 <label class="block text-sm font-semibold text-slate-700 mb-2">
                   Jam Layanan <span class="text-red-500">*</span>
                 </label>

@@ -293,35 +293,38 @@ const fetchOrders = async () => {
     const url = `/api/merchant/${merchantSlug.value}/service-orders`;
     const { data } = await api.get(url, { params: { page: 1, per_page: 100 } });
 
-    console.log('[fetchOrders] Raw response:', data);
+    console.log('[fetchOrders] Full response:', data);
 
-    // Check if the request was successful
+    // Laravel paginate response wrapped in ApiResponse::success():
+    // { message: "success", data: { current_page, data: [...], total, ... } }
     const res = data;
-    console.log('[fetchOrders] Response message:', res?.message, '| data:', res?.data);
+    const responseData = res?.data;
 
-    // ApiResponse::success → { message: 'success', data: [...] }
-    const hasSuccessFlag = res?.status === true || res?.status === 'success' || res?.success === true;
-    const hasSuccessMessage = typeof res?.message === 'string' && res.message === 'success';
-    const hasDataArray = Array.isArray(res?.data);
-    const hasDataObject = res?.data && typeof res?.data === 'object' && !Array.isArray(res?.data);
-    const isSuccess = hasSuccessFlag || hasSuccessMessage || hasDataArray || hasDataObject;
+    // Check if it's a paginated response (has current_page, data, total)
+    const isPaginated = responseData &&
+      typeof responseData === 'object' &&
+      'current_page' in responseData &&
+      'data' in responseData;
 
-    console.log('[fetchOrders] Success check:', { hasSuccessFlag, hasSuccessMessage, hasDataArray, hasDataObject }, '→', isSuccess);
+    let rawData = [];
 
-    if (!isSuccess) {
-      console.error('[fetchOrders] Failed - response:', JSON.stringify(res));
-      toast.error(res?.message || 'Gagal memuat history pesanan');
-      orders.value = [];
-      return;
+    if (isPaginated) {
+      // Extract orders from paginated data
+      console.log('[fetchOrders] Paginated response detected');
+      console.log('[fetchOrders] Total records:', responseData.total);
+      rawData = Array.isArray(responseData.data) ? responseData.data : [];
+    } else if (Array.isArray(responseData)) {
+      // Direct array response
+      rawData = responseData;
+    } else if (responseData && typeof responseData === 'object') {
+      // Try to find array property
+      const arrayProp = Object.values(responseData).find(v => Array.isArray(v));
+      rawData = arrayProp || [];
     }
 
-    // Extract orders data
-    let rawData = res?.data;
     console.log('[fetchOrders] Raw data:', rawData);
-    orders.value =
-      Array.isArray(rawData) ? rawData :
-      (rawData && typeof rawData === 'object') ? (rawData.orders || rawData.data || []) :
-      [];
+    orders.value = rawData;
+
     console.log('[fetchOrders] Extracted orders:', orders.value.length);
 
     // Debug: log sample statuses
@@ -338,6 +341,7 @@ const fetchOrders = async () => {
     });
   } catch (error) {
     console.error('[fetchOrders] Error:', error);
+    console.error('[fetchOrders] Error response:', error.response?.data);
     const errorMessage = error.response?.data?.message || error.message || 'Gagal memuat history pesanan';
     toast.error(errorMessage);
     orders.value = [];
