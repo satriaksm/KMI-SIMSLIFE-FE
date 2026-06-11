@@ -799,13 +799,16 @@ onBeforeRouteLeave(() => {
         @prev-page="prevPage"
       >
         <template #cell-voucher_name="{ value, item }">
-          <div class="flex flex-col">
-            <span
-              class="text-sm font-semibold truncate transition text-merchant-primary"
-              :title="value"
-            >
-              {{ value }}
-            </span>
+          <div class="flex flex-col items-start gap-1">
+            <div class="flex items-center gap-2">
+              <span
+                class="text-sm font-semibold truncate transition text-merchant-primary"
+                :title="value"
+              >
+                {{ value }}
+              </span>
+              <span v-if="item.is_secret" class="px-1.5 py-0.5 text-[10px] font-semibold text-gray-700 bg-gray-200 rounded">Secret</span>
+            </div>
             <span
               v-if="item.event?.event_name"
               class="text-xs truncate text-muted-foreground"
@@ -907,7 +910,8 @@ onBeforeRouteLeave(() => {
           @view-detail="goToDetail"
         >
           <template #badges="{ item }">
-            <div class="flex items-center gap-2 mt-2">
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              <span v-if="item.is_secret" class="px-1.5 py-0.5 text-[10px] font-semibold text-gray-700 bg-gray-200 rounded">Secret</span>
               <span
                 class="inline-flex items-center px-2.5 py-1 bg-merchant-primary/10 text-merchant-primary rounded-md text-xs font-medium whitespace-nowrap"
               >

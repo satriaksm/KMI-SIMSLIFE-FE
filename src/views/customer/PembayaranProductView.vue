@@ -110,33 +110,16 @@
 
       <!-- Metode Pengiriman -->
       <section class="p-4 bg-white border border-gray-200 rounded-xl">
-        <h2 class="mb-3 font-semibold text-gray-800">Metode Pengiriman</h2>
-        <div class="flex items-center gap-4 text-sm">
-          <label
-            class="flex items-center gap-2"
-            :class="
-              isGuest ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-            "
-          >
-            <input
-              type="radio"
-              value="delivery"
-              v-model="form.metodePengiriman"
-              :disabled="isGuest"
-              class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <span>Diantar</span>
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="pickup"
-              v-model="form.metodePengiriman"
-              class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <span>Ambil Sendiri</span>
-          </label>
-        </div>
+        <RadioGroupPills
+          name="metodePengiriman"
+          label="Metode Pengiriman"
+          :options="[
+            { value: 'delivery', label: 'Diantar', disabled: isGuest },
+            { value: 'pickup', label: 'Ambil Sendiri' }
+          ]"
+          v-model="form.metodePengiriman"
+          variant="primary"
+        />
       </section>
 
       <!-- Detail Alamat - hanya tampil jika diantar -->
@@ -193,93 +176,108 @@
         v-if="!isGuest"
         class="overflow-hidden bg-white border border-gray-200 rounded-xl"
       >
-        <div class="flex items-center justify-between px-4 py-3 bg-lime-50">
-          <div class="text-sm font-semibold text-gray-800">
-            {{
-              selectedPromo ? selectedPromo.name : "Belum ada voucher dipilih"
-            }}
+        <div class="flex flex-col px-4 py-3 bg-lime-50" :class="{ 'gap-2': selectedPromo }">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-semibold text-gray-800">
+              {{ selectedPromo ? selectedPromo.name : "Belum ada voucher dipilih" }}
+            </div>
+            <button
+              v-if="!selectedPromo"
+              class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
+              @click="openPromo = true"
+            >
+              Pilih
+            </button>
+            <button
+              v-else
+              class="px-3 py-1 text-xs font-semibold text-red-700 transition bg-red-100 rounded-full hover:bg-red-200"
+              @click="clearPromo"
+            >
+              Batalkan
+            </button>
           </div>
-          <button
-            v-if="!selectedPromo"
-            class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
-            @click="openPromo = true"
-          >
-            Pilih
-          </button>
-          <button
-            v-else
-            class="px-3 py-1 text-xs font-semibold text-red-700 transition bg-red-100 rounded-full hover:bg-red-200"
-            @click="clearPromo"
-          >
-            Batalkan
-          </button>
+          
+          <div v-if="selectedPromo" class="text-xs text-gray-600 space-y-1 mt-1">
+            <p>{{ selectedPromo.desc }}</p>
+            <p class="font-mono text-gray-500">Kode: {{ selectedPromo.code }}</p>
+            <p class="text-green-600 font-semibold mt-1">
+              Diskon: {{ selectedPromo.type === 'percent' ? selectedPromo.value + '%' : 'Rp ' + formatIDR(selectedPromo.value) }}
+              <span v-if="selectedPromo.type === 'percent' && selectedPromo.max_discount" class="text-gray-500 font-normal">
+                (Maks. Rp {{ formatIDR(selectedPromo.max_discount) }})
+              </span>
+            </p>
+          </div>
         </div>
+        
         <button
-          class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
+          class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50 border-t border-gray-200"
           @click="openPromo = true"
         >
-          Lihat promo lainnya <span>&rarr;</span>
+          Lihat voucher lainnya <span>&rarr;</span>
         </button>
       </section>
 
-      <!-- Ringkasan Pembayaran -->
+      <!-- Metode Pembayaran -->
+      <section class="p-4 bg-white border border-gray-200 rounded-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-gray-800">Metode Pembayaran</h2>
+          <button
+            class="text-xs font-semibold text-[#FFA30E] hover:text-[#e5920d] transition"
+            @click="openPaymentMethod = true"
+          >
+            Ubah
+          </button>
+        </div>
+        <div class="space-y-3">
+          <div v-if="paymentFeesLoading" class="w-full h-12 bg-gray-100 rounded-xl animate-pulse"></div>
+          <div v-else class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50">
+            <i :class="['pi', selectedPaymentMethod?.icon || 'pi-wallet', 'text-gray-500 text-lg']"></i>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold text-gray-800">{{ selectedPaymentMethod?.name || 'Pilih Metode Pembayaran' }}</div>
+              <div v-if="selectedPaymentMethod?.description" class="text-[11px] text-gray-500">{{ selectedPaymentMethod.description }}</div>
+            </div>
+          </div>
+          <p
+            v-if="form.metodePengiriman === 'delivery'"
+            class="flex items-start gap-1 mt-1 text-xs text-amber-600"
+          >
+            <i class="mt-0.5 pi pi-info-circle"></i>
+            <span>Untuk pengiriman, pembayaran wajib menggunakan non-tunai</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- Modal Payment Method -->
+      <ResponsiveModal
+        :show="openPaymentMethod"
+        @close="openPaymentMethod = false"
+        title="Pilih Metode Pembayaran"
+        subtitle="Pilih metode pembayaran yang tersedia"
+      >
+        <div class="space-y-4">
+          <div v-for="group in groupedPaymentMethods" :key="group.type">
+            <div class="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">{{ group.title }}</div>
+            <RadioGroupPills
+              name="payMethod"
+              layout="grid"
+              :options="group.items.map(m => ({
+                value: m.id,
+                label: m.name,
+                icon: m.icon,
+                description: m.description,
+                disabled: m.id === 'COD' && form.metodePengiriman === 'delivery'
+              }))"
+              v-model="pay.method"
+              @update:modelValue="openPaymentMethod = false"
+              variant="primary"
+            />
+          </div>
+        </div>
+      </ResponsiveModal>
+
       <section class="p-4 bg-white border border-gray-200 rounded-xl">
         <h2 class="mb-3 font-semibold text-gray-800">Ringkasan Pembayaran</h2>
-        <div class="space-y-3">
-          <div>
-            <div class="mb-2 text-sm font-bold text-gray-800">Metode Pembayaran</div>
-            <div v-if="paymentFeesLoading" class="space-y-4 py-2 animate-pulse">
-              <div class="w-32 h-3 bg-gray-200 rounded mb-3"></div>
-              <div class="grid gap-2 sm:grid-cols-2">
-                <div v-for="n in 4" :key="'skl-'+n" class="border border-gray-100 rounded-xl p-3 flex gap-3">
-                  <div class="w-4 h-4 rounded-full bg-gray-200 shrink-0 mt-0.5"></div>
-                  <div class="space-y-2 flex-1">
-                    <div class="w-24 h-4 bg-gray-200 rounded"></div>
-                    <div class="w-32 h-3 bg-gray-100 rounded"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="space-y-4">
-              <div v-for="group in groupedPaymentMethods" :key="group.type">
-                <div class="mb-2 text-xs font-bold text-gray-500 uppercase tracking-wider">{{ group.title }}</div>
-                <div class="grid gap-2 sm:grid-cols-2">
-                  <label
-                    v-for="method in group.items"
-                    :key="method.id"
-                    class="flex items-start gap-3 p-3 transition-colors border rounded-xl"
-                    :class="[
-                      pay.method === method.id ? 'border-[#FFA30E] bg-orange-50' : 'border-gray-200 cursor-pointer hover:bg-gray-50',
-                      (method.id === 'COD' && form.metodePengiriman === 'delivery') ? 'opacity-50 cursor-not-allowed' : ''
-                    ]"
-                  >
-                    <input
-                      type="radio"
-                      :value="method.id"
-                      v-model="pay.method"
-                      :disabled="method.id === 'COD' && form.metodePengiriman === 'delivery'"
-                      class="mt-1 w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E] disabled:cursor-not-allowed"
-                    />
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                        <i :class="['pi', method.icon, 'text-gray-600']"></i>
-                        {{ method.name }}
-                      </div>
-                      <div class="mt-1 text-[11px] text-gray-500">{{ method.description }}</div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-            <p
-              v-if="form.metodePengiriman === 'delivery'"
-              class="flex items-start gap-1 mt-3 text-xs text-amber-600"
-            >
-              <i class="mt-0.5 pi pi-info-circle"></i>
-              <span>Untuk pengiriman, pembayaran wajib menggunakan non-tunai</span>
-            </p>
-          </div>
-          <div
+        <div
             class="pt-3 space-y-2 text-sm text-gray-700 border-t border-gray-200"
           >
             <div class="flex justify-between">
@@ -341,7 +339,6 @@
               <span class="text-[#FFA30E]">Rp {{ formatIDR(total) }}</span>
             </div>
           </div>
-        </div>
       </section>
     </main>
 
@@ -359,9 +356,11 @@
         <button
           class="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white font-semibold bg-[#FFA30E] hover:bg-[#e5920d] transition disabled:opacity-50 disabled:cursor-not-allowed"
           @click="handleCheckout"
-          :disabled="!isFormValid || isSubmitting"
+          :disabled="!isFormValid || isSubmitting || isOwnProduct"
+          :title="isOwnProduct ? 'Anda tidak dapat membeli produk dari toko sendiri' : undefined"
         >
-          <span v-if="isSubmitting">Memproses...</span>
+          <span v-if="isOwnProduct">Toko Anda Sendiri</span>
+          <span v-else-if="isSubmitting">Memproses...</span>
           <span v-else>Buat Pesanan</span>
         </button>
       </div>
@@ -375,6 +374,26 @@
       title="Pilih Promo"
       subtitle="Gunakan promo untuk mendapat potongan harga"
     >
+      <div class="mb-4 space-y-2">
+        <label class="text-sm font-semibold text-gray-800">Punya Kode Voucher?</label>
+        <div class="flex gap-2">
+          <input 
+            v-model="inputVoucherCode" 
+            type="text" 
+            placeholder="Masukkan kode voucher"
+            class="flex-1 w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-[#FFA30E] focus:border-[#FFA30E] outline-none"
+            @keyup.enter="validateVoucherCode"
+          />
+          <button 
+            @click="validateVoucherCode"
+            :disabled="isValidatingVoucher || !inputVoucherCode"
+            class="px-4 py-2 text-sm font-semibold text-white transition rounded-lg bg-[#FFA30E] hover:bg-[#e5920d] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span v-if="isValidatingVoucher">Memproses...</span>
+            <span v-else>Terapkan</span>
+          </button>
+        </div>
+      </div>
       <div class="space-y-3">
         <div
           v-if="voucherLoading"
@@ -430,15 +449,17 @@
           <div class="text-xs text-gray-500">Pemakaian: {{ p.usage }}</div>
           <button
             class="w-full py-2 mt-2 text-xs font-semibold transition rounded-lg"
-            :disabled="p.is_expired || !isPromoEligible(p)"
-            :class="
-              p.is_expired || !isPromoEligible(p)
+            :disabled="p.is_expired || (!isPromoEligible(p) && selectedPromo?.code !== p.code)"
+            :class="[
+              p.is_expired || (!isPromoEligible(p) && selectedPromo?.code !== p.code)
                 ? 'bg-gray-200 text-gray-400'
+                : selectedPromo?.code === p.code
+                ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
                 : 'bg-[#FFA30E] text-white hover:bg-[#e5920d]'
-            "
-            @click="usePromo(p)"
+            ]"
+            @click="selectedPromo?.code === p.code ? clearPromo() : usePromo(p)"
           >
-            {{ p.is_expired ? "Tidak Berlaku" : "Gunakan Voucher" }}
+            {{ p.is_expired ? "Tidak Berlaku" : selectedPromo?.code === p.code ? "Batalkan Voucher" : "Gunakan Voucher" }}
           </button>
         </div>
       </div>
@@ -459,6 +480,7 @@ import { computed, ref, watch, onMounted } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 import { useCheckoutStore } from "@/stores/checkout";
@@ -496,6 +518,53 @@ const router = useRouter();
 const route = useRoute();
 const checkout = useCheckoutStore();
 const isSubmitting = ref(false);
+
+const inputVoucherCode = ref("");
+const isValidatingVoucher = ref(false);
+
+const validateVoucherCode = async () => {
+  if (!inputVoucherCode.value) return;
+  isValidatingVoucher.value = true;
+  try {
+    const { data: res } = await api.post(`/api/checkout/${order.value.store?.slug}/vouchers/validate`, {
+      code: inputVoucherCode.value
+    });
+    
+    const voucher = {
+      id: res.data.id,
+      code: res.data.voucher_code,
+      name: res.data.voucher_name,
+      desc: res.data.voucher_description,
+      type: res.data.voucher_type,
+      value: Number(res.data.value),
+      min_purchase: Number(res.data.min_purchase_amount),
+      max_discount: res.data.max_discount_amount ? Number(res.data.max_discount_amount) : null,
+      is_expired: res.data.is_expired,
+      usage: res.data.usage,
+      is_secret: res.data.is_secret,
+    };
+
+    // Check if it already exists in the list
+    const existingIndex = promos.value.findIndex(p => p.code === voucher.code);
+    if (existingIndex === -1) {
+      promos.value.unshift(voucher); // add to top
+    } else {
+      promos.value[existingIndex] = voucher; // update
+    }
+
+    if (!isPromoEligible(voucher)) {
+      toast.error('Voucher valid tapi tidak memenuhi syarat minimum pembelian.');
+    } else {
+      usePromo(voucher);
+      toast.success('Voucher berhasil diterapkan!');
+    }
+    inputVoucherCode.value = "";
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Kode voucher tidak valid');
+  } finally {
+    isValidatingVoucher.value = false;
+  }
+};
 
 const checkoutItems = computed(() => {
   if (checkout.from === "cart") {
@@ -540,6 +609,13 @@ const order = computed(() => {
   };
 });
 
+const isOwnProduct = computed(() => {
+  if (!auth.isAuthenticated) return false;
+  const merchantId = order.value?.store?.id;
+  if (!merchantId) return false;
+  return !!auth.getMerchantById(merchantId);
+});
+
 const amounts = ref({ product: 0, ongkir: 0, diskon: 0 });
 
 const paymentMethodsList = ref([
@@ -554,6 +630,12 @@ const paymentMethodsList = ref([
   { id: 'DANA', name: 'DANA', type: 'ewallet', feeType: 'percent', feeValue: 0.015, icon: 'pi-wallet', description: 'Biaya admin 1.5%' },
   { id: 'ALFAMART', name: 'Alfamart / Alfamidi', type: 'retail', feeType: 'fixed', feeValue: 5550, icon: 'pi-shopping-bag', description: 'Biaya admin Rp 5.550' },
 ]);
+
+const openPaymentMethod = ref(false);
+
+const selectedPaymentMethod = computed(() => {
+  return paymentMethodsList.value.find(m => m.id === pay.value.method) || null;
+});
 
 const paymentFeesLoading = ref(true);
 
@@ -705,6 +787,7 @@ const promos = computed(() =>
 // Address
 const openPromo = ref(false);
 useBodyScrollLock(openPromo);
+useBodyScrollLock(openPaymentMethod);
 const selectedAddress = ref(null);
 const addresses = ref([]);
 const addressesLoading = ref(false);

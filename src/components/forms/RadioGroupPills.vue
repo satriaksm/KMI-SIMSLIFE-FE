@@ -29,8 +29,12 @@ const props = defineProps({
   label: { type: String, default: "" },
   options: { type: Array, required: true },
   variant: { type: String, default: "primary" },
-  required: { type: Boolean, default: false }, // NEW
+  required: { type: Boolean, default: false },
+  modelValue: { type: [String, Number, Boolean], default: undefined },
+  layout: { type: String, default: "flex" },
 });
+
+const emit = defineEmits(["update:modelValue"]);
 
 const borderColorClass = computed(() => {
   return props.variant === "merchant"
@@ -69,35 +73,54 @@ const ringColorClass = computed(() => {
       {{ label }}
       <span v-if="required" class="text-danger-foreground">*</span>
     </span>
-    <div class="flex flex-wrap items-center gap-3">
+    <div :class="layout === 'grid' ? 'grid gap-2 sm:grid-cols-2' : 'flex flex-wrap items-center gap-3'">
       <label
         v-for="opt in options"
         :key="opt.value"
-        class="cursor-pointer select-none"
+        :class="[
+          'select-none',
+          opt.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+          layout === 'grid' ? 'w-full' : ''
+        ]"
       >
         <Field
           type="radio"
           :name="name"
           :value="opt.value"
+          :disabled="opt.disabled"
+          :modelValue="modelValue"
+          @update:modelValue="(val) => emit('update:modelValue', val)"
           class="sr-only peer"
         />
         <span
           :class="[
-            'inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-muted-foreground text-muted-foreground transition',
-            borderColorClass,
-            textColorClass,
-            bgColorClass,
-            ringColorClass,
-            'peer-focus:ring-1 group',
+            layout === 'grid' ? 'flex items-start gap-3 w-full h-full' : 'inline-flex items-center gap-2',
+            'px-3 py-3 rounded-xl border border-muted-foreground text-muted-foreground transition',
+            !opt.disabled ? borderColorClass : '',
+            !opt.disabled ? textColorClass : '',
+            !opt.disabled ? bgColorClass : '',
+            !opt.disabled ? ringColorClass : '',
+            !opt.disabled ? 'peer-focus:ring-1 group' : 'bg-gray-100'
           ]"
         >
           <span
             :class="[
-              'h-2.5 w-2.5 rounded-full bg-muted-foreground transition',
-              dotColorClass,
+              'rounded-full bg-muted-foreground transition shrink-0',
+              layout === 'grid' ? 'mt-1 w-3 h-3' : 'w-2.5 h-2.5',
+              !opt.disabled ? dotColorClass : ''
             ]"
           ></span>
-          <span class="text-sm">{{ opt.label }}</span>
+          
+          <div v-if="opt.description || opt.icon" class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 text-sm font-semibold">
+              <i v-if="opt.icon" :class="['pi', opt.icon, !opt.disabled ? 'text-inherit opacity-80' : 'text-gray-500']"></i>
+              {{ opt.label }}
+            </div>
+            <div v-if="opt.description" class="mt-1 text-[11px]" :class="!opt.disabled ? 'text-gray-500' : 'text-gray-400'">
+              {{ opt.description }}
+            </div>
+          </div>
+          <span v-else class="text-sm">{{ opt.label }}</span>
         </span>
       </label>
     </div>

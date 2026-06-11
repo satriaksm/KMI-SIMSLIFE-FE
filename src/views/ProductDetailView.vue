@@ -759,8 +759,11 @@
         v-if="!isAdmin"
         @click="addToCart"
         class="w-12 h-12 rounded-xl border-2 border-[#FFA30E] text-[#FFA30E] hover:bg-orange-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:-translate-y-0.5 active:scale-95"
-        :disabled="getCurrentStock() === 0 || isArchived"
-        :title="getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'"
+        :disabled="getCurrentStock() === 0 || isArchived || isOwnProduct"
+        :title="
+          isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
+          getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'
+        "
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -783,10 +786,13 @@
         @click="buyNow"
         variant="primary"
         customClass="w-full"
-        :disabled="getCurrentStock() === 0 || isArchived || isAdmin"
-        :title="isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined"
+        :disabled="getCurrentStock() === 0 || isArchived || isAdmin || isOwnProduct"
+        :title="
+          isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
+          isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined
+        "
       >
-        {{ getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
+        {{ isOwnProduct ? "Toko Anda Sendiri" : getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
       </Button>
     </div>
   </div>
@@ -843,8 +849,9 @@
             v-if="!isAdmin"
             @click="addToCart"
             variant="primary-outline"
-            :disabled="getCurrentStock() === 0 || isArchived"
+            :disabled="getCurrentStock() === 0 || isArchived || isOwnProduct"
             :title="
+              isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
               getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'
             "
           >
@@ -868,13 +875,14 @@
           <!-- Tombol Beli Sekarang -->
           <Button
             @click="buyNow"
-            :disabled="getCurrentStock() === 0 || isArchived || isAdmin"
+            :disabled="getCurrentStock() === 0 || isArchived || isAdmin || isOwnProduct"
             variant="primary"
             :title="
+              isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
               isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined
             "
           >
-            {{ getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
+            {{ isOwnProduct ? "Toko Anda Sendiri" : getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
           </Button>
         </div>
       </div>
@@ -1261,6 +1269,13 @@ import echo from "@/libs/echo";
 const { addToCart: addCart, loading: loadingCart, fetchCartCount } = useCart();
 const authStore = useAuthStore();
 const isAdmin = computed(() => authStore.isAdmin);
+
+const isOwnProduct = computed(() => {
+  if (!authStore.isAuthenticated) return false;
+  const merchantId = product.value?.merchant?.id || product.value?.merchant_id;
+  if (!merchantId) return false;
+  return !!authStore.getMerchantById(merchantId);
+});
 const cartStore = useCartStore();
 const toast = useToast();
 const showFullDescription = ref(false);
