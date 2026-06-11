@@ -370,7 +370,7 @@
           <h3 class="mb-3 text-base font-bold text-gray-900">
             Jam Operasional
           </h3>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-4 sm:grid-flow-col">
             <div
               v-for="day in operationalHours"
               :key="day.name"

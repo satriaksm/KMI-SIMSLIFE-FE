@@ -611,6 +611,14 @@ const routes = [
         component: () => import("@/views/admin/settings/Index.vue"),
         meta: { title: "Platform Settings | Admin SUMILIR" },
       },
+
+      // REFUNDS
+      {
+        path: "refunds",
+        name: "Admin - Refunds",
+        component: () => import("@/views/admin/refunds/Index.vue"),
+        meta: { title: "Refund Management | Admin SUMILIR" },
+      },
     ],
   },
 

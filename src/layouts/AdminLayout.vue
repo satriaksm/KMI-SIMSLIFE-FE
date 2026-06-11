@@ -40,6 +40,11 @@ const menuItems = computed(() => [
     route: "/admin/reports",
   },
   {
+    label: "Refunds",
+    icon: "pi-money-bill",
+    route: "/admin/refunds",
+  },
+  {
     label: "Settings",
     icon: "pi-cog",
     route: "/admin/settings",
