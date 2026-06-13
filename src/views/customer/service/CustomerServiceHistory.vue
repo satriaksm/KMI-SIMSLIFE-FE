@@ -559,18 +559,26 @@ const getServiceTypeLabel = (order) => {
 // Get booking type label
 // Get booking/mechanism label from multiple possible field names
 const getMekanismeLabel = (order) => {
+  // order_method (new) - PRIMARY
   const mechanism =
+    order?.order_method ||
     order?.mekanisme_pemesanan ||
     order?.mechanism ||
     order?.order_type ||
     order?.booking_type ||
+    order?.jasa?.order_method ||
     order?.jasa?.mekanisme_pemesanan ||
     '';
 
   const normalized = String(mechanism).toLowerCase().trim();
 
-  // Checkout tanpa jadwal keywords
-  const noScheduleKeywords = ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in', 'walkin'];
+  // order_method values (new)
+  if (normalized === 'direct') return 'Langsung Pesan (Tanpa Jadwal)';
+  if (normalized === 'scheduled') return 'Booking (Pilih Tanggal & Jam)';
+  if (normalized === 'consultation') return 'Konsultasi';
+
+  // Checkout tanpa jadwal keywords (legacy)
+  const noScheduleKeywords = ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in', 'walkin', 'langsung_pesan'];
   const isNoSchedule = noScheduleKeywords.some((kw) => normalized.includes(kw));
 
   if (isNoSchedule) {
@@ -584,6 +592,11 @@ const getMekanismeLabel = (order) => {
 
   if (hasScheduleKeyword || hasBookingDateTime) {
     return 'Booking (Pilih Tanggal & Jam)';
+  }
+
+  // Konsultasi
+  if (normalized === 'konsultasi' || normalized === 'consultation') {
+    return 'Konsultasi';
   }
 
   // Fallback: jika ada booking_date/booking_time → booking, jika tidak → keranjang

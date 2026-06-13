@@ -738,11 +738,15 @@ const getOrderPrice = (order) => {
   return Number(price) || 0;
 };
 
-// Get service type from multiple possible sources
+// Get order method / booking type from multiple possible sources
 const getServiceType = (order) => {
-  return order.service_type ||
+  // order_method (new) - PRIMARY
+  return order.order_method ||
          order.booking_type ||
+         order.service_type_booking ||
+         order.mekanisme_pemesanan ||
          order.order_type ||
+         order.jasa?.order_method ||
          order.jasa?.booking_type ||
          order.jasa?.service_type ||
          order.jasa?.mechanism ||
@@ -778,6 +782,13 @@ const getOrderAddress = (order) => {
 const formatServiceType = (type) => {
   if (!type) return 'Layanan Jasa';
   const normalized = type.toString().toLowerCase().trim();
+
+  // order_method values (new)
+  if (normalized === 'direct') return 'Langsung Pesan';
+  if (normalized === 'scheduled') return 'Booking Dengan Jadwal';
+  if (normalized === 'consultation') return 'Konsultasi';
+
+  // Legacy values
   if (normalized === 'cart_no_schedule' || normalized === 'keranjang_tanpa_jadwal') {
     return 'Keranjang Tanpa Jadwal';
   }
@@ -789,6 +800,12 @@ const formatServiceType = (type) => {
   }
   if (normalized === 'direct_order' || normalized === 'langsung_pesan') {
     return 'Langsung Pesan';
+  }
+  if (normalized === 'keranjang' || normalized === 'cart') {
+    return 'Keranjang Tanpa Jadwal';
+  }
+  if (normalized === 'booking') {
+    return 'Booking Dengan Jadwal';
   }
   // Return original if no match, capitalize first letter
   return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');

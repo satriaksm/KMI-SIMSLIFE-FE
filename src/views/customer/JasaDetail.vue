@@ -479,7 +479,7 @@
                     : jasa?.base_price && jasa.base_price > 0
                       ? 'base'
                       : '',
-                service_type_booking: 'booking',
+                order_method: 'scheduled',
               },
             }"
             class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
@@ -526,7 +526,7 @@
                     : jasa?.base_price && jasa.base_price > 0
                       ? 'base'
                       : 'cart',
-                service_type_booking: 'keranjang',
+                order_method: 'direct',
               },
             }"
             class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
@@ -804,15 +804,20 @@ const jasaDesc = computed(
   () => jasa.value?.description || "Belum ada deskripsi jasa."
 );
 
-// ----- mekanisme pemesanan (keranjang / booking / konsultasi) -----
+// ----- mekanisme pemesanan (direct / scheduled / consultation) -----
 const serviceBookingLabel = computed(() => {
-  // Check both FE field (service_type_booking) and DB field (cara_pemesanan)
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  // Check order_method first (new), then fallback to service_type_booking and cara_pemesanan
+  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
   if (!raw) return "Tidak tersedia";
 
   const t = String(raw).toLowerCase();
 
-  // Support both old values (cart/consultation) and new values (keranjang/konsultasi)
+  // order_method values
+  if (t === 'direct') return "Langsung Pesan (Tanpa Jadwal)";
+  if (t === 'scheduled') return "Booking (Pilih Tanggal & Jam)";
+  if (t === 'consultation') return "Konsultasi (Hubungi Penjual)";
+
+  // Legacy service_type_booking values
   if (t === 'keranjang' || t === 'cart' || t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
   if (t === 'booking') return "Booking (Pilih Tanggal & Jam)";
   if (t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
@@ -820,20 +825,24 @@ const serviceBookingLabel = computed(() => {
 });
 
 const isBookingMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
-  return String(raw || '').toLowerCase() === 'booking';
+  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const t = String(raw || '').toLowerCase();
+  return t === 'booking' || t === 'scheduled';
 });
 
 const isConsultationMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
   const t = String(raw || '').toLowerCase();
-  return t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi';
+  return t === 'consultation' || t === 'konsultasi' || t === 'memerlukan_konsultasi';
 });
 
 const isCartMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
   const t = String(raw || '').toLowerCase();
-  return t === 'keranjang' || t === 'cart' || t === 'langsung_pesan' || (!raw);
+  // direct = langsung pesan tanpa jadwal
+  // keranjang/cart/langsung_pesan = legacy values
+  // empty/null = default to cart mode
+  return t === 'direct' || t === 'keranjang' || t === 'cart' || t === 'langsung_pesan' || (!raw);
 });
 
 function buildConsultationMessage() {

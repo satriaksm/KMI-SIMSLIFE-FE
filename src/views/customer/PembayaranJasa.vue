@@ -862,24 +862,36 @@ const serviceType = ref(route.query.service_type || null);
 const getMekanismeFromJasa = (jasaData) => {
   if (!jasaData) return null;
 
-  // 1. service_type_booking — normalized dari API (keranjang | booking | konsultasi)
+  // 1. order_method — normalized dari API (direct | scheduled | consultation)
+  const om = jasaData?.order_method;
+  if (om !== null && om !== undefined && om !== '' && String(om).trim() !== '') {
+    const v = String(om).trim();
+    console.log(`[PembayaranJasa] order_method dari API: "${v}"`);
+    return v;
+  }
+
+  // 2. service_type_booking — normalized dari API (keranjang | booking | konsultasi)
   const stb = jasaData?.service_type_booking;
   if (stb !== null && stb !== undefined && stb !== '' && String(stb).trim() !== '') {
     const v = String(stb).trim();
     console.log(`[PembayaranJasa] service_type_booking dari API: "${v}"`);
+    // Map to new order_method format
+    if (v === 'booking') return 'scheduled';
+    if (v === 'konsultasi') return 'consultation';
+    if (v === 'keranjang') return 'direct';
     return v;
   }
 
-  // 2. Legacy DB column: cara_pemesanan
+  // 3. Legacy DB column: cara_pemesanan
   const cp = jasaData?.cara_pemesanan;
   if (cp !== null && cp !== undefined && cp !== '' && String(cp).trim() !== '') {
     const raw = String(cp).trim();
-    const mapped = raw === 'langsung_pesan' ? 'keranjang' : (raw === 'memerlukan_konsultasi' ? 'konsultasi' : raw);
+    const mapped = raw === 'langsung_pesan' ? 'direct' : (raw === 'memerlukan_konsultasi' ? 'consultation' : raw);
     console.log(`[PembayaranJasa] cara_pemesanan dari API: "${raw}" → "${mapped}"`);
     return mapped;
   }
 
-  // 3. Fallback: mekanisme_pemesanan / booking_type / order_type
+  // 4. Fallback: mekanisme_pemesanan / booking_type / order_type
   const fallbackFields = ['mekanisme_pemesanan', 'booking_type', 'order_type', 'mechanism'];
   for (const f of fallbackFields) {
     const v = jasaData?.[f];
@@ -898,20 +910,21 @@ const mekanismePemesanan = ref(
   ''
 );
 
-// Helper: apakah ini checkout tanpa jadwal (keranjang)?
+// Helper: apakah ini checkout tanpa jadwal (direct)?
+// order_method: direct = keranjang (tanpa jadwal)
 const isKeranjangCheckout = computed(() => {
   const m = String(mekanismePemesanan.value || '').toLowerCase();
-  return ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
+  return ['direct', 'keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
 });
 
 // Helper: apakah ini booking dengan jadwal?
-// Kembalikan false secara default — hanya booking jika jelas mengandung keyword tersebut
+// order_method: scheduled = booking (pilih tanggal & jam)
 const isBookingMechanism = computed(() => {
   const m = String(mekanismePemesanan.value || '').toLowerCase().trim();
   // Jika tidak ada nilai, anggap keranjang (aman: tidak perlu jadwal)
   if (!m) return false;
-  // Hanya true jika JELAS mengandung keyword booking/jadwal/scheduled
-  return ['booking', 'jadwal', 'scheduled'].some((kw) => m.includes(kw));
+  // Hanya true jika jelas mengandung keyword scheduled/booking
+  return ['scheduled', 'booking', 'jadwal'].some((kw) => m.includes(kw));
 });
 
 // Format booking_time ke H:i yang valid
@@ -1534,6 +1547,9 @@ const sendToChat = async () => {
     }
 
     // ===== Bangun payload =====
+    // order_method: direct | scheduled | consultation
+    const mappedOrderMethod = isKeranjangCheckout.value ? 'direct' : (isBookingMechanism.value ? 'scheduled' : 'direct');
+
     const orderPayload = {
       jasa_id: jasaId,
       service_name: order.title,
@@ -1544,7 +1560,10 @@ const sendToChat = async () => {
       booking_date: isKeranjangCheckout.value ? null : formatDateForApi(form.value.tanggalISO),
       booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
-      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
+      // order_method: mekanisme pemesanan (PRIMARY - direct, scheduled, consultation)
+      order_method: mappedOrderMethod,
+      // Legacy: service_type_booking (backward compatibility)
+      service_type_booking: isKeranjangCheckout.value ? 'keranjang' : (isBookingMechanism.value ? 'booking' : 'keranjang'),
       payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
       payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
       total_price: total.value || order.price || 0,
@@ -1561,7 +1580,8 @@ const sendToChat = async () => {
       customer_address: orderPayload.customer_address,
       booking_date: orderPayload.booking_date,
       booking_time: orderPayload.booking_time,
-      mekanisme_pemesanan: orderPayload.mekanisme_pemesanan,
+      order_method: orderPayload.order_method,
+      service_type_booking: orderPayload.service_type_booking,
       payment_method: orderPayload.payment_method,
       payment_channel: orderPayload.payment_channel,
       total_price: orderPayload.total_price,
@@ -1578,33 +1598,11 @@ const sendToChat = async () => {
     console.log('[PembayaranJasa] Full response:', response);
     console.log('[PembayaranJasa] Response.data:', response.data);
 
-    // ApiResponse::success → { message, data: { success, order_id, invoice_url, ... } }
-    // response.data = { message: "...", data: { ... } }
+    // ApiResponse::success → { message, data: { success, order_id, ... } }
     const responseData = response.data?.data || response.data;
     console.log('[PembayaranJasa] Normalized responseData:', responseData);
 
-    // ===== 1. Cek invoice_url DULU — Xendit redirect =====
-    const invoiceUrl =
-      responseData?.invoice_url ||
-      responseData?.payment_url ||
-      responseData?.invoiceUrl ||
-      responseData?.paymentUrl;
-
-    if (invoiceUrl) {
-      console.log('[PembayaranJasa] Redirecting to Xendit invoice:', invoiceUrl);
-      window.location.href = invoiceUrl;
-      return;
-    }
-
-    // ===== 2. Xendit dipilih tapi invoice_url kosong =====
-    const paymentMethodResponse = responseData?.payment_method;
-    if (paymentMethodResponse === 'XENDIT' || paymentMethodResponse === 'ONLINE_XENDIT') {
-      console.error('[PembayaranJasa] Xendit selected but invoice_url missing:', responseData);
-      errorMessage.value = 'Gagal membuka halaman pembayaran Xendit. Invoice URL tidak ditemukan.';
-      return;
-    }
-
-    // ===== 3. Ambil order_id (untuk COD atau fallback) =====
+    // ===== Ambil order_id =====
     const orderId =
       responseData?.order_id ||
       responseData?.id ||
@@ -1616,7 +1614,43 @@ const sendToChat = async () => {
       return;
     }
 
-    // ===== 4. COD: redirect ke BookingConfirmation =====
+    // ===== Cek apakah ini payment COD atau Xendit =====
+    const isCodPayment = selectedPayment.value?.toUpperCase() === 'COD' || paymentMethod.value === 'COD';
+    console.log('[PembayaranJasa] Payment check:', {
+      selectedPayment: selectedPayment.value,
+      paymentMethod: paymentMethod.value,
+      isCodPayment: isCodPayment
+    });
+
+    // ===== XENDIT: Panggil PaymentController untuk buat invoice =====
+    if (!isCodPayment) {
+      console.log('[PembayaranJasa] Calling PaymentController for Xendit invoice...');
+
+      try {
+        const invoiceResponse = await api.post(`/api/payments/${orderId}/invoice`);
+        console.log('[PembayaranJasa] Invoice response:', invoiceResponse);
+
+        const invoiceData = invoiceResponse.data?.data || invoiceResponse.data;
+        const invoiceUrl = invoiceData?.invoice_url;
+
+        if (invoiceUrl) {
+          console.log('[PembayaranJasa] Redirecting to Xendit invoice:', invoiceUrl);
+          window.location.href = invoiceUrl;
+          return;
+        }
+
+        // Invoice dibuat tapi URL kosong - error
+        console.error('[PembayaranJasa] Invoice created but URL missing:', invoiceData);
+        errorMessage.value = 'Invoice berhasil dibuat tapi URL tidak ditemukan. Hubungi admin.';
+        return;
+      } catch (invoiceError) {
+        console.error('[PembayaranJasa] Invoice creation failed:', invoiceError);
+        errorMessage.value = invoiceError.response?.data?.message || 'Gagal membuat invoice pembayaran. Silakan coba lagi.';
+        return;
+      }
+    }
+
+    // ===== COD: redirect ke BookingConfirmation =====
     console.log('[PembayaranJasa] COD payment - redirecting to BookingConfirmation');
     const params = new URLSearchParams({
       order_id: orderId,

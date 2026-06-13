@@ -158,6 +158,11 @@ function getServiceTypeLabel(type) {
 // Get booking mechanism label
 function getBookingTypeLabel(type) {
   const labels = {
+    // order_method (new)
+    direct: "Langsung Pesan (Tanpa Jadwal)",
+    scheduled: "Booking (Pilih Tanggal & Jam)",
+    consultation: "Konsultasi",
+    // Legacy values
     booking: "Booking (Pilih Tanggal & Jam)",
     keranjang: "Keranjang (Tanpa Jadwal)",
     walk_in: "Walk-in (Tanpa Jadwal)",
@@ -185,8 +190,8 @@ function getAddressLabel(serviceType) {
 // Check if service uses booking (has schedule)
 const usesBooking = computed(() => {
   if (!bookingData.value) return false;
-  const type = bookingData.value.mekanisme_pemesanan || bookingData.value.booking_type || "";
-  return ["booking", "jadwal", "scheduled"].some(kw => type.toLowerCase().includes(kw));
+  const type = bookingData.value.order_method || bookingData.value.mekanisme_pemesanan || bookingData.value.booking_type || "";
+  return ["scheduled", "booking", "jadwal"].some(kw => type.toLowerCase().includes(kw));
 });
 
 // Fetch order detail from backend using orders.id
@@ -220,7 +225,9 @@ function buildFromBackendOrder(order) {
   if (!order) return null;
 
   const serviceType = order.service_type || 'on_site';
-  const bookingType = order.mekanisme_pemesanan || order.service_type_booking || 'booking';
+  // order_method: direct | scheduled | consultation (PRIMARY)
+  // Fallback: service_type_booking, mekanisme_pemesanan, booking_type
+  const bookingType = order.order_method || order.service_type_booking || order.mekanisme_pemesanan || 'scheduled';
 
   // Get actual payment channel from Xendit webhook
   const actualChannel = order.paid_channel || order.payment_channel || null;
