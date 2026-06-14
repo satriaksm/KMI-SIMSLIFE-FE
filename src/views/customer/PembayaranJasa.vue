@@ -856,13 +856,12 @@ const serviceType = ref(route.query.service_type || null);
 // Mekanisme pemesanan: booking (dengan jadwal) atau keranjang (tanpa jadwal)
 // Default kosong agar isBookingMechanism aman (false) kecuali route override
 // Helper: ekstrak mekanisme dari data jasa API
-// Priority: service_type_booking > mekanisme_pemesanan > cara_pemesanan > booking_type > order_type
-// API returns: keranjang | booking | konsultasi (via service_type_booking)
-// DB column: cara_pemesanan (langsung_pesan | booking | memerlukan_konsultasi)
+// Primary: cara_pemesanan (DB: langsung_pesan | booking | memerlukan_konsultasi)
+// Maps to FE format: keranjang | booking | konsultasi
 const getMekanismeFromJasa = (jasaData) => {
   if (!jasaData) return null;
 
-  // 1. order_method — normalized dari API (direct | scheduled | consultation)
+  // 1. order_method — FE format dari API (keranjang | booking | konsultasi)
   const om = jasaData?.order_method;
   if (om !== null && om !== undefined && om !== '' && String(om).trim() !== '') {
     const v = String(om).trim();
@@ -870,29 +869,19 @@ const getMekanismeFromJasa = (jasaData) => {
     return v;
   }
 
-  // 2. service_type_booking — normalized dari API (keranjang | booking | konsultasi)
-  const stb = jasaData?.service_type_booking;
-  if (stb !== null && stb !== undefined && stb !== '' && String(stb).trim() !== '') {
-    const v = String(stb).trim();
-    console.log(`[PembayaranJasa] service_type_booking dari API: "${v}"`);
-    // Map to new order_method format
-    if (v === 'booking') return 'scheduled';
-    if (v === 'konsultasi') return 'consultation';
-    if (v === 'keranjang') return 'direct';
-    return v;
-  }
-
-  // 3. Legacy DB column: cara_pemesanan
+  // 2. cara_pemesanan — DB format (langsung_pesan | booking | memerlukan_konsultasi)
   const cp = jasaData?.cara_pemesanan;
   if (cp !== null && cp !== undefined && cp !== '' && String(cp).trim() !== '') {
     const raw = String(cp).trim();
-    const mapped = raw === 'langsung_pesan' ? 'direct' : (raw === 'memerlukan_konsultasi' ? 'consultation' : raw);
+    // Map DB format to FE format
+    const mapped = raw === 'langsung_pesan' ? 'keranjang'
+      : (raw === 'memerlukan_konsultasi' ? 'konsultasi' : raw);
     console.log(`[PembayaranJasa] cara_pemesanan dari API: "${raw}" → "${mapped}"`);
     return mapped;
   }
 
-  // 4. Fallback: mekanisme_pemesanan / booking_type / order_type
-  const fallbackFields = ['mekanisme_pemesanan', 'booking_type', 'order_type', 'mechanism'];
+  // 3. Fallback: mekanisme_pemesanan / booking_type
+  const fallbackFields = ['mekanisme_pemesanan', 'booking_type', 'mechanism'];
   for (const f of fallbackFields) {
     const v = jasaData?.[f];
     if (v !== null && v !== undefined && v !== '' && String(v).trim() !== '') {
@@ -910,21 +899,17 @@ const mekanismePemesanan = ref(
   ''
 );
 
-// Helper: apakah ini checkout tanpa jadwal (direct)?
-// order_method: direct = keranjang (tanpa jadwal)
+// Helper: apakah ini checkout tanpa jadwal (keranjang)?
 const isKeranjangCheckout = computed(() => {
   const m = String(mekanismePemesanan.value || '').toLowerCase();
-  return ['direct', 'keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
+  return ['keranjang', 'langsung_pesan', 'direct', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
 });
 
 // Helper: apakah ini booking dengan jadwal?
-// order_method: scheduled = booking (pilih tanggal & jam)
 const isBookingMechanism = computed(() => {
   const m = String(mekanismePemesanan.value || '').toLowerCase().trim();
-  // Jika tidak ada nilai, anggap keranjang (aman: tidak perlu jadwal)
   if (!m) return false;
-  // Hanya true jika jelas mengandung keyword scheduled/booking
-  return ['scheduled', 'booking', 'jadwal'].some((kw) => m.includes(kw));
+  return ['booking', 'scheduled', 'jadwal'].some((kw) => m.includes(kw));
 });
 
 // Format booking_time ke H:i yang valid
@@ -1547,8 +1532,8 @@ const sendToChat = async () => {
     }
 
     // ===== Bangun payload =====
-    // order_method: direct | scheduled | consultation
-    const mappedOrderMethod = isKeranjangCheckout.value ? 'direct' : (isBookingMechanism.value ? 'scheduled' : 'direct');
+    // order_method: mekanisme pemesanan (FE format: keranjang | booking | konsultasi)
+    const mappedOrderMethod = isKeranjangCheckout.value ? 'keranjang' : (isBookingMechanism.value ? 'booking' : 'keranjang');
 
     const orderPayload = {
       jasa_id: jasaId,
@@ -1560,10 +1545,8 @@ const sendToChat = async () => {
       booking_date: isKeranjangCheckout.value ? null : formatDateForApi(form.value.tanggalISO),
       booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
-      // order_method: mekanisme pemesanan (PRIMARY - direct, scheduled, consultation)
+      // order_method: mekanisme pemesanan (PRIMARY - keranjang | booking | konsultasi)
       order_method: mappedOrderMethod,
-      // Legacy: service_type_booking (backward compatibility)
-      service_type_booking: isKeranjangCheckout.value ? 'keranjang' : (isBookingMechanism.value ? 'booking' : 'keranjang'),
       payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
       payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
       total_price: total.value || order.price || 0,
@@ -1581,7 +1564,6 @@ const sendToChat = async () => {
       booking_date: orderPayload.booking_date,
       booking_time: orderPayload.booking_time,
       order_method: orderPayload.order_method,
-      service_type_booking: orderPayload.service_type_booking,
       payment_method: orderPayload.payment_method,
       payment_channel: orderPayload.payment_channel,
       total_price: orderPayload.total_price,
@@ -1660,7 +1642,7 @@ const sendToChat = async () => {
       merchant_address: merchantAddress.value || '',
       jasa_title: order.title,
       service_type: serviceType.value || order.serviceType || 'on_site',
-      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
+      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : (isBookingMechanism.value ? 'booking' : 'keranjang'),
       nama: form.value.nama,
       tel: form.value.tel,
       alamat: form.value.alamat || '',

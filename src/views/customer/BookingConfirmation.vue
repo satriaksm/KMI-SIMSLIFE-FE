@@ -220,14 +220,14 @@ async function refreshPaymentStatus(orderId) {
   }
 }
 
-// Build bookingData from backend response
+// Build bookingData from backend order response
+// order_method: keranjang | booking | konsultasi (FE format)
 function buildFromBackendOrder(order) {
   if (!order) return null;
 
   const serviceType = order.service_type || 'on_site';
-  // order_method: direct | scheduled | consultation (PRIMARY)
-  // Fallback: service_type_booking, mekanisme_pemesanan, booking_type
-  const bookingType = order.order_method || order.service_type_booking || order.mekanisme_pemesanan || 'scheduled';
+  // order_method: keranjang | booking | konsultasi (FE format)
+  const bookingType = order.order_method || order.mekanisme_pemesanan || order.booking_type || 'booking';
 
   // Get actual payment channel from Xendit webhook
   const actualChannel = order.paid_channel || order.payment_channel || null;

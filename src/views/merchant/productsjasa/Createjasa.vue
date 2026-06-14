@@ -62,6 +62,18 @@ const parseCurrency = (value) => {
   return Number(String(value).replace(/\D/g, ""));
 };
 
+// Format number with Indonesian thousand separator (display only)
+const formatNumberID = (value) => {
+  const number = String(value || "").replace(/\D/g, "");
+  if (!number) return "";
+  return Number(number).toLocaleString("id-ID");
+};
+
+// Parse formatted number back to raw number
+const parseNumberID = (value) => {
+  return Number(String(value || "").replace(/\D/g, "")) || 0;
+};
+
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
@@ -161,7 +173,6 @@ const formData = ref({
   service_type: "di_tempat_umkm",
   booking_type: "keranjang", // keranjang | booking | konsultasi — SATU-SATUNYA field untuk cara pemesanan
   location_address: "",
-  service_area: "",
   special_notes: "",
   payment_methods: ["cod"],
   status: "draft",
@@ -209,7 +220,6 @@ const validationSchema = yup.object({
   service_type: yup.string().required("Tipe layanan wajib dipilih"),
   booking_type: yup.string().required("Pilih cara pemesanan terlebih dahulu").oneOf(['keranjang', 'booking', 'konsultasi'], "Pilih 'Keranjang', 'Booking' atau 'Konsultasi'"),
   location_address: yup.string().nullable(),
-  service_area: yup.string().nullable(),
   special_notes: yup.string().nullable(),
   payment_methods: yup.array().nullable(),
   status: yup.string(),
@@ -480,7 +490,6 @@ const submitForm = async () => {
       fd.set("operating_times", "");
     }
     fd.set("operating_days", "1,2,3,4,5,6,7"); // Default all days
-    fd.set("service_area", formData.value.service_area || "");
     fd.set("special_notes", formData.value.special_notes || "");
     fd.set("payment_methods", normalizePaymentMethods(formData.value.payment_methods).join(","));
     fd.set("status", "draft");
@@ -706,10 +715,13 @@ onBeforeUnmount(() => {
                   <input
                     id="fixed_price"
                     name="fixed_price"
-                    v-model.number="formData.fixed_price"
-                    @input="() => { if(formData.fixed_price > 0) formData.base_price = 0; }"
-                    type="number"
-                    min="0"
+                    :value="formatNumberID(formData.fixed_price)"
+                    @input="(e) => {
+                      formData.fixed_price = parseNumberID(e.target.value);
+                      if (formData.fixed_price > 0) formData.base_price = 0;
+                    }"
+                    type="text"
+                    inputmode="numeric"
                     placeholder="0"
                     class="w-full pl-10 pr-4 py-3 text-sm border rounded-xl focus:outline-none transition disabled:bg-slate-50"
                     :class="isFixedPriceDisabled ? 'border-slate-200 bg-slate-50' : formData.base_price > 0 ? 'border-slate-200 bg-slate-50' : formData.fixed_price > 0 && formData.base_price > 0 ? 'border-red-500 focus:ring-2 focus:ring-red-500' : 'border-slate-200 focus:ring-2 focus:ring-emerald-500'"
@@ -729,10 +741,13 @@ onBeforeUnmount(() => {
                   <input
                     id="base_price"
                     name="base_price"
-                    v-model.number="formData.base_price"
-                    @input="() => { if(formData.base_price > 0 && !isFixedPriceDisabled) formData.fixed_price = 0; }"
-                    type="number"
-                    min="0"
+                    :value="formatNumberID(formData.base_price)"
+                    @input="(e) => {
+                      formData.base_price = parseNumberID(e.target.value);
+                      if (formData.base_price > 0 && !isFixedPriceDisabled) formData.fixed_price = 0;
+                    }"
+                    type="text"
+                    inputmode="numeric"
                     placeholder="0"
                     class="w-full pl-10 pr-4 py-3 text-sm border rounded-xl focus:outline-none transition disabled:bg-slate-50"
                     :class="formData.fixed_price > 0 ? 'border-slate-200 bg-slate-50' : formData.fixed_price > 0 && formData.base_price > 0 ? 'border-red-500 focus:ring-2 focus:ring-red-500' : 'border-slate-200 focus:ring-2 focus:ring-emerald-500'"
@@ -839,13 +854,6 @@ onBeforeUnmount(() => {
                   <p class="text-sm text-slate-600">{{ merchantProfileAddress || formData.location_address || 'Alamat belum tersedia' }}</p>
                 </div>
                 <p class="mt-1 text-xs text-slate-400">Otomatis dari profil bisnis Anda</p>
-              </div>
-
-              <!-- Area Layanan -->
-              <div v-if="formData.service_type === 'ke_rumah_pelanggan'">
-                <label for="service_area" class="block text-sm font-semibold text-slate-700 mb-1.5">Area Layanan</label>
-                <input id="service_area" name="service_area" v-model="formData.service_area" type="text" placeholder="Contoh: Kota Semarang, radius 10km" class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition" />
-                <p class="mt-1 text-xs text-slate-400">Customer akan diminta alamat lengkap saat booking</p>
               </div>
 
               <!-- Online Info -->

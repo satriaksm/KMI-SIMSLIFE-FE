@@ -31,7 +31,7 @@
             type="button"
             class="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border text-[10px] bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#FFA30E] focus:ring-offset-1"
             :class="[
-              (resolveJasaAssetSrc(img) === selectedImagePath) || (!selectedImagePath && img.is_cover)
+              jasa.images.indexOf(img) === selectedImageIndex.value
                 ? 'border-[#FFA30E]'
                 : 'border-gray-200'
             ]"
@@ -64,6 +64,20 @@
               @error="onImgError($event, 'header')"
               class="object-cover w-full h-full"
             />
+            <button
+              v-if="jasa?.images && jasa.images.length > 1"
+              @click="prevGalleryImage"
+              class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center text-gray-700 transition active:scale-95"
+            >
+              <i class="pi pi-chevron-left text-sm"></i>
+            </button>
+            <button
+              v-if="jasa?.images && jasa.images.length > 1"
+              @click="nextGalleryImage"
+              class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center text-gray-700 transition active:scale-95"
+            >
+              <i class="pi pi-chevron-right text-sm"></i>
+            </button>
             <div class="absolute inset-0 bg-gradient-to-t from-black/25 via-black/5 to-transparent"></div>
           </div>
           <div
@@ -76,7 +90,7 @@
               type="button"
               class="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border text-[10px] bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#FFA30E] focus:ring-offset-1"
               :class="[
-                (resolveJasaAssetSrc(img) === selectedImagePath) || (!selectedImagePath && img.is_cover)
+                jasa.images.indexOf(img) === selectedImageIndex.value
                   ? 'border-[#FFA30E]'
                   : 'border-gray-200'
               ]"
@@ -209,7 +223,7 @@
             </span>
           </div>
 
-          <div v-if="jasa?.service_type_booking" class="flex items-center justify-between">
+          <div v-if="jasa?.cara_pemesanan" class="flex items-center justify-between">
             <span class="text-gray-600 flex items-center gap-1.5">
               <i class="text-gray-500 pi pi-list"></i>
               Mekanisme Pemesanan
@@ -252,25 +266,6 @@
           </div>
 
           <!-- Area Layanan untuk ke_rumah_pelanggan -->
-          <div
-            v-if="jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site'"
-            class="flex items-start gap-2"
-          >
-            <span class="mt-0.5">
-              <i class="text-gray-500 pi pi-map-marker"></i>
-            </span>
-            <div class="flex-1">
-              <p class="text-xs text-gray-500 mb-0.5">Area Layanan</p>
-              <p class="text-sm leading-snug text-gray-700">
-                {{ jasa.service_area || '-' }}
-              </p>
-              <p class="text-xs text-gray-400 mt-0.5">
-                <i class="pi pi-info-circle mr-1"></i>
-                Anda akan diminta mengisi alamat lengkap saat checkout
-              </p>
-            </div>
-          </div>
-
           <!-- Fallback address (jika service_type tidak dikenal tapi ada alamat) -->
           <div
             v-if="jasa?.service_type !== 'di_tempat_umkm' && jasa?.service_type !== 'at_location' && jasa?.service_type !== 'ke_rumah_pelanggan' && jasa?.service_type !== 'on_site' && jasa?.service_type !== 'online' && jasa?.location_address"
@@ -620,6 +615,7 @@ const authStore = useAuthStore();
 
 const jasa = ref(null);
 const selectedImagePath = ref(null);
+const selectedImageIndex = ref(-1);
 
 // Fallback images for error handling
 const fallbackHeader = 'data:image/svg+xml,%3Csvg width="400" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect fill="%23E5E7EB" width="400" height="300"/%3E%3C/svg%3E';
@@ -762,19 +758,27 @@ const resolveJasaAssetSrc = (img) => {
 };
 
 const jasaImage = computed(() => {
-  if (selectedImagePath.value) return selectedImagePath.value;
-
   if (!jasa.value) return "";
 
-  // Prioritaskan cover URL dari API agar aman di environment deploy
-  if (jasa.value.cover_img?.id) {
-    return getImageUrl(jasa.value.cover_img.id);
+  // Prioritas 1: gambar yang dipilih via thumbnail / next/prev
+  if (selectedImageIndex.value >= 0) {
+    const images = jasa.value.images || [];
+    const img = images[selectedImageIndex.value];
+    if (img) {
+      const src = resolveJasaAssetSrc(img);
+      if (src) return src;
+    }
   }
+
+  // Prioritas 2: cover_img dari API
   if (jasa.value.cover_img?.src_url) {
     return getImageUrl(jasa.value.cover_img.src_url);
   }
   if (jasa.value.cover_img?.url) {
     return getImageUrl(jasa.value.cover_img.url);
+  }
+  if (jasa.value.cover_img?.id) {
+    return getImageUrl(jasa.value.cover_img.id);
   }
   if (jasa.value.image_url) {
     return jasa.value.image_url;
@@ -793,10 +797,31 @@ const jasaImage = computed(() => {
 
 const onSelectGalleryImage = (img) => {
   if (!img) return;
-  const src = resolveJasaAssetSrc(img);
-  if (src) {
-    selectedImagePath.value = src;
+  const images = jasa.value?.images || [];
+  const index = images.findIndex(
+    (i) => i.id === img.id || i.path === img.path || i.image === img.image
+  );
+  if (index >= 0) {
+    selectedImageIndex.value = index;
+    selectedImagePath.value = resolveJasaAssetSrc(img);
   }
+};
+
+const nextGalleryImage = () => {
+  const images = jasa.value?.images || [];
+  if (!images.length) return;
+  const next = (selectedImageIndex.value + 1) % images.length;
+  selectedImageIndex.value = next;
+  selectedImagePath.value = resolveJasaAssetSrc(images[next]);
+};
+
+const prevGalleryImage = () => {
+  const images = jasa.value?.images || [];
+  if (!images.length) return;
+  const prev =
+    (selectedImageIndex.value - 1 + images.length) % images.length;
+  selectedImageIndex.value = prev;
+  selectedImagePath.value = resolveJasaAssetSrc(images[prev]);
 };
 
 // ----- deskripsi -----
@@ -804,45 +829,46 @@ const jasaDesc = computed(
   () => jasa.value?.description || "Belum ada deskripsi jasa."
 );
 
-// ----- mekanisme pemesanan (direct / scheduled / consultation) -----
+// ----- mekanisme pemesanan (keranjang / booking / konsultasi) -----
+// Primary: cara_pemesanan (DB format: langsung_pesan | booking | memerlukan_konsultasi)
+// Fallback: order_method (for old records)
 const serviceBookingLabel = computed(() => {
-  // Check order_method first (new), then fallback to service_type_booking and cara_pemesanan
-  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   if (!raw) return "Tidak tersedia";
 
   const t = String(raw).toLowerCase();
 
-  // order_method values
-  if (t === 'direct') return "Langsung Pesan (Tanpa Jadwal)";
-  if (t === 'scheduled') return "Booking (Pilih Tanggal & Jam)";
-  if (t === 'consultation') return "Konsultasi (Hubungi Penjual)";
-
-  // Legacy service_type_booking values
-  if (t === 'keranjang' || t === 'cart' || t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
+  // DB cara_pemesanan values → FE display
+  if (t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
   if (t === 'booking') return "Booking (Pilih Tanggal & Jam)";
-  if (t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
+  if (t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
+
+  // order_method FE format (for old records)
+  if (t === 'keranjang') return "Keranjang (Tanpa Jadwal)";
+  if (t === 'konsultasi') return "Konsultasi (Hubungi Penjual)";
+
   return String(raw);
 });
 
 const isBookingMode = computed(() => {
-  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   const t = String(raw || '').toLowerCase();
-  return t === 'booking' || t === 'scheduled';
+  return t === 'booking';
 });
 
 const isConsultationMode = computed(() => {
-  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   const t = String(raw || '').toLowerCase();
-  return t === 'consultation' || t === 'konsultasi' || t === 'memerlukan_konsultasi';
+  return t === 'memerlukan_konsultasi' || t === 'konsultasi';
 });
 
 const isCartMode = computed(() => {
-  const raw = jasa.value?.order_method || jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   const t = String(raw || '').toLowerCase();
-  // direct = langsung pesan tanpa jadwal
-  // keranjang/cart/langsung_pesan = legacy values
+  // langsung_pesan = cart mode (langsung checkout tanpa jadwal)
+  // keranjang = cart mode (FE format)
   // empty/null = default to cart mode
-  return t === 'direct' || t === 'keranjang' || t === 'cart' || t === 'langsung_pesan' || (!raw);
+  return t === 'langsung_pesan' || t === 'keranjang' || (!raw);
 });
 
 function buildConsultationMessage() {

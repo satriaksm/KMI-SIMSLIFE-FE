@@ -754,7 +754,7 @@ const getDisplayServiceAddress = (jasa) => {
 
   if (serviceType === "online") return "Tidak memerlukan alamat";
   if (serviceType === "ke_rumah_pelanggan" || serviceType === "on_site") {
-    return jasa.service_area || "Area layanan sesuai alamat customer";
+    return "Sesuai alamat customer saat booking";
   }
   // For di_tempat_umkm or at_location, show merchant address
   return jasa.location_address || currentMerchantAddress.value || "-";

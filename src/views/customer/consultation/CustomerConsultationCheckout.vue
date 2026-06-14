@@ -168,11 +168,6 @@ const merchantAddress = computed(() => {
   );
 });
 
-// Service area info
-const serviceArea = computed(() => {
-  return consultation.value?.jasa?.service_area || '';
-});
-
 const formatCurrency = (value) => {
   if (!value) return '-';
   return `Rp ${Number(value).toLocaleString('id-ID')}`;
@@ -469,10 +464,6 @@ onMounted(() => {
                   Koordinat: {{ addressData.customer_latitude.toFixed(6) }}, {{ addressData.customer_longitude.toFixed(6) }}
                 </span>
               </div>
-              <p v-if="serviceArea" class="text-xs text-gray-500 mt-1.5">
-                <i class="pi pi-info-circle mr-1"></i>
-                Area layanan: {{ serviceArea }}
-              </p>
             </div>
           </div>
         </div>

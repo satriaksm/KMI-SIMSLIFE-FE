@@ -427,6 +427,31 @@ const getPaymentStatusColor = (order) => {
   return colors[order?.payment_status] || 'bg-gray-100 text-gray-700';
 };
 
+// Get payment method display (e.g. "Xendit - QRIS", "COD")
+const getChannelLabel = (channel) => {
+  const labels = {
+    QRIS: "QRIS",
+    BCA: "BCA Virtual Account", BCA_VA: "BCA Virtual Account",
+    BNI: "BNI Virtual Account", BNI_VA: "BNI Virtual Account",
+    BRI: "BRI Virtual Account", BRI_VA: "BRI Virtual Account",
+    MANDIRI: "Mandiri Virtual Account", MANDIRI_VA: "Mandiri Virtual Account",
+    OVO: "OVO", DANA: "DANA",
+    SHOPEEPAY: "ShopeePay", ALFAMART: "Alfamart",
+  };
+  return labels[String(channel).toUpperCase()] || channel;
+};
+
+const getPaymentMethodDisplay = (order) => {
+  const pm = order?.payment_method || '';
+  const upper = String(pm).toUpperCase();
+  if (upper === 'COD') return 'COD (Bayar di Tempat)';
+  // Use paid_channel (from webhook) or payment_channel for Xendit
+  const channel = order?.paid_channel || order?.payment_channel || null;
+  if (channel) return 'Xendit - ' + getChannelLabel(channel);
+  if (upper.includes('XENDIT') || upper.includes('ONLINE')) return 'Xendit';
+  return pm || '-';
+};
+
 // Open reject modal
 const openRejectModal = (order) => {
   selectedOrder.value = order;
@@ -740,10 +765,9 @@ const getOrderPrice = (order) => {
 
 // Get order method / booking type from multiple possible sources
 const getServiceType = (order) => {
-  // order_method (new) - PRIMARY
+  // order_method (PRIMARY - FE format: keranjang | booking | konsultasi)
   return order.order_method ||
          order.booking_type ||
-         order.service_type_booking ||
          order.mekanisme_pemesanan ||
          order.order_type ||
          order.jasa?.order_method ||
@@ -1202,6 +1226,7 @@ onMounted(() => {
                   >
                     {{ getPaymentStatusLabel(order) }}
                   </span>
+                  <p class="text-xs text-gray-600 mt-1">{{ getPaymentMethodDisplay(order) }}</p>
                 </div>
                 <div>
                   <p class="text-xs text-gray-500">Tipe Layanan</p>
