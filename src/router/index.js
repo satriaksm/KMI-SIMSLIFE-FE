@@ -327,6 +327,17 @@ const routes = [
         },
       },
 
+      // Edit Review Route - universal for all types
+      {
+        path: "reviews/:ratingId/edit",
+        name: "Edit Review",
+        component: () => import("@/views/CustomerOrder/EditReviewView.vue"),
+        meta: {
+          title: "Perbarui Ulasan | SUMILIR",
+          requiresAuth: true,
+        },
+      },
+
       // ===========================
       // Profil User
       // ===========================

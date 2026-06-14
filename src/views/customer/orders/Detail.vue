@@ -248,14 +248,27 @@
             <i class="pi pi-star mr-1"></i>
             Beri Ulasan
           </Button>
-          <!-- Ulasan Terkirim (sudah review) - status indicator, not clickable -->
+          <!-- Review Status Badge -->
           <div
             v-if="order.is_reviewed"
-            class="mt-2 inline-flex items-center justify-center gap-2 w-full h-12 px-4 py-2 text-sm font-medium rounded-xl bg-green-100 text-green-700 border border-green-300"
+            class="mt-2 inline-flex items-center justify-center gap-2 w-full h-12 px-4 py-2 text-sm font-medium rounded-xl"
+            :class="isReviewUpdateExhausted()
+              ? 'bg-green-100 text-green-700 border border-green-300'
+              : 'bg-orange-100 text-orange-700 border border-orange-300'"
           >
             <i class="pi pi-check-circle"></i>
-            Ulasan Terkirim
+            {{ isReviewUpdateExhausted() ? 'Update Ulasan Sudah Digunakan' : 'Ulasan Terkirim' }}
           </div>
+          <!-- Perbarui Ulasan Button (if update not exhausted) -->
+          <Button
+            v-if="canUpdateReview() && (order.status === 'selesai' || order.status === 'completed')"
+            block
+            @click="goToReview"
+            customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+          >
+            <i class="pi pi-pencil mr-1"></i>
+            Perbarui Ulasan
+          </Button>
           <!-- Review Preview (sudah review) -->
           <div
             v-if="order.is_reviewed && order.review"
@@ -408,6 +421,14 @@ function getMediaUrl(media) {
 
 function getReviewMedia(review) {
   return review?.media || review?.review_media || [];
+}
+
+function isReviewUpdateExhausted() {
+  return order.value?.review?.is_update_exhausted || (order.value?.review?.update_count ?? 0) >= 1;
+}
+
+function canUpdateReview() {
+  return order.value?.is_reviewed && !isReviewUpdateExhausted();
 }
 
 function isImageMedia(media) {
@@ -672,9 +693,17 @@ function goToReview() {
     toast.error("Data pesanan tidak lengkap untuk review");
     return;
   }
-  router.push(`/review/service/${numericOrderId}/${jasaItemId}`).catch(() => {
-    router.push(`/review/service/${numericOrderId}/${jasaItemId}`);
-  });
+  if (o.is_reviewed) {
+    // Navigate to edit review: /reviews/{id}/edit (universal)
+    const reviewId = o.review?.id || o.review_id || '';
+    router.push(`/reviews/${reviewId}/edit`).catch(() => {
+      router.push(`/reviews/${reviewId}/edit`);
+    });
+  } else {
+    router.push(`/review/service/${numericOrderId}/${jasaItemId}`).catch(() => {
+      router.push(`/review/service/${numericOrderId}/${jasaItemId}`);
+    });
+  }
 }
 
 async function handleCancel() {

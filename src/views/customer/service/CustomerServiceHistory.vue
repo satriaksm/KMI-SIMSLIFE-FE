@@ -359,14 +359,37 @@ const hasReview = (order) => {
   return order.is_reviewed && order.review;
 };
 
-// Get review rating value
-const getReviewRating = (order) => {
-  return order.review?.rating || 0;
+// Review update is exhausted
+const isReviewUpdateExhausted = (order) => {
+  return hasReview(order) && (order.review?.update_count ?? 0) >= 1;
 };
 
-// Get review title
-const getReviewTitle = (order) => {
-  return order.review?.title || '';
+// Can update review (has review AND update not exhausted)
+const canUpdateReview = (order) => {
+  return hasReview(order) && !isReviewUpdateExhausted(order);
+};
+
+// Go to review page
+const goToReview = (order) => {
+  if (hasReview(order)) {
+    // Navigate to edit review: /reviews/{id}/edit (universal for all types)
+    const reviewId = order.review?.id || order.review_id || order.review?.review_id;
+    if (reviewId) {
+      router.push(`/reviews/${reviewId}/edit`);
+    } else {
+      toast.error("Data ulasan tidak ditemukan");
+    }
+  } else {
+    // Navigate to create review
+    router.push({
+      name: "Universal Review",
+      params: {
+        reviewableType: "service",
+        orderId: order.id,
+        reviewableId: order.jasa_id,
+      },
+    });
+  }
 };
 
 // Get review comment (handle different possible field names)
@@ -953,7 +976,15 @@ onMounted(async () => {
                 v-if="hasReview(order)"
                 class="review-box"
               >
-                <span class="review-badge">Review Terkirim</span>
+                <!-- Badge: exhausted vs normal -->
+                <span
+                  v-if="isReviewUpdateExhausted(order)"
+                  class="review-badge bg-green-100 text-green-700 border border-green-300"
+                >
+                  <i class="pi pi-check-circle mr-1"></i>
+                  Update Ulasan Sudah Digunakan
+                </span>
+                <span v-else class="review-badge">Review Terkirim</span>
 
                 <!-- Rating Stars -->
                 <div class="rating-stars">
@@ -1006,6 +1037,16 @@ onMounted(async () => {
                     />
                   </template>
                 </div>
+
+                <!-- Perbarui Ulasan Button (if update not exhausted) -->
+                <button
+                  v-if="canUpdateReview(order)"
+                  @click="goToReview(order)"
+                  class="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-xs hover:from-amber-600 hover:to-orange-600 transition shadow-sm"
+                >
+                  <i class="pi pi-pencil mr-1.5"></i>
+                  Perbarui Ulasan
+                </button>
               </div>
 
               <!-- Bukti Pengerjaan - for review-before context -->

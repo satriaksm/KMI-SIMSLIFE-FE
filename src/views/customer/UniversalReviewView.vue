@@ -23,10 +23,12 @@ const reviewForm = ref({
 });
 const selectedFiles = ref([]);
 const previewFiles = ref([]);
-const loading = ref(false);
+const loadingItem = ref(false);
+const itemInfo = ref(null);
 const submitting = ref(false);
 const alreadyReviewed = ref(false);
 const existingReview = ref(null);
+const itemInfo = ref(null);
 
 // Allowed file types
 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -278,11 +280,28 @@ const checkExistingReview = async () => {
   }
 };
 
+// Load item info for item card
+const loadItemInfo = async () => {
+  const type = reviewableType.value;
+  const id = reviewableId.value;
+  if (!id) return;
+  if (type === "service") return;
+  try {
+    if (type === "product") {
+      const { data: pd } = await api.get(`/api/products/${id}`);
+      const p = pd?.data ?? pd ?? {};
+      itemInfo.value = { name: p.name || "Produk", image: p.image_url || p.logo_url || null, icon: "pi-shopping-bag", typeLabel: "Produk" };
+    } else if (type === "jasa") {
+      const { data: jd } = await api.get(`/api/jasas/${id}`);
+      const j = jd?.data ?? jd ?? {};
+      itemInfo.value = { name: j.title || j.name || "Jasa", image: j.image_url || j.logo_url || null, icon: "pi-wrench", typeLabel: "Layanan" };
+    }
+  } catch(e) { console.warn("[UniversalReview] loadItemInfo:", e); }
+};
+
 // Initialize
 onMounted(async () => {
-  console.log("[UniversalReview] Route params:", route.params);
-  console.log("[UniversalReview] User:", authStore.user);
-  await checkExistingReview();
+  await Promise.all([checkExistingReview(), loadItemInfo()]);
 });
 
 // Watch for route param changes
@@ -522,6 +541,22 @@ watch(
               <strong>Tips:</strong> Review yang detail dan jujur membantu
               pengguna lain dalam memilih layanan yang tepat.
             </p>
+          </div>
+        </div>
+
+        <!-- Warning: review can only be updated once -->
+        <div class="px-5 pb-3">
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <div class="flex items-start gap-2.5">
+              <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5 text-sm"></i>
+              <div>
+                <p class="text-xs font-semibold text-amber-700">Informasi Ulasan</p>
+                <p class="text-xs text-amber-600 mt-0.5 leading-relaxed">
+                  Ulasan hanya dapat diperbarui 1 kali setelah dikirim.<br/>
+                  Setelah pembaruan dilakukan, ulasan tidak dapat diubah kembali.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
