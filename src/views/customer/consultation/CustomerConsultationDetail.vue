@@ -63,11 +63,8 @@ const initialMedia = computed(() => {
 // Check if consultation is agreed (accepted status)
 const isAgreed = computed(() => consultation.value?.status === 'accepted');
 
-// Check if already has service order
-const hasServiceOrder = computed(() => !!consultation.value?.service_order_id);
-
-// Get the service order ID if exists
-const serviceOrderId = computed(() => consultation.value?.service_order_id);
+// Check if already has order (new FK: order_id, not service_order_id)
+const hasOrder = computed(() => !!consultation.value?.order_id);
 
 // Price helpers
 const getConsultationInitialPrice = () => {
@@ -112,8 +109,8 @@ const hasActiveOffer = computed(() => {
   if (!c.merchant_offered_price) return false;
   // Must not already be accepted locally
   if (c.customer_accepted) return false;
-  // Must not have a service order yet
-  if (c.service_order_id) return false;
+  // Must not have an order yet (check new FK: order_id)
+  if (c.order_id) return false;
   return true;
 });
 
@@ -195,11 +192,9 @@ const goToOrderHistory = () => {
   router.push('/pembayaran-jasa');
 };
 
-// Navigate to order detail (for consultation-based orders)
+// Navigate to jasa history (for consultation-based orders)
 const viewOrderDetail = () => {
-  if (serviceOrderId.value) {
-    router.push(`/pembayaran-jasa?order_id=${serviceOrderId.value}`);
-  }
+  router.push('/jasa-history');
 };
 
 // Close consultation
@@ -650,9 +645,9 @@ onMounted(async () => {
 
               <!-- Action Buttons -->
               <div class="mt-4 space-y-2">
-                <!-- If no service order yet, show Booking button -->
+                <!-- If no order yet, show Booking button -->
                 <button
-                  v-if="!hasServiceOrder"
+                  v-if="!hasOrder"
                   @click="bookNow"
                   :disabled="booking"
                   class="w-full py-3 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 disabled:opacity-50 transition flex items-center justify-center gap-2"

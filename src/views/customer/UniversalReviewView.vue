@@ -28,7 +28,6 @@ const itemInfo = ref(null);
 const submitting = ref(false);
 const alreadyReviewed = ref(false);
 const existingReview = ref(null);
-const itemInfo = ref(null);
 
 // Allowed file types
 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -204,7 +203,7 @@ const submitReview = async () => {
     let config = { headers: { 'Content-Type': 'multipart/form-data' } };
 
     if (reviewableType.value === "service") {
-      endpoint = `/api/service-orders/${orderId.value}/review`;
+      endpoint = `/api/jasa-orders/${orderId.value}/review`;
     } else {
       // For product, food, or general review
       endpoint = `/api/ratings`;
@@ -267,7 +266,7 @@ const goBack = () => {
 const checkExistingReview = async () => {
   if (reviewableType.value === "service" && orderId.value) {
     try {
-      const { data } = await api.get(`/api/service-orders/${orderId.value}`);
+      const { data } = await api.get(`/api/jasa-orders/${orderId.value}`);
       const order = data.data || data;
       if (order.review) {
         alreadyReviewed.value = true;

@@ -278,8 +278,8 @@ const routes = [
         },
       },
       {
-        path: "service-history",
-        name: "Customer Service History",
+        path: "jasa-history",
+        name: "Customer Jasa History",
         component: () => import("@/views/customer/service/CustomerServiceHistory.vue"),
         meta: {
           title: "History Layanan Jasa | SUMILIR",

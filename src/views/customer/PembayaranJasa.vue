@@ -1576,7 +1576,7 @@ const sendToChat = async () => {
     console.log('[PembayaranJasa] Available methods:', availablePaymentMethods.value.map(m => m.id));
 
     // ===== Kirim ke backend — WAJIB SUKSES =====
-    const response = await api.post("/api/service-orders", orderPayload);
+    const response = await api.post("/api/jasa-orders", orderPayload);
     console.log('[PembayaranJasa] Full response:', response);
     console.log('[PembayaranJasa] Response.data:', response.data);
 
@@ -1584,17 +1584,24 @@ const sendToChat = async () => {
     const responseData = response.data?.data || response.data;
     console.log('[PembayaranJasa] Normalized responseData:', responseData);
 
-    // ===== Ambil order_id =====
+    // ===== Ambil order_id / jasa_order_item_id =====
+    // Support multiple field names: order_id, jasa_order_item_id, id (fallback)
     const orderId =
       responseData?.order_id ||
-      responseData?.id ||
-      responseData?.service_order_id;
+      responseData?.jasa_order_item_id ||
+      responseData?.id;
 
     if (!orderId) {
       console.error('[PembayaranJasa] Response tanpa order_id:', response.data);
       errorMessage.value = response.data?.message || 'Gagal membuat pesanan. ID pesanan tidak ditemukan.';
       return;
     }
+
+    // Simpan payment_id, external_id, order_id, jasa_order_item_id jika tersedia
+    const paymentId = responseData?.payment_id || null;
+    const externalId = responseData?.external_id || null;
+    const jasaOrderItemId = responseData?.jasa_order_item_id || null;
+    console.log('[PembayaranJasa] Order IDs:', { orderId, paymentId, externalId, jasaOrderItemId });
 
     // ===== Cek apakah ini payment COD atau Xendit =====
     const isCodPayment = selectedPayment.value?.toUpperCase() === 'COD' || paymentMethod.value === 'COD';
@@ -1603,6 +1610,14 @@ const sendToChat = async () => {
       paymentMethod: paymentMethod.value,
       isCodPayment: isCodPayment
     });
+
+    // ===== XENDIT: Cek apakah invoice_url sudah ada di response (BE bikin langsung) =====
+    const directInvoiceUrl = responseData?.invoice_url;
+    if (directInvoiceUrl) {
+      console.log('[PembayaranJasa] invoice_url langsung dari response, redirect...');
+      window.location.href = directInvoiceUrl;
+      return;
+    }
 
     // ===== XENDIT: Panggil PaymentController untuk buat invoice =====
     if (!isCodPayment) {
@@ -1632,36 +1647,9 @@ const sendToChat = async () => {
       }
     }
 
-    // ===== COD: redirect ke BookingConfirmation =====
-    console.log('[PembayaranJasa] COD payment - redirecting to BookingConfirmation');
-    const params = new URLSearchParams({
-      order_id: orderId,
-      jasa_id: route.query.jasa_id || '',
-      merchant_slug: order.merchantSlug || '',
-      merchant_name: order.merchantName || '',
-      merchant_address: merchantAddress.value || '',
-      jasa_title: order.title,
-      service_type: serviceType.value || order.serviceType || 'on_site',
-      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : (isBookingMechanism.value ? 'booking' : 'keranjang'),
-      nama: form.value.nama,
-      tel: form.value.tel,
-      alamat: form.value.alamat || '',
-      tanggal: form.value.tanggalISO || order.tglISO,
-      waktu: form.value.waktu,
-      payment_method: selectedPayment.value || 'Bayar di Tempat',
-      total: total.value || order.price,
-      catatan: form.value.catatan || '',
-      service_image: order.image || '',
-    });
-
-    if (order.jasaSlug) {
-      params.set('jasa_slug', order.jasaSlug);
-    }
-
-    router.push({
-      path: '/booking-confirmation',
-      query: Object.fromEntries(params),
-    });
+    // ===== COD: redirect ke service history =====
+    console.log('[PembayaranJasa] COD payment - redirecting to service history');
+    router.push('/jasa-history');
     return;
 
   } catch (err) {

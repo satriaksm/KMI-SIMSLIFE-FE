@@ -299,21 +299,19 @@ const submitCheckout = async () => {
 
     console.log('[Checkout] Response received:', data);
 
-    // Extract order info from response
+    // Extract order info from response (new format: order_id langsung, bukan service_order)
     const responseData = data?.data ?? data;
-    const serviceOrder = responseData?.service_order;
+    const orderId = responseData?.order_id;
 
-    if (!serviceOrder?.id) {
+    if (!orderId) {
       throw new Error('Order tidak ditemukan dalam response');
     }
-
-    const orderId = serviceOrder.id;
 
     // Show success message
     toast.success(data?.message || 'Pesanan konsultasi berhasil dibuat!');
 
-    // Redirect to booking confirmation page
-    router.push(`/booking-confirmation?order_id=${orderId}`);
+    // Redirect to jasa history (COD flow — no payment needed)
+    router.push('/jasa-history');
   } catch (error) {
     console.error('[Checkout] Error:', error.response?.data || error);
     const errorMessage = error.response?.data?.message ||

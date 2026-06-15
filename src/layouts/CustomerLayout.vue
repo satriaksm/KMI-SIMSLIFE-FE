@@ -92,7 +92,7 @@ const menus = computed(() => {
     if (m.key === "pesanan" && (!isAuthenticated.value || isAdmin.value)) {
       return false;
     }
-    if (m.key === "service-history" && !isAuthenticated.value) {
+    if (m.key === "jasa-history" && !isAuthenticated.value) {
       return false;
     }
     return true;
@@ -161,7 +161,7 @@ function isMenuActive(m) {
     return (
       route.path.startsWith("/profile") ||
       route.path.startsWith("/my-order") ||
-      route.path.startsWith("/service-history") ||
+      route.path.startsWith("/jasa-history") ||
       (!isAuthenticated.value && route.path === "/login")
     );
   }
@@ -210,7 +210,7 @@ function getMobileProfileTarget() {
 }
 
 function getMobileHistoryTarget() {
-  return isAuthenticated.value ? "/service-history" : "/login";
+  return isAuthenticated.value ? "/jasa-history" : "/login";
 }
 
 function isMobileProfileActive() {
@@ -218,7 +218,7 @@ function isMobileProfileActive() {
 }
 
 function isMobileHistoryActive() {
-  return route.path.startsWith("/service-history");
+  return route.path.startsWith("/jasa-history");
 }
 
 async function handleLogout() {

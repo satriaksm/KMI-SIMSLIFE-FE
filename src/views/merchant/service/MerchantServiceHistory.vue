@@ -290,7 +290,7 @@ const fetchOrders = async () => {
   loading.value = true;
   try {
     // Always fetch all orders, no status filter
-    const url = `/api/merchant/${merchantSlug.value}/service-orders`;
+    const url = `/api/merchant/${merchantSlug.value}/jasa-orders`;
     const { data } = await api.get(url, { params: { page: 1, per_page: 100 } });
 
     console.log('[fetchOrders] Full response:', data);
@@ -476,7 +476,7 @@ const submitRejection = async () => {
     }
 
     const { data } = await api.patch(
-      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
+      `/api/merchant/${merchantSlug.value}/jasa-orders/${orderId}/status`,
       {
         status: 'ditolak',
         rejection_reason: rejectReason.value,
@@ -603,7 +603,7 @@ const submitEvidence = async () => {
     });
 
     const { data } = await api.post(
-      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
+      `/api/merchant/${merchantSlug.value}/jasa-orders/${orderId}/status`,
       formData
     );
 
@@ -658,7 +658,7 @@ const acceptOrder = async (orderId) => {
     });
 
     const { data } = await api.patch(
-      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
+      `/api/merchant/${merchantSlug.value}/jasa-orders/${orderId}/status`,
       { status: 'diterima' }
     );
 
@@ -706,7 +706,7 @@ const startWorking = async (orderId) => {
     });
 
     const { data } = await api.patch(
-      `/api/merchant/${merchantSlug.value}/service-orders/${orderId}/status`,
+      `/api/merchant/${merchantSlug.value}/jasa-orders/${orderId}/status`,
       { status: 'layanan_dikerjakan' }
     );
 

@@ -77,7 +77,7 @@ const fetchOrders = async (status = null) => {
   loading.value = true;
   try {
     const params = status && status !== "all" ? { status } : {};
-    const { data } = await api.get("/api/service-orders", { params });
+    const { data } = await api.get("/api/jasa-orders", { params });
 
     // Debug log raw API response
     console.log('[CustomerServiceHistory] Raw API response:', data);
@@ -248,16 +248,31 @@ const getAddressLabel = (order) => {
 
 // Go to review page
 const goToReview = (order) => {
-  // Navigate to universal review page: /review/:reviewableType/:orderId/:reviewableId
-  // For service orders, reviewableType = 'service'
-  router.push({
-    name: "Universal Review",
-    params: {
-      reviewableType: "service",
-      orderId: order.id,
-      reviewableId: order.jasa_id,
-    },
-  });
+  // Resolve order ID: order_id (prioritas), jasa_order_item_id, atau id (fallback)
+  const resolvedOrderId =
+    order.order_id ||
+    order.jasa_order_item_id ||
+    order.id;
+
+  if (hasReview(order)) {
+    // Navigate to edit review: /reviews/{id}/edit (universal for all types)
+    const reviewId = order.review?.id || order.review_id || order.review?.review_id;
+    if (reviewId) {
+      router.push(`/reviews/${reviewId}/edit`);
+    } else {
+      toast.error("Data ulasan tidak ditemukan");
+    }
+  } else {
+    // Navigate to create review
+    router.push({
+      name: "Universal Review",
+      params: {
+        reviewableType: "service",
+        orderId: resolvedOrderId,
+        reviewableId: order.jasa_id,
+      },
+    });
+  }
 };
 
 // Check if order can be reviewed
@@ -292,11 +307,17 @@ const confirmCompleted = async (order) => {
 
   try {
     console.log('[Confirm] Memulai konfirmasi pesanan:', {
-      id: order.id,
+      orderId,
       status: order.status,
     });
 
-    const { data } = await api.post(`/api/service-orders/${order.id}/confirm`);
+    // Resolve order ID: order_id (prioritas), jasa_order_item_id, atau id (fallback)
+    const orderId =
+      order.order_id ||
+      order.jasa_order_item_id ||
+      order.id;
+
+    const { data } = await api.post(`/api/jasa-orders/${orderId}/confirm`);
 
     console.log('[Confirm] Response received:', data);
 
@@ -347,6 +368,58 @@ const getPaymentMethodDisplay = (order) => {
   return displayMap[method] || method;
 };
 
+// Check if order needs payment (pending, not COD, not expired)
+const needsPayment = (order) => {
+  // COD doesn't need payment
+  const method = String(order.payment_method || '').toUpperCase();
+  if (method === 'COD') return false;
+
+  // Check if already paid
+  if (order.payment_status === 'PAID') return false;
+
+  // Check if payment is expired
+  const expiredAt = order.payment?.expired_at;
+  if (expiredAt) {
+    const expired = new Date(expiredAt) < new Date();
+    if (expired) return false; // Don't show button if already expired
+  }
+
+  // Check if status allows payment (pending status)
+  const pendingStatuses = ['pending', 'menunggu_konfirmasi_merchant'];
+  return pendingStatuses.includes(order.status);
+};
+
+// Get invoice URL for continue payment
+const getInvoiceUrl = (order) => {
+  return order.payment?.invoice_url || null;
+};
+
+// Continue to payment
+const continuePayment = async (order) => {
+  const invoiceUrl = getInvoiceUrl(order);
+  if (invoiceUrl) {
+    // If we have invoice URL, go directly to Xendit
+    window.location.href = invoiceUrl;
+  } else {
+    // Otherwise, create new invoice
+    try {
+      const orderId = order.order_id || order.id;
+      const response = await api.post(`/api/payments/${orderId}/invoice`);
+      const data = response.data?.data || response.data;
+      const newInvoiceUrl = data?.invoice_url;
+
+      if (newInvoiceUrl) {
+        window.location.href = newInvoiceUrl;
+      } else {
+        toast.error('Invoice tidak tersedia. Silakan coba lagi.');
+      }
+    } catch (err) {
+      console.error('[continuePayment] Error:', err);
+      toast.error(err.response?.data?.message || 'Gagal membuat invoice pembayaran.');
+    }
+  }
+};
+
 // Get payment status color
 const getPaymentStatusColor = (order) => {
   return order.payment_status === 'PAID' ? 'bg-green-100 text-green-700' :
@@ -367,29 +440,6 @@ const isReviewUpdateExhausted = (order) => {
 // Can update review (has review AND update not exhausted)
 const canUpdateReview = (order) => {
   return hasReview(order) && !isReviewUpdateExhausted(order);
-};
-
-// Go to review page
-const goToReview = (order) => {
-  if (hasReview(order)) {
-    // Navigate to edit review: /reviews/{id}/edit (universal for all types)
-    const reviewId = order.review?.id || order.review_id || order.review?.review_id;
-    if (reviewId) {
-      router.push(`/reviews/${reviewId}/edit`);
-    } else {
-      toast.error("Data ulasan tidak ditemukan");
-    }
-  } else {
-    // Navigate to create review
-    router.push({
-      name: "Universal Review",
-      params: {
-        reviewableType: "service",
-        orderId: order.id,
-        reviewableId: order.jasa_id,
-      },
-    });
-  }
 };
 
 // Get review comment (handle different possible field names)
@@ -893,6 +943,20 @@ onMounted(async () => {
                 <span class="text-gray-500">Catatan</span>
                 <p class="text-gray-800 text-xs line-clamp-2">{{ order.booking_note }}</p>
               </div>
+            </div>
+
+            <!-- Continue Payment Button (for pending Xendit payments) -->
+            <div v-if="needsPayment(order)" class="mt-4 pt-4 border-t border-gray-100">
+              <button
+                @click="continuePayment(order)"
+                class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold text-sm hover:from-blue-600 hover:to-blue-700 transition shadow-md flex items-center justify-center gap-2"
+              >
+                <i class="pi pi-credit-card text-sm"></i>
+                Lanjutkan Pembayaran
+              </button>
+              <p v-if="order.payment?.expired_at" class="text-[11px] text-center text-gray-500 mt-1.5">
+                Batas waktu: {{ new Date(order.payment.expired_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }} WIB
+              </p>
             </div>
 
             <!-- Completion Evidence (from merchant) -->

@@ -197,7 +197,7 @@ const usesBooking = computed(() => {
 // Fetch order detail from backend using orders.id
 async function fetchOrderDetail(orderId) {
   try {
-    const response = await api.get(`/api/service-orders/${orderId}`);
+    const response = await api.get(`/api/jasa-orders/${orderId}`);
     // ApiResponse::success → { message, data: { ... } }
     return response.data?.data || response.data;
   } catch (err) {
