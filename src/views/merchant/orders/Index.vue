@@ -40,6 +40,57 @@ const formatIDR = (value) => {
   return Number(value || 0).toLocaleString('id-ID');
 };
 
+// ========================
+// PAYMENT STATUS HELPER
+// ========================
+
+/**
+ * Format payment status to user-friendly label (case-insensitive)
+ */
+const formatPaymentStatus = (status) => {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
+    return 'Sudah Bayar';
+  }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'Menunggu Pembayaran';
+  }
+  if (['expired', 'kadaluarsa'].includes(value)) {
+    return 'Kadaluarsa';
+  }
+  if (['failed', 'gagal'].includes(value)) {
+    return 'Gagal';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'Menunggu Konfirmasi';
+  }
+
+  return 'Belum Dibayar';
+};
+
+/**
+ * Get color class for payment status
+ */
+const getPaymentStatusColorClass = (status) => {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
+    return 'bg-green-100 text-green-700';
+  }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+  if (['expired', 'kadaluarsa', 'failed', 'gagal'].includes(value)) {
+    return 'bg-red-100 text-red-700';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+
+  return 'bg-gray-100 text-gray-700';
+};
+
 const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 
 // ========================
@@ -191,11 +242,17 @@ let serviceOrdersChannel = null;
 const showServiceDetailModal = ref(false);
 const showRejectModal = ref(false);
 const showEvidenceModal = ref(false);
+const showEvidenceViewModal = ref(false); // Modal untuk melihat bukti
+const showReviewModal = ref(false);
 const selectedServiceOrder = ref(null);
+const selectedReview = ref(null);
+const showReviewHistory = ref(false); // Toggle review history visibility
 const rejectReason = ref('');
 const completionNote = ref('');
 const evidenceFiles = ref([]);
 const submittingService = ref(false);
+const merchantReplyText = ref('');
+const submittingReply = ref(false);
 
 // Filter tabs for service orders
 const serviceTabs = [
@@ -218,19 +275,23 @@ const serviceStatusMap = {
   'ditolak': 'ditolak',
   'layanan_dikerjakan': 'dikerjakan',
   'dikerjakan': 'dikerjakan',
+  'processing': 'dikerjakan',
   'menunggu_konfirmasi_selesai': 'tunggu_selesai',
+  'menunggu_selesai': 'tunggu_selesai',
   'selesai': 'selesai',
   'completed': 'selesai',
-  // orders table status values (mapped)
+  // orders table status values (mapped) - for backward compatibility
   'proses': 'diterima', // In process = accepted
   'batal': 'ditolak',
+  'dibatalkan': 'ditolak',
+  'cancelled': 'ditolak',
 };
 
 // Get display status for service orders
 const getServiceDisplayStatus = (order) => {
-  // Use service_status first (from service_orders table or mapped)
-  // Then fall back to status (from orders table)
-  const rawStatus = String(order.service_status || order.status || '').toLowerCase();
+  // Use status (from orders.status - PRIMARY) first, then service_status as fallback
+  // Backend now uses orders.status as source of truth
+  const rawStatus = String(order.status || order.service_status || '').toLowerCase();
   const displayStatus = serviceStatusMap[rawStatus];
   if (displayStatus) return displayStatus;
   // If no mapping found, return as-is
@@ -301,41 +362,77 @@ const getBookingDisplay = (order) => {
   return parts.length > 0 ? parts.join(' ') : null;
 };
 
-// Get payment status label
+// ========================
+// PAYMENT DISPLAY HELPER
+// ========================
+
+/**
+ * Get payment method prefix (Xendit or COD)
+ */
+const getPaymentMethodPrefix = (order) => {
+  const method = String(order?.payment_method || '').toUpperCase();
+  // Xendit/Online methods
+  if (['QRIS', 'BCA', 'BNI', 'BRI', 'MANDIRI', 'OVO', 'DANA', 'SHOPEEPAY', 'ALFAMART', 'ONLINE', 'ONLINE_XENDIT', 'XENDIT', 'EWALLET', 'VA', 'VIRTUAL_ACCOUNT'].includes(method)) {
+    return 'Xendit';
+  }
+  // COD/Cash on Delivery
+  if (['COD', 'CASH', 'BAYAR_DI_TEMPAT', 'BAYAR_DI_TEMPAT'].includes(method)) {
+    return 'COD';
+  }
+  // Check if it's a manual/cash method
+  if (['MANUAL', 'MANUAL_TRANSFER', 'TRANSFER'].includes(method)) {
+    return 'Transfer';
+  }
+  // Default: check if online/xendit in the value
+  if (method.includes('ONLINE') || method.includes('XENDIT') || method.includes('QRIS')) {
+    return 'Xendit';
+  }
+  return 'Xendit'; // Default to Xendit for unknown methods
+};
+
+/**
+ * Get payment status label (internal status)
+ */
+const getPaymentStatusLabel = (status) => {
+  return formatPaymentStatus(status);
+};
+
+// Get payment method display for table/modal
 const getServicePaymentLabel = (order) => {
-  const isManualPayment =
-    order?.payment_method === 'COD' ||
-    order?.payment_method === 'MANUAL' ||
-    order?.payment_status === 'PAID';
+  const prefix = getPaymentMethodPrefix(order);
+  const method = String(order?.payment_method || '').toUpperCase();
 
-  if (isManualPayment) return 'Sudah Bayar';
+  // COD/Manual methods - show as-is, NOT as "Sudah Bayar"
+  if (prefix === 'COD') {
+    return 'COD - Bayar di Tempat';
+  }
+  if (prefix === 'Transfer') {
+    return 'Transfer - ' + getPaymentStatusLabel(order?.payment_status);
+  }
 
-  const labels = {
-    'UNPAID': 'Belum Bayar',
-    'WAITING_CONFIRMATION': 'Menunggu Konfirmasi',
-    'PAID': 'Lunas',
-  };
-  return labels[order?.payment_status] || order?.payment_status || '—';
+  // Xendit - show status based on payment_status
+  const status = getPaymentStatusLabel(order?.payment_status);
+  return `${prefix} - ${status}`;
 };
 
 const getServicePaymentColor = (order) => {
-  const isManualPayment =
-    order?.payment_method === 'COD' ||
-    order?.payment_method === 'MANUAL' ||
-    order?.payment_status === 'PAID';
+  const prefix = getPaymentMethodPrefix(order);
 
-  if (isManualPayment) return 'bg-green-100 text-green-700';
+  // COD - always yellow (waiting for payment at service completion)
+  if (prefix === 'COD') {
+    return 'bg-yellow-100 text-yellow-700';
+  }
 
-  const colors = {
-    'UNPAID': 'bg-yellow-100 text-yellow-700',
-    'WAITING_CONFIRMATION': 'bg-yellow-100 text-yellow-700',
-    'PAID': 'bg-green-100 text-green-700',
-  };
-  return colors[order?.payment_status] || 'bg-gray-100 text-gray-700';
+  // Use status-based color
+  return getPaymentStatusColorClass(order?.payment_status);
 };
 
 // Map service order to unified format
 function mapServiceOrder(o) {
+  // Debug logging for completion evidences
+  console.log('[mapServiceOrder] Order:', o.id, '| completion_evidences:', o.completion_evidences);
+  console.log('[mapServiceOrder] Evidence count:', (o.completion_evidences || []).length);
+
   return {
     id: o.id,
     invoice: o.order_number || o.formatted_order_number || `ORD-${String(o.id).padStart(6, '0')}`,
@@ -462,6 +559,14 @@ async function fetchServiceOrders() {
 
     console.log('[fetchServiceOrders] Mapped orders:', allServiceOrders.value.length);
 
+    // Debug: Log final state after refresh
+    console.log('[fetchServiceOrders] MERCHANT ORDERS AFTER REFRESH:', allServiceOrders.value.map(o => ({
+      id: o.id,
+      order_number: o.order_number,
+      status: o.status,
+      displayStatus: o.status,
+    })));
+
     // Update pagination from response
     if (isPaginated) {
       totalPages.value = responseData.last_page || 1;
@@ -568,10 +673,17 @@ const acceptServiceOrder = async (orderId) => {
   submittingService.value = true;
   try {
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
       status: 'diterima'
     });
+
+    // Debug: Log the response
+    console.log('[acceptServiceOrder] UPDATE STATUS RESPONSE:', response.data);
+    console.log('[acceptServiceOrder] New status:', response.data?.data?.status, response.data?.data?.order_status);
+
     toast.success('Pesanan berhasil diterima');
+
+    // Refetch orders to get updated data
     fetchServiceOrders();
   } catch (e) {
     console.error('[acceptServiceOrder] Error:', e);
@@ -618,9 +730,18 @@ const startServiceWorking = async (orderId) => {
   submittingService.value = true;
   try {
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
       status: 'layanan_dikerjakan'
     });
+
+    // Debug: Log the response from server
+    console.log('[startServiceWorking] Success response:', {
+      orderId,
+      response: response.data,
+      newStatus: response.data?.data?.status,
+      serviceStatus: response.data?.data?.service_status,
+    });
+
     toast.success('Pesanan sedang dikerjakan');
     fetchServiceOrders();
   } catch (e) {
@@ -724,6 +845,19 @@ const getCompletionEvidences = (order) => {
   return order?.completion_evidences || order?.completionEvidences || [];
 };
 
+// Check if order has completion evidences
+const hasCompletionEvidences = (order) => {
+  const evidences = order?.completion_evidences || [];
+  console.log('ORDER EVIDENCE:', order.id, evidences);
+  return Array.isArray(evidences) && evidences.length > 0;
+};
+
+// Open evidence view modal
+const openEvidenceViewModal = (order) => {
+  selectedServiceOrder.value = order;
+  showEvidenceViewModal.value = true;
+};
+
 const getReviewMedia = (review) => {
   return review?.media || [];
 };
@@ -735,6 +869,69 @@ const getReviewComment = (order) => {
 const getReviewerName = (order) => {
   if (order.review?.is_anonymous) return 'Anonim';
   return order.review?.user?.name || order.review?.reviewer_name || 'Pelanggan';
+};
+
+// ========================
+// REVIEW HISTORY HELPERS
+// ========================
+const getReviewHistories = (review) => {
+  // Fallback: histories or review_histories
+  return review?.histories || review?.review_histories || [];
+};
+
+const getHistoryMedia = (history, type) => {
+  // type: 'old' or 'new'
+  const key = `${type}_media`;
+  return history?.[key] || [];
+};
+
+// ========================
+// MERCHANT REPLY TO REVIEW
+// ========================
+const openReviewModal = (order) => {
+  selectedServiceOrder.value = order;
+  selectedReview.value = order.review;
+  merchantReplyText.value = order.review?.merchant_reply || '';
+  showReviewHistory.value = false; // Reset history visibility
+  showReviewModal.value = true;
+
+  // Debug: Log review data
+  console.log('MERCHANT MODAL REVIEW DATA:', order.review);
+};
+
+const submitMerchantReply = async () => {
+  if (!merchantReplyText.value.trim()) {
+    toast.error('Tanggapan tidak boleh kosong');
+    return;
+  }
+  if (merchantReplyText.value.length > 1000) {
+    toast.error('Tanggapan maksimal 1000 karakter');
+    return;
+  }
+
+  submittingReply.value = true;
+  try {
+    const reviewId = selectedReview.value?.id;
+    if (!reviewId) {
+      toast.error('Review tidak ditemukan');
+      return;
+    }
+    const response = await api.post(
+      `/api/merchant/${currentMerchantSlug.value}/reviews/${reviewId}/reply`,
+      { merchant_reply: merchantReplyText.value }
+    );
+    toast.success('Tanggapan berhasil dikirim');
+    showReviewModal.value = false;
+    merchantReplyText.value = '';
+    selectedReview.value = null;
+    selectedServiceOrder.value = null;
+    fetchServiceOrders();
+  } catch (e) {
+    console.error('[submitMerchantReply] Error:', e.response?.data);
+    toast.error(e.response?.data?.message || 'Gagal mengirim tanggapan');
+  } finally {
+    submittingReply.value = false;
+  }
 };
 
 // ========================
@@ -1354,7 +1551,22 @@ function leaveOrdersChannel(id) {
                             class="px-3 py-1.5 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition"
                             :disabled="submittingService"
                           >
-                            <i class="pi pi-upload mr-1"></i>Bukti
+                            <i class="pi pi-upload mr-1"></i>Upload
+                          </button>
+                          <button
+                            v-if="hasCompletionEvidences(order)"
+                            @click.stop="openEvidenceViewModal(order)"
+                            class="px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition"
+                            title="Lihat Bukti Penyelesaian"
+                          >
+                            <i class="pi pi-images mr-1"></i>Bukti
+                          </button>
+                          <button
+                            v-if="order.is_reviewed || order.review"
+                            @click.stop="openReviewModal(order)"
+                            class="px-3 py-1.5 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition"
+                          >
+                            <i class="pi pi-star mr-1"></i>Ulasan
                           </button>
                         </div>
                       </td>
@@ -1626,7 +1838,14 @@ function leaveOrdersChannel(id) {
               class="flex-1 py-2 px-3 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition flex items-center justify-center gap-1"
               :disabled="submittingService"
             >
-              <i class="pi pi-upload"></i>Bukti
+              <i class="pi pi-upload"></i>Upload
+            </button>
+            <button
+              v-if="hasCompletionEvidences(order)"
+              @click.stop="openEvidenceViewModal(order)"
+              class="flex-1 py-2 px-3 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-1"
+            >
+              <i class="pi pi-images"></i>Bukti
             </button>
           </div>
         </div>
@@ -1859,25 +2078,28 @@ function leaveOrdersChannel(id) {
             </div>
 
             <!-- Completion Evidences -->
-            <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Bukti Pengerjaan ({{ getCompletionEvidences(selectedServiceOrder).length }})
-              </h4>
-              <div class="grid grid-cols-3 gap-2">
+            <div class="mb-4">
+              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Bukti Pengerjaan</h4>
+              <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0" class="grid grid-cols-3 gap-2">
                 <template v-for="ev in getCompletionEvidences(selectedServiceOrder)" :key="ev.id">
                   <img
-                    v-if="ev.file_type === 'image'"
+                    v-if="ev.file_type === 'image' || ev.media_type === 'image'"
                     :src="getServiceMediaUrl(ev)"
-                    class="w-full aspect-square object-cover rounded-xl"
+                    class="w-full aspect-square object-cover rounded-xl cursor-pointer"
+                    @click="openEvidenceViewModal(selectedServiceOrder)"
                     @error="(e) => e.target.style.display = 'none'"
                   />
                   <video
-                    v-else-if="ev.file_type === 'video'"
+                    v-else-if="ev.file_type === 'video' || ev.media_type === 'video'"
                     :src="getServiceMediaUrl(ev)"
                     controls
                     class="w-full aspect-square object-cover rounded-xl"
                   />
                 </template>
+              </div>
+              <div v-else class="p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                <i class="pi pi-image text-2xl text-gray-300 mb-1"></i>
+                <p class="text-xs text-gray-500">Belum ada bukti penyelesaian.</p>
               </div>
             </div>
 
@@ -2094,6 +2316,370 @@ function leaveOrdersChannel(id) {
               <i class="pi pi-upload" v-else></i>
               {{ submittingService ? 'Mengirim...' : 'Kirim Bukti & Selesai' }}
             </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+  <!-- Review Modal -->
+    <transition name="fade">
+      <div
+        v-if="showReviewModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="showReviewModal = false"
+      >
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <!-- Modal Header -->
+          <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
+            <h3 class="font-bold text-gray-900">Ulasan Pelanggan</h3>
+            <button @click="showReviewModal = false" class="text-gray-400 hover:text-gray-600">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div v-if="selectedReview" class="p-5 space-y-4">
+            <!-- Service Info -->
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <div class="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
+                <img
+                  v-if="getServiceImageUrl(selectedServiceOrder)"
+                  :src="getServiceImageUrl(selectedServiceOrder)"
+                  class="w-full h-full object-cover"
+                  @error="(e) => e.target.style.display = 'none'"
+                />
+                <i v-else class="pi pi-briefcase w-full h-full flex items-center justify-center text-gray-400"></i>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">
+                  {{ selectedServiceOrder?.items?.[0]?.name || 'Layanan' }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ selectedServiceOrder?.invoice || '#' + selectedServiceOrder?.id }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Reviewer Info -->
+            <div class="text-center py-2">
+              <p class="text-sm font-medium text-gray-700">
+                {{ getReviewerName(selectedServiceOrder) }}
+              </p>
+              <p v-if="selectedReview.is_anonymous" class="text-xs text-gray-400">(Anonim)</p>
+            </div>
+
+            <!-- Star Rating -->
+            <div class="flex items-center justify-center gap-1">
+              <i
+                v-for="star in 5"
+                :key="star"
+                class="pi text-2xl"
+                :class="star <= Number(selectedReview.rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+              ></i>
+              <span class="ml-2 text-sm font-semibold text-gray-700">
+                {{ selectedReview.rating }}/5
+              </span>
+            </div>
+
+            <!-- Review Comment -->
+            <div v-if="selectedReview.comment" class="p-4 bg-gray-50 rounded-xl">
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedReview.comment }}</p>
+            </div>
+
+            <!-- Review Media -->
+            <div v-if="getReviewMedia(selectedReview).length > 0">
+              <p class="text-xs font-semibold text-gray-500 uppercase mb-2">Foto/Video Ulasan</p>
+              <div class="grid grid-cols-4 gap-2">
+                <template v-for="(media, idx) in getReviewMedia(selectedReview)" :key="media.id || idx">
+                  <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      v-if="media.file_type === 'image'"
+                      :src="getServiceMediaUrl(media)"
+                      class="w-full h-full object-cover"
+                      @error="(e) => e.target.style.display = 'none'"
+                    />
+                    <video
+                      v-else-if="media.file_type === 'video'"
+                      :src="getServiceMediaUrl(media)"
+                      controls
+                      class="w-full h-full object-cover"
+                    />
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Review Date -->
+            <div v-if="selectedReview.created_at" class="text-center">
+              <p class="text-xs text-gray-400">
+                {{ formatDate(selectedReview.created_at) }} {{ formatTime(selectedReview.created_at) }}
+              </p>
+            </div>
+
+            <!-- Review Update History -->
+            <div v-if="getReviewHistories(selectedReview).length > 0" class="mt-4">
+              <div class="border-t border-gray-200 pt-4">
+                <button
+                  @click="showReviewHistory = !showReviewHistory"
+                  class="w-full flex items-center justify-between p-3 bg-amber-50 border border-amber-100 rounded-xl hover:bg-amber-100 transition"
+                >
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-history text-amber-500"></i>
+                    <span class="text-sm font-medium text-amber-700">Riwayat Perubahan Ulasan</span>
+                    <span class="text-xs text-amber-600">({{ getReviewHistories(selectedReview).length }})</span>
+                  </div>
+                  <i :class="['pi', showReviewHistory ? 'pi-chevron-up' : 'pi-chevron-down', 'text-amber-500']"></i>
+                </button>
+
+                <div v-if="showReviewHistory" class="mt-3 space-y-3">
+                  <div
+                    v-for="(history, index) in getReviewHistories(selectedReview)"
+                    :key="history.id || index"
+                    class="p-4 bg-gray-50 border border-gray-200 rounded-xl"
+                  >
+                    <!-- Before Update -->
+                    <div class="mb-4">
+                      <p class="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                        <i class="pi pi-arrow-right"></i>
+                        Sebelum diperbarui
+                      </p>
+                      <div class="space-y-2">
+                        <!-- Old Rating -->
+                        <div class="flex items-center gap-1">
+                          <i
+                            v-for="star in 5"
+                            :key="'old-' + star"
+                            class="pi text-sm"
+                            :class="star <= Number(history.old_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                          ></i>
+                          <span class="text-xs text-gray-500 ml-1">{{ history.old_rating }}/5</span>
+                        </div>
+                        <!-- Old Comment -->
+                        <p v-if="history.old_comment" class="text-sm text-gray-600 whitespace-pre-wrap">
+                          {{ history.old_comment }}
+                        </p>
+                        <!-- Old Media -->
+                        <div v-if="getHistoryMedia(history, 'old').length > 0" class="flex flex-wrap gap-2 mt-2">
+                          <img
+                            v-for="(media, mIdx) in getHistoryMedia(history, 'old')"
+                            :key="'old-media-' + mIdx"
+                            :src="getServiceMediaUrl(media)"
+                            class="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                            @error="(e) => e.target.style.display = 'none'"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- After Update -->
+                    <div class="mb-4 pb-4 border-b border-gray-200">
+                      <p class="text-xs font-semibold text-green-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="pi pi-check"></i>
+                        Setelah diperbarui
+                      </p>
+                      <div class="space-y-2">
+                        <!-- New Rating -->
+                        <div class="flex items-center gap-1">
+                          <i
+                            v-for="star in 5"
+                            :key="'new-' + star"
+                            class="pi text-sm"
+                            :class="star <= Number(history.new_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                          ></i>
+                          <span class="text-xs text-gray-500 ml-1">{{ history.new_rating }}/5</span>
+                        </div>
+                        <!-- New Comment -->
+                        <p v-if="history.new_comment" class="text-sm text-gray-600 whitespace-pre-wrap">
+                          {{ history.new_comment }}
+                        </p>
+                        <!-- New Media -->
+                        <div v-if="getHistoryMedia(history, 'new').length > 0" class="flex flex-wrap gap-2 mt-2">
+                          <img
+                            v-for="(media, mIdx) in getHistoryMedia(history, 'new')"
+                            :key="'new-media-' + mIdx"
+                            :src="getServiceMediaUrl(media)"
+                            class="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                            @error="(e) => e.target.style.display = 'none'"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Change Date -->
+                    <p class="text-xs text-gray-400">
+                      <i class="pi pi-calendar mr-1"></i>
+                      {{ formatDate(history.created_at) }} {{ formatTime(history.created_at) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="border-t border-gray-200"></div>
+
+            <!-- Merchant Reply Section -->
+            <div v-if="selectedReview.merchant_reply">
+              <!-- Already Replied - Show the reply -->
+              <div class="bg-green-50 border border-green-100 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <i class="pi pi-check-circle text-green-500"></i>
+                  <p class="text-sm font-semibold text-green-700">Tanggapan Merchant</p>
+                </div>
+                <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedReview.merchant_reply }}</p>
+                <p v-if="selectedReview.merchant_reply_at" class="text-xs text-gray-400 mt-2">
+                  {{ formatDate(selectedReview.merchant_reply_at) }} {{ formatTime(selectedReview.merchant_reply_at) }}
+                </p>
+                <div class="mt-3 pt-3 border-t border-green-200">
+                  <p class="text-xs text-green-600 flex items-center gap-1">
+                    <i class="pi pi-info-circle"></i>
+                    Ulasan ini sudah ditanggapi dan tidak dapat direspon ulang.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div v-else>
+              <!-- Not Replied Yet - Show Reply Form -->
+              <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
+                <p class="text-xs text-amber-700 flex items-start gap-2">
+                  <i class="pi pi-info-circle mt-0.5 shrink-0"></i>
+                  <span>Anda hanya dapat merespon ulasan ini satu kali. Pastikan tanggapan Anda sudah tepat sebelum dikirim.</span>
+                </p>
+              </div>
+
+              <textarea
+                v-model="merchantReplyText"
+                rows="4"
+                placeholder="Tulis tanggapan untuk ulasan pelanggan..."
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-200 focus:border-green-400 placeholder-gray-400"
+                maxlength="1000"
+              ></textarea>
+
+              <div class="flex items-center justify-between mt-2">
+                <p class="text-xs text-gray-400">
+                  {{ merchantReplyText.length }}/1000 karakter
+                </p>
+              </div>
+
+              <button
+                @click="submitMerchantReply"
+                :disabled="submittingReply || !merchantReplyText.trim()"
+                class="w-full mt-4 py-3 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              >
+                <i class="pi pi-send" v-if="!submittingReply"></i>
+                <i class="pi pi-spin pi-spinner" v-else></i>
+                {{ submittingReply ? 'Mengirim...' : 'Kirim Tanggapan' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Evidence View Modal -->
+    <transition name="fade">
+      <div
+        v-if="showEvidenceViewModal"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+        @click.self="showEvidenceViewModal = false"
+      >
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <!-- Modal Header -->
+          <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
+            <h3 class="font-bold text-gray-900">Bukti Penyelesaian</h3>
+            <button @click="showEvidenceViewModal = false" class="text-gray-400 hover:text-gray-600">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div v-if="selectedServiceOrder" class="p-5 space-y-4">
+            <!-- Order Info -->
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <div class="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
+                <img
+                  v-if="getServiceImageUrl(selectedServiceOrder)"
+                  :src="getServiceImageUrl(selectedServiceOrder)"
+                  class="w-full h-full object-cover"
+                  @error="(e) => e.target.style.display = 'none'"
+                />
+                <i v-else class="pi pi-briefcase w-full h-full flex items-center justify-center text-gray-400"></i>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">
+                  {{ selectedServiceOrder.items?.[0]?.name || 'Layanan' }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ selectedServiceOrder.invoice || '#' + selectedServiceOrder.id }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Order Status -->
+            <div class="flex items-center gap-2">
+              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServiceStatusClass(selectedServiceOrder.status)]">
+                {{ getServiceStatusLabel(selectedServiceOrder.status) }}
+              </span>
+            </div>
+
+            <!-- Completion Note -->
+            <div v-if="selectedServiceOrder.completion_note" class="p-4 bg-purple-50 border border-purple-100 rounded-xl">
+              <p class="text-xs font-semibold text-purple-700 uppercase mb-2">Keterangan</p>
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedServiceOrder.completion_note }}</p>
+            </div>
+
+            <!-- Evidence List -->
+            <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0">
+              <p class="text-xs font-semibold text-gray-500 uppercase mb-3">
+                Bukti ({{ getCompletionEvidences(selectedServiceOrder).length }})
+              </p>
+              <div class="space-y-3">
+                <div
+                  v-for="(evidence, idx) in getCompletionEvidences(selectedServiceOrder)"
+                  :key="evidence.id || idx"
+                  class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden"
+                >
+                  <!-- Evidence Image/Video -->
+                  <div class="aspect-video bg-gray-100">
+                    <img
+                      v-if="evidence.file_type === 'image' || evidence.media_type === 'image' || evidence.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)"
+                      :src="getServiceMediaUrl(evidence)"
+                      class="w-full h-full object-contain"
+                      @error="(e) => e.target.style.display = 'none'"
+                    />
+                    <video
+                      v-else-if="evidence.file_type === 'video' || evidence.media_type === 'video' || evidence.file_url?.match(/\.(mp4|mov|webm)$/i)"
+                      :src="getServiceMediaUrl(evidence)"
+                      controls
+                      class="w-full h-full object-contain"
+                    />
+                    <div v-else class="w-full h-full flex items-center justify-center">
+                      <i class="pi pi-file text-4xl text-gray-400"></i>
+                    </div>
+                  </div>
+
+                  <!-- Evidence Info -->
+                  <div class="p-3">
+                    <p v-if="evidence.description || evidence.note" class="text-sm text-gray-700 mb-2">
+                      {{ evidence.description || evidence.note }}
+                    </p>
+                    <p class="text-xs text-gray-400">
+                      <i class="pi pi-calendar mr-1"></i>
+                      {{ formatDate(evidence.created_at) }}
+                      <span class="mx-1">|</span>
+                      <i class="pi pi-clock mr-1"></i>
+                      {{ formatTime(evidence.created_at) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty Evidence State -->
+            <div v-else class="text-center py-8">
+              <i class="pi pi-inbox text-4xl text-gray-300 mb-2"></i>
+              <p class="text-sm text-gray-500">Tidak ada bukti penyelesaian</p>
+            </div>
           </div>
         </div>
       </div>
