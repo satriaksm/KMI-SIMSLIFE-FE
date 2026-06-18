@@ -240,7 +240,7 @@
               Jam Layanan
             </span>
             <span class="font-medium text-gray-900 text-right text-sm">
-              {{ parsedOperatingTimes.join(', ') }}
+              {{ availableTimes.join(', ') }}
             </span>
           </div>
 
@@ -387,19 +387,23 @@
             <button
               v-for="(t, i) in times.morning"
               :key="'m' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
             </button>
           </div>
         </div>
-        
+
         <!-- Siang -->
         <div v-if="times.afternoon && times.afternoon.length > 0" class="mb-3">
           <div class="mb-2 text-sm text-gray-700">Siang</div>
@@ -407,37 +411,60 @@
             <button
               v-for="(t, i) in times.afternoon"
               :key="'a' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
             </button>
           </div>
         </div>
-        
+
         <!-- Malam -->
-        <div v-if="times.evening && times.evening.length > 0">
+        <div v-if="times.evening && times.evening.length > 0" class="mb-3">
           <div class="mb-2 text-sm text-gray-700">Malam</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="(t, i) in times.evening"
               :key="'e' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
             </button>
           </div>
+        </div>
+
+        <!-- Fallback: jika operating_times ada tapi tidak ada tombol yang muncul -->
+        <div
+          v-if="availableTimes.length > 0 && !times.morning.length && !times.afternoon.length && !times.evening.length"
+          class="text-sm text-gray-500 text-center py-2"
+        >
+          <i class="pi pi-info-circle mr-1"></i>
+          Format jam tidak valid
+        </div>
+
+        <!-- Loading indicator saat fetch booked slots -->
+        <div v-if="loadingBookedSlots" class="mt-2 text-xs text-gray-400 flex items-center gap-1">
+          <i class="pi pi-spin pi-spinner text-[10px]"></i>
+          Memuat ketersediaan jadwal...
         </div>
         </div>
       </div>
@@ -450,7 +477,19 @@
     >
       <div class="flex items-center max-w-3xl gap-4 mx-auto lg:max-w-5xl">
         <template v-if="isBookingMode">
+          <!-- Jika jam layanan belum diatur merchant -->
+          <div v-if="!hasOperatingTimes" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
+            <i class="pi pi-clock mr-1"></i>
+            Jam layanan belum diatur oleh merchant
+          </div>
+          <!-- Jika jam sudah ada tapi belum dipilih -->
+          <div v-else-if="!canBook" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
+            <i class="pi pi-calendar mr-1"></i>
+            Pilih waktu terlebih dahulu
+          </div>
+          <!-- Tombol booking aktif -->
           <router-link
+            v-else
             :to="{
               name: 'Pembayaran Jasa',
               query: {
@@ -546,15 +585,7 @@
       v-model="selectedDate"
       :open="calendarOpen"
       :operating-days="jasa?.operating_days || ''"
-      @close="calendarOpen = false"
-    />
-
-    <!-- Kalender -->
-    <CalendarModal
-      v-model="selectedDate"
-      :open="calendarOpen"
-      :operating-days="jasa?.operating_days || ''"
-      @close="calendarOpen = false"
+      @close="calendarOpen = false; fetchBookedSlots(selectedDate)"
     />
 
     <!-- Penilaian Layanan -->
@@ -625,23 +656,44 @@ const goBack = () => {
   router.back();
 };
 
+// Helper normalisasi jam layanan
+function normalizeOperatingTimes(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map(t => String(t).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    // Coba parse sebagai JSON
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map(t => String(t).trim()).filter(Boolean);
+      }
+    } catch (e) {
+      // Bukan JSON, split dengan koma
+    }
+    // Split dengan koma
+    return value
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+// Computed property untuk jam layanan yang sudah dinormalisasi
+const availableTimes = computed(() => {
+  return normalizeOperatingTimes(jasa.value?.operating_times);
+});
+
 const hasOperatingDays = computed(() =>
   Boolean(String(jasa.value?.operating_days || "").trim())
 );
 
-const parsedOperatingTimes = computed(() => {
-  const raw = jasa.value?.operating_times;
-  // Handle both array (from DB cast) and string (old data)
-  if (Array.isArray(raw)) {
-    return raw.map(t => String(t).trim()).filter(Boolean);
-  }
-  if (typeof raw === 'string') {
-    return raw.split(",").map(t => t.trim()).filter(Boolean);
-  }
-  return [];
-});
-
-const hasOperatingTimes = computed(() => parsedOperatingTimes.value.length > 0);
+const hasOperatingTimes = computed(() => availableTimes.value.length > 0);
 
 // Helper untuk mendapatkan URL logo merchant
 const getMerchantLogo = (logo) => {
@@ -655,6 +707,74 @@ const getMerchantLogo = (logo) => {
 // ----- jadwal -----
 const selectedDate = ref(new Date());
 const calendarOpen = ref(false);
+const bookedSlots = ref([]);
+const loadingBookedSlots = ref(false);
+
+// Format tanggal ke YYYY-MM-DD untuk API
+const formatDateForApi = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Normalize time format: API returns "08:00", frontend operating_times uses "08.00"
+// Both formats should normalize to same value for comparison
+const normalizeTime = (t) => String(t || '').trim().replace(':', '.');
+
+// Ambil slot yang sudah terisi saat tanggal berubah
+const fetchBookedSlots = async (date) => {
+  if (!jasa.value?.id) return;
+
+  const dateStr = formatDateForApi(date);
+  if (!dateStr) return;
+
+  loadingBookedSlots.value = true;
+  try {
+    // Endpoint ada di dalam prefix 'public', jadi URL lengkap adalah /api/public/jasas/{id}/available-slots
+    const { data } = await api.get(`/api/public/jasas/${jasa.value.id}/available-slots`, {
+      params: { date: dateStr }
+    });
+
+    console.log('[JasaDetail] Booked slots API response:', {
+      date: dateStr,
+      booked_slots: data?.booked_slots,
+    });
+
+    // Store booked slots - will be normalized during comparison
+    bookedSlots.value = Array.isArray(data?.booked_slots) ? data.booked_slots : [];
+  } catch (e) {
+    // Endpoint tidak ada (404) atau error lainnya - tampilkan jam layanan tanpa info slot terisi
+    // Biarkan bookedSlots tetap kosong agar semua jam dapat dipilih
+    console.warn('[JasaDetail] Gagal mengambil slot terisi, tampilkan semua jam:', e?.message || e);
+    bookedSlots.value = [];
+  } finally {
+    loadingBookedSlots.value = false;
+  }
+};
+
+// Cek apakah sebuah slot jam sudah terisi
+const isSlotBooked = (time) => {
+  const normalized = normalizeTime(time);
+  const booked = bookedSlots.value.some(slot => normalizeTime(slot) === normalized);
+
+  console.log('[JasaDetail] Slot booking check:', {
+    time,
+    normalized,
+    bookedSlots: bookedSlots.value,
+    bookedSlotsNormalized: bookedSlots.value.map(s => normalizeTime(s)),
+    result: booked,
+  });
+
+  return booked;
+};
+
+// Cek apakah slot aktif adalah slot yang sudah terisi
+const isActiveTimeBooked = computed(() => {
+  return activeTime.value ? isSlotBooked(activeTime.value) : false;
+});
 
 const atMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d, n) =>
@@ -698,12 +818,13 @@ const monthShort = computed(() =>
 const selectQuick = (d, available) => {
   if (!available) return; // Tidak bisa pilih hari yang tidak tersedia
   selectedDate.value = new Date(d);
+  fetchBookedSlots(d);
 };
 
 // ----- waktu -----
 // Parse operating_times dari jasa. Jika tidak diatur saat create, waktu tidak ditampilkan di customer.
 const times = computed(() => {
-  const operatingTimes = parsedOperatingTimes.value;
+  const operatingTimes = availableTimes.value;
 
   if (operatingTimes.length === 0) {
     return { morning: [], afternoon: [], evening: [] };
@@ -714,22 +835,32 @@ const times = computed(() => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 6 && hour < 12;
   });
-  
+
   const afternoon = operatingTimes.filter(t => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 12 && hour < 18;
   });
-  
+
   const evening = operatingTimes.filter(t => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 18;
   });
-  
+
   return { morning, afternoon, evening };
 });
 
 // Active time - pilih pertama yang tersedia
 const activeTime = ref("");
+
+// Cek apakah booking sudah lengkap (tanggal dan jam dipilih)
+const canBook = computed(() => {
+  // Untuk booking mode, wajib pilih jam
+  if (isBookingMode.value) {
+    return hasOperatingTimes.value && Boolean(activeTime.value.trim());
+  }
+  // Untuk cart/consultation mode, tidak perlu validasi jam
+  return true;
+});
 
 // Set active time ketika times berubah
 const initActiveTime = () => {
@@ -742,6 +873,15 @@ const initActiveTime = () => {
   if (allTimes.length === 0) {
     activeTime.value = "";
   }
+};
+
+// Handle klik pada slot waktu
+const handleTimeClick = (t) => {
+  if (isSlotBooked(t)) {
+    toast.warning("Jadwal pada jam ini sudah terisi, silakan pilih jam lain.");
+    return;
+  }
+  activeTime.value = t;
 };
 
 // ----- gambar jasa -----
@@ -959,26 +1099,43 @@ const serviceTypeLabel = computed(() => {
 });
 
 // ----- alamat merchant untuk service_type at_location -----
+const getAddressPart = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    return value.name || value.nama || value.label || value.value || '';
+  }
+  return '';
+};
+
+const formatAddress = (address) => {
+  if (!address) return '';
+
+  const parts = [
+    getAddressPart(address.detail),
+    getAddressPart(address.village),
+    getAddressPart(address.district),
+    getAddressPart(address.city),
+    getAddressPart(address.province),
+  ].filter(Boolean);
+
+  return parts.join(', ');
+};
+
 const merchantAddress = computed(() => {
   const merchant = jasa.value?.merchant;
   if (!merchant) return '';
 
-  const primaryAddress = merchant.primary_address;
-  if (!primaryAddress) {
-    // Fallback ke field address atau alamat lama
-    return merchant.address || merchant.alamat || '';
+  // Try primary_address (snake_case from API) or primaryAddress (camelCase)
+  const primaryAddress = merchant.primary_address || merchant.primaryAddress || null;
+  if (primaryAddress) {
+    const formatted = formatAddress(primaryAddress);
+    if (formatted) return formatted;
+    if (primaryAddress.full_address) return primaryAddress.full_address;
   }
 
-  // Format alamat lengkap dari primary_address
-  const parts = [
-    primaryAddress.detail,
-    primaryAddress.village,
-    primaryAddress.district,
-    primaryAddress.city,
-    primaryAddress.province,
-  ].filter(Boolean);
-
-  return parts.join(', ') || '';
+  // Fallback ke field address atau alamat lama
+  return merchant.full_address || merchant.address || merchant.alamat || '';
 });
 
 // ----- harga display -----
@@ -1148,9 +1305,12 @@ onMounted(async () => {
         const dbDay = jsToDbDay(checkDate.getDay());
         if (operatingDays.includes(dbDay)) {
           selectedDate.value = checkDate;
+          fetchBookedSlots(checkDate);
           break;
         }
       }
+    } else {
+      fetchBookedSlots(selectedDate.value);
     }
 
     // Set active time ke waktu pertama yang tersedia

@@ -277,13 +277,10 @@ const routes = [
           title: "Konfirmasi Pemesanan | SUMILIR",
         },
       },
+      // Redirect lama /jasa-history ke /orders
       {
         path: "jasa-history",
-        name: "Customer Jasa History",
-        component: () => import("@/views/customer/service/CustomerServiceHistory.vue"),
-        meta: {
-          title: "History Layanan Jasa | SUMILIR",
-        },
+        redirect: "/orders",
       },
       // ===========================
       // KONSULTASI CUSTOMER (UMKM JASA)
@@ -736,11 +733,13 @@ const routes = [
       // ===========================
       // BOOKING MANAGEMENT
       // ===========================
+      // Redirect lama /bookings ke /orders (Pesanan Masuk)
       {
         path: "bookings",
-        name: "Merchant - Booking Management",
-        component: () => import("@/views/merchant/service/MerchantServiceHistory.vue"),
-        meta: { title: "History Layanan Jasa | SUMILIR" },
+        redirect: (to) => ({
+          name: "Merchant - Orders",
+          params: { merchantSlug: to.params.merchantSlug },
+        }),
       },
 
       // ===========================

@@ -183,7 +183,7 @@ async function fetchOrder() {
 
 // ========================
 // STATUS CONFIG
-// ========================
+// Canonical statuses: ditolak (merchant rejected) | dibatalkan (customer cancelled)
 const statusConfig = {
   waiting_review: {
     props: {
@@ -221,10 +221,34 @@ const statusConfig = {
     },
     nextAction: null,
   },
+  // Merchant rejected order
+  ditolak: {
+    props: {
+      variant: "order",
+      status: "cancelled",
+      label: "Ditolak Merchant",
+      size: "sm",
+      showIcon: true,
+    },
+    nextAction: null,
+  },
+  // Customer cancelled order
+  dibatalkan: {
+    props: {
+      variant: "order",
+      status: "cancelled",
+      label: "Dibatalkan Customer",
+      size: "sm",
+      showIcon: true,
+    },
+    nextAction: null,
+  },
+  // Legacy keys (backward compat)
   cancelled: {
     props: {
       variant: "order",
       status: "cancelled",
+      label: "Dibatalkan Customer",
       size: "sm",
       showIcon: true,
     },
@@ -234,7 +258,7 @@ const statusConfig = {
     props: {
       variant: "order",
       status: "cancelled",
-      label: "Ditolak Penjual",
+      label: "Ditolak Merchant",
       size: "sm",
       showIcon: true,
     },

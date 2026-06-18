@@ -28,7 +28,11 @@ const activeFilter = ref('all');
 // Filter & Sort State
 const showFilterModal = ref(false);
 const filters = ref({
-  sort_by: 'newest' // newest, oldest, date, price
+  sort_by: 'newest', // newest, oldest, date, price
+  date_from: '',
+  date_to: '',
+  min_price: '',
+  max_price: ''
 });
 const currentPage = ref(1);
 const totalPages = ref(1);
@@ -47,52 +51,99 @@ const sortOptions = [
   { value: 'price', label: 'Harga' },
 ];
 
-// Filter tabs - uses consultation.status directly
+// Filter tabs - simplified for merchant
 const filterTabs = [
   { key: 'all', label: 'Semua' },
   { key: 'pending', label: 'Menunggu' },
-  { key: 'dapat_dikerjakan', label: 'Dapat Dikerjakan' },
-  { key: 'penyesuaian', label: 'Penyesuaian' },
-  { key: 'ditolak', label: 'Ditolak' },
-  { key: 'ditutup', label: 'Ditutup' },
+  { key: 'waiting_customer', label: 'Menunggu Customer' },
+  { key: 'accepted', label: 'Disepakati' },
+  { key: 'rejected', label: 'Ditolak' },
 ];
 
-// Status config - direct mapping to consultation.status values
+// Status config - simplified labels for merchant
 const statusConfig = {
+  // Pending - waiting for merchant response
   'pending': { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
-  'dapat_dikerjakan': { label: 'Dapat Dikerjakan', color: 'bg-blue-100 text-blue-700' },
-  'penyesuaian': { label: 'Penyesuaian', color: 'bg-purple-100 text-purple-700' },
-  'offer_sent': { label: 'Penawaran Dikirim', color: 'bg-indigo-100 text-indigo-700' },
-  'accepted': { label: 'Diterima', color: 'bg-green-100 text-green-700' },
-  'rejected': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
-  'closed': { label: 'Ditutup Merchant', color: 'bg-gray-100 text-gray-600' },
-  'offer_rejected': { label: 'Penawaran Ditolak', color: 'bg-red-100 text-red-700' },
-  // Fallback values from old status names
   'menunggu': { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
-  'negosiasi': { label: 'Negosiasi', color: 'bg-purple-100 text-purple-700' },
+
+  // Waiting Customer - merchant sent offer, waiting for customer response
+  'dapat_dikerjakan': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
+  'perlu_penyesuaian': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
+  'penyesuaian': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
+  'offer_sent': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
+
+  // Rejected - closed/rejected consultations
   'ditolak': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
-  'ditutup': { label: 'Ditutup', color: 'bg-gray-100 text-gray-600' },
-  'selesai': { label: 'Selesai', color: 'bg-green-100 text-green-700' },
+  'rejected': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+  'penawaran_ditolak': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+  'offer_rejected': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+  'closed': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+  'ditutup': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+
+  // Accepted - customer accepted the offer
+  'accepted': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
+  'disepakati': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
+  'selesai': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
 };
 
 const getStatusLabel = (status) => statusConfig[status]?.label || status || '—';
 const getStatusColor = (status) => statusConfig[status]?.color || 'bg-gray-100 text-gray-700';
 
-// Price helpers - use jasa_order_item.jasa as primary source
+// Status groups for filtering
+const statusGroups = {
+  pending: ['pending', 'menunggu'],
+  waiting_customer: ['dapat_dikerjakan', 'perlu_penyesuaian', 'penyesuaian', 'offer_sent', 'bisa_dikerjakan'],
+  accepted: ['accepted', 'disepakati', 'selesai'],
+  rejected: ['ditolak', 'rejected', 'penawaran_ditolak', 'offer_rejected', 'closed', 'ditutup'],
+};
+
+// Helper function to get customer name from various sources
+const getCustomerName = (consultation) => {
+  return consultation?.customer?.name
+    || consultation?.customer_name
+    || consultation?.user?.name
+    || consultation?.customer?.full_name
+    || 'Pelanggan';
+};
+
+// Helper function to get customer phone from various sources
+const getCustomerPhone = (consultation) => {
+  return consultation?.customer?.phone
+    || consultation?.customer_phone
+    || consultation?.user?.phone
+    || '';
+};
+
+// Price helpers
+const getStartingPrice = (consultation) => {
+  return consultation?.initial_price
+    || consultation?.original_price
+    || consultation?.jasa_order_item?.jasa?.base_price
+    || consultation?.jasa_order_item?.jasa?.price
+    || consultation?.jasa?.base_price
+    || consultation?.jasa?.price
+    || consultation?.jasa?.fixed_price
+    || null;
+};
+
+const getOfferedPrice = (consultation) => {
+  return consultation?.merchant_offered_price
+    || consultation?.offered_price
+    || consultation?.proposed_price
+    || null;
+};
+
+const getFinalPrice = (consultation) => {
+  return consultation?.final_price
+    || consultation?.agreed_price
+    || consultation?.deal_price
+    || consultation?.negotiated_price
+    || null;
+};
+
+// Legacy price helper (kept for compatibility)
 const getConsultationPrice = (consultation) => {
-  // Primary: dari jasa_order_item.jasa (struktur baru)
-  const fromJasaOrderItem = consultation?.jasa_order_item?.jasa;
-  if (fromJasaOrderItem) {
-    return fromJasaOrderItem.price || fromJasaOrderItem.base_price || fromJasaOrderItem.fixed_price || null;
-  }
-
-  // Fallback: dari jasa langsung (struktur lama/kompatibilitas)
-  const fromJasa = consultation?.jasa;
-  if (fromJasa) {
-    return fromJasa.price || fromJasa.base_price || fromJasa.fixed_price || null;
-  }
-
-  return null;
+  return getStartingPrice(consultation);
 };
 
 const formatCurrency = (value) => {
@@ -111,18 +162,39 @@ const getJasaTitle = (consultation) => {
 };
 
 const getJasaImage = (consultation) => {
-  // Primary: dari jasa_order_item.jasa.image (struktur baru)
+  // Primary: dari service_image (dari backend)
+  const serviceImage = consultation?.service_image;
+  if (serviceImage) {
+    if (serviceImage.startsWith('http')) return serviceImage;
+    return `/storage/${serviceImage}`;
+  }
+
+  // Fallback: dari jasa_order_item.jasa.image (struktur baru)
   const image = consultation?.jasa_order_item?.jasa?.image;
   if (image) {
     if (image.startsWith('http')) return image;
     return `/storage/${image}`;
   }
 
-  // Fallback: dari jasa langsung
-  const fallbackImage = consultation?.jasa?.image || consultation?.service_image;
-  if (fallbackImage) {
-    if (fallbackImage.startsWith('http')) return fallbackImage;
-    return `/storage/${fallbackImage}`;
+  // Fallback: dari jasa.cover_img (struktur baru dengan polymorphic)
+  const coverImg = consultation?.jasa?.cover_img?.url;
+  if (coverImg) {
+    if (coverImg.startsWith('http')) return coverImg;
+    return `/storage/${coverImg}`;
+  }
+
+  // Fallback: dari jasa.image_url (jasa accessor)
+  const imageUrl = consultation?.jasa?.image_url;
+  if (imageUrl) {
+    if (imageUrl.startsWith('http')) return imageUrl;
+    return `/storage/${imageUrl}`;
+  }
+
+  // Fallback: dari jasa.image (legacy)
+  const legacyImage = consultation?.jasa?.image;
+  if (legacyImage) {
+    if (legacyImage.startsWith('http')) return legacyImage;
+    return `/storage/${legacyImage}`;
   }
 
   return '/placeholder.png';
@@ -135,17 +207,35 @@ const fetchConsultations = async () => {
     const params = {
       page: currentPage.value,
       per_page: paginationInfo.value.per_page,
-      status_group: activeFilter.value !== 'all' ? activeFilter.value : undefined,
       sort_by: filters.value.sort_by,
     };
+
+    // Only send status_group if not "all"
+    if (activeFilter.value !== 'all') {
+      params.status_group = activeFilter.value;
+    }
+
+    // Date filters
+    if (filters.value.date_from) {
+      params.date_from = filters.value.date_from;
+    }
+    if (filters.value.date_to) {
+      params.date_to = filters.value.date_to;
+    }
+
+    // Price filters
+    if (filters.value.min_price) {
+      params.min_price = filters.value.min_price;
+    }
+    if (filters.value.max_price) {
+      params.max_price = filters.value.max_price;
+    }
 
     console.log('[fetchConsultations] Params:', params);
 
     const { data } = await api.get(`/api/merchant/${merchantSlug.value}/service-consultations`, { params });
 
-    console.log('[fetchConsultations] Response:', data);
-
-    const responseData = data?.data;
+    const responseData = data?.data || data;
     let consultationsArray = [];
 
     if (Array.isArray(responseData)) {
@@ -173,8 +263,33 @@ const fetchConsultations = async () => {
       consultationsArray = [];
     }
 
+    // Frontend fallback filter - ensure we show correct statuses even if backend doesn't filter properly
+    if (activeFilter.value !== 'all') {
+      const allowedStatuses = statusGroups[activeFilter.value] || [activeFilter.value];
+      const beforeFilter = consultationsArray.length;
+      consultationsArray = consultationsArray.filter((item) =>
+        allowedStatuses.includes(item.status)
+      );
+      console.log('[fetchConsultations] Frontend filter:', {
+        filter: activeFilter.value,
+        allowedStatuses,
+        before: beforeFilter,
+        after: consultationsArray.length
+      });
+    }
+
     consultations.value = consultationsArray;
 
+    // Debug logs
+    console.log('[fetchConsultations] Response:', data);
+    console.log('CONSULTATION DATA:', responseData);
+    console.log('STATUSES FOUND:', [...new Set(consultationsArray.map(c => c.status))]);
+    console.log('CUSTOMER DATA:', consultationsArray.map(c => ({
+      id: c.id,
+      status: c.status,
+      customer_name: c.customer_name,
+      customer: c.customer,
+    })));
     console.log('[fetchConsultations] Loaded:', consultationsArray.length);
   } catch (error) {
     console.error('[fetchConsultations] Error:', error);
@@ -191,6 +306,24 @@ function openFilterModal() {
 }
 
 function applyFilters() {
+  // Validate date range
+  if (filters.value.date_from && filters.value.date_to) {
+    const from = new Date(filters.value.date_from);
+    const to = new Date(filters.value.date_to);
+    if (from > to) {
+      toast.error('Tanggal awal tidak boleh lebih besar dari tanggal akhir');
+      return;
+    }
+  }
+
+  // Validate price range
+  const minPrice = Number(filters.value.min_price);
+  const maxPrice = Number(filters.value.max_price);
+  if (filters.value.min_price && filters.value.max_price && minPrice > maxPrice) {
+    toast.error('Harga minimum tidak boleh lebih besar dari harga maksimum');
+    return;
+  }
+
   console.log('[applyFilters] Applying filters:', filters.value);
   currentPage.value = 1;
   fetchConsultations();
@@ -200,7 +333,11 @@ function applyFilters() {
 function resetFilters() {
   console.log('[resetFilters] Resetting filters');
   filters.value = {
-    sort_by: 'newest'
+    sort_by: 'newest',
+    date_from: '',
+    date_to: '',
+    min_price: '',
+    max_price: ''
   };
   currentPage.value = 1;
   fetchConsultations();
@@ -380,8 +517,8 @@ onMounted(() => {
                       </div>
                     </td>
                     <td class="px-4 py-3">
-                      <p class="text-sm text-gray-800">{{ consultation.customer_name || 'Pelanggan' }}</p>
-                      <p class="text-xs text-gray-400">{{ consultation.customer_phone || '' }}</p>
+                      <p class="text-sm text-gray-800">{{ getCustomerName(consultation) }}</p>
+                      <p class="text-xs text-gray-400">{{ getCustomerPhone(consultation) }}</p>
                     </td>
                     <td class="px-4 py-3">
                       <p class="text-sm text-gray-600 line-clamp-2 max-w-[250px]">
@@ -390,8 +527,14 @@ onMounted(() => {
                     </td>
                     <td class="px-4 py-3 text-right">
                       <div class="space-y-1">
-                        <p v-if="getConsultationPrice(consultation)" class="text-sm font-semibold text-gray-800">
-                          {{ formatCurrency(getConsultationPrice(consultation)) }}
+                        <p v-if="getStartingPrice(consultation)" class="text-sm font-semibold text-gray-800">
+                          {{ formatCurrency(getStartingPrice(consultation)) }}
+                        </p>
+                        <p v-if="getOfferedPrice(consultation)" class="text-xs text-purple-600">
+                          Penawaran: {{ formatCurrency(getOfferedPrice(consultation)) }}
+                        </p>
+                        <p v-if="getFinalPrice(consultation)" class="text-xs text-green-600 font-medium">
+                          Kesepakatan: {{ formatCurrency(getFinalPrice(consultation)) }}
                         </p>
                       </div>
                     </td>
@@ -496,7 +639,7 @@ onMounted(() => {
               </div>
               <p class="text-xs text-gray-500 mt-0.5">
                 <i class="pi pi-user mr-1"></i>
-                {{ consultation.customer_name || 'Pelanggan' }}
+                {{ getCustomerName(consultation) }}
               </p>
               <p v-if="consultation.customer_description" class="text-xs text-gray-400 mt-1 line-clamp-2">
                 "{{ consultation.customer_description }}"
@@ -505,9 +648,17 @@ onMounted(() => {
                 <span class="text-xs text-gray-400">
                   {{ formatDate(consultation.created_at) }}
                 </span>
-                <span v-if="getConsultationPrice(consultation)" class="text-sm font-semibold text-gray-800">
-                  {{ formatCurrency(getConsultationPrice(consultation)) }}
-                </span>
+                <div class="text-right">
+                  <span v-if="getStartingPrice(consultation)" class="text-sm font-semibold text-gray-800">
+                    {{ formatCurrency(getStartingPrice(consultation)) }}
+                  </span>
+                  <span v-if="getOfferedPrice(consultation)" class="block text-xs text-purple-600">
+                    Penawaran: {{ formatCurrency(getOfferedPrice(consultation)) }}
+                  </span>
+                  <span v-if="getFinalPrice(consultation)" class="block text-xs text-green-600 font-medium">
+                    Deal: {{ formatCurrency(getFinalPrice(consultation)) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -530,7 +681,7 @@ onMounted(() => {
     <!-- Filter Modal -->
     <ResponsiveModal
       v-model:show="showFilterModal"
-      title="Urutkan Konsultasi"
+      title="Filter & Urutkan"
       show-footer
       @close="showFilterModal = false"
     >
@@ -562,6 +713,62 @@ onMounted(() => {
               <i v-else-if="option.value === 'price'" class="pi pi-tag text-xs"></i>
               {{ option.label }}
             </button>
+          </div>
+        </div>
+
+        <!-- Date Filter (shown when date sort is selected) -->
+        <div v-if="filters.sort_by === 'date'" class="space-y-4">
+          <h3 class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase">
+            <i class="pi pi-calendar text-purple-600"></i>
+            Filter Tanggal
+          </h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Dari Tanggal</label>
+              <input
+                v-model="filters.date_from"
+                type="date"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Sampai Tanggal</label>
+              <input
+                v-model="filters.date_to"
+                type="date"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Price Filter (shown when price sort is selected) -->
+        <div v-if="filters.sort_by === 'price'" class="space-y-4">
+          <h3 class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase">
+            <i class="pi pi-tag text-purple-600"></i>
+            Filter Harga
+          </h3>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Harga Minimum</label>
+              <input
+                v-model="filters.min_price"
+                type="number"
+                placeholder="Contoh: 50000"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1.5">Harga Maksimum</label>
+              <input
+                v-model="filters.max_price"
+                type="number"
+                placeholder="Contoh: 200000"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -185,7 +185,7 @@ const getDisplayStatusColor = (order) => {
 };
 
 // ============================================================
-// HELPER: Get order ID for API calls (use orders.id, not service_order_id)
+// HELPER: Get order ID for API calls (use orders.id)
 // ============================================================
 const getOrderId = (order) => {
   return order.order_id || order.id;
@@ -380,51 +380,119 @@ const isTerminal = (order) => {
   return ['selesai', 'ditolak'].includes(order.status);
 };
 
-// Get payment status label and color
-// Temporary until Xendit payment gateway integration is completed.
-// COD/manual service orders are treated as paid for demonstration/testing purposes.
-const getPaymentStatusLabel = (order) => {
-  // For COD/manual payment methods, treat as paid (no Xendit integration yet)
-  const isManualPayment =
-    order?.payment_method === 'COD' ||
-    order?.payment_method === 'MANUAL' ||
-    order?.payment_method === 'cash' ||
-    order?.payment_method === 'bayar_di_tempat' ||
-    order?.payment_method === 'Bayar di Tempat' ||
-    order?.payment_status === 'PAID';
+// ========================
+// PAYMENT STATUS HELPER
+// ========================
 
-  if (isManualPayment) {
+/**
+ * Format payment status to user-friendly label (case-insensitive)
+ */
+const formatPaymentStatus = (status) => {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
     return 'Sudah Bayar';
   }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'Menunggu Pembayaran';
+  }
+  if (['expired', 'kadaluarsa'].includes(value)) {
+    return 'Kadaluarsa';
+  }
+  if (['failed', 'gagal'].includes(value)) {
+    return 'Gagal';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'Menunggu Konfirmasi';
+  }
 
-  const labels = {
-    UNPAID: 'Belum Bayar',
-    WAITING_CONFIRMATION: 'Menunggu Konfirmasi',
-    PAID: 'Lunas',
-  };
-  return labels[order?.payment_status] || order?.payment_status || '—';
+  return 'Belum Dibayar';
+};
+
+/**
+ * Get color class for payment status
+ */
+const getPaymentStatusColorClass = (status) => {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
+    return 'bg-green-100 text-green-700';
+  }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+  if (['expired', 'kadaluarsa', 'failed', 'gagal'].includes(value)) {
+    return 'bg-red-100 text-red-700';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'bg-yellow-100 text-yellow-700';
+  }
+
+  return 'bg-gray-100 text-gray-700';
+};
+
+// ========================
+// PAYMENT DISPLAY HELPER
+// ========================
+
+/**
+ * Get payment method prefix (Xendit or COD)
+ */
+const getPaymentMethodPrefix = (order) => {
+  const method = String(order?.payment_method || '').toUpperCase();
+  // Xendit/Online methods
+  if (['QRIS', 'BCA', 'BNI', 'BRI', 'MANDIRI', 'OVO', 'DANA', 'SHOPEEPAY', 'ALFAMART', 'ONLINE', 'ONLINE_XENDIT', 'XENDIT', 'EWALLET', 'VA', 'VIRTUAL_ACCOUNT'].includes(method)) {
+    return 'Xendit';
+  }
+  // COD/Cash on Delivery
+  if (['COD', 'CASH', 'BAYAR_DI_TEMPAT'].includes(method)) {
+    return 'COD';
+  }
+  // Check if it's a manual/cash method
+  if (['MANUAL', 'MANUAL_TRANSFER', 'TRANSFER'].includes(method)) {
+    return 'Transfer';
+  }
+  // Default: check if online/xendit in the value
+  if (method.includes('ONLINE') || method.includes('XENDIT') || method.includes('QRIS')) {
+    return 'Xendit';
+  }
+  return 'Xendit'; // Default to Xendit for unknown methods
+};
+
+/**
+ * Get payment status label (internal status)
+ */
+const getPaymentStatusLabelInternal = (status) => {
+  return formatPaymentStatus(status);
+};
+
+// Get payment method display for table/modal
+const getPaymentStatusLabel = (order) => {
+  const prefix = getPaymentMethodPrefix(order);
+
+  // COD - show as-is, NOT as "Sudah Bayar"
+  if (prefix === 'COD') {
+    return 'COD - Bayar di Tempat';
+  }
+  if (prefix === 'Transfer') {
+    return 'Transfer - ' + getPaymentStatusLabelInternal(order?.payment_status);
+  }
+
+  // Xendit - show status based on payment_status
+  const status = getPaymentStatusLabelInternal(order?.payment_status);
+  return `${prefix} - ${status}`;
 };
 
 const getPaymentStatusColor = (order) => {
-  // For COD/manual payment methods, show green (paid) - no Xendit integration yet
-  const isManualPayment =
-    order?.payment_method === 'COD' ||
-    order?.payment_method === 'MANUAL' ||
-    order?.payment_method === 'cash' ||
-    order?.payment_method === 'bayar_di_tempat' ||
-    order?.payment_method === 'Bayar di Tempat' ||
-    order?.payment_status === 'PAID';
+  const prefix = getPaymentMethodPrefix(order);
 
-  if (isManualPayment) {
-    return 'bg-green-100 text-green-700';
+  // COD - always yellow (waiting for payment at service completion)
+  if (prefix === 'COD') {
+    return 'bg-yellow-100 text-yellow-700';
   }
 
-  const colors = {
-    UNPAID: 'bg-yellow-100 text-yellow-700',
-    WAITING_CONFIRMATION: 'bg-yellow-100 text-yellow-700',
-    PAID: 'bg-green-100 text-green-700',
-  };
-  return colors[order?.payment_status] || 'bg-gray-100 text-gray-700';
+  // Use status-based color
+  return getPaymentStatusColorClass(order?.payment_status);
 };
 
 // Get payment method display (e.g. "Xendit - QRIS", "COD")
@@ -442,14 +510,7 @@ const getChannelLabel = (channel) => {
 };
 
 const getPaymentMethodDisplay = (order) => {
-  const pm = order?.payment_method || '';
-  const upper = String(pm).toUpperCase();
-  if (upper === 'COD') return 'COD (Bayar di Tempat)';
-  // Use paid_channel (from webhook) or payment_channel for Xendit
-  const channel = order?.paid_channel || order?.payment_channel || null;
-  if (channel) return 'Xendit - ' + getChannelLabel(channel);
-  if (upper.includes('XENDIT') || upper.includes('ONLINE')) return 'Xendit';
-  return pm || '-';
+  return getPaymentStatusLabel(order);
 };
 
 // Open reject modal

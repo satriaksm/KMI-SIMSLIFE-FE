@@ -774,7 +774,10 @@ watch(selectedPayment, (val) => {
 
 // Platform fee
 watch(selectedPayment, (methodId) => {
-  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
+  const jasa = toNumber(amounts.value.jasa);
+  const ongkir = toNumber(amounts.value.ongkir);
+  const diskon = toNumber(amounts.value.diskon);
+  const gross = Math.max(0, jasa + ongkir - diskon);
   amounts.value.platformFee = calculatePlatformFee(methodId, gross);
 });
 
@@ -972,8 +975,12 @@ const amounts = ref({
 });
 
 const total = computed(() => {
-  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
-  return gross + amounts.value.platformFee;
+  const jasa = toNumber(amounts.value.jasa);
+  const ongkir = toNumber(amounts.value.ongkir);
+  const diskon = toNumber(amounts.value.diskon);
+  const platformFee = toNumber(amounts.value.platformFee);
+  const gross = Math.max(0, jasa + ongkir - diskon);
+  return gross + platformFee;
 });
 
 // Label tipe harga untuk menandai harga tetap vs harga mulai
@@ -1070,6 +1077,18 @@ function onPhoneInput(event) {
   form.value.tel = digits;
 }
 
+// ===== Helpers =====
+
+// Convert formatted currency string to number
+// Handles formats like "Rp 1.500.000", "1.500.000", "Rp 150.000" -> 150000
+function toNumber(value) {
+  if (typeof value === 'number' && !isNaN(value)) return value;
+  if (!value) return 0;
+  const cleaned = String(value).replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 const formatIDR = (v) => Number(v || 0).toLocaleString("id-ID");
 function fmtTanggal(iso) {
   if (!iso) return "—";
@@ -1095,7 +1114,7 @@ async function loadVouchersForJasa(merchantSlug) {
     const { data } = await api.get(
       `/api/checkout/${merchantSlug}/vouchers`,
       {
-        params: { amount: order.price || 0 },
+        params: { amount: toNumber(order.price) || 0 },
       },
     );
 
@@ -1123,16 +1142,16 @@ async function loadVouchersForJasa(merchantSlug) {
 function computeDiscount(promo) {
   if (!promo) return 0;
 
-  const base = Number(order.price || 0);
+  const base = toNumber(order.price || 0);
   const raw = promo.raw || {};
   const type = raw.voucher_type || promo.type;
-  const value = Number(raw.value ?? promo.value ?? 0);
+  const value = toNumber(raw.value ?? promo.value ?? 0);
 
   let discount = 0;
   if (type === "percent") {
     discount = Math.round((value / 100) * base);
     if (raw.max_discount_amount) {
-      discount = Math.min(discount, Number(raw.max_discount_amount));
+      discount = Math.min(discount, toNumber(raw.max_discount_amount));
     }
   } else {
     discount = value;
@@ -1427,18 +1446,18 @@ function buildWhatsappMessage() {
 
   // Ringkasan pembayaran
   lines.push("=== Ringkasan Pembayaran ===");
-  lines.push(`Harga Jasa       : Rp ${formatIDR(amounts.value.jasa)}`);
-  lines.push(`Biaya Pengantaran: Rp ${formatIDR(amounts.value.ongkir)}`);
+  lines.push(`Harga Jasa       : Rp ${formatIDR(toNumber(amounts.value.jasa))}`);
+  lines.push(`Biaya Pengantaran: Rp ${formatIDR(toNumber(amounts.value.ongkir))}`);
   if (selectedPromo.value) {
     lines.push(
       `Diskon (${selectedPromo.value.code}) : Rp ${formatIDR(
-        amounts.value.diskon,
+        toNumber(amounts.value.diskon),
       )}`,
     );
   } else {
-    lines.push(`Diskon            : Rp ${formatIDR(amounts.value.diskon)}`);
+    lines.push(`Diskon            : Rp ${formatIDR(toNumber(amounts.value.diskon))}`);
   }
-  lines.push(`Total Pembayaran  : Rp ${formatIDR(total.value || order.price)}`);
+  lines.push(`Total Pembayaran  : Rp ${formatIDR(toNumber(total.value) || order.price)}`);
 
   return lines.join("\n");
 }
@@ -1549,7 +1568,7 @@ const sendToChat = async () => {
       order_method: mappedOrderMethod,
       payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
       payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
-      total_price: total.value || order.price || 0,
+      total_price: toNumber(total.value) || toNumber(order.price) || 0,
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
     };
@@ -1647,9 +1666,9 @@ const sendToChat = async () => {
       }
     }
 
-    // ===== COD: redirect ke service history =====
-    console.log('[PembayaranJasa] COD payment - redirecting to service history');
-    router.push('/jasa-history');
+    // ===== COD: redirect ke Pesanan Saya =====
+    console.log('[PembayaranJasa] COD payment - redirecting to orders');
+    router.push('/orders');
     return;
 
   } catch (err) {

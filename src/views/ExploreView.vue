@@ -388,11 +388,11 @@ import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import CategoryCard from "@/components/Card/CategoryCard.vue";
 import MerchantCard from "@/components/Card/MerchantCard.vue";
 
-import jasaIcon from "@/assets/icons/Jasa.svg";
-import kulinerIcon from "@/assets/icons/Kuliner.svg";
-import tokoIcon from "@/assets/icons/Toko.svg";
-import merchantIcon from "@/assets/icons/merchant.svg";
-import { data } from "autoprefixer";
+// Import SVG icons as URL for img src
+import JasaIconUrl from "@/assets/icons/Jasa.svg?url";
+import KulinerIconUrl from "@/assets/icons/Kuliner.svg?url";
+import TokoIconUrl from "@/assets/icons/Toko.svg?url";
+import MerchantIconUrl from "@/assets/icons/merchant.svg?url";
 
 // =========================
 // STATE
@@ -829,10 +829,10 @@ const toggleShowAllCategories = () => {
 };
 
 const segmentNavigates = ref([
-  { label: "UMKM", icon: merchantIcon, mode: "umkm" },
-  { label: "Kuliner", icon: kulinerIcon, mode: "kuliner" },
-  { label: "Toko", icon: tokoIcon, mode: "toko" },
-  { label: "Jasa", icon: jasaIcon, mode: "jasa" },
+  { label: "UMKM", icon: MerchantIconUrl, mode: "umkm" },
+  { label: "Kuliner", icon: KulinerIconUrl, mode: "kuliner" },
+  { label: "Toko", icon: TokoIconUrl, mode: "toko" },
+  { label: "Jasa", icon: JasaIconUrl, mode: "jasa" },
 ]);
 
 const modeToSegments = {

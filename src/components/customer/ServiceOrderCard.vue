@@ -197,8 +197,37 @@ const isCod = computed(() => {
   return String(props.order.payment_method || "").toUpperCase() === "COD";
 });
 
+// ========================
+// PAYMENT STATUS HELPER
+// ========================
+
+/**
+ * Format payment status to user-friendly label (case-insensitive)
+ */
+function formatPaymentStatus(status) {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
+    return 'Sudah Bayar';
+  }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'Menunggu Pembayaran';
+  }
+  if (['expired', 'kadaluarsa'].includes(value)) {
+    return 'Kadaluarsa';
+  }
+  if (['failed', 'gagal'].includes(value)) {
+    return 'Gagal';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'Menunggu Konfirmasi';
+  }
+
+  return 'Menunggu Pembayaran';
+}
+
 const paymentMethodDisplay = computed(() => {
-  if (isCod.value) return "COD (Bayar Tunai)";
+  if (isCod.value) return "COD - Bayar di Tempat";
   const channel = props.order.payment_channel || props.order.paid_channel;
   if (channel) return `Xendit - ${getChannelLabel(channel)}`;
   return "Xendit";
@@ -215,17 +244,11 @@ const paymentStatusDisplay = computed(() => {
     is_paid: isPaid.value,
   });
 
-  if (isCod.value) return null; // COD doesn't show payment status badge
-  const ps = String(props.order.payment_status || "").toUpperCase();
-  const map = {
-    PAID: "Lunas / Sudah Dibayar",
-    SETTLED: "Lunas / Sudah Dibayar",
-    SUCCEEDED: "Lunas / Sudah Dibayar",
-    WAITING_CONFIRMATION: "Menunggu",
-    UNPAID: "Belum Bayar",
-    PENDING: "Menunggu",
-  };
-  return map[ps] || null;
+  // COD doesn't show payment status badge
+  if (isCod.value) return null;
+
+  // Use helper function for case-insensitive matching
+  return formatPaymentStatus(props.order.payment_status);
 });
 
 function getChannelLabel(channel) {
@@ -252,7 +275,9 @@ function getChannelLabel(channel) {
 const resolvedStatusProps = computed(() => {
   if (props.statusProps) return props.statusProps;
 
-  const raw = String(props.order.status || props.order.order_status || "").toLowerCase();
+  // Priority: status (from orders.status - PRIMARY) > service_status (backward compat) > order_status
+  // Backend now uses orders.status as source of truth
+  const raw = String(props.order.status || props.order.service_status || props.order.order_status || "").toLowerCase();
   const ps = String(props.order.payment_status || "").toUpperCase();
 
   // Payment-related statuses
@@ -266,19 +291,22 @@ const resolvedStatusProps = computed(() => {
     return { variant: "order", status: "processing", label: "Diterima", size: "sm", showIcon: true };
   }
   if (raw === "layanan_dikerjakan" || raw === "dikerjakan" || raw === "processing") {
-    return { variant: "order", status: "processing", label: "Dikerjakan", size: "sm", showIcon: true };
+    return { variant: "order", status: "processing", label: "Sedang Dikerjakan", size: "sm", showIcon: true };
   }
   if (raw === "menunggu_konfirmasi_selesai" || raw === "menunggu_selesai") {
-    return { variant: "order", status: "processing", label: "Menunggu Selesai", size: "sm", showIcon: true };
+    return { variant: "order", status: "processing", label: "Menunggu Konfirmasi Selesai", size: "sm", showIcon: true };
   }
   if (raw === "selesai" || raw === "completed") {
-    return { variant: "order", status: "completed", size: "sm", showIcon: true };
+    return { variant: "order", status: "completed", label: "Selesai", size: "sm", showIcon: true };
   }
   if (raw === "ditolak" || raw === "rejected") {
-    return { variant: "order", status: "cancelled", label: "Ditolak", size: "sm", showIcon: true };
+    return { variant: "order", status: "cancelled", label: "Ditolak Merchant", size: "sm", showIcon: true };
   }
-  if (raw === "dibatalkan" || raw === "cancelled") {
+  if (raw === "dibatalkan" || raw === "cancelled" || raw === "batal") {
     return { variant: "order", status: "cancelled", label: "Dibatalkan", size: "sm", showIcon: true };
+  }
+  if (raw === "expired") {
+    return { variant: "order", status: "cancelled", label: "Kadaluarsa", size: "sm", showIcon: true };
   }
   return { variant: "order", status: "pending", label: raw.replace(/_/g, " "), size: "sm", showIcon: true };
 });

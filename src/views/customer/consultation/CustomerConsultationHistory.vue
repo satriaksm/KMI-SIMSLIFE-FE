@@ -117,7 +117,7 @@ onMounted(() => {
     <header class="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3">
       <div class="max-w-4xl mx-auto">
         <div class="flex items-center gap-3">
-          <router-link to="/pembayaran-jasa" class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
+          <router-link to="/" class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
             <i class="pi pi-arrow-left"></i>
           </router-link>
           <div>

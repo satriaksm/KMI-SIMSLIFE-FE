@@ -97,11 +97,45 @@
         <div class="grid grid-cols-1 gap-2 sm:gap-4">
           <ServiceOrderCard
             v-for="order in filteredOrders"
-            :key="order.id"
+            :key="order.order_id || order.id"
             :order="order"
             @click="openOrder"
           >
             <template #action="{ order: o }">
+              <!-- SLA Countdown: merchant response deadline -->
+              <div
+                v-if="getMerchantDeadlineRemaining(o)"
+                class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
+              >
+                <i class="pi pi-clock"></i>
+                Sisa waktu respon merchant: {{ getMerchantDeadlineRemaining(o) }}
+              </div>
+              <!-- SLA Countdown: completion confirmation deadline -->
+              <div
+                v-if="getCompletionDeadlineRemaining(o)"
+                class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
+              >
+                <i class="pi pi-clock"></i>
+                Sisa waktu konfirmasi selesai: {{ getCompletionDeadlineRemaining(o) }}
+              </div>
+              <!-- Bayar Kembali (Xendit belum dibayar) -->
+              <Button
+                v-if="needsPayment(o)"
+                @click.stop="retryPayment(o)"
+                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
+              >
+                <i class="pi pi-credit-card mr-1"></i>
+                Bayar Kembali
+              </Button>
+              <!-- Konfirmasi Selesai (merchant sudah upload bukti) -->
+              <Button
+                v-if="o.status === 'menunggu_konfirmasi_selesai' || o.status === 'menunggu_selesai'"
+                @click.stop="openOrderConfirmSelesai(o)"
+                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-green-500 hover:bg-green-600"
+              >
+                <i class="pi pi-check-circle mr-1"></i>
+                Konfirmasi Selesai
+              </Button>
               <!-- Beri Ulasan (belum pernah review, status selesai, ada jasa_order_item_id) -->
               <Button
                 v-if="(o.status === 'selesai' || o.status === 'completed') && !o.is_reviewed && o.jasa_order_item_id"
@@ -253,12 +287,18 @@ function applyTempToActive() {
 
 const statusOptions = [
   { value: "pending", label: "Menunggu Konfirmasi" },
+  { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
+  { value: "menunggu_konfirmasi_merchant", label: "Menunggu Konfirmasi" },
   { value: "diterima", label: "Diterima" },
-  { value: "dikerjakan", label: "Dikerjakan" },
-  { value: "menunggu_selesai", label: "Menunggu Selesai" },
+  { value: "layanan_dikerjakan", label: "Sedang Dikerjakan" },
+  { value: "dikerjakan", label: "Sedang Dikerjakan" }, // Fallback for backward compatibility
+  { value: "menunggu_konfirmasi_selesai", label: "Menunggu Konfirmasi Selesai" },
+  { value: "menunggu_selesai", label: "Menunggu Konfirmasi Selesai" }, // Fallback
   { value: "selesai", label: "Selesai" },
-  { value: "ditolak", label: "Ditolak" },
+  { value: "ditolak", label: "Ditolak Merchant" },
   { value: "dibatalkan", label: "Dibatalkan" },
+  { value: "batal", label: "Dibatalkan" }, // From orders.status mapping
+  { value: "expired", label: "Kadaluarsa" },
 ];
 
 const dateOptions = [
@@ -344,23 +384,55 @@ const orders = ref([]);
 
 // Normalize: support both response.data.data and response.data
 function getOrdersList(res) {
-  if (!res) return [];
-  // Laravel paginate: { data: [...], current_page, ... }
-  if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (!res) {
+    console.warn('[getOrdersList] Empty response:', res);
+    return [];
+  }
+  // Laravel paginate: { data: { data: [...], current_page, total, ... }, message, meta }
+  if (Array.isArray(res?.data?.data)) {
+    console.log('[getOrdersList] Using res.data.data (Laravel paginate)', { count: res.data.data.length });
+    return res.data.data;
+  }
   // Simple array: { data: [...] }
-  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.data)) {
+    console.log('[getOrdersList] Using res.data (simple array)', { count: res.data.length });
+    return res.data;
+  }
   // Already an array
-  if (Array.isArray(res)) return res;
+  if (Array.isArray(res)) {
+    console.log('[getOrdersList] Using res (direct array)', { count: res.length });
+    return res;
+  }
+  console.warn('[getOrdersList] Unknown response structure:', { keys: Object.keys(res || {}) });
   return [];
 }
 
 async function fetchOrders() {
   loading.value = true;
   try {
-    const { data: res } = await api.get("/api/service-orders", {
+    const { data: res } = await api.get("/api/jasa-orders", {
       params: { per_page: 100 },
     });
-    orders.value = getOrdersList(res);
+
+    // Normalize: ensure every item has BOTH id and order_id
+    const rawOrders = getOrdersList(res);
+    orders.value = rawOrders.map((item) => ({
+      ...item,
+      id: item.id || item.order_id,
+      order_id: item.order_id || item.id,
+    }));
+
+    // Debug: Log status values from API response
+    console.log('[Pesanan Saya] Orders loaded:', {
+      total: orders.value.length,
+      statuses: orders.value.map(o => ({
+        id: o.id,
+        status: o.status,
+        service_status: o.service_status,
+        order_status: o.order_status,
+        status_label: o.status_label,
+      })),
+    });
   } catch (e) {
     console.error("[Pesanan Saya] Gagal memuat pesanan:", e);
     toast.error("Gagal memuat pesanan");
@@ -390,11 +462,16 @@ const filteredOrders = computed(() => {
     });
   }
 
-  // Filter by status
+  // Filter by status - check both service_status and order_status
   if (selectedStatus.value) {
     result = result.filter((o) => {
-      const s = String(o.status || o.order_status || "").toLowerCase();
-      return s === selectedStatus.value.toLowerCase();
+      const serviceStatus = String(o.service_status || o.status || "").toLowerCase();
+      const orderStatus = String(o.order_status || "").toLowerCase();
+      const rawStatus = String(o.status || "").toLowerCase();
+      const filter = selectedStatus.value.toLowerCase();
+
+      // Match against any of the status fields
+      return serviceStatus === filter || orderStatus === filter || rawStatus === filter;
     });
   }
 
@@ -417,17 +494,31 @@ const filteredOrders = computed(() => {
 // HELPERS
 // ========================
 function goBack() {
-  router.back();
+  router.push('/');
 }
 
 function openOrder(order) {
-  router.push({ path: `/orders/${order.id}` }).catch(() => {
-    router.push(`/orders/${order.id}`);
+  // Resolve orderId from multiple possible field names
+  const orderId = order?.id ?? order?.order_id ?? order?.order?.id ?? null;
+  console.log('[openOrder] Order clicked:', {
+    order,
+    resolvedId: orderId,
+    idField: order?.id,
+    orderIdField: order?.order_id,
   });
+
+  if (!orderId || orderId === 'undefined' || orderId === 'null') {
+    console.error('[openOrder] Order ID tidak valid:', order);
+    toast.error('ID pesanan tidak ditemukan');
+    return;
+  }
+
+  // Use named route for type-safe navigation
+  router.push({ name: 'Detail Pesanan', params: { orderId } });
 }
 
 function goToReview(order) {
-  const numericOrderId = Number(order.id);
+  const numericOrderId = Number(order.order_id || order.id);
   const jasaItemId = order.jasa_order_item_id;
 
   // If already reviewed, navigate to jasa detail
@@ -443,6 +534,149 @@ function goToReview(order) {
 
   // Navigate to /review/service/{order_id}/{jasa_order_item_id}
   router.push(`/review/service/${numericOrderId}/${jasaItemId}`);
+}
+
+function openOrderConfirmSelesai(order) {
+  // Navigate to order detail — customer can confirm selesai there
+  const orderId = order?.id ?? order?.order_id ?? null;
+  if (!orderId || orderId === 'undefined') {
+    toast.error('ID pesanan tidak ditemukan');
+    return;
+  }
+  router.push({ name: 'Detail Pesanan', params: { orderId } });
+}
+
+// ─── Bayar Kembali ─────────────────────────────────────────────────────
+
+/**
+ * Check if order needs payment (Xendit, unpaid)
+ */
+function needsPayment(order) {
+  // COD doesn't need online payment
+  const method = String(order.payment_method || '').toUpperCase();
+  if (method === 'COD') return false;
+
+  // Already paid
+  const ps = String(order.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
+
+  // Check pending statuses
+  const pendingStatuses = ['pending', 'unpaid', 'waiting', 'menunggu_pembayaran', 'menunggu_konfirmasi_merchant'];
+  if (!pendingStatuses.includes(ps) && !pendingStatuses.includes(order.status?.toLowerCase())) {
+    // Also allow if payment_status is null/empty and order is pending
+    if (!ps && !['pending', 'menunggu_konfirmasi_merchant'].includes(order.status?.toLowerCase())) {
+      return false;
+    }
+  }
+
+  // Has invoice URL that might be expired - show retry button anyway
+  // If status is pending/waiting/unpaid, show the button
+  return true;
+}
+
+// ─── SLA Countdown ───────────────────────────────────────────────────────
+
+function formatCountdown(deadline) {
+  if (!deadline) return null;
+  const now = new Date();
+  const end = new Date(deadline);
+  const diff = end - now;
+  if (diff <= 0) return '00:00';
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) {
+    return `${hours}j ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function getMerchantDeadlineRemaining(order) {
+  if (order.status !== 'menunggu_konfirmasi' && order.status !== 'menunggu_konfirmasi_merchant') {
+    return null;
+  }
+  return formatCountdown(order.merchant_response_deadline);
+}
+
+function getCompletionDeadlineRemaining(order) {
+  if (order.status !== 'menunggu_selesai' && order.status !== 'menunggu_konfirmasi_selesai') {
+    return null;
+  }
+  if (!order.completion_submitted_at) return null;
+  const deadline = new Date(order.completion_submitted_at);
+  deadline.setHours(deadline.getHours() + 24);
+  return formatCountdown(deadline.toISOString());
+}
+
+/**
+ * Retry payment for unpaid Xendit orders
+ */
+async function retryPayment(order) {
+  const orderId = order.order_id || order.id;
+  if (!orderId) {
+    toast.error('ID pesanan tidak ditemukan');
+    return;
+  }
+
+  console.log('[retryPayment] Starting payment retry:', {
+    orderId,
+    order_id: order.id,
+    order_number: order.order_number || order.id,
+    payment_method: order.payment_method,
+    payment_status: order.payment_status,
+    payment: order.payment,
+    invoice_url: order.invoice_url,
+    xendit_invoice_url: order.xendit_invoice_url,
+  });
+
+  try {
+    // Check if we already have a valid invoice URL
+    const existingInvoiceUrl = order.invoice_url || order.payment?.invoice_url || order.xendit_invoice_url;
+    if (existingInvoiceUrl) {
+      // Check if invoice is expired
+      const expiredAt = order.payment?.expired_at || order.expired_at;
+      const isExpired = expiredAt && new Date(expiredAt) < new Date();
+
+      console.log('[retryPayment] Existing invoice check:', {
+        existingInvoiceUrl,
+        expiredAt,
+        isExpired,
+      });
+
+      if (!isExpired) {
+        // Use existing invoice URL - redirect directly
+        console.log('[retryPayment] Redirecting to existing invoice:', existingInvoiceUrl);
+        window.location.href = existingInvoiceUrl;
+        return;
+      }
+    }
+
+    // Create new invoice
+    console.log('[retryPayment] Creating new invoice for order:', orderId);
+    const { data } = await api.post(`/api/payments/${orderId}/invoice`);
+
+    console.log('[retryPayment] API Response:', {
+      status: data?.status,
+      message: data?.message,
+      invoice_url: data?.data?.invoice_url || data?.invoice_url,
+      fullData: data,
+    });
+
+    const invoiceUrl = data?.data?.invoice_url || data?.invoice_url;
+    if (invoiceUrl) {
+      console.log('[retryPayment] Redirecting to new invoice:', invoiceUrl);
+      window.location.href = invoiceUrl;
+    } else {
+      console.warn('[retryPayment] No invoice URL in response:', data);
+      toast.error('Invoice tidak tersedia. Silakan coba lagi.');
+    }
+  } catch (err) {
+    console.error('[retryPayment] Error:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+    });
+    toast.error(err.response?.data?.message || err.response?.data?.error || 'Gagal membuat invoice pembayaran.');
+  }
 }
 
 onMounted(() => {

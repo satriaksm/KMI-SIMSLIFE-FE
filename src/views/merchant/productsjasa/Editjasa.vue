@@ -66,32 +66,55 @@ const currentMerchantData = computed(() => {
   return null;
 });
 
+const getAddressPart = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    return value.name || value.nama || value.label || value.value || '';
+  }
+  return '';
+};
+
+const formatAddress = (address) => {
+  if (!address) return '';
+
+  const parts = [
+    getAddressPart(address.detail),
+    getAddressPart(address.village),
+    getAddressPart(address.district),
+    getAddressPart(address.city),
+    getAddressPart(address.province),
+  ].filter(Boolean);
+
+  return parts.join(', ');
+};
+
 const formatMerchantAddress = (merchant) => {
   if (!merchant) return "";
 
-  const primaryAddress = merchant.primary_address;
+  // Try primary_address (snake_case from API) or primaryAddress (camelCase)
+  const primaryAddress = merchant.primary_address || merchant.primaryAddress || merchant.address_primary;
   if (primaryAddress) {
-    const parts = [
-      primaryAddress.detail,
-      primaryAddress.village,
-      primaryAddress.district,
-      primaryAddress.city,
-      primaryAddress.province,
-    ].filter(Boolean);
-
-    if (parts.length) return parts.join(", ");
+    const formatted = formatAddress(primaryAddress);
+    if (formatted) return formatted;
+    if (primaryAddress.full_address) return primaryAddress.full_address;
   }
 
-  return merchant.address || merchant.alamat || "";
+  return merchant.address || merchant.alamat || merchant.full_address || "";
 };
 
 const merchantProfileAddress = computed(() => {
-  return formatMerchantAddress(currentMerchantData.value);
+  // Try currentMerchantData first (from auth store), then from loaded jasa's merchant
+  return formatMerchantAddress(currentMerchantData.value)
+    || formatMerchantAddress(currentJasa.value?.merchant);
 });
 
 const currentJasaId = computed(() => {
   return route.params.id ? Number(route.params.id) : null;
 });
+
+// Store loaded jasa data to access merchant address
+const currentJasa = ref(null);
 
 const breadcrumbItems = computed(() => [
   {
@@ -589,6 +612,9 @@ const loadJasa = async () => {
 
     // Handle both wrapped and direct responses
     const jasaData = data.data || data;
+
+    // Store for merchant address lookup
+    currentJasa.value = jasaData;
 
     console.log("[Editjasa] Raw API response:", data);
     console.log("[Editjasa] Extracted jasaData:", jasaData);

@@ -19,6 +19,7 @@ const ratings = ref([]);
 const loading = ref(false);
 const page = ref(1);
 const hasMore = ref(true);
+const expandedHistoryIds = ref([]);
 
 // Get reviewer display name — uses reviewer_name from BE (BE appends reviewer_name: "Anonim" for anonymous)
 const getReviewerDisplay = (rating) => {
@@ -168,6 +169,29 @@ const isVideo = (media) => {
   );
 };
 
+// ===== Review History Helpers =====
+
+// Check if rating has update history
+const hasReviewHistory = (rating) => {
+  const histories = rating?.histories || rating?.review_histories || [];
+  return histories.length > 0;
+};
+
+// Get review histories
+const getReviewHistories = (rating) => {
+  return rating?.histories || rating?.review_histories || [];
+};
+
+// Toggle review history expansion
+const toggleReviewHistory = (ratingId) => {
+  const index = expandedHistoryIds.value.indexOf(ratingId);
+  if (index === -1) {
+    expandedHistoryIds.value.push(ratingId);
+  } else {
+    expandedHistoryIds.value.splice(index, 1);
+  }
+};
+
 onMounted(() => {
   fetchRatings();
 });
@@ -271,6 +295,82 @@ watch(
                   @error="(e) => { e.target.style.display = 'none'; console.error('Review video load error:', getMediaUrl(media)); }"
                 />
               </template>
+            </div>
+
+            <!-- Merchant Reply -->
+            <div v-if="rating.merchant_reply" class="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+              <div class="flex items-center gap-2 mb-1">
+                <i class="pi pi-check-circle text-green-500"></i>
+                <p class="text-xs font-semibold text-green-700">Tanggapan Merchant</p>
+              </div>
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ rating.merchant_reply }}</p>
+              <p v-if="rating.merchant_reply_at" class="text-xs text-gray-400 mt-2">
+                {{ formatDate(rating.merchant_reply_at) }}
+              </p>
+            </div>
+
+            <!-- Updated Badge & History Toggle -->
+            <div v-if="hasReviewHistory(rating)">
+              <div class="mt-3 flex items-center gap-2">
+                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full">
+                  <i class="pi pi-history"></i>
+                  Ulasan diperbarui
+                </span>
+                <button
+                  @click="toggleReviewHistory(rating.id)"
+                  class="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <i :class="['pi', expandedHistoryIds.includes(rating.id) ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
+                  {{ expandedHistoryIds.includes(rating.id) ? 'Sembunyikan' : 'Lihat' }} Riwayat
+                </button>
+              </div>
+
+              <!-- Expanded History -->
+              <div v-if="expandedHistoryIds.includes(rating.id)" class="mt-3 space-y-3">
+                <div
+                  v-for="(history, index) in getReviewHistories(rating)"
+                  :key="history.id || index"
+                  class="p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                >
+                  <!-- Before -->
+                  <div class="mb-3">
+                    <p class="text-xs font-semibold text-gray-500 uppercase mb-1">Sebelum diperbarui</p>
+                    <div class="flex items-center gap-1 mb-1">
+                      <i
+                        v-for="star in 5"
+                        :key="'old-' + star"
+                        class="pi text-xs"
+                        :class="star <= Number(history.old_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                      ></i>
+                    </div>
+                    <p v-if="history.old_comment" class="text-sm text-gray-600">{{ history.old_comment }}</p>
+                  </div>
+
+                  <!-- Arrow -->
+                  <div class="flex justify-center my-2">
+                    <i class="pi pi-arrow-down text-gray-400 text-xs"></i>
+                  </div>
+
+                  <!-- After -->
+                  <div>
+                    <p class="text-xs font-semibold text-green-600 uppercase mb-1">Sesudah diperbarui</p>
+                    <div class="flex items-center gap-1 mb-1">
+                      <i
+                        v-for="star in 5"
+                        :key="'new-' + star"
+                        class="pi text-xs"
+                        :class="star <= Number(history.new_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                      ></i>
+                    </div>
+                    <p v-if="history.new_comment" class="text-sm text-gray-600">{{ history.new_comment }}</p>
+                  </div>
+
+                  <!-- Date -->
+                  <p class="text-xs text-gray-400 mt-2">
+                    {{ formatDate(history.created_at) }}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

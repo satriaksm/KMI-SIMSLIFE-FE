@@ -310,8 +310,8 @@ const submitCheckout = async () => {
     // Show success message
     toast.success(data?.message || 'Pesanan konsultasi berhasil dibuat!');
 
-    // Redirect to jasa history (COD flow — no payment needed)
-    router.push('/jasa-history');
+    // Redirect to Pesanan Saya (COD flow — no payment needed)
+    router.push('/orders');
   } catch (error) {
     console.error('[Checkout] Error:', error.response?.data || error);
     const errorMessage = error.response?.data?.message ||

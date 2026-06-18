@@ -110,19 +110,28 @@ function mapApiStatus(beStatus, o) {
     case "paid":
       return "waiting_review"; // sudah bayar, tunggu konfirmasi UMKM
     case "pending":
+    case "menunggu_konfirmasi":
+    case "menunggu_konfirmasi_merchant":
       if (o.payment_method === 'COD') return "waiting_review"; // COD langsung tunggu konfirmasi
-      return beStatus;
+      return "waiting_review";
     case "responsed":
     case "accepted":
+    case "diterima":
       return "processing";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
+    case "selesai":
       return "completed";
+    case "ditolak":
+      return "ditolak";
+    case "dibatalkan":
     case "cancelled":
-      return "cancelled";
+      return "dibatalkan";
     case "rejected":
-      return "rejected";
+      return "ditolak";
+    case "expired":
+      return "expired";
     case "undelivered":
       return "undelivered";
     default:
@@ -185,7 +194,7 @@ function mapMerchantOrder(o) {
 async function fetchOrders() {
   if (!currentMerchantSlug.value) return;
 
-  // Jika tab Jasa aktif, fetch dari endpoint service-orders
+  // Jika tab Jasa aktif, fetch dari endpoint merchant orders
   if (activeOrderType.value === "jasa") {
     await fetchServiceOrders();
     return;
@@ -263,6 +272,8 @@ const serviceTabs = [
   { key: "tunggu_selesai", label: "Tunggu Selesai" },
   { key: "selesai", label: "Selesai" },
   { key: "ditolak", label: "Ditolak" },
+  { key: "dibatalkan", label: "Dibatalkan" },
+  { key: "expired", label: "Kadaluarsa" },
 ];
 
 // Service order status mapping for display
@@ -270,6 +281,7 @@ const serviceTabs = [
 const serviceStatusMap = {
   // service_orders status values
   'pending': 'menunggu',
+  'menunggu_konfirmasi': 'menunggu',
   'menunggu_konfirmasi_merchant': 'menunggu',
   'diterima': 'diterima',
   'ditolak': 'ditolak',
@@ -282,9 +294,10 @@ const serviceStatusMap = {
   'completed': 'selesai',
   // orders table status values (mapped) - for backward compatibility
   'proses': 'diterima', // In process = accepted
-  'batal': 'ditolak',
-  'dibatalkan': 'ditolak',
-  'cancelled': 'ditolak',
+  'batal': 'dibatalkan',
+  'dibatalkan': 'dibatalkan',
+  'cancelled': 'dibatalkan',
+  'expired': 'expired',
 };
 
 // Get display status for service orders
@@ -298,26 +311,60 @@ const getServiceDisplayStatus = (order) => {
   return rawStatus;
 };
 
-// Get order ID for API calls (use orders.id, fallback to service_order_id)
+// Get human-readable status label for terminal/completed orders
+// Distinguishes between customer cancellation and merchant rejection
+const getOrderStatusLabel = (order) => {
+  const status = String(order.status || order.order_status || '').toLowerCase();
+
+  // Kadaluarsa — merchant didn't respond in time
+  if (status === 'expired') return 'Kadaluarsa';
+
+  // Dibatalkan — distinguish who cancelled
+  if (['dibatalkan', 'cancelled', 'canceled'].includes(status)) {
+    if (order.cancelled_by === 'customer') return 'Dibatalkan Customer';
+    if (order.cancelled_by === 'merchant') return 'Dibatalkan Merchant';
+    return 'Dibatalkan';
+  }
+
+  // Ditolak — distinguish who rejected
+  if (['ditolak', 'rejected'].includes(status)) {
+    if (order.rejected_by === 'merchant') return 'Ditolak Merchant';
+    if (order.rejected_by === 'customer') return 'Ditolak Customer';
+    return 'Ditolak';
+  }
+
+  // Other statuses — use status_label from backend or raw status
+  return order.status_label || order.order_status_label || status;
+};
+
+// Get order ID for API calls (use orders.id)
 const getServiceOrderId = (order) => {
   return order.order_id || order.id;
 };
 
-// Check if order is pending (needs merchant action)
+// Check if order is pending (needs merchant action) — but not expired
 const isServicePendingOrder = (order) => {
   const status = getServiceDisplayStatus(order);
   return status === 'menunggu';
 };
 
+// Check if order is expired (merchant deadline passed)
+const isServiceExpired = (order) => {
+  const status = String(order.status || '').toLowerCase();
+  if (status !== 'menunggu_konfirmasi' && status !== 'menunggu_konfirmasi_merchant') return false;
+  if (!order.merchant_response_deadline) return false;
+  return new Date(order.merchant_response_deadline) <= new Date();
+};
+
 // Check if order is terminal
 const isServiceTerminal = (order) => {
   const status = getServiceDisplayStatus(order);
-  return ['selesai', 'ditolak'].includes(status);
+  return ['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(status);
 };
 
 // Can perform actions based on status
-const canServiceAccept = (order) => isServicePendingOrder(order);
-const canServiceReject = (order) => isServicePendingOrder(order);
+const canServiceAccept = (order) => isServicePendingOrder(order) && !isServiceExpired(order);
+const canServiceReject = (order) => isServicePendingOrder(order) && !isServiceExpired(order);
 const canServiceStart = (order) => {
   const status = getServiceDisplayStatus(order);
   return status === 'diterima';
@@ -325,6 +372,38 @@ const canServiceStart = (order) => {
 const canServiceEvidence = (order) => {
   const status = getServiceDisplayStatus(order);
   return status === 'dikerjakan';
+};
+
+// SLA Countdown helpers
+function formatCountdown(deadline) {
+  if (!deadline) return null;
+  const now = new Date();
+  const end = new Date(deadline);
+  const diff = end - now;
+  if (diff <= 0) return '00:00';
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) {
+    return `${hours}j ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+// Get merchant response deadline remaining (for waiting orders)
+const getMerchantDeadlineRemaining = (order) => {
+  const status = String(order.status || '').toLowerCase();
+  if (status !== 'menunggu_konfirmasi' && status !== 'menunggu_konfirmasi_merchant') return null;
+  return formatCountdown(order.merchant_response_deadline);
+};
+
+// Get completion confirmation deadline remaining (for waiting_selesai orders)
+const getCompletionDeadlineRemaining = (order) => {
+  const status = String(order.status || '').toLowerCase();
+  if (status !== 'menunggu_selesai' && status !== 'menunggu_konfirmasi_selesai') return null;
+  if (!order.completion_submitted_at) return null;
+  const deadline = new Date(order.completion_submitted_at);
+  deadline.setHours(deadline.getHours() + 24);
+  return formatCountdown(deadline.toISOString());
 };
 
 // Format service type for display
@@ -625,6 +704,8 @@ const filteredServiceOrders = computed(() => {
     'tunggu_selesai': ['tunggu_selesai'],
     'selesai': ['selesai'],
     'ditolak': ['ditolak'],
+    'dibatalkan': ['dibatalkan'],
+    'expired': ['expired'],
   };
 
   const allowedStatuses = tabStatusMap[activeTab.value] || [];
@@ -652,18 +733,31 @@ const getServiceStatusClass = (status) => {
     'tunggu_selesai': 'bg-purple-100 text-purple-700',
     'selesai': 'bg-green-100 text-green-700',
     'ditolak': 'bg-red-100 text-red-700',
+    'dibatalkan': 'bg-red-100 text-red-700',
+    'expired': 'bg-gray-200 text-gray-600',
   };
   return classes[status] || 'bg-gray-100 text-gray-700';
 };
 
-const getServiceStatusLabel = (status) => {
+const getServiceStatusLabel = (status, order = {}) => {
+  // For dibatalkan — show who cancelled
+  if (status === 'dibatalkan') {
+    if (order.cancelled_by === 'customer') return 'Dibatalkan Customer';
+    if (order.cancelled_by === 'merchant') return 'Dibatalkan Merchant';
+    return 'Dibatalkan';
+  }
+  // For ditolak — show who rejected
+  if (status === 'ditolak') {
+    if (order.rejected_by === 'merchant') return 'Ditolak Merchant';
+    if (order.rejected_by === 'customer') return 'Ditolak Customer';
+    return 'Ditolak';
+  }
   const labels = {
     'menunggu': 'Menunggu Konfirmasi',
     'diterima': 'Diterima',
-    'dikerjakan': 'Dikerjakan',
-    'tunggu_selesai': 'Tunggu Selesai',
+    'dikerjakan': 'Sedang Dikerjakan',
+    'tunggu_selesai': 'Menunggu Customer Selesai',
     'selesai': 'Selesai',
-    'ditolak': 'Ditolak',
   };
   return labels[status] || status || '-';
 };
@@ -798,7 +892,7 @@ const submitServiceEvidence = async () => {
   try {
     const orderId = getServiceOrderId(selectedServiceOrder.value);
     const formData = new FormData();
-    formData.append('status', 'selesai');
+    formData.append('status', 'menunggu_konfirmasi_selesai');
     formData.append('completion_note', completionNote.value || '');
     evidenceFiles.value.forEach((file) => {
       formData.append('evidences[]', file);
@@ -827,22 +921,54 @@ const openServiceDetailModal = (order) => {
   showServiceDetailModal.value = true;
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const getEvidenceUrl = (evidence) => {
+  const raw =
+    evidence?.file_url ||
+    evidence?.url ||
+    evidence?.media_url ||
+    evidence?.evidence_url ||
+    evidence?.file_path ||
+    evidence?.path;
+
+  if (!raw) {
+    console.warn('[getEvidenceUrl] No URL field found in evidence:', evidence);
+    return null;
+  }
+  if (String(raw).startsWith('http')) return raw;
+  if (String(raw).startsWith('/storage')) return `${API_BASE_URL}${raw}`;
+  const result = `${API_BASE_URL}/storage/${String(raw).replace(/^\/+/, '').replace(/^public\//, '')}`;
+  console.log('[getEvidenceUrl] raw:', raw, '→ result:', result);
+  return result;
+};
+
+const isImageEvidence = (evidence) => {
+  const type = evidence?.file_type || evidence?.media_type || evidence?.mime_type || '';
+  const url = getEvidenceUrl(evidence) || '';
+  return String(type).includes('image') || /\.(jpg|jpeg|png|webp|gif)$/i.test(url);
+};
+
+const isVideoEvidence = (evidence) => {
+  const type = evidence?.file_type || evidence?.media_type || evidence?.mime_type || '';
+  const url = getEvidenceUrl(evidence) || '';
+  return String(type).includes('video') || /\.(mp4|mov|webm)$/i.test(url);
+};
+
 const getServiceMediaUrl = (mediaOrPath) => {
   if (!mediaOrPath) return '';
   if (typeof mediaOrPath === 'string') {
     if (mediaOrPath.startsWith('http')) return mediaOrPath;
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/storage/${mediaOrPath}`;
+    if (mediaOrPath.startsWith('/storage')) return `${API_BASE_URL}${mediaOrPath}`;
+    return `${API_BASE_URL}/storage/${mediaOrPath.replace(/^\/+/, '').replace(/^public\//, '')}`;
   }
-  const rawFileUrl = mediaOrPath?.file_url;
-  if (rawFileUrl && typeof rawFileUrl === 'string') {
-    if (rawFileUrl.startsWith('http')) return rawFileUrl;
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${rawFileUrl}`;
-  }
-  return '';
+  return getEvidenceUrl(mediaOrPath);
 };
 
 const getCompletionEvidences = (order) => {
-  return order?.completion_evidences || order?.completionEvidences || [];
+  const ev = order?.completion_evidences || order?.completionEvidences || [];
+  console.log('[getCompletionEvidences] Order:', order?.id, '| Count:', ev.length, '| Data:', ev);
+  return ev;
 };
 
 // Check if order has completion evidences
@@ -1491,10 +1617,20 @@ function leaveOrdersChannel(id) {
                         <div class="text-xs text-gray-400">{{ order.customer.phone }}</div>
                       </td>
                       <td class="px-4 py-3">
-                        <div class="text-sm text-gray-800 max-w-xs">
+                        <div class="text-sm text-gray-600">
                           <div class="truncate">{{ order.items[0].name }}</div>
                           <div v-if="order.items[0].variant" class="text-xs text-purple-500 font-medium">{{ order.items[0].variant }}</div>
                           <div v-if="order.booking_note" class="text-xs text-gray-400 truncate max-w-[200px]">Catatan: {{ order.booking_note }}</div>
+                          <!-- SLA countdown: merchant response deadline -->
+                          <div v-if="getMerchantDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
+                            <i class="pi pi-clock" style="font-size: 10px"></i>
+                            Sisa: {{ getMerchantDeadlineRemaining(order) }}
+                          </div>
+                          <!-- SLA countdown: completion confirmation deadline -->
+                          <div v-if="getCompletionDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
+                            <i class="pi pi-clock" style="font-size: 10px"></i>
+                            Konfirmasi: {{ getCompletionDeadlineRemaining(order) }}
+                          </div>
                         </div>
                       </td>
                       <td class="px-4 py-3">
@@ -1516,7 +1652,7 @@ function leaveOrdersChannel(id) {
                       </td>
                       <td class="px-4 py-3">
                         <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getServiceStatusClass(order.status)]">
-                          {{ getServiceStatusLabel(order.status) }}
+                          {{ getServiceStatusLabel(order.status, order) }}
                         </span>
                       </td>
                       <td class="px-4 py-3" @click.stop>
@@ -1766,7 +1902,7 @@ function leaveOrdersChannel(id) {
               </p>
             </div>
             <span :class="['px-2.5 py-1 rounded-full text-xs font-medium', getServiceStatusClass(order.status)]">
-              {{ getServiceStatusLabel(order.status) }}
+              {{ getServiceStatusLabel(order.status, order) }}
             </span>
           </div>
 
@@ -1787,6 +1923,16 @@ function leaveOrdersChannel(id) {
                 <span v-if="order.booking_note" class="text-xs text-gray-400 truncate block">
                   {{ order.booking_note }}
                 </span>
+                <!-- SLA countdown: merchant response deadline -->
+                <div v-if="getMerchantDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
+                  <i class="pi pi-clock" style="font-size: 10px"></i>
+                  Sisa waktu respon: {{ getMerchantDeadlineRemaining(order) }}
+                </div>
+                <!-- SLA countdown: completion confirmation deadline -->
+                <div v-if="getCompletionDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
+                  <i class="pi pi-clock" style="font-size: 10px"></i>
+                  Konfirmasi selesai: {{ getCompletionDeadlineRemaining(order) }}
+                </div>
               </div>
             </div>
             <div class="flex items-center justify-between pt-1">
@@ -2052,11 +2198,36 @@ function leaveOrdersChannel(id) {
             <!-- Status Badges -->
             <div class="flex gap-2 flex-wrap">
               <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServiceStatusClass(selectedServiceOrder.status)]">
-                {{ getServiceStatusLabel(selectedServiceOrder.status) }}
+                {{ getServiceStatusLabel(selectedServiceOrder.status, selectedServiceOrder) }}
               </span>
               <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServicePaymentColor(selectedServiceOrder)]">
                 {{ getServicePaymentLabel(selectedServiceOrder) }}
               </span>
+            </div>
+
+            <!-- SLA Countdown: menunggu_konfirmasi (merchant response deadline) -->
+            <div v-if="getMerchantDeadlineRemaining(selectedServiceOrder)" class="p-3 bg-orange-50 border border-orange-200 rounded-xl">
+              <div class="flex items-center gap-2 text-sm text-orange-700 font-medium">
+                <i class="pi pi-clock shrink-0"></i>
+                Sisa waktu respon: <strong>{{ getMerchantDeadlineRemaining(selectedServiceOrder) }}</strong>
+              </div>
+              <p class="mt-1 text-xs text-orange-500">Merchant wajib merespon pesanan dalam 1x24 jam.</p>
+            </div>
+
+            <!-- SLA Info: menunggu_selesai (waiting customer confirmation) -->
+            <div v-if="getCompletionDeadlineRemaining(selectedServiceOrder)" class="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+              <div class="flex items-center gap-2 text-sm text-purple-700 font-medium">
+                <i class="pi pi-clock shrink-0"></i>
+                Menunggu konfirmasi customer. Auto-selesai dalam: <strong>{{ getCompletionDeadlineRemaining(selectedServiceOrder) }}</strong>
+              </div>
+            </div>
+
+            <!-- Expired banner -->
+            <div v-if="selectedServiceOrder.status === 'expired'" class="p-3 bg-gray-100 border border-gray-300 rounded-xl">
+              <div class="flex items-center gap-2 text-sm text-gray-600 font-medium">
+                <i class="pi pi-clock shrink-0"></i>
+                Pesanan kadaluarsa karena merchant tidak merespon dalam 1x24 jam.
+              </div>
             </div>
 
             <!-- Rejection Reason -->
@@ -2082,16 +2253,17 @@ function leaveOrdersChannel(id) {
               <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Bukti Pengerjaan</h4>
               <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0" class="grid grid-cols-3 gap-2">
                 <template v-for="ev in getCompletionEvidences(selectedServiceOrder)" :key="ev.id">
+                  {{ console.log('[Thumbnail Evidence]', ev) || '' }}
                   <img
-                    v-if="ev.file_type === 'image' || ev.media_type === 'image'"
-                    :src="getServiceMediaUrl(ev)"
+                    v-if="isImageEvidence(ev)"
+                    :src="getEvidenceUrl(ev)"
                     class="w-full aspect-square object-cover rounded-xl cursor-pointer"
                     @click="openEvidenceViewModal(selectedServiceOrder)"
-                    @error="(e) => e.target.style.display = 'none'"
+                    @error="(e) => { console.error('[Thumbnail failed]', getEvidenceUrl(ev), ev); e.target.style.display = 'none'; }"
                   />
                   <video
-                    v-else-if="ev.file_type === 'video' || ev.media_type === 'video'"
-                    :src="getServiceMediaUrl(ev)"
+                    v-else-if="isVideoEvidence(ev)"
+                    :src="getEvidenceUrl(ev)"
                     controls
                     class="w-full aspect-square object-cover rounded-xl"
                   />
@@ -2392,14 +2564,14 @@ function leaveOrdersChannel(id) {
                 <template v-for="(media, idx) in getReviewMedia(selectedReview)" :key="media.id || idx">
                   <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
                     <img
-                      v-if="media.file_type === 'image'"
-                      :src="getServiceMediaUrl(media)"
+                      v-if="isImageEvidence(media)"
+                      :src="getEvidenceUrl(media)"
                       class="w-full h-full object-cover"
                       @error="(e) => e.target.style.display = 'none'"
                     />
                     <video
-                      v-else-if="media.file_type === 'video'"
-                      :src="getServiceMediaUrl(media)"
+                      v-else-if="isVideoEvidence(media)"
+                      :src="getEvidenceUrl(media)"
                       controls
                       class="w-full h-full object-cover"
                     />
@@ -2618,7 +2790,7 @@ function leaveOrdersChannel(id) {
             <!-- Order Status -->
             <div class="flex items-center gap-2">
               <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServiceStatusClass(selectedServiceOrder.status)]">
-                {{ getServiceStatusLabel(selectedServiceOrder.status) }}
+                {{ getServiceStatusLabel(selectedServiceOrder.status, selectedServiceOrder) }}
               </span>
             </div>
 
@@ -2641,20 +2813,39 @@ function leaveOrdersChannel(id) {
                 >
                   <!-- Evidence Image/Video -->
                   <div class="aspect-video bg-gray-100">
+                    <!-- Debug -->
+                    {{ console.log('[Evidence render]', idx, evidence) || '' }}
+                    <!-- Image -->
                     <img
-                      v-if="evidence.file_type === 'image' || evidence.media_type === 'image' || evidence.file_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)"
-                      :src="getServiceMediaUrl(evidence)"
+                      v-if="isImageEvidence(evidence)"
+                      :src="getEvidenceUrl(evidence)"
                       class="w-full h-full object-contain"
-                      @error="(e) => e.target.style.display = 'none'"
+                      @error="(e) => { console.error('[Evidence image failed]', getEvidenceUrl(evidence), evidence); e.target.style.display = 'none'; const fb = e.target.nextElementSibling; if (fb) { fb.style.display = 'flex'; } }"
                     />
+                    <!-- Fallback when image fails to load -->
+                    <div
+                      v-if="isImageEvidence(evidence)"
+                      class="w-full h-full items-center justify-center text-gray-400 hidden"
+                      style="display: none"
+                    >
+                      <div class="text-center">
+                        <i class="pi pi-image text-3xl mb-1"></i>
+                        <p class="text-xs">Bukti tidak dapat dimuat</p>
+                      </div>
+                    </div>
+                    <!-- Video -->
                     <video
-                      v-else-if="evidence.file_type === 'video' || evidence.media_type === 'video' || evidence.file_url?.match(/\.(mp4|mov|webm)$/i)"
-                      :src="getServiceMediaUrl(evidence)"
+                      v-else-if="isVideoEvidence(evidence)"
+                      :src="getEvidenceUrl(evidence)"
                       controls
                       class="w-full h-full object-contain"
                     />
+                    <!-- Unknown format fallback -->
                     <div v-else class="w-full h-full flex items-center justify-center">
-                      <i class="pi pi-file text-4xl text-gray-400"></i>
+                      <div class="text-center">
+                        <i class="pi pi-file text-3xl text-gray-400 mb-1"></i>
+                        <p class="text-xs text-gray-400">Format tidak dikenali</p>
+                      </div>
                     </div>
                   </div>
 

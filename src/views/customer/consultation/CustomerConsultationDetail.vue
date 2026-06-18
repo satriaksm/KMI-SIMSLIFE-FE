@@ -1,4 +1,4 @@
-diantara <script setup>
+<script setup>
 import { ref, onMounted, nextTick, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
@@ -192,9 +192,9 @@ const goToOrderHistory = () => {
   router.push('/pembayaran-jasa');
 };
 
-// Navigate to jasa history (for consultation-based orders)
+// Navigate to Pesanan Saya (for consultation-based orders)
 const viewOrderDetail = () => {
-  router.push('/jasa-history');
+  router.push('/orders');
 };
 
 // Close consultation
@@ -291,7 +291,7 @@ const fetchConsultation = async () => {
     console.error('[CustomerConsultationDetail] Fetch error:', error);
     toast.error(error.response?.data?.message || 'Gagal memuat data konsultasi');
     if (error.response?.status === 404) {
-      router.back();
+      router.push('/customer/consultations');
     }
   } finally {
     loading.value = false;
@@ -380,12 +380,12 @@ onMounted(async () => {
 
 <template>
   <div class="flex flex-col h-screen bg-gray-50">
-    <!-- Header - Sticky -->
+    <!-- Header - Sticky at top -->
     <header class="sticky top-0 z-20 bg-white border-b border-gray-200 lg:px-6 px-4 py-3 shrink-0">
       <div class="max-w-5xl mx-auto">
         <div class="flex items-center gap-3">
           <button
-            @click="router.back()"
+            @click="router.push('/customer/consultations')"
             class="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition shrink-0 lg:-ml-1"
           >
             <i class="pi pi-arrow-left text-sm"></i>
@@ -414,6 +414,7 @@ onMounted(async () => {
       <i class="pi pi-spin pi-spinner text-3xl text-gray-400"></i>
     </div>
 
+    <!-- Content (banners) - all shrink-0 so they don't scroll -->
     <template v-else-if="consultation">
       <!-- Service Info Banner -->
       <div class="bg-white border-b border-gray-100 lg:px-6 px-4 py-2 shrink-0">
@@ -502,13 +503,12 @@ onMounted(async () => {
       </div>
 
       <!-- Booking Proposal Modal -->
-      <div v-if="showBookingForm" class="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
-        <div class="w-full md:max-w-lg max-h-[85vh] bg-white rounded-t-3xl md:rounded-3xl flex flex-col overflow-hidden">
-          <!-- Header - Sticky -->
+      <div v-if="showBookingForm" class="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/40">
+        <div class="w-full md:max-w-lg bg-white rounded-t-3xl md:rounded-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <!-- Header -->
           <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
             <div>
-              <h3 class="text-sm font-bold text-gray-900">Ajukan Jadwal (Opsional)</h3>
-              <p class="text-xs text-gray-400 mt-0.5">Isi jadwal yang diinginkan</p>
+              <h3 class="text-sm font-bold text-gray-900">Ajukan Jadwal</h3>
             </div>
             <button
               @click="showBookingForm = false"
@@ -519,11 +519,7 @@ onMounted(async () => {
           </div>
 
           <!-- Body - Scrollable -->
-          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            <p class="text-xs text-gray-500">
-              Anda dapat mengisi jadwal layanan yang diinginkan. Jika tidak diisi, merchant akan menghubungi untuk konfirmasi.
-            </p>
-
+          <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4 pb-28">
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1.5">Tanggal Layanan</label>
               <input
@@ -553,8 +549,8 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Footer - Sticky -->
-          <div class="shrink-0 px-5 py-4 border-t border-gray-100 bg-white space-y-2">
+          <!-- Footer - Sticky above mobile nav -->
+          <div class="shrink-0 sticky bottom-16 md:bottom-0 bg-white border-t border-gray-100 p-4 space-y-2 z-50">
             <button
               @click="acceptOffer"
               :disabled="sending"
@@ -709,9 +705,9 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Chat Messages - Scrollable -->
-      <div ref="messageListRef" class="flex-1 overflow-y-auto lg:px-6 px-4 py-4 pb-28">
-        <div class="max-w-5xl mx-auto space-y-3">
+      <!-- Scrollable chat area -->
+      <div ref="messageListRef" class="flex-1 overflow-y-auto lg:px-6 px-4 py-4 pb-40 md:pb-36">
+          <div class="max-w-5xl mx-auto space-y-3">
           <!-- Initial request -->
           <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 lg:rounded-xl">
             <div class="flex items-center gap-2 mb-2">
@@ -823,9 +819,9 @@ onMounted(async () => {
       </div>
     </template>
 
-    <!-- File Preview -->
-    <div v-if="selectedFiles.length > 0" class="bg-purple-50 border-t border-purple-100 lg:px-6 px-4 py-2 shrink-0">
-      <div class="max-w-5xl mx-auto flex items-center gap-3 overflow-x-auto">
+    <!-- File Preview - Fixed above input -->
+    <div v-if="selectedFiles.length > 0" class="fixed left-0 right-0 bottom-[132px] md:bottom-[76px] z-40 bg-purple-50 border-t border-purple-100 px-4 py-2">
+      <div class="flex items-center gap-3 overflow-x-auto">
         <span class="text-xs text-purple-600 font-medium shrink-0 text-nowrap">Attached:</span>
         <div v-for="(file, index) in selectedFiles" :key="index" class="relative shrink-0">
           <img
@@ -848,50 +844,48 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Input Area - Sticky Bottom -->
-    <div v-if="canSendMessage" class="bg-white border-t border-gray-200 lg:px-6 px-4 py-3 shrink-0">
-      <div class="max-w-5xl mx-auto">
-        <div class="flex gap-3 items-center">
-          <!-- Attachment -->
-          <button
-            @click="triggerFileInput"
-            class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 transition shrink-0"
-          >
-            <i class="pi pi-paperclip text-sm"></i>
-          </button>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
-            multiple
-            class="hidden"
-            @change="handleFileSelect"
-          />
+    <!-- Input Area - Fixed at bottom -->
+    <div v-if="canSendMessage && !showBookingForm" class="fixed left-0 right-0 bottom-16 md:bottom-0 z-50 bg-white border-t border-gray-200 px-4 py-3">
+      <div class="flex gap-3 items-center">
+        <!-- Attachment -->
+        <button
+          @click="triggerFileInput"
+          class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-gray-200 transition shrink-0"
+        >
+          <i class="pi pi-paperclip text-sm"></i>
+        </button>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+          multiple
+          class="hidden"
+          @change="handleFileSelect"
+        />
 
-          <!-- Message input -->
-          <input
-            v-model="newMessage"
-            type="text"
-            placeholder="Ketik pesan..."
-            class="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
-            :disabled="sending"
-            @keyup.enter="sendMessage"
-          />
+        <!-- Message input -->
+        <input
+          v-model="newMessage"
+          type="text"
+          placeholder="Ketik pesan..."
+          class="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-100 focus:border-purple-400"
+          :disabled="sending"
+          @keyup.enter="sendMessage"
+        />
 
-          <!-- Send button -->
-          <button
-            @click="sendMessage"
-            :disabled="(!newMessage.trim() && selectedFiles.length === 0) || sending"
-            class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
-          >
-            <i :class="['pi', sending ? 'pi-spin pi-spinner' : 'pi-send', 'text-sm']"></i>
-          </button>
-        </div>
+        <!-- Send button -->
+        <button
+          @click="sendMessage"
+          :disabled="(!newMessage.trim() && selectedFiles.length === 0) || sending"
+          class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition shrink-0"
+        >
+          <i :class="['pi', sending ? 'pi-spin pi-spinner' : 'pi-send', 'text-sm']"></i>
+        </button>
       </div>
     </div>
 
     <!-- Cannot send notice -->
-    <div v-else class="bg-gray-50 border-t border-gray-200 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
+    <div v-else-if="!showBookingForm" class="fixed left-0 right-0 bottom-16 md:bottom-0 z-50 bg-gray-50 border-t border-gray-200 px-4 py-2 text-center text-xs text-gray-400">
       <i class="pi pi-info-circle mr-1"></i>
       {{ consultation?.status === 'penawaran_ditolak' ? 'Penawaran ditolak' : consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
     </div>

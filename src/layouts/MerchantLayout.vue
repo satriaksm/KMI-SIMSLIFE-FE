@@ -124,13 +124,6 @@ const menuItems = computed(() => {
           route: `/merchant-center/${currentMerchantSlug.value}/products`,
         },
 
-    // 🔧 History Layanan Jasa — hanya untuk Jasa
-    ...(isJasaMerchant ? [{
-      label: "History Layanan Jasa",
-      icon: "pi-history",
-      route: `/merchant-center/${currentMerchantSlug.value}/bookings`,
-    }] : []),
-
     // 💬 Konsultasi — hanya untuk Jasa
     ...(isJasaMerchant ? [{
       label: "Konsultasi",

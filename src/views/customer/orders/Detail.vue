@@ -50,11 +50,11 @@
         <div
           v-if="['ditolak', 'dibatalkan', 'cancelled', 'rejected'].includes(order.status)"
           class="flex items-center gap-3 p-4 border bg-red-50 rounded-2xl"
- >
+        >
           <i class="pi pi-times-circle text-red-500 text-xl shrink-0"></i>
           <div>
             <p class="text-sm font-semibold text-red-700">
-              {{ order.status === 'ditolak' ? 'Pesanan Ditolak' : 'Pesanan Dibatalkan' }}
+              {{ order.status === 'ditolak' ? 'Pesanan Ditolak Merchant' : 'Pesanan Dibatalkan' }}
             </p>
             <p v-if="order.booking_note && order.booking_note !== '-'" class="text-xs text-red-500 mt-0.5">
               {{ order.booking_note }}
@@ -105,6 +105,46 @@
                 {{ s.label }}
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- SLA Countdown: menunggu_konfirmasi -->
+        <div
+          v-if="order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant'"
+          class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
+        >
+          <div class="flex items-center gap-2 text-sm text-orange-700">
+            <i class="pi pi-clock shrink-0"></i>
+            <div>
+              <span class="font-semibold">Sisa waktu respon merchant: {{ merchantDeadlineRemaining }}</span>
+            </div>
+          </div>
+          <p class="mt-1 text-xs text-orange-500">Merchant wajib merespon dalam 1x24 jam.</p>
+        </div>
+
+        <!-- SLA Countdown: menunggu_selesai (customer confirmation) -->
+        <div
+          v-if="order.status === 'menunggu_selesai' || order.status === 'menunggu_konfirmasi_selesai'"
+          class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
+        >
+          <div class="flex items-center gap-2 text-sm text-orange-700">
+            <i class="pi pi-clock shrink-0"></i>
+            <div>
+              <span class="font-semibold">Sisa waktu konfirmasi selesai: {{ completionDeadlineRemaining }}</span>
+            </div>
+          </div>
+          <p class="mt-1 text-xs text-orange-500">Jika tidak dikonfirmasi dalam 1x24 jam, pesanan akan otomatis selesai.</p>
+        </div>
+
+        <!-- Expired banner -->
+        <div
+          v-if="order.status === 'expired'"
+          class="flex items-center gap-3 p-4 border bg-red-50 rounded-2xl"
+        >
+          <i class="pi pi-clock text-red-500 text-xl shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Pesanan Kadaluarsa</p>
+            <p class="text-xs text-red-500">Merchant tidak merespon dalam 1x24 jam.</p>
           </div>
         </div>
 
@@ -199,22 +239,44 @@
           </div>
         </div>
 
-        <!-- Completion evidence (if any) -->
+        <!-- Bukti Pengerjaan (if any) -->
         <div v-if="order.completion_evidences && order.completion_evidences.length > 0" class="p-4 bg-white border border-gray-200 rounded-2xl">
           <div class="text-sm font-semibold text-gray-700 mb-3">Bukti Pengerjaan</div>
+          <!-- Completion note -->
+          <div v-if="order.completion_note || order.jasa_order_item?.completion_note" class="mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
+            <p class="text-xs text-purple-600">
+              <i class="pi pi-file mr-1"></i>
+              {{ order.completion_note || order.jasa_order_item?.completion_note }}
+            </p>
+          </div>
           <div class="grid grid-cols-3 gap-2">
             <div
               v-for="(ev, idx) in order.completion_evidences"
               :key="idx"
-              v-show="!failedEvidenceImages.has(idx)"
               class="overflow-hidden bg-gray-100 rounded-xl aspect-square"
             >
+              {{ console.log('[Customer Evidence render]', idx, ev) || '' }}
+              <!-- Image evidence -->
               <img
-                v-if="ev.file_url && !failedEvidenceImages.has(idx)"
-                :src="ev.file_url"
+                v-if="isImageMedia(ev)"
+                v-show="!failedEvidenceImages.has(idx)"
+                :src="getMediaUrl(ev)"
                 :alt="'Bukti ' + (idx + 1)"
+                class="w-full h-full object-cover cursor-pointer"
+                @error="() => { console.error('[Customer Evidence image failed]', getMediaUrl(ev), ev); failedEvidenceImages.add(idx); }"
+                @click="() => openEvidencePreview(ev)"
+              />
+              <!-- Video evidence -->
+              <video
+                v-else-if="isVideoMedia(ev)"
+                :src="getMediaUrl(ev)"
+                controls
                 class="w-full h-full object-cover"
               />
+              <!-- Fallback icon -->
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <i class="pi pi-file text-gray-400 text-xl"></i>
+              </div>
             </div>
           </div>
         </div>
@@ -238,6 +300,27 @@
 
         <!-- Actions -->
         <div class="py-3 mx-auto max-w-7xl">
+          <!-- Bayar Kembali (Xendit belum dibayar) -->
+          <Button
+            v-if="needsPayment()"
+            block
+            @click="retryPayment"
+            customClass="mt-2 bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            <i class="pi pi-credit-card mr-1"></i>
+            Bayar Kembali
+          </Button>
+          <!-- Konfirmasi Selesai (merchant sudah kirim bukti pengerjaan) -->
+          <Button
+            v-if="order.status === 'menunggu_konfirmasi_selesai'"
+            block
+            :loading="confirmingSelesai"
+            @click="handleKonfirmasiSelesai"
+            customClass="mt-2 bg-green-500 hover:bg-green-600 text-white"
+          >
+            <i class="pi pi-check-circle mr-1"></i>
+            Konfirmasi Selesai
+          </Button>
           <!-- Beri Ulasan (belum pernah review, status selesai, ada jasa_order_item_id) -->
           <Button
             v-if="(order.status === 'selesai' || order.status === 'completed') && !order.is_reviewed && order.jasa_order_item_id"
@@ -322,6 +405,31 @@
               </template>
             </div>
           </div>
+
+          <!-- Merchant Reply Section -->
+          <div
+            v-if="order.review && order.review.merchant_reply"
+            class="mt-3 p-4 bg-green-50 border border-green-200 rounded-xl"
+          >
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <i class="pi pi-building text-white text-xs"></i>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-green-800">Tanggapan Merchant</p>
+                <p class="text-xs text-green-600">
+                  {{ order.merchant?.name || order.merchant_name }}
+                </p>
+              </div>
+            </div>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap pl-10">
+              {{ order.review.merchant_reply }}
+            </p>
+            <p v-if="order.review.merchant_reply_at" class="text-xs text-gray-400 mt-2 pl-10">
+              {{ formatDate(order.review.merchant_reply_at) }} {{ formatTime(order.review.merchant_reply_at) }}
+            </p>
+          </div>
+
           <!-- Kembali ke Pesanan Saya -->
           <Button
             block
@@ -354,7 +462,8 @@ import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useToast } from "vue-toastification";
-import { getCustomerOrderDetail } from "@/services/api/order";
+import { getCustomerOrderDetail, cancelJasaOrder, confirmJasaOrder } from "@/services/api/order";
+import api from "@/libs/axios";
 
 const route = useRoute();
 const router = useRouter();
@@ -364,7 +473,41 @@ const orderId = computed(() => String(route.params.orderId || ""));
 const loading = ref(true);
 const rawOrder = ref(null);
 const cancelling = ref(false);
+const confirmingSelesai = ref(false);
 const failedEvidenceImages = ref(new Set());
+
+// ─── SLA Countdown helpers ──────────────────────────────────────────────────
+
+function formatCountdown(deadline) {
+  if (!deadline) return '00:00';
+  const now = new Date();
+  const end = new Date(deadline);
+  const diff = end - now;
+  if (diff <= 0) return '00:00';
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) {
+    return `${hours}j ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+const merchantDeadlineRemaining = computed(() => {
+  const o = rawOrder.value;
+  if (!o) return null;
+  if (o.status !== 'menunggu_konfirmasi' && o.status !== 'menunggu_konfirmasi_merchant') return null;
+  return formatCountdown(o.merchant_response_deadline);
+});
+
+const completionDeadlineRemaining = computed(() => {
+  const o = rawOrder.value;
+  if (!o) return null;
+  if (o.status !== 'menunggu_selesai' && o.status !== 'menunggu_konfirmasi_selesai') return null;
+  if (!o.completion_submitted_at) return null;
+  const deadline = new Date(o.completion_submitted_at);
+  deadline.setHours(deadline.getHours() + 24);
+  return formatCountdown(deadline.toISOString());
+});
 
 
 
@@ -454,6 +597,14 @@ function formatDate(date) {
   });
 }
 
+function formatTime(date) {
+  if (!date) return '';
+  return new Date(date).toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 const serviceImageUrl = computed(() => {
   const o = rawOrder.value;
   if (!o) return null;
@@ -492,20 +643,34 @@ function handleEvidenceImageError(idx) {
 
 // ─── Tracking step helpers ──────────────────────────────────────────────────────
 
+// TRACKING_STEPS - keys must match ServiceOrder status constants
 const TRACKING_STEPS = [
-  { key: "pending", icon: "pi-clock", label: "Menunggu\nKonfirmasi" },
+  { key: "menunggu_konfirmasi_merchant", icon: "pi-clock", label: "Menunggu\nKonfirmasi" },
   { key: "diterima", icon: "pi-check", label: "Diterima" },
-  { key: "dikerjakan", icon: "pi-cog", label: "Dikerjakan" },
-  { key: "menunggu_selesai", icon: "pi-check-circle", label: "Menunggu\nSelesai" },
+  { key: "layanan_dikerjakan", icon: "pi-cog", label: "Sedang\nDikerjakan" },
+  { key: "menunggu_konfirmasi_selesai", icon: "pi-check-circle", label: "Menunggu\nSelesai" },
   { key: "selesai", icon: "pi-home", label: "Selesai" },
 ];
 
+// STATUS_MAP - maps status values to step index (0-based)
 const STATUS_MAP = {
+  // Step 0: Menunggu Konfirmasi
   pending: 0, menunggu_konfirmasi_merchant: 0,
-  diterima: 1, responsed: 1, accepted: 1,
-  dikerjakan: 2, layanan_dikerjakan: 2,
-  menunggu_selesai: 3, menunggu_konfirmasi_selesai: 3,
+
+  // Step 1: Diterima
+  diterima: 1, accepted: 1, responsed: 1,
+
+  // Step 2: Sedang Dikerjakan
+  layanan_dikerjakan: 2, dikerjakan: 2, processing: 2, in_progress: 2,
+
+  // Step 3: Menunggu Konfirmasi Selesai
+  menunggu_konfirmasi_selesai: 3, menunggu_selesai: 3,
+
+  // Step 4: Selesai
   selesai: 4, completed: 4,
+
+  // Rejected/Cancelled - show as step 0 (not completed)
+  ditolak: 0, rejected: 0, dibatalkan: 0, cancelled: 0, batal: 0,
 };
 
 const trackLineStyle = computed(() => {
@@ -535,17 +700,40 @@ function getChannelLabel(channel) {
   return labels[String(channel || "").toUpperCase()] || channel || "";
 }
 
+// ========================
+// PAYMENT STATUS HELPER
+// ========================
+
+/**
+ * Format payment status to user-friendly label (case-insensitive)
+ */
+function formatPaymentStatus(status) {
+  const value = String(status || '').toLowerCase().trim();
+
+  if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
+    return 'Sudah Bayar';
+  }
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+    return 'Menunggu Pembayaran';
+  }
+  if (['expired', 'kadaluarsa'].includes(value)) {
+    return 'Kadaluarsa';
+  }
+  if (['failed', 'gagal'].includes(value)) {
+    return 'Gagal';
+  }
+  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
+    return 'Menunggu Konfirmasi';
+  }
+
+  return 'Menunggu Pembayaran';
+}
+
+/**
+ * @deprecated Use formatPaymentStatus() instead
+ */
 function getPaymentStatusLabel(status) {
-  const ps = String(status || "").toUpperCase();
-  const map = {
-    PAID: "Lunas / Sudah Dibayar",
-    SETTLED: "Lunas / Sudah Dibayar",
-    SUCCEEDED: "Lunas / Sudah Dibayar",
-    WAITING_CONFIRMATION: "Menunggu",
-    UNPAID: "Belum Bayar",
-    PENDING: "Menunggu",
-  };
-  return map[ps] || status || "-";
+  return formatPaymentStatus(status);
 }
 
 // ─── Computed order ─────────────────────────────────────────────────────────────
@@ -554,13 +742,25 @@ const order = computed(() => {
   const o = rawOrder.value;
   if (!o) return null;
 
-  const rawStatus = String(o.status || "").toLowerCase();
+  // Priority: status (from orders.status - PRIMARY) > service_status (backward compat) > order_status
+  // Backend now uses orders.status as source of truth
+  const rawStatus = String(o.status || o.service_status || o.order_status || "").toLowerCase();
   const stepIdx = STATUS_MAP[rawStatus] ?? 0;
   const isCod = String(o.payment_method || "").toUpperCase() === "COD";
   const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED'];
   const isPaid = paidStatuses.includes(String(o.payment_status || "").toUpperCase());
 
-  // Debug logging
+  // Debug logging for status synchronization
+  console.log('[Detail] CUSTOMER ORDER STATUS:', {
+    order_id: o.id,
+    status: o.status, // PRIMARY: from orders.status
+    service_status: o.service_status, // backward compat
+    order_status: o.order_status,
+    rawStatus,
+    stepIdx,
+  });
+
+  // Debug logging for payment
   console.log('[Detail] Payment debug:', {
     order_id: o.id,
     payment_method: o.payment_method,
@@ -573,11 +773,11 @@ const order = computed(() => {
   // Payment method display
   let paymentMethodDisplay = "—";
   if (isCod) {
-    paymentMethodDisplay = "COD (Bayar Tunai)";
+    paymentMethodDisplay = "COD - Bayar di Tempat";
   } else if (o.payment_channel) {
     paymentMethodDisplay = `Xendit - ${getChannelLabel(o.payment_channel)}`;
   } else {
-    paymentMethodDisplay = "Xendit";
+    paymentMethodDisplay = `Xendit - ${formatPaymentStatus(o.payment_status)}`;
   }
 
   // Service type label
@@ -608,15 +808,27 @@ const order = computed(() => {
       })
     : "—";
 
-  // Status label
+  // Status label - MUST match the backend ServiceOrder status constants
   const statusLabelMap = {
-    pending: "Menunggu Konfirmasi", menunggu_konfirmasi_merchant: "Menunggu Konfirmasi",
-    diterima: "Diterima", responsed: "Diterima", accepted: "Diterima",
-    dikerjakan: "Dikerjakan", layanan_dikerjakan: "Dikerjakan",
-    menunggu_selesai: "Menunggu Selesai", menunggu_konfirmasi_selesai: "Menunggu Selesai",
-    selesai: "Selesai", completed: "Selesai",
-    ditolak: "Ditolak", rejected: "Ditolak",
-    dibatalkan: "Dibatalkan", cancelled: "Dibatalkan",
+    // Service order statuses
+    menunggu_konfirmasi_merchant: "Menunggu Konfirmasi",
+    pending: "Menunggu Konfirmasi",
+    diterima: "Diterima",
+    accepted: "Diterima",
+    responsed: "Diterima",
+    layanan_dikerjakan: "Sedang Dikerjakan",
+    dikerjakan: "Sedang Dikerjakan",
+    processing: "Sedang Dikerjakan",
+    menunggu_konfirmasi_selesai: "Menunggu Konfirmasi Selesai",
+    menunggu_selesai: "Menunggu Konfirmasi Selesai",
+    selesai: "Selesai",
+    completed: "Selesai",
+    // Customer context: merchant rejected → label shows who did it
+    ditolak: "Ditolak Merchant",
+    rejected: "Ditolak Merchant",
+    dibatalkan: "Dibatalkan",
+    cancelled: "Dibatalkan",
+    batal: "Dibatalkan",
   };
   const statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
 
@@ -626,10 +838,23 @@ const order = computed(() => {
     done: idx <= stepIdx,
   }));
 
-  // StatusLabel props
-  const statusVariant = ["ditolak", "dibatalkan", "cancelled", "rejected"].includes(rawStatus)
-    ? "order" : (isPaid ? "order" : "payment");
-  const statusLabelStatus = isPaid ? "completed" : rawStatus;
+  // StatusLabel props - determine variant and status for the badge
+  // For order statuses (not payment), always show as order variant
+  const orderStatusKeys = [
+    'diterima', 'accepted', 'responsed',
+    'layanan_dikerjakan', 'dikerjakan', 'processing',
+    'menunggu_konfirmasi_selesai', 'menunggu_selesai',
+    'selesai', 'completed',
+    'ditolak', 'rejected',
+    'dibatalkan', 'cancelled',
+  ];
+  const isOrderStatus = orderStatusKeys.includes(rawStatus) || rawStatus.startsWith('diterima') || rawStatus.startsWith('selesai');
+
+  // StatusLabel variant: order for completed/rejected orders, payment for pending payments
+  const statusVariant = isOrderStatus ? "order" : (isPaid ? "order" : "payment");
+
+  // StatusLabel status: for pending payment, show "pending"; otherwise show the raw status
+  const statusLabelStatus = (!isOrderStatus && !isPaid) ? "pending" : (isPaid ? "completed" : rawStatus);
 
   return {
     id: o.id,
@@ -655,19 +880,39 @@ const order = computed(() => {
     payment_method_display: paymentMethodDisplay,
     payment_channel: o.payment_channel || o.paid_channel || null,
     payment_status: o.payment_status,
-    payment_status_display: getPaymentStatusLabel(o.payment_status),
-    is_payment_completed: isPaid || isCod,
+    // COD: payment is complete when the order status is not pending/unpaid
+    // Xendit: payment is complete when payment_status is paid/settled
+    payment_status_display: isCod
+      ? (['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(rawStatus) ? 'Dibayar di Tempat' : 'COD - Menunggu Bayar')
+      : getPaymentStatusLabel(o.payment_status),
+    is_payment_completed: isPaid || (isCod && ['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(rawStatus)),
     total_price: Number(o.total_price || 0),
     status: rawStatus,
     status_label: statusLabel,
     created_at: o.created_at,
     created_at_formatted: createdAtFormatted,
     review: o.review || null,
-    completion_evidences: o.completion_evidences || [],
+    completion_evidences:
+      o.completion_evidences ||
+      o.completionEvidences ||
+      o.jasa_order_item?.completion_evidences ||
+      o.jasaOrderItem?.completionEvidences ||
+      (o.jasaItems?.[0]?.completion_evidences) ||
+      (o.jasa_items?.[0]?.completion_evidences) ||
+      [],
     tracking,
     statusVariant,
     statusLabelStatus,
   };
+});
+
+// Debug: log evidence data when it changes
+const debugEvidences = computed(() => {
+  const ev = order.value?.completion_evidences;
+  console.log('[Detail] Customer evidences:', ev);
+  console.log('[Detail] Evidence source rawOrder keys:', rawOrder.value ? Object.keys(rawOrder.value) : null);
+  console.log('[Detail] jasaItems keys:', rawOrder.value?.jasaItems ? Object.keys(rawOrder.value.jasaItems[0] || {}) : null);
+  return ev;
 });
 
 const statusVariant = computed(() => order.value?.statusVariant || "order");
@@ -679,8 +924,18 @@ function formatIDR(value) {
   return new Intl.NumberFormat("id-ID").format(Number(value || 0));
 }
 
+function evidencePreviewUrl(ev) {
+  return getMediaUrl(ev);
+}
+
+function openEvidencePreview(ev) {
+  const url = evidencePreviewUrl(ev);
+  if (!url) return;
+  window.open(url, '_blank');
+}
+
 function goBack() {
-  router.back();
+  router.push('/');
 }
 
 function goToReview() {
@@ -707,32 +962,199 @@ function goToReview() {
 }
 
 async function handleCancel() {
+  const id = route.params.orderId;
+  if (!id || id === 'undefined') {
+    toast.error('ID pesanan tidak valid');
+    return;
+  }
   if (!confirm("Yakin ingin membatalkan pesanan ini?")) return;
   cancelling.value = true;
   try {
-    // For service orders, we don't have a cancel endpoint yet — just navigate back
-    toast.info("Pesanan dibatalkan");
-    router.push("/orders");
+    const { data } = await cancelJasaOrder(id);
+
+    // Update local state with cancelled status
+    if (rawOrder.value) {
+      rawOrder.value.status = 'dibatalkan';
+      rawOrder.value.order_status = 'dibatalkan';
+      rawOrder.value.status_label = 'Dibatalkan';
+    }
+
+    toast.success("Pesanan berhasil dibatalkan");
+    router.push({ name: 'Pesanan Saya' });
   } catch (e) {
     console.error("Gagal membatalkan:", e);
-    toast.error("Gagal membatalkan pesanan");
+    toast.error(e?.response?.data?.message || "Gagal membatalkan pesanan");
   } finally {
     cancelling.value = false;
+  }
+}
+
+async function handleKonfirmasiSelesai() {
+  const id = route.params.orderId;
+  if (!id || id === 'undefined') {
+    toast.error('ID pesanan tidak valid');
+    return;
+  }
+  if (!confirm("Yakin ingin mengkonfirmasi pesanan ini sebagai selesai?")) return;
+  confirmingSelesai.value = true;
+  try {
+    await confirmJasaOrder(id);
+
+    // Update local state with completed status
+    if (rawOrder.value) {
+      rawOrder.value.status = 'selesai';
+      rawOrder.value.order_status = 'selesai';
+      rawOrder.value.status_label = 'Selesai';
+    }
+
+    toast.success("Pesanan berhasil dikonfirmasi selesai");
+  } catch (e) {
+    console.error("Gagal mengkonfirmasi selesai:", e);
+    toast.error(e?.response?.data?.message || "Gagal mengkonfirmasi pesanan");
+  } finally {
+    confirmingSelesai.value = false;
+  }
+}
+
+// ─── Bayar Kembali ─────────────────────────────────────────────────────
+
+/**
+ * Check if order needs payment (Xendit, unpaid)
+ */
+function needsPayment() {
+  const o = order.value;
+  if (!o) return false;
+
+  // COD doesn't need online payment
+  const method = String(o.payment_method || '').toUpperCase();
+  if (method === 'COD') return false;
+
+  // Already paid
+  const ps = String(o.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
+
+  // Check if status allows payment
+  const rawStatus = String(o.status || '').toLowerCase();
+  const pendingStatuses = ['pending', 'unpaid', 'waiting', 'menunggu_pembayaran', 'menunggu_konfirmasi_merchant'];
+
+  // Allow if payment_status is pending/unpaid/waiting OR status is pending
+  if (pendingStatuses.includes(ps) || pendingStatuses.includes(rawStatus)) {
+    return true;
+  }
+
+  // Also allow if status is pending and payment hasn't been made
+  if (rawStatus === 'pending' && !ps) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Retry payment for unpaid Xendit orders
+ */
+async function retryPayment() {
+  const o = order.value;
+  if (!o) return;
+
+  const orderId = o.id;
+  if (!orderId) {
+    toast.error('ID pesanan tidak ditemukan');
+    return;
+  }
+
+  console.log('[retryPayment] Starting payment retry:', {
+    orderId,
+    order_id: o.id,
+    order_number: o.order_number || o.id,
+    payment_method: o.payment_method,
+    payment_status: o.payment_status,
+    payment: o.payment,
+    invoice_url: o.invoice_url,
+    xendit_invoice_url: o.xendit_invoice_url,
+  });
+
+  try {
+    // Check if we already have a valid invoice URL
+    const existingInvoiceUrl = o.invoice_url || o.payment?.invoice_url || o.xendit_invoice_url;
+    if (existingInvoiceUrl) {
+      // Check if invoice is expired
+      const expiredAt = o.payment?.expired_at || o.expired_at;
+      const isExpired = expiredAt && new Date(expiredAt) < new Date();
+
+      console.log('[retryPayment] Existing invoice check:', {
+        existingInvoiceUrl,
+        expiredAt,
+        isExpired,
+      });
+
+      if (!isExpired) {
+        // Use existing invoice URL - redirect directly
+        console.log('[retryPayment] Redirecting to existing invoice:', existingInvoiceUrl);
+        window.location.href = existingInvoiceUrl;
+        return;
+      }
+    }
+
+    // Create new invoice
+    console.log('[retryPayment] Creating new invoice for order:', orderId);
+    const { data } = await api.post(`/api/payments/${orderId}/invoice`);
+
+    console.log('[retryPayment] API Response:', {
+      status: data?.status,
+      message: data?.message,
+      invoice_url: data?.data?.invoice_url || data?.invoice_url,
+      fullData: data,
+    });
+
+    const invoiceUrl = data?.data?.invoice_url || data?.invoice_url;
+    if (invoiceUrl) {
+      console.log('[retryPayment] Redirecting to new invoice:', invoiceUrl);
+      window.location.href = invoiceUrl;
+    } else {
+      console.warn('[retryPayment] No invoice URL in response:', data);
+      toast.error('Invoice tidak tersedia. Silakan coba lagi.');
+    }
+  } catch (err) {
+    console.error('[retryPayment] Error:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+    });
+    toast.error(err.response?.data?.message || err.response?.data?.error || 'Gagal membuat invoice pembayaran.');
   }
 }
 
 // ─── Fetch ───────────────────────────────────────────────────────────────────────
 
 async function fetchOrder() {
+  const id = route.params.orderId;
+  if (!id || id === 'undefined' || id === 'null') {
+    console.error('[Detail] Order ID tidak valid dari route.params:', route.params);
+    loading.value = false;
+    toast.error('ID pesanan tidak valid');
+    router.replace({ name: 'Pesanan Saya' });
+    return;
+  }
   loading.value = true;
   failedEvidenceImages.value = new Set();
   try {
-    const { data: res } = await getCustomerOrderDetail(orderId.value);
+    const { data: res } = await getCustomerOrderDetail(id);
     rawOrder.value = res?.data ?? res ?? null;
+
+    // Debug logging for API response
+    console.log("[Detail] API Response:", rawOrder.value);
     console.log("[Detail] rawOrder.value keys:", rawOrder.value ? Object.keys(rawOrder.value) : null);
+    console.log("[Detail] Status fields:", {
+      status: rawOrder.value?.status,
+      service_status: rawOrder.value?.service_status,
+      order_status: rawOrder.value?.order_status,
+      status_label: rawOrder.value?.status_label,
+    });
     console.log("[Detail] service_image:", rawOrder.value?.service_image);
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
+    console.error("Error response:", e.response?.data);
     toast.error("Gagal memuat detail pesanan");
     rawOrder.value = null;
   } finally {

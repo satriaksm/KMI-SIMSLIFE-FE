@@ -77,11 +77,52 @@ const getConsultationInitialPrice = () => {
     || null;
 };
 
+// Get starting price (harga mulai) - used for offer validation
+const getStartingPrice = () => {
+  // Prioritas: base_price, price, fixed_price dari jasa
+  return consultation.value?.jasa?.base_price
+    || consultation.value?.jasa?.price
+    || consultation.value?.jasa?.fixed_price
+    || consultation.value?.original_price
+    || null;
+};
+
 const getConsultationFinalPrice = () => {
   return consultation.value?.final_price
     || (consultation.value?.status === 'accepted' ? consultation.value?.negotiated_price : null)
     || null;
 };
+
+// Offer price validation - must be greater than starting price
+const offerPriceError = computed(() => {
+  const price = Number(offerPrice.value);
+  const startingPrice = getStartingPrice();
+  if (!offerPrice.value || isNaN(price) || price <= 0) {
+    return null; // Let other validation handle this
+  }
+  if (startingPrice && price <= startingPrice) {
+    return `Harga penawaran harus lebih besar dari harga mulai (${formatCurrency(startingPrice)})`;
+  }
+  return null;
+});
+
+// Check if submit button should be disabled
+const canSubmitOffer = computed(() => {
+  const price = Number(offerPrice.value);
+  const startingPrice = getStartingPrice();
+
+  // Must have valid price
+  if (!offerPrice.value || isNaN(price) || price <= 0) {
+    return false;
+  }
+
+  // Price must be greater than starting price
+  if (startingPrice && price <= startingPrice) {
+    return false;
+  }
+
+  return true;
+});
 
 // Format currency
 const formatCurrency = (value) => {
@@ -123,6 +164,12 @@ const fetchConsultation = async () => {
     const { data } = await api.get(`/api/merchant/${merchantSlug.value}/service-consultations/${route.params.id}`);
     consultation.value = data?.data || data;
     messages.value = consultation.value?.messages || [];
+
+    // Debug: Log consultation data and service image
+    console.log('CONSULTATION DATA:', consultation.value);
+    console.log('SERVICE IMAGE:', consultation.value?.service_image);
+    console.log('JASA IMAGE:', consultation.value?.jasa?.cover_img?.url || consultation.value?.jasa?.image_url);
+
     scrollToBottom();
   } catch (error) {
     console.error('Gagal memuat konsultasi:', error);
@@ -205,10 +252,17 @@ const submitOffer = async () => {
   // Parse price - input type="number" gives us a string or number
   const priceRaw = offerPrice.value;
   const price = Number(String(priceRaw).replace(/[^\d]/g, ''));
+  const startingPrice = getStartingPrice();
 
-  // Validation
+  // Validation - basic
   if (!priceRaw || String(priceRaw).trim() === '' || isNaN(price) || price <= 0) {
     toast.error('Harga penawaran wajib diisi dan harus lebih dari 0');
+    return;
+  }
+
+  // Validation - must be greater than starting price
+  if (startingPrice && price <= startingPrice) {
+    toast.error(`Harga penawaran harus lebih besar dari harga mulai (${formatCurrency(startingPrice)})`);
     return;
   }
 
@@ -385,7 +439,7 @@ onMounted(fetchConsultation);
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
             <img
-              :src="consultation.jasa?.cover_img?.url || '/placeholder.png'"
+              :src="consultation.service_image || consultation.jasa?.cover_img?.url || consultation.jasa?.image_url || '/placeholder.png'"
               class="object-cover w-full h-full"
               @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
             />
@@ -721,16 +775,29 @@ onMounted(fetchConsultation);
               </button>
             </div>
             <div class="p-5 space-y-4">
+              <!-- Starting Price Info -->
+              <div v-if="getStartingPrice()" class="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
+                <p class="text-xs text-purple-700">
+                  <i class="pi pi-info-circle mr-1"></i>
+                  Harga mulai: <span class="font-semibold">{{ formatCurrency(getStartingPrice()) }}</span>
+                </p>
+                <p class="text-xs text-purple-600 mt-1">
+                  Harga penawaran harus lebih besar dari harga mulai.
+                </p>
+              </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Harga Penawaran *</label>
                 <input
                   v-model="offerPrice"
                   type="number"
-                  min="1"
+                  :min="getStartingPrice() ? getStartingPrice() + 1 : 1"
                   placeholder="Contoh: 150000"
                   class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 focus:border-purple-400"
                 />
+                <!-- Error: less than or equal to 0 -->
                 <p v-if="offerPrice && Number(offerPrice) <= 0" class="mt-1 text-xs text-red-500">Harga harus lebih dari 0</p>
+                <!-- Error: less than or equal to starting price -->
+                <p v-if="offerPriceError" class="mt-1 text-xs text-red-500">{{ offerPriceError }}</p>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Catatan (opsional)</label>
@@ -750,7 +817,7 @@ onMounted(fetchConsultation);
                 </button>
                 <button
                   @click="submitOffer"
-                  :disabled="sending"
+                  :disabled="sending || !canSubmitOffer"
                   class="flex-1 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                 >
                   <i v-if="sending" class="pi pi-spin pi-spinner"></i>

@@ -21,17 +21,26 @@ export function getCustomerOrders(params = {}) {
 
 /**
  * Detail of a single service order (customer) — uses orders.id as primary ID
- * Endpoint: GET /api/service-orders/{id}
+ * Endpoint: GET /api/jasa-orders/{id}
  */
 export function getCustomerOrderDetail(orderId) {
-  return api.get(`/api/service-orders/${orderId}`);
+  return api.get(`/api/jasa-orders/${orderId}`);
 }
 
 /**
- * Cancel order (customer)
+ * Cancel jasa order (customer)
+ * Endpoint: POST /api/jasa-orders/{orderId}/cancel
  */
-export function cancelOrder(orderId) {
-  return api.post(`/api/orders/${orderId}/cancel`);
+export function cancelJasaOrder(orderId) {
+  return api.post(`/api/jasa-orders/${orderId}/cancel`);
+}
+
+/**
+ * Confirm jasa order completion (customer)
+ * Endpoint: POST /api/jasa-orders/{orderId}/confirm
+ */
+export function confirmJasaOrder(orderId) {
+  return api.post(`/api/jasa-orders/${orderId}/confirm`);
 }
 
 /**

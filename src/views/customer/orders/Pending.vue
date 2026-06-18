@@ -168,7 +168,7 @@ async function fetchPendingOrders() {
 }
 
 function goBack() {
-  router.back();
+  router.push('/');
 }
 
 function openOrder(order) {

@@ -22,10 +22,10 @@ import MapPreviewSection from "@/components/home/MapPreviewSection.vue";
 import AnimatedCounter from "@/components/common/AnimatedCounter.vue";
 import Button from "@/components/common/Button.vue";
 
-import jasaIcon from "@/assets/icons/Jasa.svg";
-import kulinerIcon from "@/assets/icons/Kuliner.svg";
-import tokoIcon from "@/assets/icons/Toko.svg";
-import komunitasIcon from "@/assets/icons/Komunitas.svg";
+import jasaIconUrl from "@/assets/icons/Jasa.svg?url";
+import kulinerIconUrl from "@/assets/icons/Kuliner.svg?url";
+import tokoIconUrl from "@/assets/icons/Toko.svg?url";
+import komunitasIconUrl from "@/assets/icons/Komunitas.svg?url";
 import WhiteWithText from "@/assets/icons/White-with-Text.png";
 
 import api from "@/libs/axios.js";
@@ -133,22 +133,22 @@ const carouselConfig = {
 const navigates = ref([
   {
     label: "Kuliner",
-    icon: kulinerIcon,
+    icon: kulinerIconUrl,
     to: { path: "/explore", query: { mode: "kuliner" } },
   },
   {
     label: "Toko",
-    icon: tokoIcon,
+    icon: tokoIconUrl,
     to: { path: "/explore", query: { mode: "toko" } },
   },
   {
     label: "Jasa",
-    icon: jasaIcon,
+    icon: jasaIconUrl,
     to: { path: "/explore", query: { mode: "jasa" } },
   },
   {
     label: "Komunitas",
-    icon: komunitasIcon,
+    icon: komunitasIconUrl,
     to: { name: "community" },
   },
 ]);
