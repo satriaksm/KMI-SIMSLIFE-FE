@@ -329,7 +329,7 @@
             customClass="mt-2 bg-merchant-primary hover:bg-merchant-primary/90 text-white"
           >
             <i class="pi pi-star mr-1"></i>
-            Beri Ulasan
+            Beri Rating dan Ulasan
           </Button>
           <!-- Review Status Badge -->
           <div
@@ -503,10 +503,8 @@ const completionDeadlineRemaining = computed(() => {
   const o = rawOrder.value;
   if (!o) return null;
   if (o.status !== 'menunggu_selesai' && o.status !== 'menunggu_konfirmasi_selesai') return null;
-  if (!o.completion_submitted_at) return null;
-  const deadline = new Date(o.completion_submitted_at);
-  deadline.setHours(deadline.getHours() + 24);
-  return formatCountdown(deadline.toISOString());
+  if (!o.completion_deadline_at) return null;
+  return formatCountdown(o.completion_deadline_at);
 });
 
 
@@ -864,7 +862,9 @@ const order = computed(() => {
     service_name: o.service_name || o.jasa?.title || "Layanan",
     service_image: o.service_image || o.jasa?.image || null,
     service_type: o.service_type || "",
-    service_type_label: serviceTypeLabel,
+    service_type_label: o.service_type_label || serviceTypeLabel,
+    service_location_address: o.service_location_address || null,
+    category_name: o.category_name || null,
     merchant: o.merchant || { name: o.merchant_name || "UMKM" },
     customer_name: o.customer_name || o.nama || "-",
     customer_phone: o.customer_phone || o.tel || "-",
@@ -873,7 +873,8 @@ const order = computed(() => {
     booking_date: o.booking_date || null,
     date_formatted: dateFormatted,
     booking_time: o.booking_time ? o.booking_time.slice(0, 5) : null,
-    mekanisme_pemesanan: o.mekanisme_pemesanan || null,
+    mekanisme_pemesanan: o.mekanisme_pemesanan || o.cara_pemesanan || null,
+    cara_pemesanan_label: o.cara_pemesanan_label || bookingTypeLabel,
     booking_type_label: bookingTypeLabel,
     booking_note: o.booking_note || "-",
     payment_method: o.payment_method,
