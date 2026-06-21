@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import api from '@/libs/axios';
@@ -11,14 +11,7 @@ const consultations = ref([]);
 const loading = ref(false);
 const activeFilter = ref('all');
 
-// Status group config (simplified)
-const statusGroupConfig = {
-  menunggu: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
-  negosiasi: { label: 'Negosiasi', color: 'bg-purple-100 text-purple-700' },
-  selesai: { label: 'Selesai', color: 'bg-green-100 text-green-700' },
-};
-
-// Filter tabs (simple)
+// ─── Filter tabs with counts ───────────────────────────────────────────────────
 const filters = [
   { key: 'all', label: 'Semua' },
   { key: 'menunggu', label: 'Menunggu' },
@@ -26,102 +19,119 @@ const filters = [
   { key: 'selesai', label: 'Selesai' },
 ];
 
-// Price helpers
-const getConsultationInitialPrice = (consultation) => {
-  return consultation?.initial_price
-    || consultation?.original_price
-    || consultation?.service?.price
-    || consultation?.service?.base_price
-    || consultation?.service?.fixed_price
-    || consultation?.jasa?.price
-    || consultation?.jasa?.base_price
-    || consultation?.jasa?.fixed_price
-    || null;
+const statusCounts = computed(() => {
+  const counts = { all: consultations.value.length };
+  for (const f of filters) {
+    if (f.key === 'all') continue;
+    counts[f.key] = consultations.value.filter(c => c.status_group === f.key).length;
+  }
+  return counts;
+});
+
+// ─── Status config ─────────────────────────────────────────────────────────────
+const statusGroupConfig = {
+  menunggu:  { label: 'Menunggu',   bg: 'bg-yellow-100 text-yellow-700' },
+  negosiasi:  { label: 'Negosiasi',  bg: 'bg-purple-100 text-purple-700' },
+  selesai:    { label: 'Selesai',    bg: 'bg-green-100 text-green-700' },
 };
 
-const getConsultationFinalPrice = (consultation) => {
-  return consultation?.final_price
-    || (consultation?.status === 'accepted' ? consultation?.negotiated_price : null)
-    || null;
+// ─── Individual status config (label + badge color) ───────────────────────────
+const statusConfig = {
+  menunggu:            { label: 'Menunggu',            bg: 'bg-amber-50 text-amber-600' },
+  menunggu_respon:     { label: 'Menunggu Respon',    bg: 'bg-amber-50 text-amber-600' },
+  negosiasi:           { label: 'Negosiasi',            bg: 'bg-purple-50 text-purple-600' },
+  penawaran_diberikan:  { label: 'Penawaran Diberikan', bg: 'bg-purple-50 text-purple-600' },
+  penawaran_diterima:   { label: 'Penawaran Diterima', bg: 'bg-green-50 text-green-600' },
+  penawaran_ditolak:   { label: 'Penawaran Ditolak',  bg: 'bg-red-50 text-red-600' },
+  selesai:             { label: 'Selesai',              bg: 'bg-green-50 text-green-600' },
+  ditutup:             { label: 'Ditutup',              bg: 'bg-gray-100 text-gray-500' },
+};
+
+// ─── Price helpers ─────────────────────────────────────────────────────────────
+const getInitialPrice = (c) =>
+  c?.initial_price || c?.original_price || c?.service?.price || c?.service?.base_price
+  || c?.service?.fixed_price || c?.jasa?.price || c?.jasa?.base_price || c?.jasa?.fixed_price || null;
+
+const getOfferedPrice = (c) =>
+  (c.status_group === 'negosiasi' && c.merchant_offered_price) ? c.merchant_offered_price : null;
+
+const getFinalPrice = (c) =>
+  c?.final_price || (c?.status === 'accepted' ? c?.negotiated_price : null);
+
+// ─── Format helpers ───────────────────────────────────────────────────────────
+const formatCurrency = (value) => {
+  if (!value) return null;
+  return `Rp ${Number(value).toLocaleString('id-ID')}`;
 };
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day} ${month} ${year}, ${hours}:${minutes}`;
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
 };
 
-const formatCurrency = (value) => {
-  if (!value) return null;
-  return `Rp ${Number(value).toLocaleString('id-ID')}`;
+// ─── Status helpers ────────────────────────────────────────────────────────────
+const getGroupLabel = (group) => statusGroupConfig[group]?.label || group || '—';
+const getGroupBg   = (group) => statusGroupConfig[group]?.bg    || 'bg-gray-100 text-gray-600';
+const getStatusLabel = (s) => statusConfig[s]?.label || s || '—';
+const getStatusBg    = (s) => statusConfig[s]?.bg    || 'bg-gray-50 text-gray-500';
+
+// ─── Computed: empty state message per tab ─────────────────────────────────────
+const emptyMessages = {
+  all:        { icon: 'pi-comments', title: 'Belum ada konsultasi', sub: 'Ajukan konsultasi dari detail layanan jasa' },
+  menunggu:   { icon: 'pi-clock',   title: 'Tidak ada yang menunggu', sub: 'Konsultasi baru akan muncul di sini' },
+  negosiasi:  { icon: 'pi-comments', title: 'Belum ada negosiasi', sub: 'Mulai negosiasi harga di halaman konsultasi' },
+  selesai:    { icon: 'pi-check-circle', title: 'Belum ada yang selesai', sub: 'Konsultasi yang terselesaikan akan muncul di sini' },
 };
 
-const getStatusGroupLabel = (group) => statusGroupConfig[group]?.label || group || '—';
-const getStatusGroupColor = (group) => statusGroupConfig[group]?.color || 'bg-gray-100 text-gray-700';
-const getStatusLabel = (status) => {
-  const labels = {
-    pending: 'Menunggu',
-    dapat_dikerjakan: 'Bisa Dikerjakan',
-    perlu_penyesuaian: 'Perlu Penyesuaian',
-    ditolak: 'Ditolak',
-    accepted: 'Disepakati',
-    closed: 'Ditutup',
-  };
-  return labels[status] || status || '—';
-};
+const currentEmpty = computed(() => emptyMessages[activeFilter.value] || emptyMessages.all);
+const showEmpty    = computed(() => !loading.value && consultations.value.length === 0);
+const filteredEmpty = computed(() => {
+  if (activeFilter.value === 'all') return consultations.value.length === 0;
+  return consultations.value.filter(c => c.status_group === activeFilter.value).length === 0;
+});
 
-const fetchConsultations = async (statusGroup = null) => {
+// ─── API ───────────────────────────────────────────────────────────────────────
+const fetchConsultations = async (filter = 'all') => {
   loading.value = true;
   try {
-    const params = statusGroup && statusGroup !== 'all' ? { status_group: statusGroup } : {};
+    const params = filter !== 'all' ? { status_group: filter } : {};
     const { data } = await api.get('/api/service-consultations', { params });
-    const responseData = data?.data;
-    if (Array.isArray(responseData)) {
-      consultations.value = responseData;
-    } else if (responseData?.data) {
-      consultations.value = responseData.data;
-    } else {
-      consultations.value = [];
-    }
+    consultations.value = data?.data?.data ?? data?.data ?? [];
   } catch (error) {
-    console.error('Gagal memuat konsultasi:', error);
     toast.error('Gagal memuat data konsultasi');
   } finally {
     loading.value = false;
   }
 };
 
-const changeFilter = (filter) => {
-  activeFilter.value = filter;
-  fetchConsultations(filter);
+const changeFilter = (key) => {
+  activeFilter.value = key;
+  fetchConsultations(key);
 };
 
 const openConsultation = (id) => {
   router.push(`/customer/consultations/${id}`);
 };
 
-onMounted(() => {
-  fetchConsultations();
-});
+onMounted(() => fetchConsultations());
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 pb-20">
+  <div class="min-h-screen bg-gray-50 pb-12">
     <!-- Header -->
     <header class="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 py-3">
-      <div class="max-w-4xl mx-auto">
+      <div class="max-w-[1080px] mx-auto">
         <div class="flex items-center gap-3">
-          <router-link to="/" class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
-            <i class="pi pi-arrow-left"></i>
+          <router-link
+            to="/"
+            class="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition"
+          >
+            <i class="pi pi-arrow-left text-sm"></i>
           </router-link>
           <div>
-            <h1 class="text-lg font-bold text-gray-900">Konsultasi Saya</h1>
+            <h1 class="text-base font-bold text-gray-900 leading-tight">Konsultasi Saya</h1>
             <p class="text-xs text-gray-500">Riwayat konsultasi layanan jasa</p>
           </div>
         </div>
@@ -129,106 +139,110 @@ onMounted(() => {
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-4xl mx-auto px-4 py-4">
-      <!-- Filter Tabs (simple: Semua, Menunggu, Negosiasi, Selesai) -->
-      <div class="bg-white rounded-2xl p-2 mb-4 flex gap-2 overflow-x-auto">
+    <main class="max-w-[1080px] mx-auto px-4 pt-4">
+
+      <!-- Filter Tabs with counts -->
+      <div class="bg-white rounded-2xl p-1.5 mb-4 flex gap-1">
         <button
           v-for="filter in filters"
           :key="filter.key"
           @click="changeFilter(filter.key)"
-          class="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium transition whitespace-nowrap"
-          :class="activeFilter === filter.key ? 'bg-purple-500 text-white shadow-md' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'"
+          class="flex-1 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5"
+          :class="activeFilter === filter.key
+            ? 'bg-purple-500 text-white shadow-sm'
+            : 'text-gray-500 hover:bg-gray-50'"
         >
           {{ filter.label }}
+          <span
+            v-if="statusCounts[filter.key] !== undefined"
+            class="min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+            :class="activeFilter === filter.key ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'"
+          >
+            {{ statusCounts[filter.key] }}
+          </span>
         </button>
       </div>
 
       <!-- Loading -->
-      <div v-if="loading" class="text-center py-12">
-        <i class="pi pi-spin pi-spinner text-3xl text-gray-400"></i>
-        <p class="text-gray-500 mt-2">Memuat...</p>
+      <div v-if="loading" class="flex flex-col items-center justify-center py-16">
+        <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+        <p class="text-sm text-gray-500 mt-2">Memuat...</p>
       </div>
 
-      <!-- Empty State -->
-      <div v-else-if="consultations.length === 0" class="bg-white rounded-2xl p-8 text-center">
-        <i class="pi pi-comments text-5xl text-gray-300 mb-3"></i>
-        <p class="text-gray-500">Belum ada konsultasi</p>
-        <p class="text-sm text-gray-400 mt-1">Ajukan konsultasi dari detail layanan jasa</p>
+      <!-- Empty state per tab -->
+      <div v-else-if="filteredEmpty" class="bg-white rounded-2xl px-6 py-14 text-center">
+        <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+          <i :class="['pi', currentEmpty.icon, 'text-2xl text-gray-300']"></i>
+        </div>
+        <p class="text-sm font-semibold text-gray-500">{{ currentEmpty.title }}</p>
+        <p class="text-xs text-gray-400 mt-1">{{ currentEmpty.sub }}</p>
       </div>
 
-      <!-- Consultation List -->
-      <div v-else class="space-y-4">
+      <!-- Consultation Cards -->
+      <div v-else class="space-y-2">
         <div
           v-for="consultation in consultations"
           :key="consultation.id"
           @click="openConsultation(consultation.id)"
-          class="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:border-purple-200 transition cursor-pointer"
+          class="block bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-purple-200 hover:shadow-sm transition cursor-pointer"
         >
-          <div class="p-4">
-            <div class="flex items-start gap-3">
-              <!-- Service Image -->
-              <div class="w-14 h-14 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                <img
-                  :src="consultation.jasa?.cover_img?.url || consultation.jasa?.cover_img?.src_url || '/placeholder.png'"
-                  class="object-cover w-full h-full"
-                  @error="(e) => { if (!e.target.dataset.errored) { e.target.dataset.errored = 'true'; e.target.src = '/placeholder.png'; } }"
-                />
-              </div>
+          <div class="px-4 py-3">
+            <!-- Row 1: merchant + group badge -->
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs text-gray-500 truncate">
+                <i class="pi pi-store text-[10px] mr-1"></i>
+                {{ consultation.merchant?.name || consultation.merchant_name || 'Merchant' }}
+              </p>
+              <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0', getGroupBg(consultation.status_group)]">
+                {{ getGroupLabel(consultation.status_group) }}
+              </span>
+            </div>
 
-              <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold text-gray-900 line-clamp-2">
-                      {{ consultation.service_name || consultation.jasa?.title || 'Layanan Jasa' }}
-                    </p>
-                    <p class="text-xs text-gray-500 mt-0.5">
-                      <i class="pi pi-store mr-1"></i>
-                      {{ consultation.merchant?.name || consultation.merchant_name || 'Merchant' }}
-                    </p>
-                  </div>
-                  <!-- Status group badge -->
-                  <span
-                    :class="['px-2.5 py-1 rounded-full text-xs font-medium shrink-0', getStatusGroupColor(consultation.status_group)]"
-                  >
-                    {{ getStatusGroupLabel(consultation.status_group) }}
-                  </span>
-                </div>
+            <!-- Row 2: service title -->
+            <p class="text-sm font-bold text-gray-900 leading-snug mt-1.5 line-clamp-2">
+              {{ consultation.service_name || consultation.jasa?.title || 'Layanan Jasa' }}
+            </p>
 
-                <!-- Price info -->
-                <div class="mt-2 flex items-center gap-2 flex-wrap">
-                  <span v-if="getConsultationInitialPrice(consultation)" class="px-2 py-0.5 bg-gray-50 border border-gray-100 rounded-full text-xs text-gray-600">
-                    Awal: {{ formatCurrency(getConsultationInitialPrice(consultation)) }}
-                  </span>
-                  <span v-if="getConsultationFinalPrice(consultation)" class="px-2 py-0.5 bg-green-50 border border-green-100 rounded-full text-xs font-medium text-green-700">
-                    Kesepakatan: {{ formatCurrency(getConsultationFinalPrice(consultation)) }}
-                  </span>
-                  <span v-else-if="consultation.merchant_offered_price && consultation.status !== 'accepted'" class="px-2 py-0.5 bg-purple-50 border border-purple-100 rounded-full text-xs font-medium text-purple-700">
-                    Ditawarkan: {{ formatCurrency(consultation.merchant_offered_price) }}
-                  </span>
-                </div>
+            <!-- Row 3: individual status + price -->
+            <div class="flex items-center justify-between gap-3 mt-2">
+              <!-- Status individual -->
+              <span :class="['px-1.5 py-0.5 rounded text-[10px] font-medium', getStatusBg(consultation.status)]">
+                {{ getStatusLabel(consultation.status) }}
+              </span>
 
-                <!-- Description preview -->
-                <p v-if="consultation.customer_description" class="mt-2 text-xs text-gray-600 line-clamp-2">
-                  "{{ consultation.customer_description }}"
-                </p>
-
-                <!-- Messages count -->
-                <div v-if="consultation.notes?.length > 0" class="mt-2 text-xs text-gray-500">
-                  <i class="pi pi-comment mr-1"></i>
-                  {{ consultation.notes.length }} pesan
-                </div>
+              <!-- Price -->
+              <div class="flex items-center gap-2 flex-wrap justify-end">
+                <span v-if="getInitialPrice(consultation)" class="text-[11px] text-gray-500">
+                  Awal: <span class="font-medium text-gray-700">{{ formatCurrency(getInitialPrice(consultation)) }}</span>
+                </span>
+                <span v-if="getOfferedPrice(consultation)" class="px-1.5 py-0.5 bg-purple-50 border border-purple-100 rounded text-[10px] font-semibold text-purple-700">
+                  Penawaran: {{ formatCurrency(getOfferedPrice(consultation)) }}
+                </span>
+                <span v-if="getFinalPrice(consultation)" class="px-1.5 py-0.5 bg-green-50 border border-green-100 rounded text-[10px] font-semibold text-green-700">
+                  Kesepakatan: {{ formatCurrency(getFinalPrice(consultation)) }}
+                </span>
               </div>
             </div>
 
-            <!-- Footer -->
-            <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-              <span class="text-xs text-gray-400">
-                {{ formatDateTime(consultation.created_at) }}
-              </span>
-              <span class="text-xs text-purple-500 font-medium">
-                <i class="pi pi-arrow-right mr-1"></i>
-                Buka Konsultasi
-              </span>
+            <!-- Row 4: description preview + footer -->
+            <div class="flex items-center justify-between gap-3 mt-2">
+              <p v-if="consultation.customer_description" class="text-xs text-gray-500 line-clamp-1 flex-1">
+                "{{ consultation.customer_description }}"
+              </p>
+              <div v-else class="flex-1"></div>
+
+              <div class="flex items-center gap-3 shrink-0">
+                <span class="text-[11px] text-gray-400">
+                  {{ formatDateTime(consultation.created_at) }}
+                </span>
+                <button
+                  class="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1"
+                  @click.stop="openConsultation(consultation.id)"
+                >
+                  <i class="pi pi-arrow-right text-[10px]"></i>
+                  Buka
+                </button>
+              </div>
             </div>
           </div>
         </div>
