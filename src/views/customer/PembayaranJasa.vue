@@ -1568,7 +1568,8 @@ const sendToChat = async () => {
       order_method: mappedOrderMethod,
       payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
       payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
-      total_price: toNumber(total.value) || toNumber(order.price) || 0,
+      subtotal: toNumber(amounts.value.jasa), // service price before fee
+      total_price: toNumber(total.value) || toNumber(order.price) || 0, // includes fee
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
     };
@@ -1585,6 +1586,7 @@ const sendToChat = async () => {
       order_method: orderPayload.order_method,
       payment_method: orderPayload.payment_method,
       payment_channel: orderPayload.payment_channel,
+      subtotal: orderPayload.subtotal,
       total_price: orderPayload.total_price,
     });
 

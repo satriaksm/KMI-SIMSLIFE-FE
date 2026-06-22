@@ -138,13 +138,13 @@
 
         <!-- Expired banner -->
         <div
-          v-if="order.status === 'expired'"
+          v-if="order.status === 'expired' || order.status === 'kadaluarsa'"
           class="flex items-center gap-3 p-4 border bg-red-50 rounded-2xl"
         >
           <i class="pi pi-clock text-red-500 text-xl shrink-0"></i>
           <div>
             <p class="text-sm font-semibold text-red-700">Pesanan Kadaluarsa</p>
-            <p class="text-xs text-red-500">Merchant tidak merespon dalam 1x24 jam.</p>
+            <p class="text-xs text-red-500">Batas waktu respon merchant telah berakhir.</p>
           </div>
         </div>
 
@@ -232,9 +232,29 @@
                 {{ order.payment_status_display }}
               </span>
             </div>
-            <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-              <div class="text-sm font-semibold text-black">Total</div>
-              <div class="text-lg font-extrabold text-black">Rp {{ formatIDR(order.total_price) }}</div>
+
+            <!-- Non-COD: selalu tampilkan fee breakdown (fee=0 tetap tampil untuk debugging) -->
+            <template v-if="!order.is_cod">
+              <div class="pt-2 border-t border-gray-100 space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-muted-foreground">Subtotal Layanan</div>
+                  <div class="text-sm font-medium text-black">Rp {{ formatIDR(order.subtotal) }}</div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div class="text-xs text-muted-foreground">Biaya Pembayaran</div>
+                  <div class="text-sm font-medium text-black">Rp {{ formatIDR(order.payment_fee) }}</div>
+                </div>
+                <div class="flex items-center justify-between pt-1.5 border-t border-gray-100">
+                  <div class="text-sm font-semibold text-black">Total Pembayaran</div>
+                  <div class="text-lg font-extrabold text-black">Rp {{ formatIDR(order.total_payment) }}</div>
+                </div>
+              </div>
+            </template>
+
+            <!-- COD: hanya total -->
+            <div v-else class="flex items-center justify-between pt-2 border-t border-gray-100">
+              <div class="text-sm font-semibold text-black">Total Pembayaran</div>
+              <div class="text-lg font-extrabold text-black">Rp {{ formatIDR(order.total_payment) }}</div>
             </div>
           </div>
         </div>
@@ -496,6 +516,11 @@ const merchantDeadlineRemaining = computed(() => {
   const o = rawOrder.value;
   if (!o) return null;
   if (o.status !== 'menunggu_konfirmasi' && o.status !== 'menunggu_konfirmasi_merchant') return null;
+  if (!o.merchant_response_deadline) return null;
+  // Jika deadline sudah lewat, tampilkan null (tidak menampilkan countdown 00:00)
+  // Status akan otomatis berubah menjadi expired oleh backend/API
+  const deadline = new Date(o.merchant_response_deadline);
+  if (deadline <= new Date()) return null;
   return formatCountdown(o.merchant_response_deadline);
 });
 
@@ -641,7 +666,7 @@ function handleEvidenceImageError(idx) {
 
 // ─── Tracking step helpers ──────────────────────────────────────────────────────
 
-// TRACKING_STEPS - keys must match ServiceOrder status constants
+// TRACKING_STEPS - keys must match backend orders.status values
 const TRACKING_STEPS = [
   { key: "menunggu_konfirmasi_merchant", icon: "pi-clock", label: "Menunggu\nKonfirmasi" },
   { key: "diterima", icon: "pi-check", label: "Diterima" },
@@ -667,8 +692,9 @@ const STATUS_MAP = {
   // Step 4: Selesai
   selesai: 4, completed: 4,
 
-  // Rejected/Cancelled - show as step 0 (not completed)
-  ditolak: 0, rejected: 0, dibatalkan: 0, cancelled: 0, batal: 0,
+  // Rejected/Cancelled/Expired — no progress bar fill, shown as terminal state
+  ditolak: -1, rejected: -1, dibatalkan: -1, cancelled: -1, batal: -1,
+  expired: -1, kadaluarsa: -1,
 };
 
 const trackLineStyle = computed(() => {
@@ -806,7 +832,7 @@ const order = computed(() => {
       })
     : "—";
 
-  // Status label - MUST match the backend ServiceOrder status constants
+  // Status label - MUST match the backend getServiceStatusLabel() output
   const statusLabelMap = {
     // Service order statuses
     menunggu_konfirmasi_merchant: "Menunggu Konfirmasi",
@@ -827,6 +853,8 @@ const order = computed(() => {
     dibatalkan: "Dibatalkan",
     cancelled: "Dibatalkan",
     batal: "Dibatalkan",
+    expired: "Kadaluarsa",
+    kadaluarsa: "Kadaluarsa",
   };
   const statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
 
@@ -845,6 +873,7 @@ const order = computed(() => {
     'selesai', 'completed',
     'ditolak', 'rejected',
     'dibatalkan', 'cancelled',
+    'expired', 'kadaluarsa',
   ];
   const isOrderStatus = orderStatusKeys.includes(rawStatus) || rawStatus.startsWith('diterima') || rawStatus.startsWith('selesai');
 
@@ -881,6 +910,13 @@ const order = computed(() => {
     payment_method_display: paymentMethodDisplay,
     payment_channel: o.payment_channel || o.paid_channel || null,
     payment_status: o.payment_status,
+    // Fee breakdown
+    subtotal: Number(o.subtotal ?? o.total_price ?? 0),
+    platform_fee: Number(o.platform_fee ?? 0),
+    payment_fee: Number(o.payment_fee ?? 0),
+    is_cod: isCod,
+    total_payment: Number(o.total_payment ?? o.total_price ?? 0),
+    payment_channel: o.payment_channel || null,
     // COD: payment is complete when the order status is not pending/unpaid
     // Xendit: payment is complete when payment_status is paid/settled
     payment_status_display: isCod
