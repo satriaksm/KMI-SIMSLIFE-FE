@@ -95,7 +95,7 @@
             <!-- NIK Field -->
             <div class="">
               <label for="nik" class="block mb-2 text-sm font-bold text-black">
-                NIK
+                NIK <span class="text-xs font-normal text-gray-500">(Opsional)</span>
               </label>
               <Field
                 id="nik"
@@ -446,8 +446,9 @@ const schema = yup.object({
     .max(13, "No. Telepon maksimal 13 digit"),
   nik: yup
     .string()
-    .required("NIK wajib diisi")
-    .length(16, "NIK harus 16 karakter"),
+    .nullable()
+    .notRequired()
+    .test('len', 'NIK harus 16 karakter', val => !val || val.length === 16),
   password: yup
     .string()
     .required("Kata sandi wajib diisi")

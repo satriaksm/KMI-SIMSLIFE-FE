@@ -323,7 +323,7 @@ onMounted(() => {
                 <!-- NIK -->
                 <div class="lg:col-span-2">
                   <label class="block mb-2 text-sm font-semibold text-gray-700">
-                    NIK (Nomor Induk Kependudukan)
+                    NIK (Nomor Induk Kependudukan) <span class="text-xs font-normal text-gray-500">(Opsional)</span>
                   </label>
                   <TextField
                     name="nik"
@@ -472,7 +472,7 @@ onMounted(() => {
           <!-- NIK -->
           <div>
             <label class="block mb-2 text-sm font-medium text-gray-700"
-              >NIK</label
+              >NIK <span class="text-xs font-normal text-gray-500">(Opsional)</span></label
             >
             <TextField
               name="nik"
