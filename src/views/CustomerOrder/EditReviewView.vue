@@ -11,7 +11,7 @@
             <i class="pi pi-arrow-left"></i>
           </button>
           <div>
-            <h1 class="text-lg font-bold text-gray-900">Perbarui Ulasan</h1>
+            <h1 class="text-lg font-bold text-gray-900">Perbarui Rating dan Ulasan</h1>
             <p class="text-xs text-gray-500">Ubah penilaian Anda</p>
           </div>
         </div>
@@ -507,7 +507,8 @@ const saveReview = async () => {
       fd.append('removed_media_ids', JSON.stringify(removedMediaIds.value));
     }
 
-    const { data } = await api.put(`/api/reviews/${ratingId.value}`, fd, {
+    fd.append('_method', 'PUT');
+    const { data } = await api.post(`/api/reviews/${ratingId.value}`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 

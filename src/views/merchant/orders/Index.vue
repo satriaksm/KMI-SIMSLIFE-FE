@@ -98,6 +98,23 @@ const breadcrumbItems = computed(() => [{ label: "Pesanan Masuk" }]);
 // ========================
 const activeOrderType = ref("produk"); // "produk" | "jasa"
 
+const segmentationId = computed(() => {
+  const merchant = authStore.getMerchantBySlug(currentMerchantSlug.value);
+  return Number(merchant?.segmentation?.id || merchant?.segmentation_id || 0);
+});
+
+watch(
+  segmentationId,
+  (newId) => {
+    if (newId === 3) {
+      activeOrderType.value = "jasa";
+    } else {
+      activeOrderType.value = "produk";
+    }
+  },
+  { immediate: true }
+);
+
 // ========================
 // ORDERS DATA (from API) - PRODUK
 // ========================
@@ -131,6 +148,7 @@ function mapApiStatus(beStatus, o) {
     case "rejected":
       return "ditolak";
     case "expired":
+    case "kadaluarsa":
       return "expired";
     case "undelivered":
       return "undelivered";
@@ -196,7 +214,7 @@ async function fetchOrders() {
 
   // Jika tab Jasa aktif, fetch dari endpoint merchant orders
   if (activeOrderType.value === "jasa") {
-    await fetchServiceOrders();
+    await fetchJasaOrders();
     return;
   }
 
@@ -241,45 +259,41 @@ async function fetchOrders() {
 }
 
 // ========================
-// SERVICE ORDERS DATA (JASA)
+// JASA ORDERS DATA
 // ========================
-const allServiceOrders = ref([]);
-const serviceOrdersLoading = ref(false);
-let serviceOrdersChannel = null;
+const allJasaOrders = ref([]);
+const jasaOrdersLoading = ref(false);
+let jasaOrdersChannel = null;
 
-// Modals for service orders
-const showServiceDetailModal = ref(false);
-const showRejectModal = ref(false);
-const showEvidenceModal = ref(false);
-const showEvidenceViewModal = ref(false); // Modal untuk melihat bukti
-const showReviewModal = ref(false);
-const selectedServiceOrder = ref(null);
+// Modals for jasa orders
+const showJasaDetailModal = ref(false);
+const showJasaRejectModal = ref(false);
+const showJasaEvidenceModal = ref(false);
+const showJasaEvidenceViewModal = ref(false); // Modal untuk melihat bukti
+const showJasaReviewModal = ref(false);
+const selectedJasaOrder = ref(null);
 const selectedReview = ref(null);
 const showReviewHistory = ref(false); // Toggle review history visibility
 const rejectReason = ref('');
 const completionNote = ref('');
 const evidenceFiles = ref([]);
-const submittingService = ref(false);
+const submittingJasa = ref(false);
 const merchantReplyText = ref('');
 const submittingReply = ref(false);
 
 // Filter tabs for service orders
-const serviceTabs = [
+const jasaTabs = [
   { key: "all", label: "Semua" },
-  { key: "menunggu", label: "Konfirmasi" },
-  { key: "diterima", label: "Diterima" },
-  { key: "dikerjakan", label: "Dikerjakan" },
-  { key: "tunggu_selesai", label: "Tunggu Selesai" },
+  { key: "perlu_diproses", label: "Perlu Diproses" },
+  { key: "sedang_diproses", label: "Sedang Diproses" },
   { key: "selesai", label: "Selesai" },
-  { key: "ditolak", label: "Ditolak" },
-  { key: "dibatalkan", label: "Dibatalkan" },
-  { key: "expired", label: "Kadaluarsa" },
+  { key: "batal_gagal", label: "Batal/Gagal" },
 ];
 
 // Service order status mapping for display
 // Maps raw backend status values to frontend display status
-const serviceStatusMap = {
-  // service_orders status values
+const jasaStatusMap = {
+  // orders.status display value mapping
   'pending': 'menunggu',
   'menunggu_konfirmasi': 'menunggu',
   'menunggu_konfirmasi_merchant': 'menunggu',
@@ -298,14 +312,15 @@ const serviceStatusMap = {
   'dibatalkan': 'dibatalkan',
   'cancelled': 'dibatalkan',
   'expired': 'expired',
+  'kadaluarsa': 'expired',
 };
 
-// Get display status for service orders
-const getServiceDisplayStatus = (order) => {
+// Get display status for jasa orders
+const getJasaDisplayStatus = (order) => {
   // Use status (from orders.status - PRIMARY) first, then service_status as fallback
   // Backend now uses orders.status as source of truth
   const rawStatus = String(order.status || order.service_status || '').toLowerCase();
-  const displayStatus = serviceStatusMap[rawStatus];
+  const displayStatus = jasaStatusMap[rawStatus];
   if (displayStatus) return displayStatus;
   // If no mapping found, return as-is
   return rawStatus;
@@ -313,11 +328,11 @@ const getServiceDisplayStatus = (order) => {
 
 // Get human-readable status label for terminal/completed orders
 // Distinguishes between customer cancellation and merchant rejection
-const getOrderStatusLabel = (order) => {
+const getJasaOrderStatusLabel = (order) => {
   const status = String(order.status || order.order_status || '').toLowerCase();
 
   // Kadaluarsa — merchant didn't respond in time
-  if (status === 'expired') return 'Kadaluarsa';
+  if (status === 'expired' || status === 'kadaluarsa') return 'Kadaluarsa';
 
   // Dibatalkan — distinguish who cancelled
   if (['dibatalkan', 'cancelled', 'canceled'].includes(status)) {
@@ -338,39 +353,52 @@ const getOrderStatusLabel = (order) => {
 };
 
 // Get order ID for API calls (use orders.id)
-const getServiceOrderId = (order) => {
+const getOrderId = (order) => {
   return order.order_id || order.id;
 };
 
 // Check if order is pending (needs merchant action) — but not expired
-const isServicePendingOrder = (order) => {
-  const status = getServiceDisplayStatus(order);
+const isJasaPendingOrder = (order) => {
+  const status = getJasaDisplayStatus(order);
   return status === 'menunggu';
 };
 
 // Check if order is expired (merchant deadline passed)
-const isServiceExpired = (order) => {
-  const status = String(order.status || '').toLowerCase();
-  if (status !== 'menunggu_konfirmasi' && status !== 'menunggu_konfirmasi_merchant') return false;
+const isJasaExpired = (order) => {
+  const displayStatus = getJasaDisplayStatus(order);
+  if (displayStatus !== 'menunggu') return false;
   if (!order.merchant_response_deadline) return false;
   return new Date(order.merchant_response_deadline) <= new Date();
 };
 
 // Check if order is terminal
-const isServiceTerminal = (order) => {
-  const status = getServiceDisplayStatus(order);
+const isJasaTerminal = (order) => {
+  const status = getJasaDisplayStatus(order);
   return ['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(status);
 };
 
 // Can perform actions based on status
-const canServiceAccept = (order) => isServicePendingOrder(order) && !isServiceExpired(order);
-const canServiceReject = (order) => isServicePendingOrder(order) && !isServiceExpired(order);
-const canServiceStart = (order) => {
-  const status = getServiceDisplayStatus(order);
+const canJasaAccept = (order) => {
+  if (!order) return false;
+  if (!isJasaPendingOrder(order) || isJasaExpired(order)) return false;
+
+  const prefix = getJasaPaymentMethodPrefix(order);
+  const ps = String(order.payment_status || '').toUpperCase();
+
+  if (prefix === 'Xendit' || prefix === 'Transfer') {
+    return ['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps);
+  }
+
+  // COD is paid on completion/delivery, so merchant can accept/reject even if unpaid
+  return true;
+};
+const canJasaReject = (order) => canJasaAccept(order);
+const canJasaStart = (order) => {
+  const status = getJasaDisplayStatus(order);
   return status === 'diterima';
 };
-const canServiceEvidence = (order) => {
-  const status = getServiceDisplayStatus(order);
+const canJasaEvidence = (order) => {
+  const status = getJasaDisplayStatus(order);
   return status === 'dikerjakan';
 };
 
@@ -389,25 +417,195 @@ function formatCountdown(deadline) {
   return `${minutes}m`;
 }
 
-// Get merchant response deadline remaining (for waiting orders)
-const getMerchantDeadlineRemaining = (order) => {
-  const status = String(order.status || '').toLowerCase();
-  if (status !== 'menunggu_konfirmasi' && status !== 'menunggu_konfirmasi_merchant') return null;
-  return formatCountdown(order.merchant_response_deadline);
+// SLA real-time clock
+const now = ref(Date.now());
+let clockInterval = null;
+onMounted(() => {
+  clockInterval = setInterval(() => {
+    now.value = Date.now();
+  }, 60000); // update every minute
+});
+onUnmounted(() => {
+  if (clockInterval) clearInterval(clockInterval);
+});
+
+// Get merchant response deadline remaining (for waiting orders) — live
+const getJasaMerchantDeadlineRemaining = (order) => {
+  const displayStatus = getJasaDisplayStatus(order);
+  const rawStatus = String(order.status || '').toLowerCase();
+  if (displayStatus !== 'menunggu' && !['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'pending'].includes(rawStatus)) return null;
+  if (!order.merchant_response_deadline) return null;
+  const diff = new Date(order.merchant_response_deadline) - now.value;
+  if (diff <= 0) return null; // expired
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `${hours}j ${minutes}m`;
+  return `${minutes}m`;
+};
+
+// Check if SLA deadline has passed
+const isJasaMerchantDeadlinePassed = (order) => {
+  const displayStatus = getJasaDisplayStatus(order);
+  const rawStatus = String(order.status || '').toLowerCase();
+  if (displayStatus !== 'menunggu' && !['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'pending'].includes(rawStatus)) return false;
+  if (!order.merchant_response_deadline) return false;
+  return new Date(order.merchant_response_deadline) <= now.value;
+};
+
+// SLA urgency color class for merchant response deadline
+const getJasaSlaDeadlineColorClass = (order) => {
+  if (isJasaMerchantDeadlinePassed(order)) return 'border-red-400 bg-red-50 text-red-700';
+  const remaining = getJasaMerchantDeadlineRemaining(order);
+  if (!remaining) return 'border-gray-200 bg-gray-50 text-gray-700';
+  // Parse remaining string "23j 45m" or "45m"
+  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
+  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
+  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
+  const totalMinutes = hours * 60 + minutes;
+  if (totalMinutes < 60) return 'border-red-400 bg-red-50 text-red-700';
+  if (totalMinutes < 360) return 'border-yellow-400 bg-yellow-50 text-yellow-700';
+  return 'border-green-400 bg-green-50 text-green-700';
+};
+
+// SLA badge color class for status column (uses bg- prefix for badge styling)
+const getJasaSlaBadgeColorClass = (order) => {
+  if (isJasaMerchantDeadlinePassed(order)) return 'bg-red-100 text-red-600';
+  const remaining = getJasaMerchantDeadlineRemaining(order);
+  if (!remaining) return 'bg-gray-100 text-gray-400';
+  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
+  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
+  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
+  const totalMinutes = hours * 60 + minutes;
+  if (totalMinutes < 60) return 'bg-red-100 text-red-600';
+  if (totalMinutes < 360) return 'bg-orange-100 text-orange-600';
+  return 'bg-green-100 text-green-600';
+};
+
+// Get simple payment line 1 (method name only)
+const getJasaPaymentLine1 = (order) => {
+  return getJasaPaymentMethodPrefix(order);
+};
+
+// Get simple payment line 2 (status text)
+const getJasaPaymentLine2 = (order) => {
+  const prefix = getJasaPaymentMethodPrefix(order);
+  if (prefix === 'COD') return 'Bayar di Tempat';
+  if (prefix === 'Transfer') return getJasaPaymentStatusLabel(order?.payment_status);
+  return getJasaPaymentStatusLabel(order?.payment_status);
+};
+
+// Get SLA badge display text
+const getJasaSlaBadgeText = (order) => {
+  if (isJasaMerchantDeadlinePassed(order)) return 'Berakhir';
+  return getJasaMerchantDeadlineRemaining(order) || null;
+};
+
+// SLA countdown color for table row display (text only)
+const getJasaMerchantDeadlineColorClass = (order) => {
+  if (isJasaMerchantDeadlinePassed(order)) return 'text-red-600';
+  const remaining = getJasaMerchantDeadlineRemaining(order);
+  if (!remaining) return 'text-gray-400';
+  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
+  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
+  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
+  const totalMinutes = hours * 60 + minutes;
+  if (totalMinutes < 60) return 'text-red-600';
+  if (totalMinutes < 360) return 'text-orange-500';
+  return 'text-orange-600';
+};
+
+// Format merchant deadline date for SLA display
+const formatMerchantDeadlineDate = (deadline) => {
+  if (!deadline) return '';
+  const d = new Date(deadline);
+  const date = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time} WIB`;
+};
+
+// Determine order method from order object with correct priority
+const getJasaOrderMethod = (order) => {
+  // If backend already provides the label, use it
+  if (order?.cara_pemesanan_label) return order.cara_pemesanan_label;
+  // Priority: cara_pemesanan > order_method > mekanisme_pemesanan > service_type_booking >
+  //           jasa_order_item.order_method > jasa_order_item.service_type_booking
+  const raw =
+    order?.cara_pemesanan ||
+    order?.order_method ||
+    order?.mekanisme_pemesanan ||
+    order?.service_type_booking ||
+    order?.jasa_order_item?.order_method ||
+    order?.jasa_order_item?.service_type_booking ||
+    '';
+
+  const val = String(raw).toLowerCase().trim();
+
+  // Map to labels
+  if (['direct_checkout', 'keranjang', 'checkout', 'tanpa_jadwal'].includes(val)) {
+    return 'Checkout Tanpa Jadwal';
+  }
+  if (['booking', 'booking_schedule', 'jadwal', 'booking_jadwal'].includes(val)) {
+    return 'Booking Jadwal';
+  }
+  if (['consultation', 'konsultasi', 'hasil_konsultasi'].includes(val)) {
+    return 'Hasil Konsultasi';
+  }
+
+  // Fallback heuristics
+  if (order?.booking_date || order?.booking_time) {
+    return 'Booking Jadwal';
+  }
+  if (order?.consultation_id || order?.consultation) {
+    return 'Hasil Konsultasi';
+  }
+
+  return 'Checkout Tanpa Jadwal';
+};
+
+// Get order method label (for display)
+const getJasaOrderMethodLabel = (order) => {
+  return getJasaOrderMethod(order);
+};
+
+// Get category with proper field priority
+const getJasaCategory = (order) => {
+  return (
+    order?.category_name ||
+    order?.service_category ||
+    order?.jasa_category ||
+    order?.jasa_order_item?.category_name ||
+    order?.jasa_order_item?.jasa?.categories?.[0]?.name ||
+    order?.jasa?.categories?.[0]?.name ||
+    order?._raw?.category_name ||
+    order?._raw?.jasa?.categories?.[0]?.name ||
+    '—'
+  );
+};
+
+// Get agreed/final price with priority
+const getOrderAgreedPrice = (order) => {
+  const val = order?.total_price
+    || order?.total_amount
+    || order?.grand_total
+    || order?.final_price
+    || order?.agreed_price
+    || order?.jasa_order_item?.total_price
+    || order?.jasa_order_item?.agreed_price
+    || order?.jasa_order_item?.price
+    || 0;
+  return Number(val);
 };
 
 // Get completion confirmation deadline remaining (for waiting_selesai orders)
-const getCompletionDeadlineRemaining = (order) => {
+const getJasaCompletionDeadlineRemaining = (order) => {
   const status = String(order.status || '').toLowerCase();
   if (status !== 'menunggu_selesai' && status !== 'menunggu_konfirmasi_selesai') return null;
-  if (!order.completion_submitted_at) return null;
-  const deadline = new Date(order.completion_submitted_at);
-  deadline.setHours(deadline.getHours() + 24);
-  return formatCountdown(deadline.toISOString());
+  if (!order.completion_deadline_at) return null;
+  return formatCountdown(order.completion_deadline_at);
 };
 
 // Format service type for display
-const formatServiceType = (type) => {
+const formatJasaType = (type) => {
   if (!type) return 'Jasa';
   const normalized = type.toString().toLowerCase().trim();
   if (normalized === 'consultation' || normalized === 'konsultasi') return 'Konsultasi';
@@ -417,7 +615,7 @@ const formatServiceType = (type) => {
 };
 
 // Get service image URL
-const getServiceImageUrl = (order) => {
+const getJasaImageUrl = (order) => {
   const image = order.service_image || order.items?.[0]?.image;
   if (!image) return null;
   if (image.startsWith('http')) return image;
@@ -425,12 +623,12 @@ const getServiceImageUrl = (order) => {
 };
 
 // Get order price
-const getServiceOrderPrice = (order) => {
+const getOrderPrice = (order) => {
   return order.total_price || order.amounts?.total || 0;
 };
 
 // Get booking display string
-const getBookingDisplay = (order) => {
+const getJasaBookingDisplay = (order) => {
   const parts = [];
   if (order.booking_date) {
     parts.push(formatDate(order.booking_date));
@@ -448,7 +646,7 @@ const getBookingDisplay = (order) => {
 /**
  * Get payment method prefix (Xendit or COD)
  */
-const getPaymentMethodPrefix = (order) => {
+const getJasaPaymentMethodPrefix = (order) => {
   const method = String(order?.payment_method || '').toUpperCase();
   // Xendit/Online methods
   if (['QRIS', 'BCA', 'BNI', 'BRI', 'MANDIRI', 'OVO', 'DANA', 'SHOPEEPAY', 'ALFAMART', 'ONLINE', 'ONLINE_XENDIT', 'XENDIT', 'EWALLET', 'VA', 'VIRTUAL_ACCOUNT'].includes(method)) {
@@ -472,13 +670,13 @@ const getPaymentMethodPrefix = (order) => {
 /**
  * Get payment status label (internal status)
  */
-const getPaymentStatusLabel = (status) => {
+const getJasaPaymentStatusLabel = (status) => {
   return formatPaymentStatus(status);
 };
 
 // Get payment method display for table/modal
-const getServicePaymentLabel = (order) => {
-  const prefix = getPaymentMethodPrefix(order);
+const getJasaPaymentLabel = (order) => {
+  const prefix = getJasaPaymentMethodPrefix(order);
   const method = String(order?.payment_method || '').toUpperCase();
 
   // COD/Manual methods - show as-is, NOT as "Sudah Bayar"
@@ -486,16 +684,16 @@ const getServicePaymentLabel = (order) => {
     return 'COD - Bayar di Tempat';
   }
   if (prefix === 'Transfer') {
-    return 'Transfer - ' + getPaymentStatusLabel(order?.payment_status);
+    return 'Transfer - ' + getJasaPaymentStatusLabel(order?.payment_status);
   }
 
   // Xendit - show status based on payment_status
-  const status = getPaymentStatusLabel(order?.payment_status);
+  const status = getJasaPaymentStatusLabel(order?.payment_status);
   return `${prefix} - ${status}`;
 };
 
-const getServicePaymentColor = (order) => {
-  const prefix = getPaymentMethodPrefix(order);
+const getJasaPaymentColor = (order) => {
+  const prefix = getJasaPaymentMethodPrefix(order);
 
   // COD - always yellow (waiting for payment at service completion)
   if (prefix === 'COD') {
@@ -506,11 +704,36 @@ const getServicePaymentColor = (order) => {
   return getPaymentStatusColorClass(order?.payment_status);
 };
 
+// Get service type label for display (accepts order object)
+const getServiceTypeLabel = (orderOrType) => {
+  // If backend already provides the label, use it
+  if (orderOrType?.service_type_label) return orderOrType.service_type_label;
+  const type = (
+    orderOrType?.service_type ||
+    orderOrType?.tipe_layanan ||
+    orderOrType?.service_location_type ||
+    orderOrType?.order_type ||
+    orderOrType?.jasa_order_item?.service_type ||
+    orderOrType?.jasa_order_item?.jasa?.service_type ||
+    orderOrType?.jasa?.service_type ||
+    orderOrType?._raw?.service_type ||
+    orderOrType?._raw?.jasa?.service_type ||
+    (typeof orderOrType === 'string' ? orderOrType : '') ||
+    ''
+  );
+  if (!type) return '—';
+  const val = String(type).toLowerCase().trim();
+  if (['di_tempat_umkm', 'ditempat_umkm', 'ditempat', 'di_tempat', 'di tempat', 'at_merchant'].includes(val)) return 'Di Tempat UMKM';
+  if (['ke_rumah_pelanggan', 'ke_tempat_pelanggan', 'kerumah', 'ke_rumah', 'customer_location'].includes(val)) return 'Ke Tempat Pelanggan';
+  if (val === 'online') return 'Online';
+  return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
+};
+
 // Map service order to unified format
-function mapServiceOrder(o) {
+function mapJasaOrder(o) {
   // Debug logging for completion evidences
-  console.log('[mapServiceOrder] Order:', o.id, '| completion_evidences:', o.completion_evidences);
-  console.log('[mapServiceOrder] Evidence count:', (o.completion_evidences || []).length);
+  console.log('[mapJasaOrder] Order:', o.id, '| completion_evidences:', o.completion_evidences);
+  console.log('[mapJasaOrder] Evidence count:', (o.completion_evidences || []).length);
 
   return {
     id: o.id,
@@ -519,22 +742,43 @@ function mapServiceOrder(o) {
     customer: {
       name: o.customer_name || o.customer?.name || o.user?.name || "Pelanggan",
       phone: o.customer_phone || o.customer?.phone || o.user?.phone || "-",
+      address: o.customer_address || o.address || '',
     },
-    status: getServiceDisplayStatus(o),
+    status: getJasaDisplayStatus(o),
     service_status: o.service_status || o.status,
     order_status: o.order_status,
     payment_method: o.payment_method || "COD",
     payment_status: o.payment_status,
     created_at: o.created_at,
+    // Service info
+    service_name: o.service_name || o.jasa?.title || "Layanan Jasa",
+    category_name: o.category_name || o.service_category || o.jasa_category || o.jasa_order_item?.category_name || o.jasa_order_item?.jasa?.categories?.[0]?.name || o.jasa?.categories?.[0]?.name || '',
+    service_type: o.service_type || o.tipe_layanan || o.service_location_type || o.order_type || o.jasa_order_item?.service_type || o.jasa_order_item?.jasa?.service_type || o.jasa?.service_type || '',
+    service_type_label: o.service_type_label || '',
+    cara_pemesanan: o.cara_pemesanan || o.booking_type || '',
+    cara_pemesanan_label: o.cara_pemesanan_label || '',
+    // Addresses (from API — already computed by backend based on service_type)
+    merchant_address: o.merchant_address || o.merchant?.address || o.umkm_address || '',
+    service_location_address: o.service_location_address || '',
+    customer_address: o.customer_address || '',
+    // Price snapshot — use agreed/final price from order
+    total_price: o.total_price || o.total_amount || o.grand_total || o.final_price || o.agreed_price || 0,
+    // Order method — use correct priority
+    order_method: o.order_method || o.mekanisme_pemesanan || o.service_type_booking || o.jasa_order_item?.order_method || o.jasa_order_item?.service_type_booking || '',
+    // SLA
+    merchant_response_deadline: o.merchant_response_deadline,
+    completion_deadline_at: o.completion_deadline_at,
+    consultation_id: o.consultation_id,
+    consultation: o.consultation,
     items: [{
       id: o.jasa_order_item_id,
       name: o.service_name || o.jasa?.title || "Layanan Jasa",
-      variant: formatServiceType(o.order_type || o.service_type),
+      variant: formatJasaType(o.order_type || o.service_type),
       addons: [],
       qty: 1,
       price: o.total_price,
       subtotal: o.total_price,
-      image: getServiceImageUrl(o),
+      image: getJasaImageUrl(o),
     }],
     amounts: {
       total: Number(o.total_price || 0),
@@ -542,6 +786,7 @@ function mapServiceOrder(o) {
     booking_date: o.booking_date,
     booking_time: o.booking_time,
     booking_note: o.booking_note,
+    customer_note: o.customer_note || o.note || '',
     order_type: o.order_type,
     service_type: o.service_type,
     completion_evidences: o.completion_evidences || [],
@@ -552,21 +797,21 @@ function mapServiceOrder(o) {
   };
 }
 
-async function fetchServiceOrders() {
+async function fetchJasaOrders() {
   if (!currentMerchantSlug.value) {
-    console.log('[fetchServiceOrders] No merchant slug, skipping...');
+    console.log('[fetchJasaOrders] No merchant slug, skipping...');
     return;
   }
 
-  serviceOrdersLoading.value = true;
+  jasaOrdersLoading.value = true;
   try {
     const merchantSlug = currentMerchantSlug.value;
     // Use new endpoint: /api/merchant/{merchant}/orders
     const url = `/api/merchant/${merchantSlug}/orders`;
 
-    console.log('[fetchServiceOrders] Merchant slug:', merchantSlug);
-    console.log('[fetchServiceOrders] Full URL:', url);
-    console.log('[fetchServiceOrders] Filter params:', {
+    console.log('[fetchJasaOrders] Merchant slug:', merchantSlug);
+    console.log('[fetchJasaOrders] Full URL:', url);
+    console.log('[fetchJasaOrders] Filter params:', {
       q: query.value,
       start_date: filters.value.start_date,
       end_date: filters.value.end_date,
@@ -586,7 +831,7 @@ async function fetchServiceOrders() {
 
     const { data: res } = await api.get(url, { params });
 
-    console.log('[fetchServiceOrders] Full response:', res);
+    console.log('[fetchJasaOrders] Full response:', res);
 
     // Laravel paginate response wrapped in ApiResponse::success():
     // { message: "success", data: { current_page, data: [...], total, ... } }
@@ -602,27 +847,27 @@ async function fetchServiceOrders() {
 
     if (isPaginated) {
       // Extract orders from paginated data
-      console.log('[fetchServiceOrders] Paginated response detected');
-      console.log('[fetchServiceOrders] Total records:', responseData.total);
-      console.log('[fetchServiceOrders] Current page:', responseData.current_page);
+      console.log('[fetchJasaOrders] Paginated response detected');
+      console.log('[fetchJasaOrders] Total records:', responseData.total);
+      console.log('[fetchJasaOrders] Current page:', responseData.current_page);
       ordersArray = Array.isArray(responseData.data) ? responseData.data : [];
     } else if (Array.isArray(responseData)) {
       // Direct array response
-      console.log('[fetchServiceOrders] Direct array response');
+      console.log('[fetchJasaOrders] Direct array response');
       ordersArray = responseData;
     } else if (responseData && typeof responseData === 'object') {
       // Try to find array property
-      console.log('[fetchServiceOrders] Object response, trying to find array property');
+      console.log('[fetchJasaOrders] Object response, trying to find array property');
       const arrayProp = Object.values(responseData).find(v => Array.isArray(v));
       ordersArray = arrayProp || [];
     } else {
-      console.log('[fetchServiceOrders] No data found');
+      console.log('[fetchJasaOrders] No data found');
     }
 
-    console.log('[fetchServiceOrders] Extracted orders count:', ordersArray.length);
+    console.log('[fetchJasaOrders] Extracted orders count:', ordersArray.length);
 
     // Log all orders with their status fields
-    console.log('[fetchServiceOrders] All orders status data:');
+    console.log('[fetchJasaOrders] All orders status data:');
     ordersArray.forEach((order, idx) => {
       console.log(`[Order ${idx + 1}]`, {
         id: order.id,
@@ -634,12 +879,12 @@ async function fetchServiceOrders() {
       });
     });
 
-    allServiceOrders.value = ordersArray.map(mapServiceOrder);
+    allJasaOrders.value = ordersArray.map(mapJasaOrder);
 
-    console.log('[fetchServiceOrders] Mapped orders:', allServiceOrders.value.length);
+    console.log('[fetchJasaOrders] Mapped orders:', allJasaOrders.value.length);
 
     // Debug: Log final state after refresh
-    console.log('[fetchServiceOrders] MERCHANT ORDERS AFTER REFRESH:', allServiceOrders.value.map(o => ({
+    console.log('[fetchJasaOrders] MERCHANT ORDERS AFTER REFRESH:', allJasaOrders.value.map(o => ({
       id: o.id,
       order_number: o.order_number,
       status: o.status,
@@ -667,65 +912,61 @@ async function fetchServiceOrders() {
       };
     }
   } catch (e) {
-    console.error('[fetchServiceOrders] Error:', e);
-    console.error('[fetchServiceOrders] Error response:', e.response?.data);
-    console.error('[fetchServiceOrders] Error status:', e.response?.status);
+    console.error('[fetchJasaOrders] Error:', e);
+    console.error('[fetchJasaOrders] Error response:', e.response?.data);
+    console.error('[fetchJasaOrders] Error status:', e.response?.status);
     toast.error(e.response?.data?.message || e.response?.data?.error || "Gagal memuat pesanan jasa");
-    allServiceOrders.value = [];
+    allJasaOrders.value = [];
   } finally {
-    serviceOrdersLoading.value = false;
+    jasaOrdersLoading.value = false;
   }
 }
 
 // Filter service orders by status tab
-const filteredServiceOrders = computed(() => {
+const filteredJasaOrders = computed(() => {
   if (activeTab.value === 'all') {
-    console.log('[filteredServiceOrders] Showing all orders:', allServiceOrders.value.length);
-    return allServiceOrders.value;
+    console.log('[filteredJasaOrders] Showing all orders:', allJasaOrders.value.length);
+    return allJasaOrders.value;
   }
 
   // Debug: Log all orders with their statuses
-  console.log('[filteredServiceOrders] All orders status:');
-  allServiceOrders.value.forEach(order => {
+  console.log('[filteredJasaOrders] All orders status:');
+  allJasaOrders.value.forEach(order => {
     console.log({
       id: order.id,
       order_number: order.order_number,
       'order.status': order.status,
       'order.service_status': order.service_status,
-      displayStatus: getServiceDisplayStatus(order)
+      displayStatus: getJasaDisplayStatus(order)
     });
   });
 
   // Mapping from tab key to allowed display statuses
   const tabStatusMap = {
-    'menunggu': ['menunggu'],
-    'diterima': ['diterima'],
-    'dikerjakan': ['dikerjakan'],
-    'tunggu_selesai': ['tunggu_selesai'],
+    'perlu_diproses': ['menunggu'],
+    'sedang_diproses': ['diterima', 'dikerjakan', 'tunggu_selesai'],
     'selesai': ['selesai'],
-    'ditolak': ['ditolak'],
-    'dibatalkan': ['dibatalkan'],
-    'expired': ['expired'],
+    'batal_gagal': ['ditolak', 'dibatalkan', 'expired', 'kadaluarsa'],
   };
 
   const allowedStatuses = tabStatusMap[activeTab.value] || [];
-  console.log('[filteredServiceOrders] Selected filter:', activeTab.value, '| Allowed statuses:', allowedStatuses);
+  console.log('[filteredJasaOrders] Selected filter:', activeTab.value, '| Allowed statuses:', allowedStatuses);
 
-  const filtered = allServiceOrders.value.filter(order => {
-    const displayStatus = getServiceDisplayStatus(order);
+  const filtered = allJasaOrders.value.filter(order => {
+    const displayStatus = getJasaDisplayStatus(order);
     const matches = allowedStatuses.includes(displayStatus);
     if (matches) {
-      console.log('[filteredServiceOrders] MATCH - Order:', order.order_number, '| Status:', displayStatus);
+      console.log('[filteredJasaOrders] MATCH - Order:', order.order_number, '| Status:', displayStatus);
     }
     return matches;
   });
 
-  console.log('[filteredServiceOrders] Filtered count:', filtered.length);
+  console.log('[filteredJasaOrders] Filtered count:', filtered.length);
   return filtered;
 });
 
 // Get status badge class for service orders
-const getServiceStatusClass = (status) => {
+const getJasaStatusClass = (status) => {
   const classes = {
     'menunggu': 'bg-yellow-100 text-yellow-700',
     'diterima': 'bg-blue-100 text-blue-700',
@@ -734,12 +975,16 @@ const getServiceStatusClass = (status) => {
     'selesai': 'bg-green-100 text-green-700',
     'ditolak': 'bg-red-100 text-red-700',
     'dibatalkan': 'bg-red-100 text-red-700',
-    'expired': 'bg-gray-200 text-gray-600',
+    'expired': 'bg-pink-100 text-pink-700',
+    'kadaluarsa': 'bg-pink-100 text-pink-700',
   };
   return classes[status] || 'bg-gray-100 text-gray-700';
 };
 
-const getServiceStatusLabel = (status, order = {}) => {
+const getJasaStatusLabel = (status, order = {}) => {
+  // For expired/kadaluarsa
+  if (status === 'expired' || status === 'kadaluarsa') return 'Kadaluarsa';
+
   // For dibatalkan — show who cancelled
   if (status === 'dibatalkan') {
     if (order.cancelled_by === 'customer') return 'Dibatalkan Customer';
@@ -756,15 +1001,15 @@ const getServiceStatusLabel = (status, order = {}) => {
     'menunggu': 'Menunggu Konfirmasi',
     'diterima': 'Diterima',
     'dikerjakan': 'Sedang Dikerjakan',
-    'tunggu_selesai': 'Menunggu Customer Selesai',
+    'tunggu_selesai': 'Menunggu Selesai',
     'selesai': 'Selesai',
   };
   return labels[status] || status || '-';
 };
 
 // Service order actions
-const acceptServiceOrder = async (orderId) => {
-  submittingService.value = true;
+const acceptJasaOrder = async (orderId) => {
+  submittingJasa.value = true;
   try {
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
     const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
@@ -772,56 +1017,82 @@ const acceptServiceOrder = async (orderId) => {
     });
 
     // Debug: Log the response
-    console.log('[acceptServiceOrder] UPDATE STATUS RESPONSE:', response.data);
-    console.log('[acceptServiceOrder] New status:', response.data?.data?.status, response.data?.data?.order_status);
+    console.log('[acceptJasaOrder] UPDATE STATUS RESPONSE:', response.data);
+    console.log('[acceptJasaOrder] New status:', response.data?.data?.status, response.data?.data?.order_status);
 
     toast.success('Pesanan berhasil diterima');
 
+    // Update selectedJasaOrder reactively
+    if (selectedJasaOrder.value && (selectedJasaOrder.value.id === orderId || selectedJasaOrder.value.order_id === orderId)) {
+      if (response.data?.data) {
+        selectedJasaOrder.value = mapJasaOrder(response.data.data);
+      } else {
+        selectedJasaOrder.value.status = 'diterima';
+        selectedJasaOrder.value.service_status = 'diterima';
+        selectedJasaOrder.value.order_status = 'diterima';
+        selectedJasaOrder.value.status_label = 'Diterima';
+      }
+    }
+
     // Refetch orders to get updated data
-    fetchServiceOrders();
+    await fetchJasaOrders();
   } catch (e) {
-    console.error('[acceptServiceOrder] Error:', e);
-    console.error('[acceptServiceOrder] Response:', e.response?.data);
+    console.error('[acceptJasaOrder] Error:', e);
+    console.error('[acceptJasaOrder] Response:', e.response?.data);
     toast.error(e.response?.data?.message || 'Gagal menerima pesanan');
   } finally {
-    submittingService.value = false;
+    submittingJasa.value = false;
   }
 };
 
-const openServiceRejectModal = (order) => {
-  selectedServiceOrder.value = order;
+const openJasaRejectModal = (order) => {
+  selectedJasaOrder.value = order;
   rejectReason.value = '';
-  showRejectModal.value = true;
+  showJasaRejectModal.value = true;
 };
 
-const submitServiceRejection = async () => {
+const submitJasaRejection = async () => {
   if (!rejectReason.value.trim()) {
     toast.error('Alasan penolakan wajib diisi');
     return;
   }
-  submittingService.value = true;
+  submittingJasa.value = true;
   try {
-    const orderId = getServiceOrderId(selectedServiceOrder.value);
+    const orderId = getOrderId(selectedJasaOrder.value);
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
       status: 'ditolak',
       rejection_reason: rejectReason.value,
     });
     toast.success('Pesanan berhasil ditolak');
-    showRejectModal.value = false;
+    showJasaRejectModal.value = false;
     rejectReason.value = '';
-    fetchServiceOrders();
+
+    // Update selectedJasaOrder reactively
+    if (selectedJasaOrder.value) {
+      if (response.data?.data) {
+        selectedJasaOrder.value = mapJasaOrder(response.data.data);
+      } else {
+        selectedJasaOrder.value.status = 'ditolak';
+        selectedJasaOrder.value.service_status = 'ditolak';
+        selectedJasaOrder.value.order_status = 'ditolak';
+        selectedJasaOrder.value.status_label = 'Ditolak';
+        selectedJasaOrder.value.rejection_reason = rejectReason.value;
+      }
+    }
+
+    await fetchJasaOrders();
   } catch (e) {
-    console.error('[submitServiceRejection] Error:', e);
-    console.error('[submitServiceRejection] Response:', e.response?.data);
+    console.error('[submitJasaRejection] Error:', e);
+    console.error('[submitJasaRejection] Response:', e.response?.data);
     toast.error(e.response?.data?.message || 'Gagal menolak pesanan');
   } finally {
-    submittingService.value = false;
+    submittingJasa.value = false;
   }
 };
 
-const startServiceWorking = async (orderId) => {
-  submittingService.value = true;
+const startJasaWorking = async (orderId) => {
+  submittingJasa.value = true;
   try {
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
     const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
@@ -829,7 +1100,7 @@ const startServiceWorking = async (orderId) => {
     });
 
     // Debug: Log the response from server
-    console.log('[startServiceWorking] Success response:', {
+    console.log('[startJasaWorking] Success response:', {
       orderId,
       response: response.data,
       newStatus: response.data?.data?.status,
@@ -837,21 +1108,34 @@ const startServiceWorking = async (orderId) => {
     });
 
     toast.success('Pesanan sedang dikerjakan');
-    fetchServiceOrders();
+
+    // Update selectedJasaOrder reactively
+    if (selectedJasaOrder.value && (selectedJasaOrder.value.id === orderId || selectedJasaOrder.value.order_id === orderId)) {
+      if (response.data?.data) {
+        selectedJasaOrder.value = mapJasaOrder(response.data.data);
+      } else {
+        selectedJasaOrder.value.status = 'layanan_dikerjakan';
+        selectedJasaOrder.value.service_status = 'layanan_dikerjakan';
+        selectedJasaOrder.value.order_status = 'layanan_dikerjakan';
+        selectedJasaOrder.value.status_label = 'Sedang Dikerjakan';
+      }
+    }
+
+    await fetchJasaOrders();
   } catch (e) {
-    console.error('[startServiceWorking] Error:', e);
-    console.error('[startServiceWorking] Response:', e.response?.data);
+    console.error('[startJasaWorking] Error:', e);
+    console.error('[startJasaWorking] Response:', e.response?.data);
     toast.error(e.response?.data?.message || 'Gagal memulai pekerjaan');
   } finally {
-    submittingService.value = false;
+    submittingJasa.value = false;
   }
 };
 
-const openServiceEvidenceModal = (order) => {
-  selectedServiceOrder.value = order;
+const openJasaEvidenceModal = (order) => {
+  selectedJasaOrder.value = order;
   completionNote.value = '';
   evidenceFiles.value = [];
-  showEvidenceModal.value = true;
+  showJasaEvidenceModal.value = true;
 };
 
 const handleEvidenceFileSelect = (event) => {
@@ -883,14 +1167,14 @@ const removeEvidenceFile = (index) => {
   evidenceFiles.value.splice(index, 1);
 };
 
-const submitServiceEvidence = async () => {
+const submitJasaEvidence = async () => {
   if (evidenceFiles.value.length === 0) {
     toast.error('Minimal 1 bukti pengerjaan wajib diunggah');
     return;
   }
-  submittingService.value = true;
+  submittingJasa.value = true;
   try {
-    const orderId = getServiceOrderId(selectedServiceOrder.value);
+    const orderId = getOrderId(selectedJasaOrder.value);
     const formData = new FormData();
     formData.append('status', 'menunggu_konfirmasi_selesai');
     formData.append('completion_note', completionNote.value || '');
@@ -901,24 +1185,43 @@ const submitServiceEvidence = async () => {
     // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
     await api.post(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, formData);
     toast.success('Bukti pengerjaan berhasil dikirim');
-    showEvidenceModal.value = false;
-    showServiceDetailModal.value = false;
+    showJasaEvidenceModal.value = false;
+    showJasaDetailModal.value = false;
     completionNote.value = '';
     evidenceFiles.value = [];
-    selectedServiceOrder.value = null;
-    fetchServiceOrders();
+    selectedJasaOrder.value = null;
+    fetchJasaOrders();
   } catch (e) {
-    console.error('[submitServiceEvidence] Error:', e);
-    console.error('[submitServiceEvidence] Response:', e.response?.data);
+    console.error('[submitJasaEvidence] Error:', e);
+    console.error('[submitJasaEvidence] Response:', e.response?.data);
     toast.error(e.response?.data?.message || 'Gagal mengirim bukti pengerjaan');
   } finally {
-    submittingService.value = false;
+    submittingJasa.value = false;
   }
 };
 
-const openServiceDetailModal = (order) => {
-  selectedServiceOrder.value = order;
-  showServiceDetailModal.value = true;
+const openJasaDetailModal = (order) => {
+  selectedJasaOrder.value = order;
+  console.log('[LOG SEMENTARA - MERCHANT DETAIL] Selected Order ID:', order?.id);
+  console.log('[LOG SEMENTARA - MERCHANT DETAIL] Completion evidences from API:', order?._raw?.completion_evidences);
+  console.log('[LOG SEMENTARA - MERCHANT DETAIL] Mapped completion evidences:', order?.completion_evidences);
+  console.log('selectedJasaOrder full:', JSON.stringify(order, null, 2));
+  console.log('[openJasaDetailModal] category fields:', {
+    category_name: order?.category_name,
+    service_category: order?.service_category,
+    jasa_category: order?.jasa_category,
+    jasa_order_item_category: order?.jasa_order_item?.category_name,
+    jasa_jasa_category: order?.jasa?.category?.name,
+  });
+  console.log('[openJasaDetailModal] service_type fields:', {
+    service_type: order?.service_type,
+    tipe_layanan: order?.tipe_layanan,
+    service_location_type: order?.service_location_type,
+    order_type: order?.order_type,
+    jasa_order_item_service_type: order?.jasa_order_item?.service_type,
+    jasa_jasa_service_type: order?.jasa?.service_type,
+  });
+  showJasaDetailModal.value = true;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -965,23 +1268,25 @@ const getServiceMediaUrl = (mediaOrPath) => {
   return getEvidenceUrl(mediaOrPath);
 };
 
-const getCompletionEvidences = (order) => {
+const getJasaMediaUrl = (mediaOrPath) => getServiceMediaUrl(mediaOrPath);
+
+const getJasaCompletionEvidences = (order) => {
   const ev = order?.completion_evidences || order?.completionEvidences || [];
-  console.log('[getCompletionEvidences] Order:', order?.id, '| Count:', ev.length, '| Data:', ev);
+  console.log('[getJasaCompletionEvidences] Order:', order?.id, '| Count:', ev.length, '| Data:', ev);
   return ev;
 };
 
 // Check if order has completion evidences
-const hasCompletionEvidences = (order) => {
+const hasJasaCompletionEvidences = (order) => {
   const evidences = order?.completion_evidences || [];
   console.log('ORDER EVIDENCE:', order.id, evidences);
   return Array.isArray(evidences) && evidences.length > 0;
 };
 
 // Open evidence view modal
-const openEvidenceViewModal = (order) => {
-  selectedServiceOrder.value = order;
-  showEvidenceViewModal.value = true;
+const openJasaEvidenceViewModal = (order) => {
+  selectedJasaOrder.value = order;
+  showJasaEvidenceViewModal.value = true;
 };
 
 const getReviewMedia = (review) => {
@@ -1014,12 +1319,12 @@ const getHistoryMedia = (history, type) => {
 // ========================
 // MERCHANT REPLY TO REVIEW
 // ========================
-const openReviewModal = (order) => {
-  selectedServiceOrder.value = order;
+const openJasaReviewModal = (order) => {
+  selectedJasaOrder.value = order;
   selectedReview.value = order.review;
   merchantReplyText.value = order.review?.merchant_reply || '';
   showReviewHistory.value = false; // Reset history visibility
-  showReviewModal.value = true;
+  showJasaReviewModal.value = true;
 
   // Debug: Log review data
   console.log('MERCHANT MODAL REVIEW DATA:', order.review);
@@ -1047,11 +1352,11 @@ const submitMerchantReply = async () => {
       { merchant_reply: merchantReplyText.value }
     );
     toast.success('Tanggapan berhasil dikirim');
-    showReviewModal.value = false;
+    showJasaReviewModal.value = false;
     merchantReplyText.value = '';
     selectedReview.value = null;
-    selectedServiceOrder.value = null;
-    fetchServiceOrders();
+    selectedJasaOrder.value = null;
+    fetchJasaOrders();
   } catch (e) {
     console.error('[submitMerchantReply] Error:', e.response?.data);
     toast.error(e.response?.data?.message || 'Gagal mengirim tanggapan');
@@ -1178,7 +1483,7 @@ const tableColumns = [
   { key: "actions", label: "" },
 ];
 
-const serviceTableColumns = [
+const jasaTableColumns = [
   { key: "invoice", label: "No. Pesanan" },
   { key: "customer.name", label: "Pelanggan" },
   { key: "itemsSummary", label: "Layanan" },
@@ -1297,7 +1602,7 @@ function statusProps(status) {
 
 function goToDetail(order) {
   if (activeOrderType.value === 'jasa') {
-    openServiceDetailModal(order);
+    openJasaDetailModal(order);
   } else {
     router.push(`/merchant-center/${currentMerchantSlug.value}/orders/${order.id}`);
   }
@@ -1346,56 +1651,46 @@ function leaveOrdersChannel(id) {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Header - FIXED -->
+    <!-- Header -->
     <div
-      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
+      class="sticky top-0 z-30 bg-white sm:static sm:z-auto border-b border-gray-100 sm:border-0"
     >
-      <div class="flex items-center gap-3">
-        <button
-          @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
-        >
-          <i class="pi pi-bars text-muted-foreground"></i>
-        </button>
-        <div>
-          <!-- ✅ Desktop: Show breadcrumb -->
-          <div class="hidden sm:block">
-            <Breadcrumb
-              :items="breadcrumbItems"
-              :merchantId="currentMerchantSlug"
-            />
-            <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-              Kelola pesanan masuk {{ currentMerchantName }}
-            </p>
-          </div>
-
-          <!-- ✅ Mobile: Show simple title -->
-          <div class="sm:hidden">
-            <h1 class="text-base font-semibold text-merchant-primary">
+      <div class="px-4 pt-4 pb-2 sm:px-6 sm:py-6 sm:bg-transparent">
+        <div class="flex items-center gap-3">
+          <button
+            @click="emit('toggle-sidebar')"
+            class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background shrink-0 border border-gray-100"
+          >
+            <i class="pi pi-bars text-muted-foreground"></i>
+          </button>
+          <div>
+            <h1 class="text-base font-semibold text-merchant-primary sm:hidden">
               Pesanan Masuk
             </h1>
-            <p class="text-xs text-muted-foreground">
+            <div class="hidden sm:block">
+              <Breadcrumb
+                :items="breadcrumbItems"
+                :merchantId="currentMerchantSlug"
+              />
+              <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
+                Kelola pesanan masuk {{ currentMerchantName }}
+              </p>
+            </div>
+            <p class="text-xs text-muted-foreground sm:hidden">
               {{ currentMerchantName }}
             </p>
           </div>
         </div>
       </div>
 
-      <div class="flex gap-2 sm:gap-3 items-center">
-      </div>
-    </div>
-
-
-    <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
-      <!-- STICKY WRAPPER UNTUK TABS DAN SEARCH -->
-      <div class=" z-10 top-[88px] sm:top-0 bg-gray-50 pt-0 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 space-y-2">
-        <!-- ORDER TYPE TABS (Produk / Jasa) -->
+      <!-- ORDER TYPE TABS (Produk / Jasa) -->
+      <div v-if="false" class="px-4 sm:px-6">
         <div class="bg-white shadow-sm rounded-xl">
           <div class="flex">
             <button
               @click="activeOrderType = 'produk'"
               :class="[
-                'flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition border-b-2',
+                'flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition border-b-2',
                 activeOrderType === 'produk'
                   ? 'text-merchant-primary border-merchant-primary'
                   : 'text-gray-500 hover:text-gray-700 border-transparent',
@@ -1407,7 +1702,7 @@ function leaveOrdersChannel(id) {
             <button
               @click="activeOrderType = 'jasa'"
               :class="[
-                'flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium transition border-b-2',
+                'flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition border-b-2',
                 activeOrderType === 'jasa'
                   ? 'text-merchant-primary border-merchant-primary'
                   : 'text-gray-500 hover:text-gray-700 border-transparent',
@@ -1418,16 +1713,18 @@ function leaveOrdersChannel(id) {
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- STATUS TABS -->
-        <div class="overflow-x-auto bg-white shadow-sm rounded-xl no-scrollbar">
-          <div class="flex min-w-max sm:min-w-0">
+      <!-- STATUS TABS - horizontal scroll on mobile -->
+      <div class="px-4 sm:px-6 pb-2">
+        <div class="bg-white shadow-sm rounded-xl overflow-x-auto no-scrollbar">
+          <div class="flex min-w-max">
             <button
-              v-for="tab in (activeOrderType === 'jasa' ? serviceTabs : tabs)"
+              v-for="tab in (activeOrderType === 'jasa' ? jasaTabs : tabs)"
               :key="tab.key"
               @click="activeTab = tab.key"
               :class="[
-                'relative flex items-center gap-2 px-4 py-3.5 text-sm font-medium transition whitespace-nowrap border-b-2',
+                'relative flex items-center gap-2 px-4 py-3 text-sm font-medium transition whitespace-nowrap border-b-2 shrink-0',
                 activeTab === tab.key
                   ? 'text-merchant-primary border-merchant-primary'
                   : 'text-gray-500 hover:text-gray-700 border-transparent',
@@ -1448,9 +1745,43 @@ function leaveOrdersChannel(id) {
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- SEARCH + FILTER -->
+      <!-- SEARCH + FILTER (mobile only) -->
+      <div class="px-4 pb-4 sm:hidden">
         <div class="flex items-center gap-2">
+          <TextField
+            name="search"
+            :modelValue="query"
+            @update:modelValue="(v) => (query = v)"
+            placeholder="Cari no. pesanan / pelanggan / produk"
+            :hideLabel="true"
+            variant="merchant"
+            wrapperClass="flex-1 min-w-0"
+            :alignWithPassword="false"
+          />
+          <button
+            type="button"
+            @click="openFilterModal"
+            class="flex items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
+          >
+            <i class="text-gray-500 pi pi-sliders-h"></i>
+            <span
+              v-if="filters.start_date || filters.end_date || filters.sort_by !== 'newest'"
+              class="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
+            >
+              !
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="px-4 py-2 space-y-2 sm:px-6 sm:py-6">
+
+      <!-- SEARCH + FILTER (desktop only) -->
+      <div class="hidden sm:flex items-center gap-2">
         <TextField
           name="search"
           :modelValue="query"
@@ -1458,23 +1789,22 @@ function leaveOrdersChannel(id) {
           placeholder="Cari no. pesanan / pelanggan / produk"
           :hideLabel="true"
           variant="merchant"
-          wrapperClass="flex-1"
+          wrapperClass="flex-1 min-w-0"
           :alignWithPassword="false"
         />
         <button
           type="button"
           @click="openFilterModal"
-          class="relative flex items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
+          class="flex items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
         >
           <i class="text-gray-500 pi pi-sliders-h"></i>
           <span
             v-if="filters.start_date || filters.end_date || filters.sort_by !== 'newest'"
-            class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
+            class="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
           >
             !
           </span>
         </button>
-      </div>
       </div>
 
       <!-- DESKTOP TABLE - PRODUK -->
@@ -1587,13 +1917,13 @@ function leaveOrdersChannel(id) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                  <tr v-if="serviceOrdersLoading">
+                  <tr v-if="jasaOrdersLoading">
                     <td colspan="9" class="px-4 py-12 text-center">
                       <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
                       <p class="mt-2 text-sm text-gray-500">Memuat...</p>
                     </td>
                   </tr>
-                  <tr v-else-if="!filteredServiceOrders.length">
+                  <tr v-else-if="!filteredJasaOrders.length">
                     <td colspan="9" class="px-4 py-12 text-center">
                       <i class="pi pi-inbox text-3xl text-gray-300"></i>
                       <p class="mt-2 text-sm text-gray-500">Tidak ada pesanan jasa</p>
@@ -1601,10 +1931,10 @@ function leaveOrdersChannel(id) {
                   </tr>
                   <template v-else>
                     <tr
-                      v-for="order in filteredServiceOrders"
+                      v-for="order in filteredJasaOrders"
                       :key="order.id"
                       class="hover:bg-gray-50 cursor-pointer transition"
-                      @click="openServiceDetailModal(order)"
+                      @click="openJasaDetailModal(order)"
                     >
                       <td class="px-4 py-3">
                         <div class="text-sm font-semibold text-gray-800">{{ order.invoice }}</div>
@@ -1617,20 +1947,11 @@ function leaveOrdersChannel(id) {
                         <div class="text-xs text-gray-400">{{ order.customer.phone }}</div>
                       </td>
                       <td class="px-4 py-3">
-                        <div class="text-sm text-gray-600">
-                          <div class="truncate">{{ order.items[0].name }}</div>
-                          <div v-if="order.items[0].variant" class="text-xs text-purple-500 font-medium">{{ order.items[0].variant }}</div>
-                          <div v-if="order.booking_note" class="text-xs text-gray-400 truncate max-w-[200px]">Catatan: {{ order.booking_note }}</div>
-                          <!-- SLA countdown: merchant response deadline -->
-                          <div v-if="getMerchantDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
-                            <i class="pi pi-clock" style="font-size: 10px"></i>
-                            Sisa: {{ getMerchantDeadlineRemaining(order) }}
-                          </div>
-                          <!-- SLA countdown: completion confirmation deadline -->
-                          <div v-if="getCompletionDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
-                            <i class="pi pi-clock" style="font-size: 10px"></i>
-                            Konfirmasi: {{ getCompletionDeadlineRemaining(order) }}
-                          </div>
+                        <div class="text-sm text-gray-600 space-y-0.5">
+                          <div class="truncate font-medium">{{ order.items[0].name }}</div>
+                          <div v-if="order.category_name" class="text-xs text-purple-500 font-medium truncate">{{ order.category_name }}</div>
+                          <div class="text-[11px] text-gray-400">{{ getJasaOrderMethod(order) }}</div>
+                          <div v-if="order.booking_note" class="text-[11px] text-gray-400 truncate max-w-[180px]">Catatan: {{ order.booking_note }}</div>
                         </div>
                       </td>
                       <td class="px-4 py-3">
@@ -1641,68 +1962,77 @@ function leaveOrdersChannel(id) {
                         <div class="text-sm font-semibold text-gray-800">Rp {{ formatIDR(order.amounts.total) }}</div>
                       </td>
                       <td class="px-4 py-3">
-                        <span :class="['inline-block px-2 py-0.5 rounded-full text-xs font-medium', getServicePaymentColor(order)]">
-                          {{ getServicePaymentLabel(order) }}
-                        </span>
-                      </td>
-                      <td class="px-4 py-3">
-                        <div class="text-sm text-gray-600">
-                          {{ order.service_type === 'online' ? 'Online' : order.service_type === 'ke_rumah_pelanggan' ? 'Ke Rumah' : 'Di Tempat' }}
+                        <div class="text-xs space-y-0.5">
+                          <div class="font-medium text-gray-700">{{ getJasaPaymentLine1(order) }}</div>
+                          <div class="text-gray-500">{{ getJasaPaymentLine2(order) }}</div>
                         </div>
                       </td>
                       <td class="px-4 py-3">
-                        <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getServiceStatusClass(order.status)]">
-                          {{ getServiceStatusLabel(order.status, order) }}
-                        </span>
+                        <div class="text-sm text-gray-600">{{ getServiceTypeLabel(order.service_type) }}</div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="space-y-1">
+                          <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getJasaStatusClass(order.status)]">
+                            {{ getJasaStatusLabel(order.status, order) }}
+                          </span>
+                          <div v-if="getJasaSlaBadgeText(order)" :class="['inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full', getJasaSlaBadgeColorClass(order)]">
+                            <i class="pi pi-clock" style="font-size: 9px"></i>
+                            Sisa {{ getJasaSlaBadgeText(order) }}
+                          </div>
+                          <div v-else-if="getJasaCompletionDeadlineRemaining(order)" class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">
+                            <i class="pi pi-clock" style="font-size: 9px"></i>
+                            Konfirmasi {{ getJasaCompletionDeadlineRemaining(order) }}
+                          </div>
+                        </div>
                       </td>
                       <td class="px-4 py-3" @click.stop>
-                        <div class="flex items-center justify-center gap-2">
+                        <div class="flex flex-wrap items-center gap-1">
                           <button
-                            v-if="canServiceAccept(order)"
-                            @click="acceptServiceOrder(getServiceOrderId(order))"
-                            class="px-3 py-1.5 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition"
-                            :disabled="submittingService"
+                            v-if="canJasaAccept(order)"
+                            @click="acceptJasaOrder(getOrderId(order))"
+                            class="px-2 py-1 bg-blue-500 text-white text-[11px] font-medium rounded-md hover:bg-blue-600 transition"
+                            :disabled="submittingJasa"
                           >
-                            <i class="pi pi-check mr-1"></i>Terima
+                            Terima
                           </button>
                           <button
-                            v-if="canServiceReject(order)"
-                            @click="openServiceRejectModal(order)"
-                            class="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition"
-                            :disabled="submittingService"
+                            v-if="canJasaReject(order)"
+                            @click="openJasaRejectModal(order)"
+                            class="px-2 py-1 border border-red-200 text-red-600 text-[11px] font-medium rounded-md hover:bg-red-50 transition"
+                            :disabled="submittingJasa"
                           >
-                            <i class="pi pi-times mr-1"></i>Tolak
+                            Tolak
                           </button>
                           <button
-                            v-if="canServiceStart(order)"
-                            @click="startServiceWorking(getServiceOrderId(order))"
-                            class="px-3 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 transition"
-                            :disabled="submittingService"
+                            v-if="canJasaStart(order)"
+                            @click="startJasaWorking(getOrderId(order))"
+                            class="px-2 py-1 bg-amber-500 text-white text-[11px] font-medium rounded-md hover:bg-amber-600 transition"
+                            :disabled="submittingJasa"
                           >
-                            <i class="pi pi-play mr-1"></i>Kerjakan
+                            Kerjakan
                           </button>
                           <button
-                            v-if="canServiceEvidence(order)"
-                            @click="openServiceEvidenceModal(order)"
-                            class="px-3 py-1.5 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition"
-                            :disabled="submittingService"
+                            v-if="canJasaEvidence(order)"
+                            @click="openJasaEvidenceModal(order)"
+                            class="px-2 py-1 bg-purple-500 text-white text-[11px] font-medium rounded-md hover:bg-purple-600 transition"
+                            :disabled="submittingJasa"
                           >
-                            <i class="pi pi-upload mr-1"></i>Upload
+                            Upload
                           </button>
                           <button
-                            v-if="hasCompletionEvidences(order)"
-                            @click.stop="openEvidenceViewModal(order)"
-                            class="px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition"
+                            v-if="hasJasaCompletionEvidences(order)"
+                            @click.stop="openJasaEvidenceViewModal(order)"
+                            class="px-2 py-1 bg-purple-600 text-white text-[11px] font-medium rounded-md hover:bg-purple-700 transition"
                             title="Lihat Bukti Penyelesaian"
                           >
-                            <i class="pi pi-images mr-1"></i>Bukti
+                            Bukti
                           </button>
                           <button
                             v-if="order.is_reviewed || order.review"
-                            @click.stop="openReviewModal(order)"
-                            class="px-3 py-1.5 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition"
+                            @click.stop="openJasaReviewModal(order)"
+                            class="px-2 py-1 bg-green-500 text-white text-[11px] font-medium rounded-md hover:bg-green-600 transition"
                           >
-                            <i class="pi pi-star mr-1"></i>Ulasan
+                            Rating
                           </button>
                         </div>
                       </td>
@@ -1712,7 +2042,7 @@ function leaveOrdersChannel(id) {
               </table>
             </div>
             <!-- Pagination -->
-            <div v-if="filteredServiceOrders.length > 0" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <div v-if="filteredJasaOrders.length > 0" class="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
               <div class="text-sm text-gray-500">
                 Menampilkan {{ paginationInfo.start }} - {{ paginationInfo.end }} dari {{ paginationInfo.total }}
               </div>
@@ -1845,7 +2175,7 @@ function leaveOrdersChannel(id) {
       <!-- MOBILE CARD LIST - JASA -->
       <div v-else class="sm:hidden space-y-3">
         <div
-          v-if="serviceOrdersLoading"
+          v-if="jasaOrdersLoading"
           v-for="i in 3"
           :key="i"
           class="p-4 bg-white border border-gray-100 shadow-sm rounded-2xl animate-pulse"
@@ -1870,7 +2200,7 @@ function leaveOrdersChannel(id) {
         </div>
 
         <div
-          v-else-if="!filteredServiceOrders.length"
+          v-else-if="!filteredJasaOrders.length"
           class="p-10 text-center bg-white border border-gray-100 shadow-sm rounded-2xl"
         >
           <div
@@ -1884,13 +2214,13 @@ function leaveOrdersChannel(id) {
 
         <div
           v-else
-          v-for="order in filteredServiceOrders"
+          v-for="order in filteredJasaOrders"
           :key="order.id"
           class="p-4 bg-white border border-gray-100 shadow-sm cursor-pointer rounded-2xl active:bg-gray-50"
-          @click="openServiceDetailModal(order)"
+          @click="openJasaDetailModal(order)"
         >
           <div
-            class="flex items-center justify-between mb-3"
+            class="flex items-start justify-between mb-3"
           >
             <div class="min-w-0">
               <p class="text-sm font-semibold text-gray-800 truncate">
@@ -1901,9 +2231,15 @@ function leaveOrdersChannel(id) {
                 {{ formatTime(order.created_at) }}
               </p>
             </div>
-            <span :class="['px-2.5 py-1 rounded-full text-xs font-medium', getServiceStatusClass(order.status)]">
-              {{ getServiceStatusLabel(order.status, order) }}
-            </span>
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <span :class="['px-2 py-0.5 rounded-full text-[11px] font-medium', getJasaStatusClass(order.status)]">
+                {{ getJasaStatusLabel(order.status, order) }}
+              </span>
+              <span v-if="getJasaSlaBadgeText(order)" :class="['inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full', getJasaSlaBadgeColorClass(order)]">
+                <i class="pi pi-clock" style="font-size: 8px"></i>
+                Sisa {{ getJasaSlaBadgeText(order) }}
+              </span>
+            </div>
           </div>
 
           <div class="space-y-2">
@@ -1914,36 +2250,22 @@ function leaveOrdersChannel(id) {
             <div class="flex items-center gap-2">
               <i class="text-xs text-gray-400 pi pi-briefcase shrink-0"></i>
               <div class="flex-1 min-w-0">
-                <span class="text-sm text-gray-600 truncate block">
-                  {{ order.items[0].name }}
-                </span>
-                <span class="text-xs text-purple-500 font-medium truncate block">
-                  {{ order.items[0].variant }}
-                </span>
-                <span v-if="order.booking_note" class="text-xs text-gray-400 truncate block">
-                  {{ order.booking_note }}
-                </span>
-                <!-- SLA countdown: merchant response deadline -->
-                <div v-if="getMerchantDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
-                  <i class="pi pi-clock" style="font-size: 10px"></i>
-                  Sisa waktu respon: {{ getMerchantDeadlineRemaining(order) }}
-                </div>
-                <!-- SLA countdown: completion confirmation deadline -->
-                <div v-if="getCompletionDeadlineRemaining(order)" class="mt-1 text-xs text-orange-600 font-medium flex items-center gap-1">
-                  <i class="pi pi-clock" style="font-size: 10px"></i>
-                  Konfirmasi selesai: {{ getCompletionDeadlineRemaining(order) }}
-                </div>
+                <span class="text-sm text-gray-600 truncate block font-medium">{{ order.items[0].name }}</span>
+                <span v-if="order.category_name" class="text-xs text-purple-500 truncate block">{{ order.category_name }}</span>
+                <span class="text-[11px] text-gray-400 truncate block">{{ getJasaOrderMethod(order) }}</span>
+                <span v-if="order.booking_note" class="text-[11px] text-gray-400 truncate block">Catatan: {{ order.booking_note }}</span>
               </div>
             </div>
             <div class="flex items-center justify-between pt-1">
-              <div class="flex items-center gap-3">
+              <div class="flex flex-col gap-1">
                 <div class="flex items-center gap-1">
                   <i class="text-[10px] text-gray-400 pi pi-credit-card"></i>
-                  <span class="text-xs text-gray-500">{{ getServicePaymentLabel(order) }}</span>
+                  <span class="text-[11px] text-gray-700 font-medium">{{ getJasaPaymentLine1(order) }}</span>
+                  <span class="text-[11px] text-gray-400">{{ getJasaPaymentLine2(order) }}</span>
                 </div>
                 <div class="flex items-center gap-1">
                   <i class="text-[10px] text-gray-400 pi pi-map-marker"></i>
-                  <span class="text-xs text-gray-500">{{ order.service_type === 'online' ? 'Online' : order.service_type === 'ke_rumah_pelanggan' ? 'Ke Rumah' : 'Di Tempat' }}</span>
+                  <span class="text-[11px] text-gray-500">{{ getServiceTypeLabel(order.service_type) }}</span>
                 </div>
               </div>
               <span class="text-sm font-bold text-gray-800">
@@ -1955,43 +2277,50 @@ function leaveOrdersChannel(id) {
           <!-- Mobile Action Buttons -->
           <div class="flex gap-2 mt-3 pt-3 border-t border-gray-100" @click.stop>
             <button
-              v-if="canServiceAccept(order)"
-              @click="acceptServiceOrder(getServiceOrderId(order))"
-              class="flex-1 py-2 px-3 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition flex items-center justify-center gap-1"
-              :disabled="submittingService"
+              v-if="canJasaAccept(order)"
+              @click="acceptJasaOrder(getOrderId(order))"
+              class="flex-1 py-1.5 px-3 bg-blue-500 text-white text-[11px] font-medium rounded-lg hover:bg-blue-600 transition flex items-center justify-center gap-1"
+              :disabled="submittingJasa"
             >
-              <i class="pi pi-check"></i>Terima
+              Terima
             </button>
             <button
-              v-if="canServiceReject(order)"
-              @click="openServiceRejectModal(order)"
-              class="flex-1 py-2 px-3 border border-red-200 text-red-600 text-xs font-medium rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-1"
-              :disabled="submittingService"
+              v-if="canJasaReject(order)"
+              @click="openJasaRejectModal(order)"
+              class="flex-1 py-1.5 px-3 border border-red-200 text-red-600 text-[11px] font-medium rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-1"
+              :disabled="submittingJasa"
             >
-              <i class="pi pi-times"></i>Tolak
+              Tolak
             </button>
             <button
-              v-if="canServiceStart(order)"
-              @click="startServiceWorking(getServiceOrderId(order))"
-              class="flex-1 py-2 px-3 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 transition flex items-center justify-center gap-1"
-              :disabled="submittingService"
+              v-if="canJasaStart(order)"
+              @click="startJasaWorking(getOrderId(order))"
+              class="flex-1 py-1.5 px-3 bg-amber-500 text-white text-[11px] font-medium rounded-lg hover:bg-amber-600 transition flex items-center justify-center gap-1"
+              :disabled="submittingJasa"
             >
-              <i class="pi pi-play"></i>Kerjakan
+              Kerjakan
             </button>
             <button
-              v-if="canServiceEvidence(order)"
-              @click="openServiceEvidenceModal(order)"
-              class="flex-1 py-2 px-3 bg-purple-500 text-white text-xs font-medium rounded-lg hover:bg-purple-600 transition flex items-center justify-center gap-1"
-              :disabled="submittingService"
+              v-if="canJasaEvidence(order)"
+              @click="openJasaEvidenceModal(order)"
+              class="flex-1 py-1.5 px-3 bg-purple-500 text-white text-[11px] font-medium rounded-lg hover:bg-purple-600 transition flex items-center justify-center gap-1"
+              :disabled="submittingJasa"
             >
-              <i class="pi pi-upload"></i>Upload
+              Upload
             </button>
             <button
-              v-if="hasCompletionEvidences(order)"
-              @click.stop="openEvidenceViewModal(order)"
-              class="flex-1 py-2 px-3 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-1"
+              v-if="hasJasaCompletionEvidences(order)"
+              @click.stop="openJasaEvidenceViewModal(order)"
+              class="flex-1 py-1.5 px-3 bg-purple-600 text-white text-[11px] font-medium rounded-lg hover:bg-purple-700 transition flex items-center justify-center gap-1"
             >
-              <i class="pi pi-images"></i>Bukti
+              Bukti
+            </button>
+            <button
+              v-if="order.is_reviewed || order.review"
+              @click.stop="openJasaReviewModal(order)"
+              class="flex-1 py-1.5 px-3 bg-green-500 text-white text-[11px] font-medium rounded-lg hover:bg-green-600 transition flex items-center justify-center gap-1"
+            >
+              Rating
             </button>
           </div>
         </div>
@@ -2000,7 +2329,7 @@ function leaveOrdersChannel(id) {
       <!-- Mobile Pagination -->
 
        <div
-      v-if="!ordersLoading && !serviceOrdersLoading && (allOrders.length > 0 || filteredServiceOrders.length > 0)"
+      v-if="!ordersLoading && !jasaOrdersLoading && (allOrders.length > 0 || filteredJasaOrders.length > 0)"
       class=" pb-4 sm:hidden"
     >
       <MobilePagination
@@ -2110,7 +2439,7 @@ function leaveOrdersChannel(id) {
     <!-- Service Order Detail Modal -->
     <transition name="fade">
       <div
-        v-if="showServiceDetailModal"
+        v-if="showJasaDetailModal"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       >
         <div class="w-full max-w-xl max-h-[90vh] rounded-2xl bg-white shadow-xl overflow-hidden">
@@ -2120,145 +2449,228 @@ function leaveOrdersChannel(id) {
             <button
               type="button"
               class="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
-              @click="showServiceDetailModal = false"
+              @click="showJasaDetailModal = false"
             >
               <i class="pi pi-times"></i>
             </button>
           </div>
 
           <!-- Modal Body -->
-          <div v-if="selectedServiceOrder" class="max-h-[calc(90vh-72px)] overflow-y-auto px-5 py-4 space-y-5">
-            <!-- Service Info -->
-            <div class="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl">
-              <div class="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden">
+          <div v-if="selectedJasaOrder" class="max-h-[calc(90vh-72px)] overflow-y-auto px-5 py-4 space-y-4">
+
+            <!-- 1. HEADER LAYANAN -->
+            <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
+              <div class="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden shrink-0">
                 <img
-                  v-if="getServiceImageUrl(selectedServiceOrder)"
-                  :src="getServiceImageUrl(selectedServiceOrder)"
+                  v-if="getJasaImageUrl(selectedJasaOrder)"
+                  :src="getJasaImageUrl(selectedJasaOrder)"
                   class="w-full h-full object-cover"
                   @error="(e) => e.target.style.display = 'none'"
                 />
                 <i v-else class="pi pi-briefcase w-full h-full flex items-center justify-center text-gray-400"></i>
               </div>
-              <div>
-                <p class="text-sm font-semibold text-gray-900">
-                  {{ selectedServiceOrder.items[0].name }}
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-900 leading-tight">
+                  {{ selectedJasaOrder.service_name || selectedJasaOrder.items[0].name }}
                 </p>
-                <p class="text-sm text-merchant-primary font-bold">
-                  Rp {{ formatIDR(getServiceOrderPrice(selectedServiceOrder)) }}
+                <p class="text-xs text-gray-500 mt-0.5">
+                  Kategori: {{ getJasaCategory(selectedJasaOrder) }}
+                </p>
+                <p class="text-xs text-purple-500 mt-0.5 font-medium">
+                  Tipe Layanan: {{ getServiceTypeLabel(selectedJasaOrder) }}
                 </p>
               </div>
             </div>
 
-            <!-- Customer Info -->
-            <div class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Data Pelanggan</h4>
-              <div class="space-y-2 text-sm">
+            <!-- 2. RINGKASAN PESANAN (grid 2 kolom) -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ringkasan Pesanan</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
+                  <p class="text-xs text-gray-400">No. Pesanan</p>
+                  <p class="text-gray-800 font-semibold font-mono">{{ selectedJasaOrder.invoice }}</p>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
+                  <p class="text-xs text-gray-400">Tanggal Pesanan</p>
+                  <p class="text-gray-800">{{ formatDate(selectedJasaOrder.created_at) }}</p>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
+                  <p class="text-xs text-gray-400">Cara Pemesanan</p>
+                  <p class="text-gray-800 font-medium">{{ getJasaOrderMethod(selectedJasaOrder) }}</p>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
+                  <p class="text-xs text-gray-400">Status Pesanan</p>
+                  <span :class="['inline-block px-2 py-0.5 rounded-full text-xs font-medium', getJasaStatusClass(selectedJasaOrder.status)]">
+                    {{ getJasaStatusLabel(selectedJasaOrder.status, selectedJasaOrder) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. DATA PELANGGAN -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Data Pelanggan</h3>
+              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
                 <div class="flex justify-between">
                   <span class="text-gray-500">Nama</span>
-                  <span class="text-gray-800 font-medium">{{ selectedServiceOrder.customer.name }}</span>
+                  <span class="text-gray-800 font-medium">{{ selectedJasaOrder.customer.name }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-gray-500">Telepon</span>
-                  <span class="text-gray-800">{{ selectedServiceOrder.customer.phone || "—" }}</span>
+                  <span class="text-gray-500">Nomor Telepon</span>
+                  <span class="text-gray-800">{{ selectedJasaOrder.customer.phone || '—' }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- Booking Info -->
-            <div v-if="selectedServiceOrder.booking_date || selectedServiceOrder.booking_time" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Jadwal</h4>
-              <div class="space-y-2 text-sm">
-                <div v-if="selectedServiceOrder.booking_date" class="flex justify-between">
-                  <span class="text-gray-500">Tanggal</span>
-                  <span class="text-gray-800">{{ formatDate(selectedServiceOrder.booking_date) }}</span>
+            <!-- 4. METODE PEMBAYARAN -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Metode Pembayaran</h3>
+              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-500">Metode</span>
+                  <span :class="['inline-block px-2.5 py-0.5 rounded-full text-xs font-medium', getJasaPaymentColor(selectedJasaOrder)]">
+                    {{ getJasaPaymentMethodPrefix(selectedJasaOrder) === 'COD' ? 'COD' : getJasaPaymentMethodPrefix(selectedJasaOrder) === 'Transfer' ? 'Transfer' : 'Xendit' }}
+                  </span>
                 </div>
-                <div v-if="selectedServiceOrder.booking_time" class="flex justify-between">
-                  <span class="text-gray-500">Waktu</span>
-                  <span class="text-gray-800">{{ selectedServiceOrder.booking_time }}</span>
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-500">Status</span>
+                  <span class="text-gray-800 text-xs">{{ getJasaPaymentLabel(selectedJasaOrder) }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- Booking Note -->
-            <div v-if="selectedServiceOrder.booking_note" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Catatan</h4>
+            <!-- 5. JADWAL -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Jadwal</h3>
+              <div v-if="selectedJasaOrder.booking_date || selectedJasaOrder.booking_time" class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
+                <div v-if="selectedJasaOrder.booking_date" class="flex justify-between">
+                  <span class="text-gray-500">Tanggal Booking</span>
+                  <span class="text-gray-800">{{ formatDate(selectedJasaOrder.booking_date) }}</span>
+                </div>
+                <div v-if="selectedJasaOrder.booking_time" class="flex justify-between">
+                  <span class="text-gray-500">Jam Booking</span>
+                  <span class="text-gray-800">{{ formatTime(selectedJasaOrder.booking_time) }} WIB</span>
+                </div>
+              </div>
+              <div v-else class="p-3 bg-gray-50 rounded-xl text-sm text-gray-400 text-center italic">
+                Tidak menggunakan jadwal booking
+              </div>
+            </div>
+
+            <!-- 5b. TIPE LAYANAN (dengan alamat sesuai jenis) -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipe Layanan</h3>
+              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
+                <div class="flex justify-between">
+                  <span class="text-gray-500">Tipe</span>
+                  <span class="text-gray-800 font-medium">{{ getServiceTypeLabel(selectedJasaOrder) }}</span>
+                </div>
+                <!-- Alamat UMKM untuk "Di Tempat UMKM" -->
+                <div v-if="['Di Tempat UMKM'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
+                  <span class="text-gray-500">Alamat UMKM</span>
+                  <span class="text-gray-800 text-right max-w-[60%]">
+                    {{ selectedJasaOrder.merchant_address || '—' }}
+                  </span>
+                </div>
+                <!-- Alamat Pelanggan untuk "Ke Tempat Pelanggan" -->
+                <div v-else-if="['Ke Tempat Pelanggan'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
+                  <span class="text-gray-500">Alamat Pelanggan</span>
+                  <span class="text-gray-800 text-right max-w-[60%]">
+                    {{ selectedJasaOrder.customer.address || selectedJasaOrder.customer_address || '—' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6. TOTAL HARGA + SLA (side by side) -->
+            <div class="grid grid-cols-2 gap-2">
+              <!-- Total Harga Disepakati -->
+              <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Total Harga</p>
+                <p class="text-lg font-bold text-blue-700 leading-tight">
+                  {{ getOrderAgreedPrice(selectedJasaOrder) > 0 ? 'Rp ' + formatIDR(getOrderAgreedPrice(selectedJasaOrder)) : '—' }}
+                </p>
+              </div>
+              <!-- SLA Respon Merchant -->
+              <div
+                v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu'"
+                class="p-3 rounded-xl border-2"
+                :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
+                  ? 'border-red-400 bg-red-50'
+                  : getJasaSlaDeadlineColorClass(selectedJasaOrder)"
+              >
+                <p class="text-xs font-semibold uppercase tracking-wide mb-1"
+                  :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
+                    ? 'text-red-600'
+                    : ''">
+                  Sisa Waktu
+                </p>
+                <p class="text-lg font-bold leading-tight"
+                  :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
+                    ? 'text-red-700'
+                    : ''">
+                  {{ isJasaMerchantDeadlinePassed(selectedJasaOrder)
+                    ? 'Berakhir'
+                    : (getJasaMerchantDeadlineRemaining(selectedJasaOrder) || '—') }}
+                </p>
+                <p v-if="selectedJasaOrder.merchant_response_deadline" class="text-[10px] mt-1 opacity-70">
+                  Batas respon: {{ formatMerchantDeadlineDate(selectedJasaOrder.merchant_response_deadline) }}
+                </p>
+              </div>
+              <div v-else-if="['expired', 'kadaluarsa'].includes(String(selectedJasaOrder.status || '').toLowerCase())" class="p-3 bg-pink-50 border border-pink-200 rounded-xl">
+                <p class="text-xs font-semibold text-pink-500 uppercase tracking-wide mb-1">Sisa Waktu</p>
+                <p class="text-lg font-bold text-pink-600 leading-tight">Kadaluarsa</p>
+              </div>
+              <div v-else class="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sisa Waktu</p>
+                <p class="text-lg font-bold text-gray-400 leading-tight">—</p>
+              </div>
+            </div>
+
+            <!-- 7. CATATAN PELANGGAN -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Catatan Pelanggan</h3>
               <div class="p-3 bg-gray-50 rounded-xl text-sm text-gray-700">
-                {{ selectedServiceOrder.booking_note }}
+                {{ selectedJasaOrder.customer_note || selectedJasaOrder.booking_note || '—' }}
               </div>
             </div>
 
-            <!-- Order Number -->
-            <div class="p-3 bg-gray-50 rounded-xl flex items-center justify-between">
-              <span class="text-xs text-gray-500">No. Pesanan</span>
-              <span class="text-xs font-bold text-gray-700 font-mono">
-                {{ selectedServiceOrder.invoice }}
-              </span>
-            </div>
-
-            <!-- Status Badges -->
-            <div class="flex gap-2 flex-wrap">
-              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServiceStatusClass(selectedServiceOrder.status)]">
-                {{ getServiceStatusLabel(selectedServiceOrder.status, selectedServiceOrder) }}
-              </span>
-              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServicePaymentColor(selectedServiceOrder)]">
-                {{ getServicePaymentLabel(selectedServiceOrder) }}
-              </span>
-            </div>
-
-            <!-- SLA Countdown: menunggu_konfirmasi (merchant response deadline) -->
-            <div v-if="getMerchantDeadlineRemaining(selectedServiceOrder)" class="p-3 bg-orange-50 border border-orange-200 rounded-xl">
-              <div class="flex items-center gap-2 text-sm text-orange-700 font-medium">
-                <i class="pi pi-clock shrink-0"></i>
-                Sisa waktu respon: <strong>{{ getMerchantDeadlineRemaining(selectedServiceOrder) }}</strong>
-              </div>
-              <p class="mt-1 text-xs text-orange-500">Merchant wajib merespon pesanan dalam 1x24 jam.</p>
-            </div>
-
-            <!-- SLA Info: menunggu_selesai (waiting customer confirmation) -->
-            <div v-if="getCompletionDeadlineRemaining(selectedServiceOrder)" class="p-3 bg-purple-50 border border-purple-200 rounded-xl">
-              <div class="flex items-center gap-2 text-sm text-purple-700 font-medium">
-                <i class="pi pi-clock shrink-0"></i>
-                Menunggu konfirmasi customer. Auto-selesai dalam: <strong>{{ getCompletionDeadlineRemaining(selectedServiceOrder) }}</strong>
-              </div>
-            </div>
-
-            <!-- Expired banner -->
-            <div v-if="selectedServiceOrder.status === 'expired'" class="p-3 bg-gray-100 border border-gray-300 rounded-xl">
-              <div class="flex items-center gap-2 text-sm text-gray-600 font-medium">
-                <i class="pi pi-clock shrink-0"></i>
-                Pesanan kadaluarsa karena merchant tidak merespon dalam 1x24 jam.
-              </div>
-            </div>
-
-            <!-- Rejection Reason -->
-            <div v-if="selectedServiceOrder.rejection_reason" class="mb-4">
-              <h4 class="text-xs font-semibold text-red-500 uppercase mb-2">Alasan Penolakan</h4>
+            <!-- Alasan Penolakan -->
+            <div v-if="selectedJasaOrder.rejection_reason" class="space-y-2">
+              <h3 class="text-xs font-semibold text-red-500 uppercase tracking-wide">Alasan Penolakan</h3>
               <div class="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">
                 <i class="pi pi-info-circle mr-1"></i>
-                {{ selectedServiceOrder.rejection_reason }}
+                {{ selectedJasaOrder.rejection_reason }}
               </div>
             </div>
 
-            <!-- Completion Note -->
-            <div v-if="selectedServiceOrder.completion_note" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Catatan Pengerjaan</h4>
+            <!-- Catatan Pengerjaan -->
+            <div v-if="selectedJasaOrder.completion_note" class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Catatan Pengerjaan</h3>
               <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-sm text-purple-700">
                 <i class="pi pi-file mr-1"></i>
-                {{ selectedServiceOrder.completion_note }}
+                {{ selectedJasaOrder.completion_note }}
               </div>
             </div>
 
-            <!-- Completion Evidences -->
-            <div class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Bukti Pengerjaan</h4>
-              <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0" class="grid grid-cols-3 gap-2">
-                <template v-for="ev in getCompletionEvidences(selectedServiceOrder)" :key="ev.id">
-                  {{ console.log('[Thumbnail Evidence]', ev) || '' }}
+            <!-- SLA Info: menunggu_selesai -->
+            <div v-if="getJasaCompletionDeadlineRemaining(selectedJasaOrder)" class="p-3 bg-purple-50 border border-purple-200 rounded-xl">
+              <div class="flex items-center gap-2 text-sm text-purple-700 font-medium">
+                <i class="pi pi-clock shrink-0"></i>
+                Menunggu konfirmasi customer. Auto-selesai dalam: <strong>{{ getJasaCompletionDeadlineRemaining(selectedJasaOrder) }}</strong>
+              </div>
+            </div>
+
+            <!-- 9. BUKTI PENGERJAAN -->
+            <div class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bukti Pengerjaan</h3>
+              <div v-if="getJasaCompletionEvidences(selectedJasaOrder).length > 0" class="grid grid-cols-3 gap-2">
+                <template v-for="ev in getJasaCompletionEvidences(selectedJasaOrder)" :key="ev.id">
                   <img
                     v-if="isImageEvidence(ev)"
                     :src="getEvidenceUrl(ev)"
                     class="w-full aspect-square object-cover rounded-xl cursor-pointer"
-                    @click="openEvidenceViewModal(selectedServiceOrder)"
+                    @click="openJasaEvidenceViewModal(selectedJasaOrder)"
                     @error="(e) => { console.error('[Thumbnail failed]', getEvidenceUrl(ev), ev); e.target.style.display = 'none'; }"
                   />
                   <video
@@ -2275,56 +2687,53 @@ function leaveOrdersChannel(id) {
               </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div v-if="!isServiceTerminal(selectedServiceOrder)" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Aksi</h4>
+            <!-- 10. AKSI -->
+            <div v-if="!isJasaTerminal(selectedJasaOrder)" class="space-y-2 pt-1">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aksi</h3>
               <div class="space-y-2">
                 <!-- Menunggu Konfirmasi -->
-                <template v-if="canServiceAccept(selectedServiceOrder)">
+                <template v-if="canJasaAccept(selectedJasaOrder)">
                   <button
-                    @click="acceptServiceOrder(getServiceOrderId(selectedServiceOrder))"
-                    :disabled="submittingService"
+                    @click="acceptJasaOrder(getOrderId(selectedJasaOrder))"
+                    :disabled="submittingJasa"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                   >
                     <i class="pi pi-check"></i>
                     Terima Pesanan
                   </button>
                   <button
-                    @click="openServiceRejectModal(selectedServiceOrder)"
-                    :disabled="submittingService"
+                    @click="openJasaRejectModal(selectedJasaOrder)"
+                    :disabled="submittingJasa"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
                   >
                     <i class="pi pi-times mr-1"></i>
                     Tolak Pesanan
                   </button>
                 </template>
-
                 <!-- Diterima -->
-                <template v-else-if="canServiceStart(selectedServiceOrder)">
+                <template v-else-if="canJasaStart(selectedJasaOrder)">
                   <button
-                    @click="startServiceWorking(getServiceOrderId(selectedServiceOrder))"
-                    :disabled="submittingService"
+                    @click="startJasaWorking(getOrderId(selectedJasaOrder))"
+                    :disabled="submittingJasa"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                   >
                     <i class="pi pi-play"></i>
                     Mulai Kerjakan
                   </button>
                 </template>
-
                 <!-- Dikerjakan -->
-                <template v-else-if="canServiceEvidence(selectedServiceOrder)">
+                <template v-else-if="canJasaEvidence(selectedJasaOrder)">
                   <button
-                    @click="openServiceEvidenceModal(selectedServiceOrder)"
-                    :disabled="submittingService"
+                    @click="openJasaEvidenceModal(selectedJasaOrder)"
+                    :disabled="submittingJasa"
                     class="w-full py-3 rounded-xl text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
                   >
                     <i class="pi pi-upload"></i>
                     Kirim Bukti & Selesai
                   </button>
                 </template>
-
                 <!-- Menunggu Konfirmasi Selesai -->
-                <template v-else-if="selectedServiceOrder.status === 'tunggu_selesai'">
+                <template v-else-if="String(selectedJasaOrder.status || '').toLowerCase() === 'tunggu_selesai' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_selesai'">
                   <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-sm text-purple-700 text-center">
                     <i class="pi pi-clock mr-1"></i>
                     Menunggu pelanggan mengkonfirmasi penyelesaian...
@@ -2333,31 +2742,31 @@ function leaveOrdersChannel(id) {
               </div>
             </div>
 
-            <!-- Review Section -->
-            <div v-if="selectedServiceOrder.status === 'selesai' && selectedServiceOrder.review" class="mb-4">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Review Pelanggan</h4>
+            <!-- Rating dan Ulasan (bukan bagian dari 10 section, muncul jika pesanan selesai) -->
+            <div v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'selesai' && selectedJasaOrder.review" class="space-y-2">
+              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating dan Ulasan</h3>
               <div class="bg-green-50 border border-green-100 rounded-xl p-4">
-                <span class="inline-block bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full mb-2">Review Terkirim</span>
+                <span class="inline-block bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full mb-2">Ulasan dari Pelanggan</span>
                 <div class="flex items-center gap-2 mt-2 mb-1">
-                  <span class="text-sm font-medium text-gray-800">{{ getReviewerName(selectedServiceOrder) }}</span>
-                  <span v-if="selectedServiceOrder.review.is_anonymous" class="text-xs text-gray-500">(Anonim)</span>
+                  <span class="text-sm font-medium text-gray-800">{{ getReviewerName(selectedJasaOrder) }}</span>
+                  <span v-if="selectedJasaOrder.review.is_anonymous" class="text-xs text-gray-500">(Anonim)</span>
                 </div>
                 <div class="flex gap-1">
                   <i
                     v-for="star in 5"
                     :key="star"
                     class="pi text-sm"
-                    :class="star <= Number(selectedServiceOrder.review.rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                    :class="star <= Number(selectedJasaOrder.review.rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
                   ></i>
                 </div>
-                <p v-if="getReviewComment(selectedServiceOrder)" class="text-sm text-gray-700 mt-2">
-                  {{ getReviewComment(selectedServiceOrder) }}
+                <p v-if="getReviewComment(selectedJasaOrder)" class="text-sm text-gray-700 mt-2">
+                  {{ getReviewComment(selectedJasaOrder) }}
                 </p>
-                <div v-if="getReviewMedia(selectedServiceOrder.review).length > 0" class="flex gap-2 mt-3 flex-wrap">
-                  <template v-for="media in getReviewMedia(selectedServiceOrder.review)" :key="media.id">
+                <div v-if="getReviewMedia(selectedJasaOrder.review).length > 0" class="flex gap-2 mt-3 flex-wrap">
+                  <template v-for="media in getReviewMedia(selectedJasaOrder.review)" :key="media.id">
                     <img
                       v-if="media.file_type === 'image'"
-                      :src="getServiceMediaUrl(media)"
+                      :src="getJasaMediaUrl(media)"
                       class="w-16 h-16 object-cover rounded-lg"
                       @error="(e) => e.target.style.display = 'none'"
                     />
@@ -2365,6 +2774,7 @@ function leaveOrdersChannel(id) {
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -2373,14 +2783,14 @@ function leaveOrdersChannel(id) {
     <!-- Reject Order Modal -->
     <transition name="fade">
       <div
-        v-if="showRejectModal"
+        v-if="showJasaRejectModal"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
           <div class="px-5 py-4 border-b border-gray-100">
             <div class="flex items-center justify-between">
               <h3 class="font-bold text-gray-900">Tolak Pesanan</h3>
-              <button @click="showRejectModal = false" class="text-gray-400 hover:text-gray-600">
+              <button @click="showJasaRejectModal = false" class="text-gray-400 hover:text-gray-600">
                 <i class="pi pi-times"></i>
               </button>
             </div>
@@ -2397,17 +2807,17 @@ function leaveOrdersChannel(id) {
             ></textarea>
             <div class="flex gap-2 mt-4">
               <button
-                @click="showRejectModal = false"
+                @click="showJasaRejectModal = false"
                 class="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium hover:bg-gray-50 transition"
               >
                 Batal
               </button>
               <button
-                @click="submitServiceRejection"
-                :disabled="submittingService"
+                @click="submitJasaRejection"
+                :disabled="submittingJasa"
                 class="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition"
               >
-                {{ submittingService ? 'Mengirim...' : 'Tolak Pesanan' }}
+                {{ submittingJasa ? 'Mengirim...' : 'Tolak Pesanan' }}
               </button>
             </div>
           </div>
@@ -2418,14 +2828,14 @@ function leaveOrdersChannel(id) {
     <!-- Evidence Upload Modal -->
     <transition name="fade">
       <div
-        v-if="showEvidenceModal"
+        v-if="showJasaEvidenceModal"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
           <div class="px-5 py-4 border-b border-gray-100 sticky top-0 bg-white">
             <div class="flex items-center justify-between">
               <h3 class="font-bold text-gray-900">Kirim Bukti Pengerjaan</h3>
-              <button @click="showEvidenceModal = false" class="text-gray-400 hover:text-gray-600">
+              <button @click="showJasaEvidenceModal = false" class="text-gray-400 hover:text-gray-600">
                 <i class="pi pi-times"></i>
               </button>
             </div>
@@ -2480,13 +2890,13 @@ function leaveOrdersChannel(id) {
             ></textarea>
 
             <button
-              @click="submitServiceEvidence"
-              :disabled="submittingService || evidenceFiles.length === 0"
+              @click="submitJasaEvidence"
+              :disabled="submittingJasa || evidenceFiles.length === 0"
               class="w-full py-3 bg-purple-500 text-white rounded-xl text-sm font-medium hover:bg-purple-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
             >
-              <i class="pi pi-spin pi-spinner" v-if="submittingService"></i>
+              <i class="pi pi-spin pi-spinner" v-if="submittingJasa"></i>
               <i class="pi pi-upload" v-else></i>
-              {{ submittingService ? 'Mengirim...' : 'Kirim Bukti & Selesai' }}
+              {{ submittingJasa ? 'Mengirim...' : 'Kirim Bukti & Selesai' }}
             </button>
           </div>
         </div>
@@ -2495,15 +2905,15 @@ function leaveOrdersChannel(id) {
   <!-- Review Modal -->
     <transition name="fade">
       <div
-        v-if="showReviewModal"
+        v-if="showJasaReviewModal"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-        @click.self="showReviewModal = false"
+        @click.self="showJasaReviewModal = false"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <!-- Modal Header -->
           <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
-            <h3 class="font-bold text-gray-900">Ulasan Pelanggan</h3>
-            <button @click="showReviewModal = false" class="text-gray-400 hover:text-gray-600">
+            <h3 class="font-bold text-gray-900">Rating dan Ulasan Pelanggan</h3>
+            <button @click="showJasaReviewModal = false" class="text-gray-400 hover:text-gray-600">
               <i class="pi pi-times"></i>
             </button>
           </div>
@@ -2514,8 +2924,8 @@ function leaveOrdersChannel(id) {
             <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
               <div class="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
                 <img
-                  v-if="getServiceImageUrl(selectedServiceOrder)"
-                  :src="getServiceImageUrl(selectedServiceOrder)"
+                  v-if="getJasaImageUrl(selectedJasaOrder)"
+                  :src="getJasaImageUrl(selectedJasaOrder)"
                   class="w-full h-full object-cover"
                   @error="(e) => e.target.style.display = 'none'"
                 />
@@ -2523,10 +2933,10 @@ function leaveOrdersChannel(id) {
               </div>
               <div>
                 <p class="text-sm font-semibold text-gray-900">
-                  {{ selectedServiceOrder?.items?.[0]?.name || 'Layanan' }}
+                  {{ selectedJasaOrder?.items?.[0]?.name || 'Layanan' }}
                 </p>
                 <p class="text-xs text-gray-500">
-                  {{ selectedServiceOrder?.invoice || '#' + selectedServiceOrder?.id }}
+                  {{ selectedJasaOrder?.invoice || '#' + selectedJasaOrder?.id }}
                 </p>
               </div>
             </div>
@@ -2534,7 +2944,7 @@ function leaveOrdersChannel(id) {
             <!-- Reviewer Info -->
             <div class="text-center py-2">
               <p class="text-sm font-medium text-gray-700">
-                {{ getReviewerName(selectedServiceOrder) }}
+                {{ getReviewerName(selectedJasaOrder) }}
               </p>
               <p v-if="selectedReview.is_anonymous" class="text-xs text-gray-400">(Anonim)</p>
             </div>
@@ -2634,7 +3044,7 @@ function leaveOrdersChannel(id) {
                           <img
                             v-for="(media, mIdx) in getHistoryMedia(history, 'old')"
                             :key="'old-media-' + mIdx"
-                            :src="getServiceMediaUrl(media)"
+                            :src="getJasaMediaUrl(media)"
                             class="w-16 h-16 object-cover rounded-lg border border-gray-200"
                             @error="(e) => e.target.style.display = 'none'"
                           />
@@ -2668,7 +3078,7 @@ function leaveOrdersChannel(id) {
                           <img
                             v-for="(media, mIdx) in getHistoryMedia(history, 'new')"
                             :key="'new-media-' + mIdx"
-                            :src="getServiceMediaUrl(media)"
+                            :src="getJasaMediaUrl(media)"
                             class="w-16 h-16 object-cover rounded-lg border border-gray-200"
                             @error="(e) => e.target.style.display = 'none'"
                           />
@@ -2751,27 +3161,27 @@ function leaveOrdersChannel(id) {
     <!-- Evidence View Modal -->
     <transition name="fade">
       <div
-        v-if="showEvidenceViewModal"
+        v-if="showJasaEvidenceViewModal"
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-        @click.self="showEvidenceViewModal = false"
+        @click.self="showJasaEvidenceViewModal = false"
       >
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <!-- Modal Header -->
           <div class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white border-b border-gray-100">
             <h3 class="font-bold text-gray-900">Bukti Penyelesaian</h3>
-            <button @click="showEvidenceViewModal = false" class="text-gray-400 hover:text-gray-600">
+            <button @click="showJasaEvidenceViewModal = false" class="text-gray-400 hover:text-gray-600">
               <i class="pi pi-times"></i>
             </button>
           </div>
 
           <!-- Modal Body -->
-          <div v-if="selectedServiceOrder" class="p-5 space-y-4">
+          <div v-if="selectedJasaOrder" class="p-5 space-y-4">
             <!-- Order Info -->
             <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
               <div class="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
                 <img
-                  v-if="getServiceImageUrl(selectedServiceOrder)"
-                  :src="getServiceImageUrl(selectedServiceOrder)"
+                  v-if="getJasaImageUrl(selectedJasaOrder)"
+                  :src="getJasaImageUrl(selectedJasaOrder)"
                   class="w-full h-full object-cover"
                   @error="(e) => e.target.style.display = 'none'"
                 />
@@ -2779,35 +3189,35 @@ function leaveOrdersChannel(id) {
               </div>
               <div>
                 <p class="text-sm font-semibold text-gray-900">
-                  {{ selectedServiceOrder.items?.[0]?.name || 'Layanan' }}
+                  {{ selectedJasaOrder.items?.[0]?.name || 'Layanan' }}
                 </p>
                 <p class="text-xs text-gray-500">
-                  {{ selectedServiceOrder.invoice || '#' + selectedServiceOrder.id }}
+                  {{ selectedJasaOrder.invoice || '#' + selectedJasaOrder.id }}
                 </p>
               </div>
             </div>
 
             <!-- Order Status -->
             <div class="flex items-center gap-2">
-              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getServiceStatusClass(selectedServiceOrder.status)]">
-                {{ getServiceStatusLabel(selectedServiceOrder.status, selectedServiceOrder) }}
+              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getJasaStatusClass(selectedJasaOrder.status)]">
+                {{ getJasaStatusLabel(selectedJasaOrder.status, selectedJasaOrder) }}
               </span>
             </div>
 
             <!-- Completion Note -->
-            <div v-if="selectedServiceOrder.completion_note" class="p-4 bg-purple-50 border border-purple-100 rounded-xl">
+            <div v-if="selectedJasaOrder.completion_note" class="p-4 bg-purple-50 border border-purple-100 rounded-xl">
               <p class="text-xs font-semibold text-purple-700 uppercase mb-2">Keterangan</p>
-              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedServiceOrder.completion_note }}</p>
+              <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ selectedJasaOrder.completion_note }}</p>
             </div>
 
             <!-- Evidence List -->
-            <div v-if="getCompletionEvidences(selectedServiceOrder).length > 0">
+            <div v-if="getJasaCompletionEvidences(selectedJasaOrder).length > 0">
               <p class="text-xs font-semibold text-gray-500 uppercase mb-3">
-                Bukti ({{ getCompletionEvidences(selectedServiceOrder).length }})
+                Bukti ({{ getJasaCompletionEvidences(selectedJasaOrder).length }})
               </p>
               <div class="space-y-3">
                 <div
-                  v-for="(evidence, idx) in getCompletionEvidences(selectedServiceOrder)"
+                  v-for="(evidence, idx) in getJasaCompletionEvidences(selectedJasaOrder)"
                   :key="evidence.id || idx"
                   class="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden"
                 >

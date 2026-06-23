@@ -136,22 +136,31 @@
                 <i class="pi pi-check-circle mr-1"></i>
                 Konfirmasi Selesai
               </Button>
-              <!-- Beri Ulasan (belum pernah review, status selesai, ada jasa_order_item_id) -->
+              <!-- Beri Ulasan (belum pernah review) -->
               <Button
-                v-if="(o.status === 'selesai' || o.status === 'completed') && !o.is_reviewed && o.jasa_order_item_id"
+                v-if="o.can_review"
                 @click.stop="goToReview(o)"
                 class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
               >
                 <i class="pi pi-star mr-1"></i>
-                Beri Ulasan
+                Beri Rating dan Ulasan
               </Button>
-              <!-- Ulasan Terkirim (sudah review) - status indicator, not clickable -->
+              <!-- Perbarui Ulasan (sudah review, masih boleh update) -->
+              <Button
+                v-else-if="o.is_reviewed && o.can_update_review"
+                @click.stop="goToReview(o)"
+                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 font-semibold"
+              >
+                <i class="pi pi-pencil mr-1"></i>
+                Perbarui Rating dan Ulasan
+              </Button>
+              <!-- Ulasan sudah diperbarui (sudah review, tidak boleh update lagi) -->
               <div
-                v-else-if="o.is_reviewed"
+                v-else-if="o.is_reviewed && !o.can_update_review"
                 class="inline-flex items-center gap-1.5 h-8 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 border border-green-300 cursor-default"
               >
                 <i class="pi pi-check-circle"></i>
-                Ulasan Terkirim
+                Ulasan sudah diperbarui
               </div>
             </template>
           </ServiceOrderCard>
@@ -521,9 +530,13 @@ function goToReview(order) {
   const numericOrderId = Number(order.order_id || order.id);
   const jasaItemId = order.jasa_order_item_id;
 
-  // If already reviewed, navigate to jasa detail
-  if (order.is_reviewed && order.jasa?.slug) {
-    router.push(`/jasa/${order.jasa.slug}`);
+  if (order.is_reviewed) {
+    const reviewId = order.review?.id || order.review_id;
+    if (reviewId) {
+      router.push(`/reviews/${reviewId}/edit`);
+    } else if (order.jasa?.slug) {
+      router.push(`/jasa/${order.jasa.slug}`);
+    }
     return;
   }
 
@@ -552,6 +565,8 @@ function openOrderConfirmSelesai(order) {
  * Check if order needs payment (Xendit, unpaid)
  */
 function needsPayment(order) {
+  if (!order) return false;
+
   // COD doesn't need online payment
   const method = String(order.payment_method || '').toUpperCase();
   if (method === 'COD') return false;
@@ -560,17 +575,11 @@ function needsPayment(order) {
   const ps = String(order.payment_status || '').toUpperCase();
   if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
 
-  // Check pending statuses
-  const pendingStatuses = ['pending', 'unpaid', 'waiting', 'menunggu_pembayaran', 'menunggu_konfirmasi_merchant'];
-  if (!pendingStatuses.includes(ps) && !pendingStatuses.includes(order.status?.toLowerCase())) {
-    // Also allow if payment_status is null/empty and order is pending
-    if (!ps && !['pending', 'menunggu_konfirmasi_merchant'].includes(order.status?.toLowerCase())) {
-      return false;
-    }
-  }
+  // Terminal statuses
+  const rawStatus = String(order.status || '').toLowerCase();
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed'];
+  if (terminalStatuses.includes(rawStatus)) return false;
 
-  // Has invoice URL that might be expired - show retry button anyway
-  // If status is pending/waiting/unpaid, show the button
   return true;
 }
 
@@ -601,10 +610,8 @@ function getCompletionDeadlineRemaining(order) {
   if (order.status !== 'menunggu_selesai' && order.status !== 'menunggu_konfirmasi_selesai') {
     return null;
   }
-  if (!order.completion_submitted_at) return null;
-  const deadline = new Date(order.completion_submitted_at);
-  deadline.setHours(deadline.getHours() + 24);
-  return formatCountdown(deadline.toISOString());
+  if (!order.completion_deadline_at) return null;
+  return formatCountdown(order.completion_deadline_at);
 }
 
 /**

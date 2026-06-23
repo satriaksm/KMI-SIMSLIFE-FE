@@ -38,11 +38,14 @@
           <div class="text-sm font-bold text-black truncate">
             {{ serviceTitle }}
           </div>
-          <div class="mt-0.5 text-xs text-muted-foreground">
-            {{ serviceTypeLabel }}
+          <div v-if="categoryName" class="mt-0.5 text-xs text-muted-foreground truncate">
+            {{ categoryName }}
           </div>
           <div class="mt-0.5 text-xs text-muted-foreground">
-            {{ bookingTypeLabel }}
+            {{ caraPemesananLabel }}
+          </div>
+          <div class="mt-0.5 text-xs text-muted-foreground">
+            {{ serviceTypeLabel }}
           </div>
         </div>
       </div>
@@ -140,6 +143,8 @@ const serviceImage = computed(() => {
 });
 
 const serviceTypeLabel = computed(() => {
+  // Prioritas: dari API (computed label) > dari API (raw value) > fallback manual
+  if (props.order.service_type_label) return props.order.service_type_label;
   const map = {
     online: "Online",
     di_tempat_umkm: "Di Tempat UMKM",
@@ -150,15 +155,19 @@ const serviceTypeLabel = computed(() => {
   return map[props.order.service_type] || props.order.service_type || "";
 });
 
-const bookingTypeLabel = computed(() => {
+const caraPemesananLabel = computed(() => {
+  // Prioritas: dari API > fallback manual
+  if (props.order.cara_pemesanan_label) return props.order.cara_pemesanan_label;
   const map = {
     booking: "Booking (Pilih Tanggal & Jam)",
     keranjang: "Tanpa Jadwal",
     walk_in: "Walk-in",
     konsultasi: "Konsultasi",
   };
-  return map[props.order.booking_type] || props.order.booking_type || "";
+  return map[props.order.cara_pemesanan] || map[props.order.booking_type] || props.order.booking_type || "";
 });
+
+const categoryName = computed(() => props.order.category_name || null);
 
 const orderDateLabel = computed(() => {
   const d = props.order.created_at

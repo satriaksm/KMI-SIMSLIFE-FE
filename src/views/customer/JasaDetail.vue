@@ -146,7 +146,7 @@
             :to="{ name: 'Merchant Detail', params: { slug: jasa.merchant.slug }, hash: '#reviews' }"
             class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold shrink-0 hover:bg-gray-100 transition"
           >
-            Ulasan
+            Rating dan Ulasan
           </router-link>
           <button
             v-else
@@ -593,7 +593,7 @@
       <div class="max-w-2xl mx-auto">
         <!-- Rating Summary Header -->
         <div class="mb-4">
-          <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Layanan</h3>
+          <h3 class="text-lg font-bold text-gray-900 mb-2">Rating dan Ulasan</h3>
           <div v-if="jasa?.rating_summary && jasa.rating_summary.total_reviews > 0" class="flex items-center gap-3">
             <div class="flex items-center gap-1">
               <i

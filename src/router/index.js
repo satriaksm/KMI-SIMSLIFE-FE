@@ -319,7 +319,7 @@ const routes = [
         name: "Universal Review",
         component: () => import("@/views/customer/UniversalReviewView.vue"),
         meta: {
-          title: "Beri Review | SUMILIR",
+          title: "Nilai Produk/Layanan | SUMILIR",
           requiresAuth: true,
         },
       },
@@ -330,7 +330,7 @@ const routes = [
         name: "Edit Review",
         component: () => import("@/views/CustomerOrder/EditReviewView.vue"),
         meta: {
-          title: "Perbarui Ulasan | SUMILIR",
+          title: "Perbarui Penilaian | SUMILIR",
           requiresAuth: true,
         },
       },
@@ -867,6 +867,14 @@ const routes = [
         component: () => import("@/views/merchant/reports/Index.vue"),
         meta: {
           title: "Laporan UMKM | SUMILIR",
+        },
+      },
+      {
+        path: "reviews",
+        name: "Merchant - Reviews",
+        component: () => import("@/views/merchant/reviews/Index.vue"),
+        meta: {
+          title: "Ulasan UMKM | SUMILIR",
         },
       },
 

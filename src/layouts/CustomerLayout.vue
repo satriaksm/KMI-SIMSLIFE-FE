@@ -78,14 +78,6 @@ const baseMenus = [
     </svg>`,
   },
   {
-    key: "konsultasi",
-    label: "Konsultasi",
-    to: isAuthenticated.value ? "/customer/consultations" : "/login",
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 1 0-1.598 5.48 5.48 0 0 1 1.598-1.598 4.48 4.48 0 0 1 1.598 0A5.48 5.48 0 0 1 12 13.5a5.48 5.48 0 0 1 1.598 0 4.48 4.48 0 0 1 1.598 0A5.48 5.48 0 0 1 21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 1 0-1.598 5.48 5.48 0 0 1 1.598-1.598 4.48 4.48 0 0 1 1.598 0Z" />
-    </svg>`,
-  },
-  {
     key: "profile",
     label: "Profil",
     to: isAuthenticated.value ? "/profile" : "/login",
@@ -97,7 +89,7 @@ const baseMenus = [
 
 const menus = computed(() => {
   return baseMenus.filter((m) => {
-    if ((m.key === "pesanan" || m.key === "konsultasi") && (!isAuthenticated.value || isAdmin.value)) {
+    if (m.key === "pesanan" && (!isAuthenticated.value || isAdmin.value)) {
       return false;
     }
     return true;
@@ -465,11 +457,8 @@ watch(
                     v-if="!isAdmin"
                     type="button"
                     @click="goToConsultationsFromModal"
-                    class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100 flex items-center gap-2"
+                    class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 shrink-0">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 1 0-1.598 5.48 5.48 0 0 1 1.598-1.598 4.48 4.48 0 0 1 1.598 0A5.48 5.48 0 0 1 12 13.5a5.48 5.48 0 0 1 1.598 0 4.48 4.48 0 0 1 1.598 0A5.48 5.48 0 0 1 21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 1 0-1.598 5.48 5.48 0 0 1 1.598-1.598 4.48 4.48 0 0 1 1.598 0Z" />
-                    </svg>
                     Konsultasi Saya
                   </button>
                   <button

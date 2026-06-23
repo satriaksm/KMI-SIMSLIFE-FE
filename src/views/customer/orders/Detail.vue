@@ -259,9 +259,9 @@
           </div>
         </div>
 
-        <!-- Bukti Pengerjaan (if any) -->
-        <div v-if="order.completion_evidences && order.completion_evidences.length > 0" class="p-4 bg-white border border-gray-200 rounded-2xl">
-          <div class="text-sm font-semibold text-gray-700 mb-3">Bukti Pengerjaan</div>
+        <!-- Bukti Penyelesaian -->
+        <div v-if="['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(order.status)" class="p-4 bg-white border border-gray-200 rounded-2xl">
+          <div class="text-sm font-semibold text-gray-700 mb-3">Bukti Penyelesaian</div>
           <!-- Completion note -->
           <div v-if="order.completion_note || order.jasa_order_item?.completion_note" class="mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
             <p class="text-xs text-purple-600">
@@ -269,7 +269,7 @@
               {{ order.completion_note || order.jasa_order_item?.completion_note }}
             </p>
           </div>
-          <div class="grid grid-cols-3 gap-2">
+          <div v-if="order.completion_evidences && order.completion_evidences.length > 0" class="grid grid-cols-3 gap-2">
             <div
               v-for="(ev, idx) in order.completion_evidences"
               :key="idx"
@@ -298,6 +298,9 @@
                 <i class="pi pi-file text-gray-400 text-xl"></i>
               </div>
             </div>
+          </div>
+          <div v-else class="text-center py-4 text-gray-500 text-sm bg-gray-50 rounded-xl border border-gray-100">
+            Belum ada bukti penyelesaian.
           </div>
         </div>
 
@@ -341,9 +344,9 @@
             <i class="pi pi-check-circle mr-1"></i>
             Konfirmasi Selesai
           </Button>
-          <!-- Beri Ulasan (belum pernah review, status selesai, ada jasa_order_item_id) -->
+          <!-- Beri Ulasan (belum pernah review) -->
           <Button
-            v-if="(order.status === 'selesai' || order.status === 'completed') && !order.is_reviewed && order.jasa_order_item_id"
+            v-if="order.can_review"
             block
             @click="goToReview"
             customClass="mt-2 bg-merchant-primary hover:bg-merchant-primary/90 text-white"
@@ -351,27 +354,24 @@
             <i class="pi pi-star mr-1"></i>
             Beri Rating dan Ulasan
           </Button>
-          <!-- Review Status Badge -->
-          <div
-            v-if="order.is_reviewed"
-            class="mt-2 inline-flex items-center justify-center gap-2 w-full h-12 px-4 py-2 text-sm font-medium rounded-xl"
-            :class="isReviewUpdateExhausted()
-              ? 'bg-green-100 text-green-700 border border-green-300'
-              : 'bg-orange-100 text-orange-700 border border-orange-300'"
-          >
-            <i class="pi pi-check-circle"></i>
-            {{ isReviewUpdateExhausted() ? 'Update Ulasan Sudah Digunakan' : 'Ulasan Terkirim' }}
-          </div>
-          <!-- Perbarui Ulasan Button (if update not exhausted) -->
+          <!-- Perbarui Rating dan Ulasan (sudah review, masih boleh update) -->
           <Button
-            v-if="canUpdateReview() && (order.status === 'selesai' || order.status === 'completed')"
+            v-if="order.is_reviewed && order.can_update_review"
             block
             @click="goToReview"
-            customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+            customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
           >
             <i class="pi pi-pencil mr-1"></i>
-            Perbarui Ulasan
+            Perbarui Rating dan Ulasan
           </Button>
+          <!-- Ulasan sudah diperbarui (sudah review, tidak boleh update lagi) -->
+          <div
+            v-if="order.is_reviewed && !order.can_update_review"
+            class="mt-2 inline-flex items-center justify-center gap-2 w-full h-12 px-4 py-2 text-sm font-medium rounded-xl bg-green-100 text-green-700 border border-green-300 cursor-default"
+          >
+            <i class="pi pi-check-circle"></i>
+            Ulasan sudah diperbarui
+          </div>
           <!-- Review Preview (sudah review) -->
           <div
             v-if="order.is_reviewed && order.review"
@@ -590,11 +590,11 @@ function getReviewMedia(review) {
 }
 
 function isReviewUpdateExhausted() {
-  return order.value?.review?.is_update_exhausted || (order.value?.review?.update_count ?? 0) >= 1;
+  return !order.value?.can_update_review;
 }
 
 function canUpdateReview() {
-  return order.value?.is_reviewed && !isReviewUpdateExhausted();
+  return order.value?.is_reviewed && order.value?.can_update_review;
 }
 
 function isImageMedia(media) {
@@ -888,6 +888,8 @@ const order = computed(() => {
     order_number: o.order_number || `SO-${String(o.id).padStart(6, "0")}`,
     jasa_order_item_id: o.jasa_order_item_id || null,
     is_reviewed: o.is_reviewed || false,
+    can_review: o.can_review || false,
+    can_update_review: o.can_update_review || false,
     service_name: o.service_name || o.jasa?.title || "Layanan",
     service_image: o.service_image || o.jasa?.image || null,
     service_type: o.service_type || "",
@@ -1045,6 +1047,7 @@ async function handleKonfirmasiSelesai() {
     }
 
     toast.success("Pesanan berhasil dikonfirmasi selesai");
+    await fetchOrder();
   } catch (e) {
     console.error("Gagal mengkonfirmasi selesai:", e);
     toast.error(e?.response?.data?.message || "Gagal mengkonfirmasi pesanan");
@@ -1070,21 +1073,12 @@ function needsPayment() {
   const ps = String(o.payment_status || '').toUpperCase();
   if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
 
-  // Check if status allows payment
+  // Terminal statuses where payment is no longer possible
   const rawStatus = String(o.status || '').toLowerCase();
-  const pendingStatuses = ['pending', 'unpaid', 'waiting', 'menunggu_pembayaran', 'menunggu_konfirmasi_merchant'];
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed'];
+  if (terminalStatuses.includes(rawStatus)) return false;
 
-  // Allow if payment_status is pending/unpaid/waiting OR status is pending
-  if (pendingStatuses.includes(ps) || pendingStatuses.includes(rawStatus)) {
-    return true;
-  }
-
-  // Also allow if status is pending and payment hasn't been made
-  if (rawStatus === 'pending' && !ps) {
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
 /**
@@ -1178,6 +1172,11 @@ async function fetchOrder() {
   try {
     const { data: res } = await getCustomerOrderDetail(id);
     rawOrder.value = res?.data ?? res ?? null;
+
+    // Temporary logs (Log target 9)
+    console.log('[LOG SEMENTARA - CUSTOMER DETAIL] Selected Order ID:', id);
+    console.log('[LOG SEMENTARA - CUSTOMER DETAIL] Completion evidences from API:', rawOrder.value?.completion_evidences || rawOrder.value?.jasa_order_item?.completion_evidences || rawOrder.value?.jasa_items?.[0]?.completion_evidences);
+    console.log('[LOG SEMENTARA - CUSTOMER DETAIL] Mapped completion evidences:', order.value?.completion_evidences);
 
     // Debug logging for API response
     console.log("[Detail] API Response:", rawOrder.value);

@@ -74,12 +74,12 @@ export const useReviews = (merchantSlug) => {
     };
   });
 
-  // Reply to review (belum diimplementasikan di backend)
+  // Reply to review (merchant reply)
   const replyToReview = async (reviewId, replyMessage) => {
     try {
       const response = await axios.post(
-        `/api/ratings/${reviewId}/reply`,
-        { reply: replyMessage }
+        `/api/merchant/${merchantSlug}/reviews/${reviewId}/reply`,
+        { merchant_reply: replyMessage }
       );
       return response.data;
     } catch (err) {

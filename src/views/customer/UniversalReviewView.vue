@@ -240,7 +240,7 @@ const submitReview = async () => {
 
     // Check for 409 Conflict (already reviewed)
     if (error.response?.status === 409 || (error.response?.data?.message || '').includes('sudah') && (error.response?.data?.message || '').includes('review')) {
-      toast.info('Pesanan ini sudah diberi review sebelumnya');
+      toast.info('Pesanan ini sudah diberi penilaian sebelumnya');
       alreadyReviewed.value = true;
       setTimeout(() => router.push('/orders'), 1500);
       return;
@@ -271,7 +271,7 @@ const checkExistingReview = async () => {
       if (order.review) {
         alreadyReviewed.value = true;
         existingReview.value = order.review;
-        toast.info('Pesanan ini sudah diberi review');
+        toast.info('Pesanan ini sudah diberi penilaian');
       }
     } catch (err) {
       console.log("[UniversalReview] Could not check existing review:", err);
@@ -329,7 +329,7 @@ watch(
             <i class="pi pi-arrow-left"></i>
           </button>
           <div>
-            <h1 class="text-lg font-bold text-gray-900">Beri Review</h1>
+            <h1 class="text-lg font-bold text-gray-900">Beri Rating dan Ulasan</h1>
             <p class="text-xs text-gray-500">Berikan penilaian Anda</p>
           </div>
         </div>
@@ -342,9 +342,9 @@ watch(
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <i class="pi pi-check-circle text-3xl text-green-600"></i>
         </div>
-        <h2 class="text-lg font-bold text-green-800 mb-2">Review Sudah Terkirim</h2>
+        <h2 class="text-lg font-bold text-green-800 mb-2">Rating dan Ulasan Sudah Terkirim</h2>
         <p class="text-sm text-green-700 mb-4">
-          Anda sudah memberikan review untuk pesanan ini.
+          Anda sudah memberikan rating dan ulasan untuk pesanan ini.
         </p>
         <div v-if="existingReview" class="bg-white rounded-xl p-4 mb-4 text-left">
           <div class="flex items-center gap-1 mb-2">

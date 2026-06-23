@@ -53,6 +53,13 @@ const breadcrumbItems = computed(() => [
 const dashboardStats = ref([]);
 const orderStats = ref(null);
 const walletStats = ref(null);
+const ratingSummary = ref(null);
+
+const getStarPercentage = (star) => {
+  if (!ratingSummary.value || !ratingSummary.value.total_reviews) return 0;
+  const count = ratingSummary.value[`rating_${star}_count`] || 0;
+  return Math.round((count / ratingSummary.value.total_reviews) * 100);
+};
 
 const statusChart = ref(null);
 const categoryChart = ref(null);
@@ -166,6 +173,7 @@ const fetchDashboard = async () => {
     
     orderStats.value = data.order_stats || null;
     walletStats.value = data.wallet || null;
+    ratingSummary.value = data.rating_summary || null;
 
     const label = catalogLabel.value;
     const catalogIcon = isJasaMerchant.value ? "pi pi-briefcase" : "pi pi-box";
@@ -438,6 +446,50 @@ onMounted(fetchDashboard);
             </div>
             <p class="text-xs text-muted-foreground">{{ stat.title }}</p>
             <p class="text-lg font-semibold text-gray-900">{{ stat.value }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================
+         RATING DAN ULASAN STATS
+      ====================== -->
+      <div class="px-4 mt-6 sm:px-6" v-if="ratingSummary">
+        <h2 class="mb-3 text-sm font-semibold text-gray-900">Rating & Ulasan Merchant</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <!-- Overall rating -->
+          <div class="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-gray-100 pb-6 md:pb-0">
+            <span class="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Rata-Rata Rating</span>
+            <span class="text-4xl font-extrabold text-gray-950 mt-2 flex items-baseline gap-1">
+              {{ ratingSummary.average_rating || '0.0' }}
+              <span class="text-sm font-normal text-gray-400">/ 5.0</span>
+            </span>
+            <div class="flex gap-0.5 mt-2">
+              <i
+                v-for="i in 5"
+                :key="i"
+                class="pi text-sm"
+                :class="i <= Math.round(ratingSummary.average_rating || 0) ? 'pi-star-fill text-amber-400' : 'pi-star text-gray-200'"
+              ></i>
+            </div>
+            <span class="text-xs text-gray-400 mt-2">Berdasarkan {{ ratingSummary.total_reviews || 0 }} Ulasan</span>
+          </div>
+
+          <!-- Star distribution progress bars -->
+          <div class="md:col-span-2 space-y-2.5 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center">
+            <div
+              v-for="star in [5, 4, 3, 2, 1]"
+              :key="star"
+              class="flex items-center gap-3 text-xs"
+            >
+              <span class="w-8 text-gray-500 font-semibold flex items-center gap-0.5">{{ star }} <i class="pi pi-star-fill text-[9px] text-amber-400"></i></span>
+              <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-amber-400 rounded-full transition-all duration-500"
+                  :style="{ width: `${getStarPercentage(star)}%` }"
+                ></div>
+              </div>
+              <span class="w-8 text-right text-gray-400 font-semibold">{{ ratingSummary[`rating_${star}_count`] || 0 }}</span>
+            </div>
           </div>
         </div>
       </div>

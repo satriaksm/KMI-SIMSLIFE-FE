@@ -111,6 +111,13 @@ const menuItems = computed(() => {
       route: `/merchant-center/${currentMerchantSlug.value}/reports`,
     },
 
+    // ⭐️ Ulasan — semua merchant
+    {
+      label: "Ulasan",
+      icon: "pi-star",
+      route: `/merchant-center/${currentMerchantSlug.value}/reviews`,
+    },
+
     // 📦 Produk / Jasa
     isJasaMerchant
       ? {

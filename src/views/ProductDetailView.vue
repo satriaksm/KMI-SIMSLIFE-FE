@@ -1200,7 +1200,7 @@
     <div class="max-w-2xl mx-auto">
       <!-- Rating Summary Header -->
       <div class="mb-4">
-        <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Produk</h3>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Rating dan Ulasan</h3>
         <div v-if="product?.rating_summary && product.rating_summary.total_reviews > 0" class="flex items-center gap-3">
           <div class="flex items-center gap-1">
             <i
@@ -1213,7 +1213,7 @@
             ></i>
           </div>
           <span class="font-semibold text-gray-700">{{ product.rating_summary.average_rating?.toFixed(1) || '0.0' }}</span>
-          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} keseluruhan)</span>
+          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} ulasan)</span>
         </div>
         <p v-else class="text-sm text-gray-500">Belum ada ulasan</p>
       </div>

@@ -1208,7 +1208,7 @@ onMounted(async () => {
                 class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm hover:from-amber-600 hover:to-orange-600 transition shadow-md"
               >
                 <i class="pi pi-star mr-2"></i>
-                Beri Review
+                Nilai Produk/Layanan
               </button>
             </div>
           </div>
