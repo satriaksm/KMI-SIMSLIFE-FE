@@ -28,6 +28,13 @@ export function getCustomerOrderDetail(orderId) {
 }
 
 /**
+ * Cancel order (customer)
+ */
+export function cancelOrder(orderId) {
+  return api.post(`/api/orders/${orderId}/cancel`);
+}
+
+/**
  * Cancel jasa order (customer)
  * Endpoint: POST /api/jasa-orders/{orderId}/cancel
  */

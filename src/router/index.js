@@ -282,6 +282,29 @@ const routes = [
         path: "jasa-history",
         redirect: "/orders",
       },
+      {
+        path: "service-history",
+        redirect: "/orders",
+      },
+      {
+        path: "service-orders",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/service-history",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/orders",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/orders/:orderId",
+        redirect: (to) => ({
+          name: "Detail Pesanan",
+          params: { orderId: to.params.orderId },
+        }),
+      },
       // ===========================
       // KONSULTASI CUSTOMER (UMKM JASA)
       // ===========================

@@ -40,19 +40,35 @@
       <template v-else>
         <!-- Order list -->
         <div class="grid grid-cols-1 gap-4">
-          <OrderCard
-            v-for="order in orders"
-            :key="order.id"
-            :order="order"
-            :status-props="pendingStatusProps"
-            @click="openOrder"
-          >
-            <template #action="{ order: o }">
-              <Button variant="primary" size="sm" @click.stop="pay(o)">
-                Bayar
-              </Button>
-            </template>
-          </OrderCard>
+          <template v-for="order in orders" :key="order.id">
+            <!-- Jasa Order Card -->
+            <ServiceOrderCard
+              v-if="order.order_type === 'jasa'"
+              :order="order"
+              :status-props="pendingStatusProps"
+              @click="openOrder"
+            >
+              <template #action="{ order: o }">
+                <Button variant="primary" size="sm" @click.stop="pay(o)">
+                  Bayar
+                </Button>
+              </template>
+            </ServiceOrderCard>
+
+            <!-- Product/Kuliner Order Card -->
+            <OrderCard
+              v-else
+              :order="order"
+              :status-props="pendingStatusProps"
+              @click="openOrder"
+            >
+              <template #action="{ order: o }">
+                <Button variant="primary" size="sm" @click.stop="pay(o)">
+                  Bayar
+                </Button>
+              </template>
+            </OrderCard>
+          </template>
         </div>
 
         <!-- Empty -->
@@ -76,11 +92,13 @@ import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import OrderCard from "@/components/customer/OrderCard.vue";
+import ServiceOrderCard from "@/components/customer/ServiceOrderCard.vue";
 import { getCustomerOrders } from "@/services/api/order";
 import { createOrderInvoice } from "@/services/api/payment";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
 import echo from "@/libs/echo";
+import api from "@/libs/axios";
 
 const router = useRouter();
 const toast = useToast();
@@ -139,25 +157,60 @@ function mapOrder(o) {
   };
 }
 
+function getOrdersList(res) {
+  if (!res) return [];
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res)) return res;
+  return [];
+}
+
+function needsPayment(order) {
+  if (!order) return false;
+  const method = String(order.payment_method || '').toUpperCase();
+  if (method === 'COD') return false;
+
+  const ps = String(order.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
+
+  const rawStatus = String(order.status || '').toLowerCase();
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed'];
+  if (terminalStatuses.includes(rawStatus)) return false;
+
+  return true;
+}
+
 async function fetchPendingOrders() {
   loading.value = true;
   try {
-    const { data: res } = await getCustomerOrders({
-      status: "pending",
-      per_page: 100,
-    });
-    const list = res?.data ?? res ?? [];
-    const transferOnlyList = (Array.isArray(list) ? list : []).filter(o => {
-      // Exclude COD orders (they don't need payment)
+    const [resJasa, resProducts] = await Promise.all([
+      api.get("/api/jasa-orders", { params: { per_page: 100 } }),
+      getCustomerOrders({ status: "pending", per_page: 100 }),
+    ]);
+
+    const rawJasaOrders = getOrdersList(resJasa)
+      .map((item) => ({
+        ...item,
+        id: item.id || item.order_id,
+        order_id: item.order_id || item.id,
+        order_type: 'jasa',
+      }))
+      .filter(needsPayment);
+
+    const productList = getOrdersList(resProducts);
+    const transferOnlyProducts = productList.filter(o => {
       if (o.payment_method === 'COD') return false;
-      
       if (o.payment && o.payment.expired_at) {
         const expireTime = new Date(o.payment.expired_at).getTime();
         if (new Date().getTime() > expireTime) return false;
       }
       return true;
-    });
-    orders.value = transferOnlyList.map(mapOrder);
+    }).map(mapOrder);
+
+    const merged = [...rawJasaOrders, ...transferOnlyProducts];
+    merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    orders.value = merged;
   } catch (e) {
     console.error("Gagal memuat pesanan pending:", e);
     toast.error("Gagal memuat pesanan");

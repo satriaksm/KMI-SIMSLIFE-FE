@@ -95,75 +95,95 @@
       <template v-else>
         <!-- Order list -->
         <div class="grid grid-cols-1 gap-2 sm:gap-4">
-          <ServiceOrderCard
-            v-for="order in filteredOrders"
-            :key="order.order_id || order.id"
-            :order="order"
-            @click="openOrder"
-          >
-            <template #action="{ order: o }">
-              <!-- SLA Countdown: merchant response deadline -->
-              <div
-                v-if="getMerchantDeadlineRemaining(o)"
-                class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
-              >
-                <i class="pi pi-clock"></i>
-                Sisa waktu respon merchant: {{ getMerchantDeadlineRemaining(o) }}
-              </div>
-              <!-- SLA Countdown: completion confirmation deadline -->
-              <div
-                v-if="getCompletionDeadlineRemaining(o)"
-                class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
-              >
-                <i class="pi pi-clock"></i>
-                Sisa waktu konfirmasi selesai: {{ getCompletionDeadlineRemaining(o) }}
-              </div>
-              <!-- Bayar Kembali (Xendit belum dibayar) -->
-              <Button
-                v-if="needsPayment(o)"
-                @click.stop="retryPayment(o)"
-                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
-              >
-                <i class="pi pi-credit-card mr-1"></i>
-                Bayar Kembali
-              </Button>
-              <!-- Konfirmasi Selesai (merchant sudah upload bukti) -->
-              <Button
-                v-if="o.status === 'menunggu_konfirmasi_selesai' || o.status === 'menunggu_selesai'"
-                @click.stop="openOrderConfirmSelesai(o)"
-                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-green-500 hover:bg-green-600"
-              >
-                <i class="pi pi-check-circle mr-1"></i>
-                Konfirmasi Selesai
-              </Button>
-              <!-- Beri Ulasan (belum pernah review) -->
-              <Button
-                v-if="o.can_review"
-                @click.stop="goToReview(o)"
-                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
-              >
-                <i class="pi pi-star mr-1"></i>
-                Beri Rating dan Ulasan
-              </Button>
-              <!-- Perbarui Ulasan (sudah review, masih boleh update) -->
-              <Button
-                v-else-if="o.is_reviewed && o.can_update_review"
-                @click.stop="goToReview(o)"
-                class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 font-semibold"
-              >
-                <i class="pi pi-pencil mr-1"></i>
-                Perbarui Rating dan Ulasan
-              </Button>
-              <!-- Ulasan sudah diperbarui (sudah review, tidak boleh update lagi) -->
-              <div
-                v-else-if="o.is_reviewed && !o.can_update_review"
-                class="inline-flex items-center gap-1.5 h-8 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 border border-green-300 cursor-default"
-              >
-                <i class="pi pi-check-circle"></i>
-                Ulasan sudah diperbarui
-              </div>
-            </template>
-          </ServiceOrderCard>
+          <template v-for="order in filteredOrders" :key="order.order_id || order.id">
+            <!-- Jasa Order Card -->
+            <ServiceOrderCard
+              v-if="order.order_type === 'jasa'"
+              :order="order"
+              @click="openOrder"
+            >
+              <template #action="{ order: o }">
+                <!-- SLA Countdown: merchant response deadline -->
+                <div
+                  v-if="getMerchantDeadlineRemaining(o)"
+                  class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
+                >
+                  <i class="pi pi-clock"></i>
+                  Sisa waktu respon merchant: {{ getMerchantDeadlineRemaining(o) }}
+                </div>
+                <!-- SLA Countdown: completion confirmation deadline -->
+                <div
+                  v-if="getCompletionDeadlineRemaining(o)"
+                  class="flex items-center gap-1.5 mb-2 text-xs text-orange-600 font-medium"
+                >
+                  <i class="pi pi-clock"></i>
+                  Sisa waktu konfirmasi selesai: {{ getCompletionDeadlineRemaining(o) }}
+                </div>
+                <!-- Bayar Kembali (Xendit belum dibayar) -->
+                <Button
+                  v-if="needsPayment(o)"
+                  @click.stop="retryPayment(o)"
+                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
+                >
+                  <i class="pi pi-credit-card mr-1"></i>
+                  Bayar Kembali
+                </Button>
+                <!-- Konfirmasi Selesai (merchant sudah upload bukti) -->
+                <Button
+                  v-if="o.status === 'menunggu_konfirmasi_selesai' || o.status === 'menunggu_selesai'"
+                  @click.stop="openOrderConfirmSelesai(o)"
+                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-green-500 hover:bg-green-600"
+                >
+                  <i class="pi pi-check-circle mr-1"></i>
+                  Konfirmasi Selesai
+                </Button>
+                <!-- Beri Ulasan (belum pernah review) -->
+                <Button
+                  v-if="o.can_review"
+                  @click.stop="goToReview(o)"
+                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
+                >
+                  <i class="pi pi-star mr-1"></i>
+                  Beri Rating dan Ulasan
+                </Button>
+                <!-- Perbarui Ulasan (sudah review, masih boleh update) -->
+                <Button
+                  v-else-if="o.is_reviewed && o.can_update_review"
+                  @click.stop="goToReview(o)"
+                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 font-semibold"
+                >
+                  <i class="pi pi-pencil mr-1"></i>
+                  Perbarui Rating dan Ulasan
+                </Button>
+                <!-- Ulasan sudah diperbarui (sudah review, tidak boleh update lagi) -->
+                <div
+                  v-else-if="o.is_reviewed && !o.can_update_review"
+                  class="inline-flex items-center gap-1.5 h-8 px-3 py-1.5 text-xs font-medium rounded-lg bg-green-100 text-green-700 border border-green-300 cursor-default"
+                >
+                  <i class="pi pi-check-circle"></i>
+                  Ulasan sudah diperbarui
+                </div>
+              </template>
+            </ServiceOrderCard>
+
+            <!-- Product/Kuliner Order Card -->
+            <OrderCard
+              v-else
+              :order="order"
+              @click="openOrder"
+            >
+              <template #action="{ order: o }">
+                <Button
+                  v-if="o.status === 'pending_payment'"
+                  @click.stop="retryPayment(o)"
+                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
+                >
+                  <i class="pi pi-credit-card mr-1"></i>
+                  Bayar Kembali
+                </Button>
+              </template>
+            </OrderCard>
+          </template>
         </div>
 
         <!-- Empty -->
@@ -173,7 +193,7 @@
         >
           <div class="text-lg font-bold text-black">Pesanan tidak ditemukan</div>
           <div class="mt-1 text-sm text-muted-foreground">
-            {{ orders.length === 0 ? 'Belum ada pesanan layanan jasa.' : 'Coba ubah filter pencarian.' }}
+            {{ orders.length === 0 ? 'Belum ada pesanan.' : 'Coba ubah filter pencarian.' }}
           </div>
         </div>
       </template>
@@ -243,6 +263,7 @@ import { useRouter } from "vue-router";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import ServiceOrderCard from "@/components/customer/ServiceOrderCard.vue";
+import OrderCard from "@/components/customer/OrderCard.vue";
 import TextField from "@/components/forms/TextField.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import SelectField from "@/components/forms/SelectField.vue";
@@ -391,6 +412,81 @@ function isDateInRange(dateLabel, range) {
 // ========================
 const orders = ref([]);
 
+function mapApiStatus(beStatus, o) {
+  switch (beStatus) {
+    case "pending":
+      // Check if expired
+      if (o.payment && o.payment.expired_at) {
+        const expireTime = new Date(o.payment.expired_at).getTime();
+        if (new Date().getTime() > expireTime) return "cancelled";
+      }
+      // COD orders don't need payment → they are "processing" (waiting UMKM confirm)
+      if (o.payment_method === 'COD') return "processing";
+      return "pending_payment";
+    case "paid":
+    case "responsed":
+    case "accepted":
+      return "processing";
+    case "delivered":
+      return o.delivery_type === "pickup" ? "ready" : "shipped";
+    case "completed":
+      return "completed";
+    case "cancelled":
+      return "cancelled";
+    case "rejected":
+      return "rejected";
+    case "undelivered":
+      return "undelivered";
+    default:
+      return beStatus;
+  }
+}
+
+function formatDateLabel(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getOrderSnapshotUrl(orderItemId, path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
+  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+}
+
+function mapOrder(o) {
+  return {
+    id: o.id,
+    storeName: o.merchant?.name || "Toko",
+    dateLabel: formatDateLabel(o.created_at),
+    status: mapApiStatus(o.status, o),
+    total: o.gross_amount || o.total_price || 0,
+    delivery_type: o.delivery_type || "delivery",
+    items: (o.items || []).map((it) => ({
+      id: it.id,
+      productId: it.product_id,
+      title: it.product_name_snapshot || "Produk",
+      qty: it.quantity,
+      variant: it.product_variant_snapshot || "",
+      addons: (it.addons || []).map((a) => ({
+        name: a.addon_name_snapshot || a.addon?.name || "Addon",
+        price: Number(a.addon_price_snapshot || 0),
+      })),
+      price: it.unit_price_snapshot,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      productSlug: it.product?.slug,
+    })),
+    order_type: o.order_type || 'product',
+    created_at: o.created_at,
+    _raw: o,
+  };
+}
+
 // Normalize: support both response.data.data and response.data
 function getOrdersList(res) {
   if (!res) {
@@ -419,28 +515,31 @@ function getOrdersList(res) {
 async function fetchOrders() {
   loading.value = true;
   try {
-    const { data: res } = await api.get("/api/jasa-orders", {
-      params: { per_page: 100 },
-    });
+    const [resJasa, resProducts] = await Promise.all([
+      api.get("/api/jasa-orders", { params: { per_page: 100 } }),
+      api.get("/api/orders", { params: { per_page: 100 } }),
+    ]);
 
-    // Normalize: ensure every item has BOTH id and order_id
-    const rawOrders = getOrdersList(res);
-    orders.value = rawOrders.map((item) => ({
+    const rawJasaOrders = getOrdersList(resJasa).map((item) => ({
       ...item,
       id: item.id || item.order_id,
       order_id: item.order_id || item.id,
+      order_type: 'jasa',
     }));
 
-    // Debug: Log status values from API response
-    console.log('[Pesanan Saya] Orders loaded:', {
+    const rawProductOrders = getOrdersList(resProducts).map(mapOrder);
+
+    const merged = [...rawJasaOrders, ...rawProductOrders];
+
+    // Sort by created_at desc
+    merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    orders.value = merged;
+
+    console.log('[Pesanan Saya] Unified Orders loaded:', {
       total: orders.value.length,
-      statuses: orders.value.map(o => ({
-        id: o.id,
-        status: o.status,
-        service_status: o.service_status,
-        order_status: o.order_status,
-        status_label: o.status_label,
-      })),
+      jasa: rawJasaOrders.length,
+      product: rawProductOrders.length,
     });
   } catch (e) {
     console.error("[Pesanan Saya] Gagal memuat pesanan:", e);
@@ -461,13 +560,26 @@ const filteredOrders = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (q) {
     result = result.filter((o) => {
-      const haystack = [
-        o.merchant?.name || o.merchant_name || "",
-        o.service_name || o.jasa?.title || o.service_title || "",
-        o.booking_date || "",
-        o.id,
-      ].join(" ").toLowerCase();
-      return haystack.includes(q);
+      if (o.order_type === 'jasa') {
+        const haystack = [
+          o.merchant?.name || o.merchant_name || "",
+          o.service_name || o.jasa?.title || o.service_title || "",
+          o.booking_date || "",
+          o.id,
+        ].join(" ").toLowerCase();
+        return haystack.includes(q);
+      } else {
+        const itemText = (o.items || [])
+          .map((it) => `${it.title || ""} ${it.variant || ""}`)
+          .join(" ");
+        const haystack = [
+          o.storeName || "",
+          itemText,
+          o.dateLabel || "",
+          o.id,
+        ].join(" ").toLowerCase();
+        return haystack.includes(q);
+      }
     });
   }
 
@@ -478,6 +590,11 @@ const filteredOrders = computed(() => {
       const orderStatus = String(o.order_status || "").toLowerCase();
       const rawStatus = String(o.status || "").toLowerCase();
       const filter = selectedStatus.value.toLowerCase();
+
+      // For product orders, compare with mapped status or raw status
+      if (o.order_type !== 'jasa') {
+        return rawStatus === filter || o.status === filter;
+      }
 
       // Match against any of the status fields
       return serviceStatus === filter || orderStatus === filter || rawStatus === filter;
