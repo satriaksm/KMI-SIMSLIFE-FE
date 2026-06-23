@@ -211,12 +211,15 @@
                 banks.map((bank) => ({ value: bank.code, label: bank.name }))
               "
               emptyText="Data bank tidak tersedia"
+              required
             />
 
             <TextField
               name="bank_account_number"
               label="Nomor Rekening"
               placeholder="Contoh: 1234567890"
+              required
+
             />
 
             <TextField
@@ -224,6 +227,8 @@
               label="Nama Pemilik Rekening"
               placeholder="Sesuai buku tabungan"
               class="sm:col-span-2"
+              required
+
             />
 
             <!-- Error -->
@@ -309,9 +314,9 @@ const schema = yup.object({
     .required("Jenis usaha wajib dipilih"),
   description: yup.string().nullable(),
   NPWP: yup.string().nullable(),
-  bank_code: yup.string().nullable(),
-  bank_account_number: yup.string().nullable(),
-  bank_account_name: yup.string().nullable(),
+  bank_code: yup.string().required("Bank wajib dipilih"),
+  bank_account_number: yup.string().required("Nomor rekening wajib diisi"),
+  bank_account_name: yup.string().required("Nama pemilik rekening wajib diisi"),
   address: yup.object({
     province_id: yup
       .number()

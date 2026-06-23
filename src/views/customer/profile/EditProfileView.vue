@@ -7,6 +7,8 @@ import { useRouter } from "vue-router";
 import { useUserStore } from "@/stores/user";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "vue-toastification";
+import { Form } from "vee-validate";
+import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import AppButton from "@/components/common/Button.vue";
@@ -20,6 +22,23 @@ const router = useRouter();
 const userStore = useUserStore();
 const authStore = useAuthStore();
 const toast = useToast();
+
+// Validation Schema
+const schema = yup.object({
+  name: yup.string().required("Nama lengkap wajib diisi"),
+  phone: yup
+    .string()
+    .required("Nomor telepon wajib diisi")
+    .matches(/^08[0-9]{8,11}$/, "Format telepon tidak valid (contoh: 08123456789)")
+    .min(10, "No. Telepon minimal 10 digit")
+    .max(13, "No. Telepon maksimal 13 digit"),
+  email: yup.string().required("Email wajib diisi").email("Format email tidak valid"),
+  nik: yup
+    .string()
+    .required("NIK wajib diisi")
+    .length(16, "NIK harus 16 digit")
+    .matches(/^[0-9]+$/, "NIK harus berupa angka"),
+});
 
 // Form data
 const formData = ref({
@@ -130,10 +149,25 @@ const handleSave = async () => {
     if (isDev) {
       console.error("Error saving profile:", error);
     }
-    const message =
-      error.response?.data?.message ||
-      "Gagal memperbarui profil. Silakan coba lagi.";
-    toast.error(message);
+
+    // Tangani error khusus jika email diubah dan butuh verifikasi ulang
+    if (error.response?.status === 403 && error.response?.data?.message?.includes("verified")) {
+      authStore.logout({ silent: true });
+      toast.success("Email berhasil diubah. Silakan login kembali dan periksa email Anda untuk verifikasi.");
+      router.push("/login");
+      return;
+    }
+
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+      const specificMessage = Object.values(errors).flat().join(", ");
+      toast.error(specificMessage);
+    } else {
+      const message =
+        error.response?.data?.message ||
+        "Gagal memperbarui profil. Silakan coba lagi.";
+      toast.error(message);
+    }
   }
 };
 
@@ -276,15 +310,13 @@ onMounted(() => {
               Edit Informasi Profil
             </h3>
 
-            <form @submit.prevent="handleSave">
+            <Form @submit="handleSave" :validation-schema="schema">
               <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <!-- Nama -->
                 <div class="lg:col-span-2">
-                  <label class="block mb-2 text-sm font-semibold text-gray-700">
-                    Nama Lengkap <span class="text-red-500">*</span>
-                  </label>
                   <TextField
                     name="name"
+                    label="Nama Lengkap"
                     v-model="formData.name"
                     type="text"
                     required
@@ -294,11 +326,9 @@ onMounted(() => {
 
                 <!-- Telepon -->
                 <div>
-                  <label class="block mb-2 text-sm font-semibold text-gray-700">
-                    Nomor Telepon <span class="text-red-500">*</span>
-                  </label>
                   <TextField
                     name="phone"
+                    label="Nomor Telepon"
                     v-model="formData.phone"
                     type="tel"
                     required
@@ -308,11 +338,9 @@ onMounted(() => {
 
                 <!-- Email -->
                 <div>
-                  <label class="block mb-2 text-sm font-semibold text-gray-700">
-                    Email <span class="text-red-500">*</span>
-                  </label>
                   <TextField
                     name="email"
+                    label="Email"
                     v-model="formData.email"
                     type="email"
                     required
@@ -322,14 +350,13 @@ onMounted(() => {
 
                 <!-- NIK -->
                 <div class="lg:col-span-2">
-                  <label class="block mb-2 text-sm font-semibold text-gray-700">
-                    NIK (Nomor Induk Kependudukan)
-                  </label>
                   <TextField
                     name="nik"
+                    label="NIK(Nomor Induk Kependudukan)"
                     v-model="formData.nik"
                     type="text"
                     :maxlength="16"
+                    required
                     placeholder="16 digit NIK"
                   />
                 </div>
@@ -355,7 +382,7 @@ onMounted(() => {
                   {{ userStore.loading ? "Menyimpan..." : "Simpan Perubahan" }}
                 </AppButton>
               </div>
-            </form>
+            </Form>
           </div>
         </div>
       </div>
@@ -426,7 +453,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <form @submit.prevent="handleSave" class="mb-6 space-y-4">
+        <Form @submit="handleSave" :validation-schema="schema" class="mb-6 space-y-4">
           <!-- Nama -->
           <div>
             <label class="block mb-2 text-sm font-medium text-gray-700"
@@ -478,6 +505,7 @@ onMounted(() => {
               name="nik"
               v-model="formData.nik"
               type="text"
+              required
               :maxlength="16"
               placeholder="Masukkan NIK"
             />
@@ -495,7 +523,7 @@ onMounted(() => {
           >
             {{ userStore.loading ? "Menyimpan..." : "Simpan" }}
           </AppButton>
-        </form>
+        </Form>
       </div>
     </div>
   </div>

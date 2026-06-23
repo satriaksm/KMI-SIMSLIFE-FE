@@ -631,7 +631,7 @@
 // =========================
 // IMPORTS
 // =========================
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import Button from "@/components/common/Button.vue";
@@ -677,7 +677,12 @@ const {
   updateItemVariant,
   removeItem,
   clearCartByStore,
+  totalItems,
 } = useCart();
+
+watch(totalItems, (newTotal) => {
+  cartStore.setTotal(newTotal);
+});
 const addonGroups = ref([]);
 
 const quantityDrafts = ref({}); // simpan nilai ketikan sementara
@@ -1075,7 +1080,6 @@ const increaseQuantity = async (itemId) => {
     if (!item || item.quantity >= item.stock) continue;
 
     onQuantityInput(itemId, item.quantity + 1);
-    await cartStore.fetchCartCount(true);
 
     break;
   }
@@ -1087,7 +1091,6 @@ const decreaseQuantity = async (itemId) => {
     if (!item || item.quantity <= 1) continue;
 
     onQuantityInput(itemId, item.quantity - 1);
-    await cartStore.fetchCartCount(true);
 
     break;
   }

@@ -84,168 +84,137 @@ const handleBackdropClick = () => {
     leave-to-class="opacity-0"
   >
     <div
-      v-if="show"
+      v-show="show"
       @click="handleBackdropClick"
       :class="[
-        'fixed inset-0 z-[60]',
+        'fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center p-0 sm:p-4',
         backdropClass,
       ]"
     ></div>
   </transition>
 
-  <!-- Desktop Modal -->
+  <!-- Modal Container dengan max-height -->
   <transition
     enter-active-class="transition-all duration-300 ease-out"
-    enter-from-class="opacity-0 scale-95"
-    enter-to-class="opacity-100 scale-100"
-    leave-active-class="transition-all duration-200 ease-in"
-    leave-from-class="opacity-100 scale-100"
-    leave-to-class="opacity-0 scale-95"
+    enter-from-class="translate-y-full sm:opacity-0 sm:scale-95 sm:translate-y-0"
+    enter-to-class="translate-y-0 sm:opacity-100 sm:scale-100"
+    leave-active-class="transition-all duration-300 ease-in"
+    leave-from-class="translate-y-0 sm:opacity-100 sm:scale-100"
+    leave-to-class="translate-y-full sm:opacity-0 sm:scale-95 sm:translate-y-0"
   >
     <div
-      v-if="show"
-      class="hidden sm:block"
+      v-show="show"
+      @click.stop
+      :class="[
+        // Mobile: Full width, bottom sheet, max 85vh
+        'fixed inset-x-0 bottom-0 max-h-[85vh]',
+        // Desktop: Centered without top constraint
+        'sm:fixed sm:inset-x-0 sm:inset-y-0 sm:m-auto',
+        'sm:max-h-[90vh] h-fit sm:max-w-3xl sm:w-3/4',
+        // Base styles
+        'bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl',
+        'flex flex-col z-[70]',
+        'overflow-hidden',
+      ]"
     >
+      <!--Header - Fixed (tidak scroll) -->
       <div
-        @click.stop
         :class="[
-          'fixed inset-0 z-[70] m-auto',
-          'max-h-[85vh] w-full max-w-lg',
-          'bg-white rounded-2xl shadow-2xl',
-          'flex flex-col',
+          'flex items-center justify-between px-4 sm:px-6 py-4',
+          'border-b border-gray-200',
+          'bg-white rounded-t-3xl sm:rounded-t-2xl',
+          'flex-shrink-0', //Prevent shrinking
+          'sticky top-0 z-10', //Sticky on mobile scroll
+          headerClass,
         ]"
       >
-        <!-- Header -->
-        <div
-          :class="[
-            'flex items-center justify-between px-6 py-4',
-            'border-b border-gray-200',
-            'flex-shrink-0',
-            headerClass,
-          ]"
-        >
-          <div class="flex-1 min-w-0 pr-4">
-            <h2 class="text-lg font-semibold text-black">
-              {{ title }}
-            </h2>
-            <p
-              v-if="subtitle"
-              class="mt-1 text-sm text-gray-500"
-            >
-              {{ subtitle }}
-            </p>
-          </div>
-          <button
-            v-if="showCloseButton"
-            @click="handleClose"
-            type="button"
-            class="flex items-center justify-center w-8 h-8 transition rounded-full hover:bg-gray-100"
+        <div class="flex-1 min-w-0 pr-2">
+          <h2 class="text-base font-semibold text-black truncate sm:text-lg">
+            {{ title }}
+          </h2>
+          <p
+            v-if="subtitle"
+            class="mt-1 text-xs truncate sm:text-sm text-muted-foreground"
           >
-            <i class="pi pi-times text-gray-500"></i>
-          </button>
+            {{ subtitle }}
+          </p>
         </div>
-
-        <!-- Body - Scrollable -->
-        <div
-          :class="[
-            'flex-1 overflow-y-auto px-6 py-4',
-            'custom-scrollbar',
-            bodyClass,
-          ]"
+        <button
+          v-if="showCloseButton"
+          @click="handleClose"
+          type="button"
+          class="flex items-center justify-center flex-shrink-0 w-8 h-8 transition rounded-full hover:bg-muted-background"
         >
-          <slot></slot>
-        </div>
-
-        <!-- Footer -->
-        <div
-          v-if="showFooter || $slots.footer"
-          :class="[
-            'border-t border-gray-200 p-4',
-            'flex-shrink-0',
-            footerClass,
-          ]"
-        >
-          <slot name="footer"></slot>
-        </div>
+          <i class="pi pi-times text-muted-foreground"></i>
+        </button>
       </div>
-    </div>
-  </transition>
 
-  <!-- Mobile Modal (Bottom Sheet) -->
-  <transition
-    enter-active-class="transition-all duration-300 ease-out"
-    enter-from-class="translate-y-full"
-    enter-to-class="translate-y-0"
-    leave-active-class="transition-all duration-300 ease-in"
-    leave-from-class="translate-y-0"
-    leave-to-class="translate-y-full"
-  >
-    <div
-      v-if="show"
-      class="sm:hidden"
-    >
+      <!--Body - Scrollable Area -->
       <div
-        @click.stop
-        class="fixed inset-x-0 bottom-0 z-[70] max-h-[90vh] flex flex-col bg-white rounded-t-3xl shadow-2xl"
+        :class="[
+          'flex-1 overflow-y-auto overflow-x-hidden',
+          'px-4 sm:px-6 py-4 mb-4 sm:mb-0',
+          'custom-scrollbar', //Custom scrollbar class
+          bodyClass,
+        ]"
       >
-        <!-- Mobile Header -->
-        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
-          <h2 class="text-base font-semibold text-black">{{ title }}</h2>
-          <button
-            v-if="showCloseButton"
-            @click="handleClose"
-            type="button"
-            class="flex items-center justify-center w-8 h-8 transition rounded-full hover:bg-gray-100"
-          >
-            <i class="pi pi-times text-gray-500"></i>
-          </button>
-        </div>
+        <slot></slot>
+      </div>
 
-        <!-- Mobile Body -->
-        <div
-          :class="[
-            'flex-1 overflow-y-auto px-4 py-4 max-h-[60vh]',
-            'custom-scrollbar',
-            bodyClass,
-          ]"
-        >
-          <slot></slot>
-        </div>
-
-        <!-- Mobile Footer -->
-        <div
-          v-if="showFooter || $slots.footer"
-          class="border-t border-gray-200 p-4 flex-shrink-0"
-        >
-          <slot name="footer"></slot>
-        </div>
+      <!--Footer - Fixed (tidak scroll) -->
+      <div
+        v-if="showFooter || $slots.footer"
+        :class="[
+          'border-t border-gray-200 p-4',
+          'bg-white rounded-b-3xl sm:rounded-b-2xl',
+          'flex-shrink-0', //Prevent shrinking
+          'sticky sm:static bottom-0', //Sticky on mobile
+          footerClass,
+        ]"
+      >
+        <slot name="footer"></slot>
       </div>
     </div>
   </transition>
 </template>
 
 <style scoped>
-/* Custom scrollbar */
+/*Custom scrollbar for modal body */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db;
   border-radius: 4px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: background 0.2s;
 }
 
-/* Firefox scrollbar */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/*Firefox scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/*Smooth scrolling */
+.custom-scrollbar {
+  scroll-behavior: smooth;
+}
+
+/*Mobile: Handle safe area (iPhone notch, etc.) */
+@media (max-width: 640px) {
+  .custom-scrollbar {
+    /* Add padding bottom for safe area */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
 }
 </style>

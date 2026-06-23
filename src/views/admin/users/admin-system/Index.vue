@@ -23,6 +23,8 @@ const pagination = ref({});
 const searchQuery = ref("");
 const currentPage = ref(1);
 const perPage = ref(15);
+const sortBy = ref("");
+const sortDir = ref("");
 
 const showExportModal = ref(false);
 const exportLoading = ref(false);
@@ -116,6 +118,8 @@ const loadAdmins = async () => {
         status: activeFilters.value.status,
         page: currentPage.value,
         per_page: perPage.value,
+        sort_by: sortBy.value,
+        sort_order: sortDir.value,
       },
     });
 
@@ -177,6 +181,13 @@ const exportPDF = async () => {
 
 const goToDetail = (admin) => {
   router.push({ name: "Admin - Admin System Detail", params: { id: admin.id } });
+};
+
+const handleSortChange = ({ key, dir }) => {
+  sortBy.value = key;
+  sortDir.value = dir;
+  currentPage.value = 1;
+  loadAdmins();
 };
 
 const goToPage = (page) => {
@@ -250,11 +261,14 @@ watch(searchQuery, () => {
         :total-pages="totalPages"
         :pagination-info="paginationInfo"
         :show-checkbox="false"
+        :sort-by="sortBy"
+        :sort-dir="sortDir"
         empty-message="Tidak ada admin yang ditemukan"
         @row-click="goToDetail"
         @page-change="goToPage"
         @next-page="nextPage"
         @prev-page="prevPage"
+        @sort-change="handleSortChange"
       >
         <template #cell-photo="{ item }">
           <div class="w-10 h-10 rounded-full bg-merchant-primary/10 flex items-center justify-center overflow-hidden">
