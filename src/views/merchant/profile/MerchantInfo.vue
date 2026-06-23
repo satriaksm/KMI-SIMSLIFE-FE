@@ -159,6 +159,10 @@ const merchantDisplayName = computed(() => {
   );
 });
 
+const showReviews = computed(() => {
+  return !route.path.includes('/merchant-center/');
+});
+
 const canDeleteMerchant = computed(() => {
   const expected = String(merchantDisplayName.value || "").trim();
   const typed = String(deleteMerchantConfirmText.value || "").trim();
@@ -679,7 +683,7 @@ const goToEdit = () => {
           </div>
 
           <!-- Daftar Ulasan -->
-          <div class="pt-6">
+          <div v-if="showReviews" class="pt-6">
             <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
               Daftar Ulasan
             </h3>
