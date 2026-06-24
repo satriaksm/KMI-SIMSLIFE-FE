@@ -245,7 +245,7 @@
               </div>        </template>
         <template #cell-delivery_type="{ item }">
           <span class="px-2.5 py-1 text-[10px] font-bold tracking-wider text-gray-600 bg-gray-100 border border-gray-200 rounded-md uppercase">
-            {{ item.delivery_type }}
+            {{ getTransactionType(item) }}
           </span>
         </template>
         <template #cell-status="{ item }">
@@ -297,7 +297,7 @@
           <div class="text-right">
             <div class="text-[10px] text-gray-400">Tipe</div>
             <span class="px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-gray-600 bg-gray-100 rounded uppercase">
-              {{ order.delivery_type }}
+              {{ getTransactionType(order) }}
             </span>
           </div>
         </div>
@@ -520,16 +520,35 @@ const walletStats = ref({
 
 function mapApiStatus(beStatus, o) {
   switch (beStatus) {
+    // Jasa Statuses
+    case "menunggu_konfirmasi_merchant":
+      return "waiting_review";
+    case "diterima":
+    case "layanan_dikerjakan":
+      return "processing";
+    case "menunggu_konfirmasi_selesai":
+      return "ready";
+    case "selesai":
+      return "completed";
+    case "expired":
+      return "expired";
+    case "batal":
+    case "dibatalkan":
+      return "cancelled";
+    case "ditolak":
+      return "rejected";
+
+    // Product Statuses
     case "paid":
       return "waiting_review";
     case "pending":
-      if (o.payment_method === 'COD') return "waiting_review";
+      if (o && o.payment_method === 'COD') return "waiting_review";
       return beStatus;
     case "responsed":
     case "accepted":
       return "processing";
     case "delivered":
-      return o.delivery_type === "pickup" ? "ready" : "shipped";
+      return o && o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
       return "completed";
     case "cancelled":
@@ -544,14 +563,35 @@ function mapApiStatus(beStatus, o) {
 }
 
 function statusProps(beStatus) {
+  switch (beStatus) {
+    // Jasa Status mappings
+    case "menunggu_konfirmasi_merchant":
+      return { status: "pending", variant: "order", label: "Menunggu Konfirmasi" };
+    case "diterima":
+      return { status: "processing", variant: "order", label: "Diterima" };
+    case "layanan_dikerjakan":
+      return { status: "processing", variant: "order", label: "Layanan Dikerjakan" };
+    case "menunggu_konfirmasi_selesai":
+      return { status: "ready", variant: "order", label: "Menunggu Konfirmasi Selesai" };
+    case "selesai":
+      return { status: "completed", variant: "order", label: "Selesai" };
+    case "expired":
+      return { status: "cancelled", variant: "order", label: "Kadaluarsa" };
+    case "batal":
+    case "dibatalkan":
+      return { status: "cancelled", variant: "order", label: "Dibatalkan" };
+    case "ditolak":
+      return { status: "cancelled", variant: "order", label: "Ditolak" };
+  }
+
   const status = mapApiStatus(beStatus, { payment_method: 'Transfer', delivery_type: 'delivery' }); 
   switch (status) {
     case "pending":
       return { status: "pending", variant: "order" };
     case "waiting_review":
-      return { status: "paid", variant: "order" };
+      return { status: "pending", variant: "order", label: "Menunggu" };
     case "processing":
-      return { status: "processed", variant: "order", label: "Diproses" };
+      return { status: "processing", variant: "order", label: "Diproses" };
     case "ready":
       return { status: "ready", variant: "order", label: "Siap Diambil" };
     case "shipped":
@@ -757,6 +797,19 @@ const handleExport = async (type) => {
 
 const formatIDR = (value) => {
   return Number(value || 0).toLocaleString('id-ID');
+};
+
+const getTransactionType = (item) => {
+  if (item.order_type === 'jasa') {
+    return 'Jasa';
+  }
+  const segId = currentMerchant.value?.segmentation_id;
+  if (segId === 2) {
+    return 'Kuliner';
+  } else if (segId === 1) {
+    return 'Produk';
+  }
+  return item.delivery_type || 'Produk';
 };
 
 

@@ -206,7 +206,12 @@ const submitReview = async () => {
       endpoint = `/api/jasa-orders/${orderId.value}/review`;
     } else {
       // For product, food, or general review
-      endpoint = `/api/ratings`;
+      if (existingReview.value && existingReview.value.id) {
+        endpoint = `/api/ratings/${existingReview.value.id}`;
+        formData.append('_method', 'PUT');
+      } else {
+        endpoint = `/api/ratings`;
+      }
       formData.append('rateable_id', reviewableId.value);
       
       const typeMapping = {
@@ -219,6 +224,9 @@ const submitReview = async () => {
       }
       if (orderId.value) {
         formData.append('order_id', orderId.value);
+      }
+      if (route.query.orderItemId) {
+        formData.append('order_item_id', route.query.orderItemId);
       }
     }
 
@@ -233,8 +241,12 @@ const submitReview = async () => {
     toast.success(data?.message || 'Review berhasil dikirim!');
     alreadyReviewed.value = true;
     existingReview.value = data?.data?.review || data?.data || {};
-    // Redirect back to service history
-    router.push("/orders");
+    // Redirect back to order detail
+    if (orderId.value) {
+      router.push(`/orders/${orderId.value}`);
+    } else {
+      router.push("/orders");
+    }
   } catch (error) {
     console.log("[UniversalReview] Response received:", error.response?.data || error);
 
@@ -242,7 +254,11 @@ const submitReview = async () => {
     if (error.response?.status === 409 || (error.response?.data?.message || '').includes('sudah') && (error.response?.data?.message || '').includes('review')) {
       toast.info('Pesanan ini sudah diberi penilaian sebelumnya');
       alreadyReviewed.value = true;
-      setTimeout(() => router.push('/orders'), 1500);
+      if (orderId.value) {
+        setTimeout(() => router.push(`/orders/${orderId.value}`), 1500);
+      } else {
+        setTimeout(() => router.push('/orders'), 1500);
+      }
       return;
     }
 
@@ -262,9 +278,11 @@ const goBack = () => {
   router.back();
 };
 
-// Check if service order already has a review
+// Check if service/product order already has a review
 const checkExistingReview = async () => {
-  if (reviewableType.value === "service" && orderId.value) {
+  if (!orderId.value) return;
+
+  if (reviewableType.value === "service") {
     try {
       const { data } = await api.get(`/api/jasa-orders/${orderId.value}`);
       const order = data.data || data;
@@ -275,6 +293,35 @@ const checkExistingReview = async () => {
       }
     } catch (err) {
       console.log("[UniversalReview] Could not check existing review:", err);
+    }
+  } else {
+    // For product or general review
+    try {
+      const { data: od } = await api.get(`/api/orders/${orderId.value}`);
+      const o = od?.data ?? od ?? {};
+      const orderItemIdVal = route.query.orderItemId ? Number(route.query.orderItemId) : null;
+      
+      // Find the specific item being reviewed
+      const item = (o.items || []).find(it => it.id === orderItemIdVal || it.product_id === reviewableId.value);
+      if (item && item.review) {
+        existingReview.value = item.review;
+        
+        // If they can still update the review, prefill the form and set edit mode!
+        if (item.can_update_review) {
+          reviewForm.value.rating = item.review.rating || 5;
+          reviewForm.value.comment = item.review.comment || "";
+          reviewForm.value.title = item.review.title || "";
+          reviewForm.value.is_anonymous = item.review.is_anonymous || false;
+          // Set alreadyReviewed to false so they can submit update
+          alreadyReviewed.value = false;
+        } else {
+          // If they cannot update anymore, show already reviewed screen
+          alreadyReviewed.value = true;
+          toast.info('Pesanan ini sudah diberi penilaian dan tidak dapat diubah lagi');
+        }
+      }
+    } catch (err) {
+      console.log("[UniversalReview] Could not check existing review for product:", err);
     }
   }
 };

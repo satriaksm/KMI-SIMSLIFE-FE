@@ -514,6 +514,7 @@ const getStatusLabel = (status) => {
 // Toggle visibility method
 const toggleProductVisibility = (product) => {
   selectedProductForVisibility.value = product;
+  newStatusForChange.value = product.status;
   showVisibilityModal.value = true;
 };
 
@@ -1793,7 +1794,7 @@ const tableActions = [
       </template>
     </ResponsiveModal>
 
-    <!-- UPDATED: Visibility Modal - Single Footer -->
+    <!-- Visibility Modal -->
     <ResponsiveModal
       v-model:show="showVisibilityModal"
       title="Ubah Status Produk"
@@ -1803,7 +1804,7 @@ const tableActions = [
       @close="closeVisibilityModal"
     >
       <!-- Content -->
-      <div class="space-y-3">
+      <div class="space-y-4 pb-4">
         <!-- Current Status Info -->
         <div
           v-if="selectedProductForVisibility"
@@ -1817,7 +1818,7 @@ const tableActions = [
           />
         </div>
 
-        <!-- Moderation warning for admin-archived products -->
+        <!-- Moderation warning -->
         <div
           v-if="
             selectedProductForVisibility &&
@@ -1843,18 +1844,20 @@ const tableActions = [
         <!-- Publish Action -->
         <button
           @click="confirmVisibilityChange('published')"
-          :disabled="selectedProductForVisibility?.status === 'published'"
-          class="flex items-center w-full gap-4 p-4 text-left transition border border-muted-background rounded-xl group"
-          :class="
+          :disabled="selectedProductForVisibility?.status === 'published' || isProductPublishBlocked(selectedProductForVisibility)"
+          class="flex items-center w-full gap-4 p-4 text-left transition border rounded-xl group"
+          :class="[
             selectedProductForVisibility?.status === 'published'
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-muted-background hover:border-merchant-primary'
-          "
+              ? 'border-success-foreground bg-success-background/10 cursor-default'
+              : isProductPublishBlocked(selectedProductForVisibility)
+              ? 'opacity-50 cursor-not-allowed border-muted-background'
+              : 'border-muted-background hover:bg-muted-background hover:border-merchant-primary'
+          ]"
         >
           <div
             class="flex items-center justify-center w-12 h-12 transition-transform rounded-lg shrink-0 bg-success-background"
             :class="
-              selectedProductForVisibility?.status !== 'published' &&
+              selectedProductForVisibility?.status !== 'published' && !isProductPublishBlocked(selectedProductForVisibility) &&
               'group-hover:scale-110'
             "
           >
@@ -1874,12 +1877,12 @@ const tableActions = [
         <button
           @click="confirmVisibilityChange('archived')"
           :disabled="selectedProductForVisibility?.status === 'archived'"
-          class="flex items-center w-full gap-4 p-4 text-left transition border border-muted-background rounded-xl group"
-          :class="
+          class="flex items-center w-full gap-4 p-4 text-left transition border rounded-xl group"
+          :class="[
             selectedProductForVisibility?.status === 'archived'
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-muted-background hover:border-merchant-primary'
-          "
+              ? 'border-merchant-primary bg-merchant-primary/5 cursor-default'
+              : 'border-muted-background hover:bg-muted-background hover:border-merchant-primary'
+          ]"
         >
           <div
             class="flex items-center justify-center w-12 h-12 transition-transform rounded-lg shrink-0 bg-danger-background"

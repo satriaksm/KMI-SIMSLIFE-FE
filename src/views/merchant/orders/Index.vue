@@ -16,6 +16,7 @@ import { useToast } from "vue-toastification";
 import echo from "@/libs/echo";
 import api from "@/libs/axios";
 import { formatTime, formatDate } from "@/libs/format.js";
+import { formatPaymentLabel } from "@/utils/payment";
 
 const router = useRouter();
 const route = useRoute();
@@ -122,15 +123,44 @@ const allOrders = ref([]);
 const ordersLoading = ref(false);
 let ordersChannel = null;
 
+const normalizeStatus = (status) => {
+  return String(status || '').toLowerCase().trim();
+};
+
+const isConfirmationOrder = (status, paymentStatus, paymentMethod) => {
+  const normStatus = normalizeStatus(status);
+  const normPaymentStatus = normalizeStatus(paymentStatus);
+  const normPaymentMethod = normalizeStatus(paymentMethod);
+
+  // COD pending / waiting confirmation is always waiting_review
+  if (
+    ['pending', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant'].includes(normStatus)
+    && normPaymentMethod === 'cod'
+  ) {
+    return true;
+  }
+
+  // Transfer paid is waiting_review if order status is not terminal or processed
+  const isPaid = ['paid', 'settled', 'sudah_bayar', 'success'].includes(normPaymentStatus) || normStatus === 'paid';
+  const isTerminalOrProcessed = [
+    'responsed', 'accepted', 'diterima', 'diproses', 'dikirim', 'delivered', 
+    'ready', 'shipped', 'selesai', 'completed', 'batal', 'dibatalkan', 
+    'cancelled', 'ditolak', 'rejected', 'expired', 'kadaluarsa', 'undelivered'
+  ].includes(normStatus);
+
+  return isPaid && !isTerminalOrProcessed;
+};
+
 function mapApiStatus(beStatus, o) {
-  switch (beStatus) {
-    case "paid":
-      return "waiting_review"; // sudah bayar, tunggu konfirmasi UMKM
-    case "pending":
-    case "menunggu_konfirmasi":
-    case "menunggu_konfirmasi_merchant":
-      if (o.payment_method === 'COD') return "waiting_review"; // COD langsung tunggu konfirmasi
-      return "waiting_review";
+  const status = normalizeStatus(beStatus);
+  const paymentStatus = normalizeStatus(o.payment_status || o.payment?.status);
+  const paymentMethod = normalizeStatus(o.payment_method);
+
+  if (isConfirmationOrder(status, paymentStatus, paymentMethod)) {
+    return "waiting_review";
+  }
+
+  switch (status) {
     case "responsed":
     case "accepted":
     case "diterima":
@@ -141,12 +171,11 @@ function mapApiStatus(beStatus, o) {
     case "selesai":
       return "completed";
     case "ditolak":
+    case "rejected":
       return "ditolak";
     case "dibatalkan":
     case "cancelled":
       return "dibatalkan";
-    case "rejected":
-      return "ditolak";
     case "expired":
     case "kadaluarsa":
       return "expired";
@@ -284,8 +313,9 @@ const submittingReply = ref(false);
 // Filter tabs for service orders
 const jasaTabs = [
   { key: "all", label: "Semua" },
-  { key: "perlu_diproses", label: "Perlu Diproses" },
-  { key: "sedang_diproses", label: "Sedang Diproses" },
+  { key: "konfirmasi", label: "Konfirmasi" },
+  { key: "dikerjakan", label: "Dikerjakan" },
+  { key: "tunggu_selesai", label: "Menunggu Konfirmasi Selesai" },
   { key: "selesai", label: "Selesai" },
   { key: "batal_gagal", label: "Batal/Gagal" },
 ];
@@ -404,17 +434,17 @@ const canJasaEvidence = (order) => {
 
 // SLA Countdown helpers
 function formatCountdown(deadline) {
-  if (!deadline) return null;
-  const now = new Date();
-  const end = new Date(deadline);
-  const diff = end - now;
-  if (diff <= 0) return '00:00';
+  if (!deadline) return '00:00:00';
+  const diff = new Date(deadline).getTime() - now.value;
+  if (diff <= 0) return '00:00:00';
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) {
-    return `${hours}j ${minutes}m`;
-  }
-  return `${minutes}m`;
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  return (
+    String(hours).padStart(2, '0') + ":" +
+    String(minutes).padStart(2, '0') + ":" +
+    String(seconds).padStart(2, '0')
+  );
 }
 
 // SLA real-time clock
@@ -423,7 +453,7 @@ let clockInterval = null;
 onMounted(() => {
   clockInterval = setInterval(() => {
     now.value = Date.now();
-  }, 60000); // update every minute
+  }, 1000); // update every second
 });
 onUnmounted(() => {
   if (clockInterval) clearInterval(clockInterval);
@@ -434,13 +464,9 @@ const getJasaMerchantDeadlineRemaining = (order) => {
   const displayStatus = getJasaDisplayStatus(order);
   const rawStatus = String(order.status || '').toLowerCase();
   if (displayStatus !== 'menunggu' && !['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'pending'].includes(rawStatus)) return null;
-  if (!order.merchant_response_deadline) return null;
-  const diff = new Date(order.merchant_response_deadline) - now.value;
-  if (diff <= 0) return null; // expired
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) return `${hours}j ${minutes}m`;
-  return `${minutes}m`;
+  const deadline = order.confirm_deadline || order.merchant_response_deadline;
+  if (!deadline) return null;
+  return formatCountdown(deadline);
 };
 
 // Check if SLA deadline has passed
@@ -457,11 +483,8 @@ const getJasaSlaDeadlineColorClass = (order) => {
   if (isJasaMerchantDeadlinePassed(order)) return 'border-red-400 bg-red-50 text-red-700';
   const remaining = getJasaMerchantDeadlineRemaining(order);
   if (!remaining) return 'border-gray-200 bg-gray-50 text-gray-700';
-  // Parse remaining string "23j 45m" or "45m"
-  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
-  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
-  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
-  const totalMinutes = hours * 60 + minutes;
+  const [hours, minutes] = remaining.split(':').map(Number);
+  const totalMinutes = (hours || 0) * 60 + (minutes || 0);
   if (totalMinutes < 60) return 'border-red-400 bg-red-50 text-red-700';
   if (totalMinutes < 360) return 'border-yellow-400 bg-yellow-50 text-yellow-700';
   return 'border-green-400 bg-green-50 text-green-700';
@@ -472,10 +495,8 @@ const getJasaSlaBadgeColorClass = (order) => {
   if (isJasaMerchantDeadlinePassed(order)) return 'bg-red-100 text-red-600';
   const remaining = getJasaMerchantDeadlineRemaining(order);
   if (!remaining) return 'bg-gray-100 text-gray-400';
-  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
-  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
-  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
-  const totalMinutes = hours * 60 + minutes;
+  const [hours, minutes] = remaining.split(':').map(Number);
+  const totalMinutes = (hours || 0) * 60 + (minutes || 0);
   if (totalMinutes < 60) return 'bg-red-100 text-red-600';
   if (totalMinutes < 360) return 'bg-orange-100 text-orange-600';
   return 'bg-green-100 text-green-600';
@@ -483,14 +504,15 @@ const getJasaSlaBadgeColorClass = (order) => {
 
 // Get simple payment line 1 (method name only)
 const getJasaPaymentLine1 = (order) => {
-  return getJasaPaymentMethodPrefix(order);
+  return formatPaymentLabel(order);
 };
 
 // Get simple payment line 2 (status text)
 const getJasaPaymentLine2 = (order) => {
-  const prefix = getJasaPaymentMethodPrefix(order);
-  if (prefix === 'COD') return 'Bayar di Tempat';
-  if (prefix === 'Transfer') return getJasaPaymentStatusLabel(order?.payment_status);
+  const method = String(order?.payment_method || '').toUpperCase();
+  if (method === "COD" || method.includes("COD") || method === "TUNAI" || method === "BAYAR DI TEMPAT" || formatPaymentLabel(order) === "COD - Bayar di Tempat") {
+    return '';
+  }
   return getJasaPaymentStatusLabel(order?.payment_status);
 };
 
@@ -505,10 +527,8 @@ const getJasaMerchantDeadlineColorClass = (order) => {
   if (isJasaMerchantDeadlinePassed(order)) return 'text-red-600';
   const remaining = getJasaMerchantDeadlineRemaining(order);
   if (!remaining) return 'text-gray-400';
-  const parts = remaining.match(/(\d+)j|(\d+)m/g) || [];
-  const hours = parseInt(parts.find(p => p.endsWith('j'))?.replace('j', '') || '0');
-  const minutes = parseInt(parts.find(p => p.endsWith('m'))?.replace('m', '') || '0');
-  const totalMinutes = hours * 60 + minutes;
+  const [hours, minutes] = remaining.split(':').map(Number);
+  const totalMinutes = (hours || 0) * 60 + (minutes || 0);
   if (totalMinutes < 60) return 'text-red-600';
   if (totalMinutes < 360) return 'text-orange-500';
   return 'text-orange-600';
@@ -676,20 +696,15 @@ const getJasaPaymentStatusLabel = (status) => {
 
 // Get payment method display for table/modal
 const getJasaPaymentLabel = (order) => {
-  const prefix = getJasaPaymentMethodPrefix(order);
-  const method = String(order?.payment_method || '').toUpperCase();
-
-  // COD/Manual methods - show as-is, NOT as "Sudah Bayar"
-  if (prefix === 'COD') {
-    return 'COD - Bayar di Tempat';
-  }
-  if (prefix === 'Transfer') {
-    return 'Transfer - ' + getJasaPaymentStatusLabel(order?.payment_status);
-  }
-
-  // Xendit - show status based on payment_status
+  const label = formatPaymentLabel(order);
   const status = getJasaPaymentStatusLabel(order?.payment_status);
-  return `${prefix} - ${status}`;
+
+  const method = String(order?.payment_method || '').toUpperCase();
+  if (method === "COD" || method.includes("COD") || method === "TUNAI" || method === "BAYAR DI TEMPAT" || label === "COD - Bayar di Tempat") {
+    return label;
+  }
+
+  return `${label} - ${status}`;
 };
 
 const getJasaPaymentColor = (order) => {
@@ -747,7 +762,7 @@ function mapJasaOrder(o) {
     status: getJasaDisplayStatus(o),
     service_status: o.service_status || o.status,
     order_status: o.order_status,
-    payment_method: o.payment_method || "COD",
+    payment_method: formatPaymentLabel(o),
     payment_status: o.payment_status,
     created_at: o.created_at,
     // Service info
@@ -943,8 +958,9 @@ const filteredJasaOrders = computed(() => {
 
   // Mapping from tab key to allowed display statuses
   const tabStatusMap = {
-    'perlu_diproses': ['menunggu'],
-    'sedang_diproses': ['diterima', 'dikerjakan', 'tunggu_selesai'],
+    'konfirmasi': ['menunggu'],
+    'dikerjakan': ['diterima', 'dikerjakan'],
+    'tunggu_selesai': ['tunggu_selesai'],
     'selesai': ['selesai'],
     'batal_gagal': ['ditolak', 'dibatalkan', 'expired', 'kadaluarsa'],
   };
@@ -964,6 +980,71 @@ const filteredJasaOrders = computed(() => {
   console.log('[filteredJasaOrders] Filtered count:', filtered.length);
   return filtered;
 });
+
+const jasaTabCounts = computed(() => {
+  const counts = {
+    all: allJasaOrders.value.length,
+    konfirmasi: 0,
+    dikerjakan: 0,
+    tunggu_selesai: 0,
+    selesai: 0,
+    batal_gagal: 0,
+  };
+
+  allJasaOrders.value.forEach((order) => {
+    const status = getJasaDisplayStatus(order);
+    if (status === 'menunggu') {
+      counts.konfirmasi++;
+    } else if (status === 'diterima' || status === 'dikerjakan') {
+      counts.dikerjakan++;
+    } else if (status === 'tunggu_selesai') {
+      counts.tunggu_selesai++;
+    } else if (status === 'selesai') {
+      counts.selesai++;
+    } else if (['ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(status)) {
+      counts.batal_gagal++;
+    }
+  });
+
+  return counts;
+});
+
+const getJasaTrackingSteps = (order) => {
+  if (!order) return [];
+  const rawStatus = String(order.status || '').toLowerCase();
+  const isCod = String(order.payment_method || '').toUpperCase() === 'COD';
+  const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED'];
+  const isPaid = paidStatuses.includes(String(order.payment_status || '').toUpperCase());
+
+  return [
+    { key: "placed", icon: "pi-receipt", label: "Pesanan\nDibuat", done: true },
+    { key: "paid", icon: "pi-credit-card", label: "Pembayaran\nDiterima", done: isPaid || isCod || (rawStatus !== 'pending' && rawStatus !== 'menunggu_pembayaran') },
+    { key: "confirmed", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: ['diterima', 'accepted', 'responsed', 'layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "working", icon: "pi-cog", label: "Layanan\nDikerjakan", done: ['layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "completion_pending", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: ['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "completed", icon: "pi-home", label: "Selesai", done: ['selesai', 'completed'].includes(rawStatus) }
+  ];
+};
+
+const modalProgressLineStyle = computed(() => {
+  if (!selectedJasaOrder.value) return {};
+  const steps = getJasaTrackingSteps(selectedJasaOrder.value);
+  const n = steps.length;
+  const half = 100 / (2 * n);
+  const trackWidth = 100 - 2 * half;
+  const lastDone = steps.reduce((acc, s, i) => (s.done ? i : acc), -1);
+  const fill = lastDone <= 0 ? 0 : (lastDone / (n - 1)) * trackWidth;
+  return { width: `${fill}%` };
+});
+
+async function copyJasaInvoice(invoice) {
+  try {
+    await navigator.clipboard.writeText(String(invoice));
+    toast.success("Nomor pesanan berhasil disalin", { timeout: 1500 });
+  } catch {
+    toast.warning("Gagal menyalin", { timeout: 1500 });
+  }
+}
 
 // Get status badge class for service orders
 const getJasaStatusClass = (status) => {
@@ -1601,11 +1682,7 @@ function statusProps(status) {
 }
 
 function goToDetail(order) {
-  if (activeOrderType.value === 'jasa') {
-    openJasaDetailModal(order);
-  } else {
-    router.push(`/merchant-center/${currentMerchantSlug.value}/orders/${order.id}`);
-  }
+  router.push(`/merchant-center/${currentMerchantSlug.value}/orders/${order.id}`);
 }
 
 onMounted(() => {
@@ -1732,7 +1809,7 @@ function leaveOrdersChannel(id) {
             >
               {{ tab.label }}
               <span
-                v-if="tabCounts[tab.key] && ['waiting_review', 'processing', 'delivered'].includes(tab.key) && activeOrderType === 'produk'"
+                v-if="activeOrderType === 'produk' && tabCounts[tab.key] && ['waiting_review', 'processing', 'delivered'].includes(tab.key)"
                 :class="[
                   'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
                   activeTab === tab.key
@@ -1741,6 +1818,17 @@ function leaveOrdersChannel(id) {
                 ]"
               >
                 {{ tabCounts[tab.key] }}
+              </span>
+              <span
+                v-if="activeOrderType === 'jasa' && jasaTabCounts[tab.key] > 0 && ['konfirmasi', 'dikerjakan', 'tunggu_selesai'].includes(tab.key)"
+                :class="[
+                  'inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[10px] font-bold',
+                  activeTab === tab.key
+                    ? 'bg-merchant-primary text-white'
+                    : 'bg-gray-100 text-gray-500',
+                ]"
+              >
+                {{ jasaTabCounts[tab.key] }}
               </span>
             </button>
           </div>
@@ -1934,7 +2022,7 @@ function leaveOrdersChannel(id) {
                       v-for="order in filteredJasaOrders"
                       :key="order.id"
                       class="hover:bg-gray-50 cursor-pointer transition"
-                      @click="openJasaDetailModal(order)"
+                      @click="goToDetail(order)"
                     >
                       <td class="px-4 py-3">
                         <div class="text-sm font-semibold text-gray-800">{{ order.invoice }}</div>
@@ -1968,7 +2056,7 @@ function leaveOrdersChannel(id) {
                         </div>
                       </td>
                       <td class="px-4 py-3">
-                        <div class="text-sm text-gray-600">{{ getServiceTypeLabel(order.service_type) }}</div>
+                        <div class="text-sm text-gray-600">{{ getServiceTypeLabel(order) }}</div>
                       </td>
                       <td class="px-4 py-3">
                         <div class="space-y-1">
@@ -2217,7 +2305,7 @@ function leaveOrdersChannel(id) {
           v-for="order in filteredJasaOrders"
           :key="order.id"
           class="p-4 bg-white border border-gray-100 shadow-sm cursor-pointer rounded-2xl active:bg-gray-50"
-          @click="openJasaDetailModal(order)"
+          @click="goToDetail(order)"
         >
           <div
             class="flex items-start justify-between mb-3"
@@ -2265,7 +2353,7 @@ function leaveOrdersChannel(id) {
                 </div>
                 <div class="flex items-center gap-1">
                   <i class="text-[10px] text-gray-400 pi pi-map-marker"></i>
-                  <span class="text-[11px] text-gray-500">{{ getServiceTypeLabel(order.service_type) }}</span>
+                  <span class="text-[11px] text-gray-500">{{ getServiceTypeLabel(order) }}</span>
                 </div>
               </div>
               <span class="text-sm font-bold text-gray-800">
@@ -2442,9 +2530,9 @@ function leaveOrdersChannel(id) {
         v-if="showJasaDetailModal"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       >
-        <div class="w-full max-w-xl max-h-[90vh] rounded-2xl bg-white shadow-xl overflow-hidden">
+        <div class="w-full max-w-xl max-h-[90vh] rounded-2xl bg-white shadow-xl overflow-hidden flex flex-col">
           <!-- Modal Header -->
-          <div class="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
+          <div class="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4 shrink-0">
             <h2 class="text-lg font-semibold text-gray-900">Detail Pesanan Jasa</h2>
             <button
               type="button"
@@ -2456,325 +2544,328 @@ function leaveOrdersChannel(id) {
           </div>
 
           <!-- Modal Body -->
-          <div v-if="selectedJasaOrder" class="max-h-[calc(90vh-72px)] overflow-y-auto px-5 py-4 space-y-4">
+          <div v-if="selectedJasaOrder" class="overflow-y-auto px-5 py-4 space-y-4 flex-1">
 
-            <!-- 1. HEADER LAYANAN -->
-            <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
-              <div class="w-14 h-14 bg-gray-200 rounded-xl overflow-hidden shrink-0">
-                <img
-                  v-if="getJasaImageUrl(selectedJasaOrder)"
-                  :src="getJasaImageUrl(selectedJasaOrder)"
-                  class="w-full h-full object-cover"
-                  @error="(e) => e.target.style.display = 'none'"
-                />
-                <i v-else class="pi pi-briefcase w-full h-full flex items-center justify-center text-gray-400"></i>
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900 leading-tight">
-                  {{ selectedJasaOrder.service_name || selectedJasaOrder.items[0].name }}
-                </p>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  Kategori: {{ getJasaCategory(selectedJasaOrder) }}
-                </p>
-                <p class="text-xs text-purple-500 mt-0.5 font-medium">
-                  Tipe Layanan: {{ getServiceTypeLabel(selectedJasaOrder) }}
-                </p>
+            <!-- 1. stepper (6-step stepper) -->
+            <div class="relative flex items-start py-4 px-2 bg-gray-50 rounded-2xl border border-gray-100">
+              <div class="absolute h-0.5 top-[34px] left-[8.33%] right-[8.33%] -translate-y-1/2 bg-gray-200" />
+              <div class="absolute h-0.5 top-[34px] left-[8.33%] -translate-y-1/2 bg-merchant-primary transition-all duration-500" :style="modalProgressLineStyle" />
+              <div
+                v-for="s in getJasaTrackingSteps(selectedJasaOrder)"
+                :key="s.key"
+                class="relative z-10 flex flex-col items-center flex-1 gap-1.5"
+              >
+                <div
+                  class="flex items-center justify-center text-xs border rounded-full w-9 h-9 transition-colors"
+                  :class="s.done ? 'bg-merchant-primary/10 border-merchant-primary text-merchant-primary' : 'bg-white border-gray-200 text-muted-foreground'"
+                >
+                  <i :class="['pi', s.icon]" />
+                </div>
+                <div
+                  class="text-center leading-tight px-0.5 font-medium"
+                  style="font-size: 9px; min-height: 24px;"
+                  :class="s.done ? 'text-merchant-primary font-bold' : 'text-muted-foreground'"
+                >
+                  {{ s.label }}
+                </div>
               </div>
             </div>
 
-            <!-- 2. RINGKASAN PESANAN (grid 2 kolom) -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ringkasan Pesanan</h3>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
-                  <p class="text-xs text-gray-400">No. Pesanan</p>
-                  <p class="text-gray-800 font-semibold font-mono">{{ selectedJasaOrder.invoice }}</p>
+            <!-- 2. SLA COUNTDOWNS & WARNING BANNER -->
+            <!-- SLA Countdown: menunggu_konfirmasi -->
+            <div
+              v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi_merchant'"
+              class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-xs text-orange-700">
+                  <i class="pi pi-clock shrink-0"></i>
+                  <span>Batas waktu respon merchant</span>
                 </div>
-                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
-                  <p class="text-xs text-gray-400">Tanggal Pesanan</p>
-                  <p class="text-gray-800">{{ formatDate(selectedJasaOrder.created_at) }}</p>
+                <span class="text-sm font-bold text-orange-700 font-mono">{{ getJasaMerchantDeadlineRemaining(selectedJasaOrder) || '00:00:00' }}</span>
+              </div>
+              <p class="mt-1 text-[10px] text-orange-500">UMKM wajib merespon dalam 60 menit. Jika terlewati, pesanan akan otomatis dibatalkan.</p>
+            </div>
+
+            <!-- SLA Countdown: menunggu_selesai (customer confirmation) -->
+            <div
+              v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_selesai' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi_selesai'"
+              class="p-3 bg-purple-50 border border-purple-200 rounded-2xl"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 text-xs text-purple-700 font-medium">
+                  <i class="pi pi-clock shrink-0"></i>
+                  <span>Menunggu konfirmasi customer</span>
                 </div>
-                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
-                  <p class="text-xs text-gray-400">Cara Pemesanan</p>
-                  <p class="text-gray-800 font-medium">{{ getJasaOrderMethod(selectedJasaOrder) }}</p>
+                <span class="text-sm font-bold text-purple-700 font-mono">{{ getJasaCompletionDeadlineRemaining(selectedJasaOrder) || '00:00:00' }}</span>
+              </div>
+              <p class="mt-1 text-[10px] text-purple-500">Jika tidak dikonfirmasi customer dalam 24 jam, pesanan akan otomatis diselesaikan.</p>
+            </div>
+
+            <!-- Expired banner -->
+            <div
+              v-if="['expired', 'kadaluarsa'].includes(String(selectedJasaOrder.status || '').toLowerCase())"
+              class="flex items-center gap-3 p-4 border bg-red-50 rounded-2xl border-red-200"
+            >
+              <i class="pi pi-clock text-red-500 text-xl shrink-0"></i>
+              <div>
+                <p class="text-sm font-semibold text-red-700">Pesanan Kadaluarsa</p>
+                <p class="text-xs text-red-500">Batas waktu respon merchant telah berakhir.</p>
+              </div>
+            </div>
+
+            <!-- 3. CARDS GROUP -->
+            
+            <!-- Card 1: Service details card -->
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Detail Layanan Jasa</h3>
+              </div>
+              <div class="p-4 space-y-3">
+                <div class="flex items-start gap-3">
+                  <div class="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden shrink-0 flex items-center justify-center border border-gray-200">
+                    <img
+                      v-if="getJasaImageUrl(selectedJasaOrder)"
+                      :src="getJasaImageUrl(selectedJasaOrder)"
+                      class="w-full h-full object-cover"
+                    />
+                    <i v-else class="pi pi-briefcase text-gray-400 text-lg"></i>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-bold text-gray-900 leading-tight">
+                      {{ selectedJasaOrder.service_name || selectedJasaOrder.items[0].name }}
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">
+                      Kategori: {{ getJasaCategory(selectedJasaOrder) }}
+                    </p>
+                    <p class="text-xs text-primary font-semibold mt-0.5">
+                      Cara Pemesanan: {{ getJasaOrderMethod(selectedJasaOrder) }}
+                    </p>
+                  </div>
                 </div>
-                <div class="p-3 bg-gray-50 rounded-xl space-y-1.5 text-sm">
-                  <p class="text-xs text-gray-400">Status Pesanan</p>
-                  <span :class="['inline-block px-2 py-0.5 rounded-full text-xs font-medium', getJasaStatusClass(selectedJasaOrder.status)]">
-                    {{ getJasaStatusLabel(selectedJasaOrder.status, selectedJasaOrder) }}
+
+                <!-- Booking date time if available -->
+                <div v-if="selectedJasaOrder.booking_date || selectedJasaOrder.booking_time" class="pt-2 border-t border-gray-100 space-y-2">
+                  <div v-if="selectedJasaOrder.booking_date" class="flex justify-between text-xs">
+                    <span class="text-gray-500">Tanggal Booking</span>
+                    <span class="text-gray-800 font-semibold">{{ formatDate(selectedJasaOrder.booking_date) }}</span>
+                  </div>
+                  <div v-if="selectedJasaOrder.booking_time" class="flex justify-between text-xs">
+                    <span class="text-gray-500">Jam Booking</span>
+                    <span class="text-gray-800 font-semibold">{{ formatTime(selectedJasaOrder.booking_time) }} WIB</span>
+                  </div>
+                </div>
+
+                <!-- Customer Note -->
+                <div class="pt-2 border-t border-gray-100">
+                  <span class="text-xs text-gray-400 block mb-1">Catatan Pelanggan:</span>
+                  <p class="text-xs text-gray-700 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                    {{ selectedJasaOrder.customer_note || selectedJasaOrder.booking_note || '—' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Order Info & Pricing Card -->
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Informasi Pesanan & Biaya</h3>
+              </div>
+              <div class="p-4 space-y-3 text-xs">
+                <!-- Order number with Copy Button -->
+                <div class="flex items-center justify-between">
+                  <span class="text-gray-500">No. Pesanan</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono font-bold text-gray-900">{{ selectedJasaOrder.invoice }}</span>
+                    <Button variant="primary-outline" size="sm" class="!p-1.5" @click="copyJasaInvoice(selectedJasaOrder.invoice)">
+                      <i class="pi pi-copy text-[10px]" />
+                    </Button>
+                  </div>
+                </div>
+
+                <!-- Order Date -->
+                <div class="flex justify-between">
+                  <span class="text-gray-500">Waktu Pemesanan</span>
+                  <span class="font-semibold text-gray-800">{{ formatDate(selectedJasaOrder.created_at) }}</span>
+                </div>
+
+                <!-- Tipe Layanan & Alamat -->
+                <div class="flex justify-between">
+                  <span class="text-gray-500">Tipe Layanan</span>
+                  <span class="font-semibold text-gray-800">{{ getServiceTypeLabel(selectedJasaOrder) }}</span>
+                </div>
+
+                <div v-if="['Di Tempat UMKM'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
+                  <span class="text-gray-500">Alamat UMKM</span>
+                  <span class="text-gray-800 text-right font-medium max-w-[60%]">{{ selectedJasaOrder.merchant_address || '—' }}</span>
+                </div>
+
+                <div v-else-if="['Ke Tempat Pelanggan'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
+                  <span class="text-gray-500">Alamat Pelanggan</span>
+                  <span class="text-gray-800 text-right font-medium max-w-[60%]">{{ selectedJasaOrder.customer.address || selectedJasaOrder.customer_address || '—' }}</span>
+                </div>
+
+                <!-- Pricing -->
+                <div class="pt-2 border-t border-gray-100 flex justify-between items-center">
+                  <span class="text-sm font-bold text-gray-800">Total Harga Disepakati</span>
+                  <span class="text-base font-extrabold text-blue-600">
+                    Rp {{ formatIDR(getOrderAgreedPrice(selectedJasaOrder)) }}
                   </span>
                 </div>
               </div>
             </div>
 
-            <!-- 3. DATA PELANGGAN -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Data Pelanggan</h3>
-              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
+            <!-- Card 3: Customer Data Card -->
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Data Pelanggan</h3>
+              </div>
+              <div class="p-4 space-y-2.5 text-xs">
                 <div class="flex justify-between">
                   <span class="text-gray-500">Nama</span>
-                  <span class="text-gray-800 font-medium">{{ selectedJasaOrder.customer.name }}</span>
+                  <span class="text-gray-800 font-bold">{{ selectedJasaOrder.customer.name }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-500">Nomor Telepon</span>
-                  <span class="text-gray-800">{{ selectedJasaOrder.customer.phone || '—' }}</span>
+                  <span class="text-gray-800 font-semibold">{{ selectedJasaOrder.customer.phone || '—' }}</span>
                 </div>
               </div>
             </div>
 
-            <!-- 4. METODE PEMBAYARAN -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Metode Pembayaran</h3>
-              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
+            <!-- Card 4: Payment Details Card -->
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Status Pembayaran</h3>
+              </div>
+              <div class="p-4 space-y-2.5 text-xs">
                 <div class="flex justify-between items-center">
-                  <span class="text-gray-500">Metode</span>
-                  <span :class="['inline-block px-2.5 py-0.5 rounded-full text-xs font-medium', getJasaPaymentColor(selectedJasaOrder)]">
-                    {{ getJasaPaymentMethodPrefix(selectedJasaOrder) === 'COD' ? 'COD' : getJasaPaymentMethodPrefix(selectedJasaOrder) === 'Transfer' ? 'Transfer' : 'Xendit' }}
-                  </span>
+                  <span class="text-gray-500">Pembayaran</span>
+                  <span class="text-gray-800 font-bold">{{ formatPaymentLabel(selectedJasaOrder) }}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-gray-500">Status</span>
-                  <span class="text-gray-800 text-xs">{{ getJasaPaymentLabel(selectedJasaOrder) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 5. JADWAL -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Jadwal</h3>
-              <div v-if="selectedJasaOrder.booking_date || selectedJasaOrder.booking_time" class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
-                <div v-if="selectedJasaOrder.booking_date" class="flex justify-between">
-                  <span class="text-gray-500">Tanggal Booking</span>
-                  <span class="text-gray-800">{{ formatDate(selectedJasaOrder.booking_date) }}</span>
-                </div>
-                <div v-if="selectedJasaOrder.booking_time" class="flex justify-between">
-                  <span class="text-gray-500">Jam Booking</span>
-                  <span class="text-gray-800">{{ formatTime(selectedJasaOrder.booking_time) }} WIB</span>
-                </div>
-              </div>
-              <div v-else class="p-3 bg-gray-50 rounded-xl text-sm text-gray-400 text-center italic">
-                Tidak menggunakan jadwal booking
-              </div>
-            </div>
-
-            <!-- 5b. TIPE LAYANAN (dengan alamat sesuai jenis) -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipe Layanan</h3>
-              <div class="p-3 bg-gray-50 rounded-xl space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <span class="text-gray-500">Tipe</span>
-                  <span class="text-gray-800 font-medium">{{ getServiceTypeLabel(selectedJasaOrder) }}</span>
-                </div>
-                <!-- Alamat UMKM untuk "Di Tempat UMKM" -->
-                <div v-if="['Di Tempat UMKM'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
-                  <span class="text-gray-500">Alamat UMKM</span>
-                  <span class="text-gray-800 text-right max-w-[60%]">
-                    {{ selectedJasaOrder.merchant_address || '—' }}
-                  </span>
-                </div>
-                <!-- Alamat Pelanggan untuk "Ke Tempat Pelanggan" -->
-                <div v-else-if="['Ke Tempat Pelanggan'].includes(getServiceTypeLabel(selectedJasaOrder))" class="flex justify-between">
-                  <span class="text-gray-500">Alamat Pelanggan</span>
-                  <span class="text-gray-800 text-right max-w-[60%]">
-                    {{ selectedJasaOrder.customer.address || selectedJasaOrder.customer_address || '—' }}
+                  <span :class="['inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold', getJasaPaymentColor(selectedJasaOrder)]">
+                    {{ formatPaymentStatus(selectedJasaOrder.payment_status) }}
                   </span>
                 </div>
               </div>
             </div>
 
-            <!-- 6. TOTAL HARGA + SLA (side by side) -->
-            <div class="grid grid-cols-2 gap-2">
-              <!-- Total Harga Disepakati -->
-              <div class="p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                <p class="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Total Harga</p>
-                <p class="text-lg font-bold text-blue-700 leading-tight">
-                  {{ getOrderAgreedPrice(selectedJasaOrder) > 0 ? 'Rp ' + formatIDR(getOrderAgreedPrice(selectedJasaOrder)) : '—' }}
-                </p>
-              </div>
-              <!-- SLA Respon Merchant -->
-              <div
-                v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu'"
-                class="p-3 rounded-xl border-2"
-                :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
-                  ? 'border-red-400 bg-red-50'
-                  : getJasaSlaDeadlineColorClass(selectedJasaOrder)"
-              >
-                <p class="text-xs font-semibold uppercase tracking-wide mb-1"
-                  :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
-                    ? 'text-red-600'
-                    : ''">
-                  Sisa Waktu
-                </p>
-                <p class="text-lg font-bold leading-tight"
-                  :class="isJasaMerchantDeadlinePassed(selectedJasaOrder)
-                    ? 'text-red-700'
-                    : ''">
-                  {{ isJasaMerchantDeadlinePassed(selectedJasaOrder)
-                    ? 'Berakhir'
-                    : (getJasaMerchantDeadlineRemaining(selectedJasaOrder) || '—') }}
-                </p>
-                <p v-if="selectedJasaOrder.merchant_response_deadline" class="text-[10px] mt-1 opacity-70">
-                  Batas respon: {{ formatMerchantDeadlineDate(selectedJasaOrder.merchant_response_deadline) }}
-                </p>
-              </div>
-              <div v-else-if="['expired', 'kadaluarsa'].includes(String(selectedJasaOrder.status || '').toLowerCase())" class="p-3 bg-pink-50 border border-pink-200 rounded-xl">
-                <p class="text-xs font-semibold text-pink-500 uppercase tracking-wide mb-1">Sisa Waktu</p>
-                <p class="text-lg font-bold text-pink-600 leading-tight">Kadaluarsa</p>
-              </div>
-              <div v-else class="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Sisa Waktu</p>
-                <p class="text-lg font-bold text-gray-400 leading-tight">—</p>
-              </div>
+            <!-- Card 5: Rejection Reason (If rejected) -->
+            <div v-if="selectedJasaOrder.rejection_reason" class="bg-red-50 border border-red-200 rounded-2xl p-4">
+              <h3 class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Alasan Penolakan</h3>
+              <p class="text-xs text-red-700">{{ selectedJasaOrder.rejection_reason }}</p>
             </div>
 
-            <!-- 7. CATATAN PELANGGAN -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Catatan Pelanggan</h3>
-              <div class="p-3 bg-gray-50 rounded-xl text-sm text-gray-700">
-                {{ selectedJasaOrder.customer_note || selectedJasaOrder.booking_note || '—' }}
+            <!-- Card 6: Completion proof & notes card -->
+            <div
+              v-if="['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(selectedJasaOrder.status)"
+              class="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
+            >
+              <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                <h3 class="text-xs font-bold text-gray-800 uppercase tracking-wider">Bukti Penyelesaian Jasa</h3>
               </div>
-            </div>
-
-            <!-- Alasan Penolakan -->
-            <div v-if="selectedJasaOrder.rejection_reason" class="space-y-2">
-              <h3 class="text-xs font-semibold text-red-500 uppercase tracking-wide">Alasan Penolakan</h3>
-              <div class="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">
-                <i class="pi pi-info-circle mr-1"></i>
-                {{ selectedJasaOrder.rejection_reason }}
-              </div>
-            </div>
-
-            <!-- Catatan Pengerjaan -->
-            <div v-if="selectedJasaOrder.completion_note" class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Catatan Pengerjaan</h3>
-              <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-sm text-purple-700">
-                <i class="pi pi-file mr-1"></i>
-                {{ selectedJasaOrder.completion_note }}
-              </div>
-            </div>
-
-            <!-- SLA Info: menunggu_selesai -->
-            <div v-if="getJasaCompletionDeadlineRemaining(selectedJasaOrder)" class="p-3 bg-purple-50 border border-purple-200 rounded-xl">
-              <div class="flex items-center gap-2 text-sm text-purple-700 font-medium">
-                <i class="pi pi-clock shrink-0"></i>
-                Menunggu konfirmasi customer. Auto-selesai dalam: <strong>{{ getJasaCompletionDeadlineRemaining(selectedJasaOrder) }}</strong>
-              </div>
-            </div>
-
-            <!-- 9. BUKTI PENGERJAAN -->
-            <div class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Bukti Pengerjaan</h3>
-              <div v-if="getJasaCompletionEvidences(selectedJasaOrder).length > 0" class="grid grid-cols-3 gap-2">
-                <template v-for="ev in getJasaCompletionEvidences(selectedJasaOrder)" :key="ev.id">
-                  <img
-                    v-if="isImageEvidence(ev)"
-                    :src="getEvidenceUrl(ev)"
-                    class="w-full aspect-square object-cover rounded-xl cursor-pointer"
-                    @click="openJasaEvidenceViewModal(selectedJasaOrder)"
-                    @error="(e) => { console.error('[Thumbnail failed]', getEvidenceUrl(ev), ev); e.target.style.display = 'none'; }"
-                  />
-                  <video
-                    v-else-if="isVideoEvidence(ev)"
-                    :src="getEvidenceUrl(ev)"
-                    controls
-                    class="w-full aspect-square object-cover rounded-xl"
-                  />
-                </template>
-              </div>
-              <div v-else class="p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
-                <i class="pi pi-image text-2xl text-gray-300 mb-1"></i>
-                <p class="text-xs text-gray-500">Belum ada bukti penyelesaian.</p>
-              </div>
-            </div>
-
-            <!-- 10. AKSI -->
-            <div v-if="!isJasaTerminal(selectedJasaOrder)" class="space-y-2 pt-1">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aksi</h3>
-              <div class="space-y-2">
-                <!-- Menunggu Konfirmasi -->
-                <template v-if="canJasaAccept(selectedJasaOrder)">
-                  <button
-                    @click="acceptJasaOrder(getOrderId(selectedJasaOrder))"
-                    :disabled="submittingJasa"
-                    class="w-full py-3 rounded-xl text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
-                  >
-                    <i class="pi pi-check"></i>
-                    Terima Pesanan
-                  </button>
-                  <button
-                    @click="openJasaRejectModal(selectedJasaOrder)"
-                    :disabled="submittingJasa"
-                    class="w-full py-3 rounded-xl text-sm font-medium bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
-                  >
-                    <i class="pi pi-times mr-1"></i>
-                    Tolak Pesanan
-                  </button>
-                </template>
-                <!-- Diterima -->
-                <template v-else-if="canJasaStart(selectedJasaOrder)">
-                  <button
-                    @click="startJasaWorking(getOrderId(selectedJasaOrder))"
-                    :disabled="submittingJasa"
-                    class="w-full py-3 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
-                  >
-                    <i class="pi pi-play"></i>
-                    Mulai Kerjakan
-                  </button>
-                </template>
-                <!-- Dikerjakan -->
-                <template v-else-if="canJasaEvidence(selectedJasaOrder)">
-                  <button
-                    @click="openJasaEvidenceModal(selectedJasaOrder)"
-                    :disabled="submittingJasa"
-                    class="w-full py-3 rounded-xl text-sm font-medium bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
-                  >
-                    <i class="pi pi-upload"></i>
-                    Kirim Bukti & Selesai
-                  </button>
-                </template>
-                <!-- Menunggu Konfirmasi Selesai -->
-                <template v-else-if="String(selectedJasaOrder.status || '').toLowerCase() === 'tunggu_selesai' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_selesai'">
-                  <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-sm text-purple-700 text-center">
-                    <i class="pi pi-clock mr-1"></i>
-                    Menunggu pelanggan mengkonfirmasi penyelesaian...
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <!-- Rating dan Ulasan (bukan bagian dari 10 section, muncul jika pesanan selesai) -->
-            <div v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'selesai' && selectedJasaOrder.review" class="space-y-2">
-              <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating dan Ulasan</h3>
-              <div class="bg-green-50 border border-green-100 rounded-xl p-4">
-                <span class="inline-block bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full mb-2">Ulasan dari Pelanggan</span>
-                <div class="flex items-center gap-2 mt-2 mb-1">
-                  <span class="text-sm font-medium text-gray-800">{{ getReviewerName(selectedJasaOrder) }}</span>
-                  <span v-if="selectedJasaOrder.review.is_anonymous" class="text-xs text-gray-500">(Anonim)</span>
+              <div class="p-4 space-y-3">
+                <div v-if="selectedJasaOrder.completion_note" class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-xs text-purple-700">
+                  <i class="pi pi-file mr-1"></i>
+                  {{ selectedJasaOrder.completion_note }}
                 </div>
-                <div class="flex gap-1">
-                  <i
-                    v-for="star in 5"
-                    :key="star"
-                    class="pi text-sm"
-                    :class="star <= Number(selectedJasaOrder.review.rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
-                  ></i>
-                </div>
-                <p v-if="getReviewComment(selectedJasaOrder)" class="text-sm text-gray-700 mt-2">
-                  {{ getReviewComment(selectedJasaOrder) }}
-                </p>
-                <div v-if="getReviewMedia(selectedJasaOrder.review).length > 0" class="flex gap-2 mt-3 flex-wrap">
-                  <template v-for="media in getReviewMedia(selectedJasaOrder.review)" :key="media.id">
+                
+                <div v-if="getJasaCompletionEvidences(selectedJasaOrder).length > 0" class="grid grid-cols-3 gap-2">
+                  <template v-for="ev in getJasaCompletionEvidences(selectedJasaOrder)" :key="ev.id">
                     <img
-                      v-if="media.file_type === 'image'"
-                      :src="getJasaMediaUrl(media)"
-                      class="w-16 h-16 object-cover rounded-lg"
-                      @error="(e) => e.target.style.display = 'none'"
+                      v-if="isImageEvidence(ev)"
+                      :src="getEvidenceUrl(ev)"
+                      class="w-full aspect-square object-cover rounded-xl cursor-pointer border border-gray-100"
+                      @click="openJasaEvidenceViewModal(selectedJasaOrder)"
+                    />
+                    <video
+                      v-else-if="isVideoEvidence(ev)"
+                      :src="getEvidenceUrl(ev)"
+                      controls
+                      class="w-full aspect-square object-cover rounded-xl border border-gray-100"
                     />
                   </template>
                 </div>
+                <div v-else class="p-4 bg-gray-50 border border-gray-100 rounded-xl text-center">
+                  <i class="pi pi-image text-xl text-gray-300 mb-1"></i>
+                  <p class="text-[10px] text-gray-500">Belum ada bukti penyelesaian.</p>
+                </div>
               </div>
             </div>
 
+            <!-- Card 7: Review from customer (If finished & reviewed) -->
+            <div v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'selesai' && selectedJasaOrder.review" class="bg-green-50 border border-green-100 rounded-2xl p-4">
+              <h3 class="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">Ulasan dari Pelanggan</h3>
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="text-xs font-bold text-gray-800">{{ getReviewerName(selectedJasaOrder) }}</span>
+                <span v-if="selectedJasaOrder.review.is_anonymous" class="text-[10px] text-gray-500">(Anonim)</span>
+              </div>
+              <div class="flex gap-0.5 mb-2">
+                <i
+                  v-for="star in 5"
+                  :key="star"
+                  class="pi text-xs"
+                  :class="star <= Number(selectedJasaOrder.review.rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                ></i>
+              </div>
+              <p v-if="getReviewComment(selectedJasaOrder)" class="text-xs text-gray-700 bg-white/50 p-2 rounded-lg border border-green-100/50">
+                {{ getReviewComment(selectedJasaOrder) }}
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Modal Footer (Actions) -->
+          <div v-if="!isJasaTerminal(selectedJasaOrder)" class="sticky bottom-0 bg-gray-50 border-t px-5 py-4 shrink-0 space-y-2">
+            <!-- Menunggu Konfirmasi -->
+            <template v-if="canJasaAccept(selectedJasaOrder)">
+              <button
+                @click="acceptJasaOrder(getOrderId(selectedJasaOrder))"
+                :disabled="submittingJasa"
+                class="w-full py-3 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              >
+                <i class="pi pi-check"></i>
+                Terima Pesanan
+              </button>
+              <button
+                @click="openJasaRejectModal(selectedJasaOrder)"
+                :disabled="submittingJasa"
+                class="w-full py-3 rounded-xl text-sm font-semibold bg-white border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+              >
+                <i class="pi pi-times mr-1"></i>
+                Tolak Pesanan
+              </button>
+            </template>
+            <!-- Diterima -->
+            <template v-else-if="canJasaStart(selectedJasaOrder)">
+              <button
+                @click="startJasaWorking(getOrderId(selectedJasaOrder))"
+                :disabled="submittingJasa"
+                class="w-full py-3 rounded-xl text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              >
+                <i class="pi pi-play"></i>
+                Mulai Kerjakan
+              </button>
+            </template>
+            <!-- Dikerjakan -->
+            <template v-else-if="canJasaEvidence(selectedJasaOrder)">
+              <button
+                @click="openJasaEvidenceModal(selectedJasaOrder)"
+                :disabled="submittingJasa"
+                class="w-full py-3 rounded-xl text-sm font-semibold bg-purple-500 text-white hover:bg-purple-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              >
+                <i class="pi pi-upload"></i>
+                Kirim Bukti & Selesai
+              </button>
+            </template>
+            <!-- Menunggu Konfirmasi Selesai -->
+            <template v-else-if="String(selectedJasaOrder.status || '').toLowerCase() === 'tunggu_selesai' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_selesai'">
+              <div class="p-3 bg-purple-50 border border-purple-100 rounded-xl text-xs text-purple-700 text-center font-medium">
+                <i class="pi pi-clock mr-1"></i>
+                Menunggu pelanggan mengkonfirmasi penyelesaian...
+              </div>
+            </template>
           </div>
         </div>
       </div>

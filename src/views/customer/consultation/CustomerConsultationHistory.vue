@@ -19,12 +19,115 @@ const filters = [
   { key: 'selesai', label: 'Selesai' },
 ];
 
+// Normalize backend status to frontend group filter
+function normalizeConsultationStatus(status) {
+  const s = String(status || '').toLowerCase().trim();
+  
+  const groups = {
+    menunggu: [
+      'pending',
+      'menunggu',
+      'menunggu_respon',
+      'menunggu_konfirmasi'
+    ],
+    negosiasi: [
+      'perlu_penyesuaian',
+      'penyesuaian',
+      'negosiasi',
+      'offer_sent',
+      'penawaran_dikirim',
+      'dapat_dikerjakan'
+    ],
+    selesai: [
+      'accepted',
+      'diterima',
+      'selesai',
+      'closed',
+      'rejected',
+      'ditolak',
+      'offer_rejected',
+      'penawaran_ditolak'
+    ]
+  };
+
+  if (groups.menunggu.includes(s)) return 'menunggu';
+  if (groups.negosiasi.includes(s)) return 'negosiasi';
+  if (groups.selesai.includes(s)) return 'selesai';
+  
+  return 'menunggu'; // default fallback
+}
+
+// Get neat Indonesian status label
+function getConsultationStatusLabel(status) {
+  const s = String(status || '').toLowerCase().trim();
+  const map = {
+    pending: 'Menunggu Respon',
+    menunggu: 'Menunggu Respon',
+    menunggu_respon: 'Menunggu Respon',
+    menunggu_konfirmasi: 'Menunggu Respon',
+    
+    perlu_penyesuaian: 'Perlu Penyesuaian',
+    penyesuaian: 'Perlu Penyesuaian',
+    negosiasi: 'Perlu Penyesuaian',
+    
+    offer_sent: 'Penawaran Dikirim',
+    penawaran_dikirim: 'Penawaran Dikirim',
+    dapat_dikerjakan: 'Penawaran Dikirim',
+    
+    accepted: 'Penawaran Diterima',
+    diterima: 'Penawaran Diterima',
+    
+    rejected: 'Ditolak',
+    ditolak: 'Ditolak',
+    
+    offer_rejected: 'Penawaran Ditolak',
+    penawaran_ditolak: 'Penawaran Ditolak',
+    
+    closed: 'Selesai',
+    selesai: 'Selesai'
+  };
+  
+  return map[s] || status || '—';
+}
+
+// Get neat status badge background color & border
+function getConsultationStatusBg(status) {
+  const s = String(status || '').toLowerCase().trim();
+  const map = {
+    pending: 'bg-amber-50 text-amber-600 border border-amber-100',
+    menunggu: 'bg-amber-50 text-amber-600 border border-amber-100',
+    menunggu_respon: 'bg-amber-50 text-amber-600 border border-amber-100',
+    menunggu_konfirmasi: 'bg-amber-50 text-amber-600 border border-amber-100',
+    
+    perlu_penyesuaian: 'bg-purple-50 text-purple-600 border border-purple-100',
+    penyesuaian: 'bg-purple-50 text-purple-600 border border-purple-100',
+    negosiasi: 'bg-purple-50 text-purple-600 border border-purple-100',
+    offer_sent: 'bg-purple-50 text-purple-600 border border-purple-100',
+    penawaran_dikirim: 'bg-purple-50 text-purple-600 border border-purple-100',
+    dapat_dikerjakan: 'bg-purple-50 text-purple-600 border border-purple-100',
+    
+    accepted: 'bg-green-50 text-green-600 border border-green-100',
+    diterima: 'bg-green-50 text-green-600 border border-green-100',
+    selesai: 'bg-green-50 text-green-600 border border-green-100',
+    closed: 'bg-green-50 text-green-600 border border-green-100',
+    
+    rejected: 'bg-red-50 text-red-600 border border-red-100',
+    ditolak: 'bg-red-50 text-red-600 border border-red-100',
+    offer_rejected: 'bg-red-50 text-red-600 border border-red-100',
+    penawaran_ditolak: 'bg-red-50 text-red-600 border border-red-100',
+  };
+  
+  return map[s] || 'bg-gray-50 text-gray-500 border border-gray-100';
+}
+
 const statusCounts = computed(() => {
-  const counts = { all: consultations.value.length };
-  for (const f of filters) {
-    if (f.key === 'all') continue;
-    counts[f.key] = consultations.value.filter(c => c.status_group === f.key).length;
-  }
+  const counts = { all: consultations.value.length, menunggu: 0, negosiasi: 0, selesai: 0 };
+  consultations.value.forEach(c => {
+    const group = normalizeConsultationStatus(c.status);
+    if (counts[group] !== undefined) {
+      counts[group]++;
+    }
+  });
   return counts;
 });
 
@@ -35,28 +138,16 @@ const statusGroupConfig = {
   selesai:    { label: 'Selesai',    bg: 'bg-green-100 text-green-700' },
 };
 
-// ─── Individual status config (label + badge color) ───────────────────────────
-const statusConfig = {
-  menunggu:            { label: 'Menunggu',            bg: 'bg-amber-50 text-amber-600' },
-  menunggu_respon:     { label: 'Menunggu Respon',    bg: 'bg-amber-50 text-amber-600' },
-  negosiasi:           { label: 'Negosiasi',            bg: 'bg-purple-50 text-purple-600' },
-  penawaran_diberikan:  { label: 'Penawaran Diberikan', bg: 'bg-purple-50 text-purple-600' },
-  penawaran_diterima:   { label: 'Penawaran Diterima', bg: 'bg-green-50 text-green-600' },
-  penawaran_ditolak:   { label: 'Penawaran Ditolak',  bg: 'bg-red-50 text-red-600' },
-  selesai:             { label: 'Selesai',              bg: 'bg-green-50 text-green-600' },
-  ditutup:             { label: 'Ditutup',              bg: 'bg-gray-100 text-gray-500' },
-};
-
 // ─── Price helpers ─────────────────────────────────────────────────────────────
 const getInitialPrice = (c) =>
   c?.initial_price || c?.original_price || c?.service?.price || c?.service?.base_price
   || c?.service?.fixed_price || c?.jasa?.price || c?.jasa?.base_price || c?.jasa?.fixed_price || null;
 
 const getOfferedPrice = (c) =>
-  (c.status_group === 'negosiasi' && c.merchant_offered_price) ? c.merchant_offered_price : null;
+  (normalizeConsultationStatus(c.status) === 'negosiasi' && c.merchant_offered_price) ? c.merchant_offered_price : null;
 
 const getFinalPrice = (c) =>
-  c?.final_price || (c?.status === 'accepted' ? c?.negotiated_price : null);
+  c?.final_price || (['accepted', 'diterima', 'selesai', 'closed'].includes(String(c?.status || '').toLowerCase()) ? c?.negotiated_price : null);
 
 // ─── Format helpers ───────────────────────────────────────────────────────────
 const formatCurrency = (value) => {
@@ -74,8 +165,6 @@ const formatDateTime = (dateStr) => {
 // ─── Status helpers ────────────────────────────────────────────────────────────
 const getGroupLabel = (group) => statusGroupConfig[group]?.label || group || '—';
 const getGroupBg   = (group) => statusGroupConfig[group]?.bg    || 'bg-gray-100 text-gray-600';
-const getStatusLabel = (s) => statusConfig[s]?.label || s || '—';
-const getStatusBg    = (s) => statusConfig[s]?.bg    || 'bg-gray-50 text-gray-500';
 
 // ─── Computed: empty state message per tab ─────────────────────────────────────
 const emptyMessages = {
@@ -87,17 +176,23 @@ const emptyMessages = {
 
 const currentEmpty = computed(() => emptyMessages[activeFilter.value] || emptyMessages.all);
 const showEmpty    = computed(() => !loading.value && consultations.value.length === 0);
+
+const filteredConsultations = computed(() => {
+  if (activeFilter.value === 'all') {
+    return consultations.value;
+  }
+  return consultations.value.filter(c => normalizeConsultationStatus(c.status) === activeFilter.value);
+});
+
 const filteredEmpty = computed(() => {
-  if (activeFilter.value === 'all') return consultations.value.length === 0;
-  return consultations.value.filter(c => c.status_group === activeFilter.value).length === 0;
+  return filteredConsultations.value.length === 0;
 });
 
 // ─── API ───────────────────────────────────────────────────────────────────────
-const fetchConsultations = async (filter = 'all') => {
+const fetchConsultations = async () => {
   loading.value = true;
   try {
-    const params = filter !== 'all' ? { status_group: filter } : {};
-    const { data } = await api.get('/api/service-consultations', { params });
+    const { data } = await api.get('/api/service-consultations');
     consultations.value = data?.data?.data ?? data?.data ?? [];
   } catch (error) {
     toast.error('Gagal memuat data konsultasi');
@@ -108,7 +203,6 @@ const fetchConsultations = async (filter = 'all') => {
 
 const changeFilter = (key) => {
   activeFilter.value = key;
-  fetchConsultations(key);
 };
 
 const openConsultation = (id) => {
@@ -181,7 +275,7 @@ onMounted(() => fetchConsultations());
       <!-- Consultation Cards -->
       <div v-else class="space-y-2">
         <div
-          v-for="consultation in consultations"
+          v-for="consultation in filteredConsultations"
           :key="consultation.id"
           @click="openConsultation(consultation.id)"
           class="block bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-purple-200 hover:shadow-sm transition cursor-pointer"
@@ -193,8 +287,8 @@ onMounted(() => fetchConsultations());
                 <i class="pi pi-store text-[10px] mr-1"></i>
                 {{ consultation.merchant?.name || consultation.merchant_name || 'Merchant' }}
               </p>
-              <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0', getGroupBg(consultation.status_group)]">
-                {{ getGroupLabel(consultation.status_group) }}
+              <span :class="['px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0', getGroupBg(normalizeConsultationStatus(consultation.status))]">
+                {{ getGroupLabel(normalizeConsultationStatus(consultation.status)) }}
               </span>
             </div>
 
@@ -206,8 +300,8 @@ onMounted(() => fetchConsultations());
             <!-- Row 3: individual status + price -->
             <div class="flex items-center justify-between gap-3 mt-2">
               <!-- Status individual -->
-              <span :class="['px-1.5 py-0.5 rounded text-[10px] font-medium', getStatusBg(consultation.status)]">
-                {{ getStatusLabel(consultation.status) }}
+              <span :class="['px-1.5 py-0.5 rounded text-[10px] font-medium', getConsultationStatusBg(consultation.status)]">
+                {{ getConsultationStatusLabel(consultation.status) }}
               </span>
 
               <!-- Price -->

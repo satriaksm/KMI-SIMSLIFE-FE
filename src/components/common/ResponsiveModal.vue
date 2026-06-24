@@ -54,6 +54,24 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  size: {
+    type: String,
+    default: "xl",
+  },
+});
+
+const sizeClass = computed(() => {
+  const sizeMap = {
+    xs: "sm:max-w-xs sm:w-full",
+    sm: "sm:max-w-sm sm:w-full",
+    md: "sm:max-w-md sm:w-full",
+    lg: "sm:max-w-lg sm:w-full",
+    xl: "sm:max-w-3xl sm:w-3/4",
+    "2xl": "sm:max-w-5xl sm:w-11/12",
+    "3xl": "sm:max-w-7xl sm:w-11/12",
+    full: "sm:max-w-full sm:w-11/12",
+  };
+  return sizeMap[props.size] ?? "sm:max-w-3xl sm:w-3/4";
 });
 
 const emit = defineEmits(["close", "update:show"]);
@@ -106,11 +124,12 @@ const handleBackdropClick = () => {
       v-show="show"
       @click.stop
       :class="[
-        // Mobile: Full width, bottom sheet, max 85vh
-        'fixed inset-x-0 bottom-0 max-h-[85vh]',
+        // Mobile: Full width, bottom sheet, max 90vh, min 70vh
+        'fixed inset-x-0 bottom-0 max-h-[90vh] min-h-[70vh]',
         // Desktop: Centered without top constraint
         'sm:fixed sm:inset-x-0 sm:inset-y-0 sm:m-auto',
-        'sm:max-h-[90vh] h-fit sm:max-w-3xl sm:w-3/4',
+        'sm:max-h-[85vh] sm:min-h-[560px] sm:h-auto',
+        sizeClass.value,
         // Base styles
         'bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl',
         'flex flex-col z-[70]',
@@ -152,8 +171,8 @@ const handleBackdropClick = () => {
       <!--Body - Scrollable Area -->
       <div
         :class="[
-          'flex-1 overflow-y-auto overflow-x-hidden',
-          'px-4 sm:px-6 py-4 mb-4 sm:mb-0',
+          'flex-1 overflow-y-auto',
+          'px-4 sm:px-6 pt-4 pb-28 sm:pb-32 sm:min-h-[320px]',
           'custom-scrollbar', //Custom scrollbar class
           bodyClass,
         ]"
@@ -167,8 +186,7 @@ const handleBackdropClick = () => {
         :class="[
           'border-t border-gray-200 p-4',
           'bg-white rounded-b-3xl sm:rounded-b-2xl',
-          'flex-shrink-0', //Prevent shrinking
-          'sticky sm:static bottom-0', //Sticky on mobile
+          'flex-shrink-0 sticky bottom-0 bg-white z-20',
           footerClass,
         ]"
       >

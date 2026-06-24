@@ -81,7 +81,7 @@
                   <i class="pi pi-check text-primary"></i>
                 </div>
                 <div>
-                  <div class="text-sm font-bold text-black">{{ order.status_label }}</div>
+                  <div class="text-sm font-bold text-black">Status Pesanan</div>
                   <div class="text-xs text-muted-foreground">#{{ order.order_number }}</div>
                 </div>
               </div>
@@ -93,7 +93,7 @@
               />
             </div>
 
-            <!-- Service order tracking steps -->
+            <!-- Service order tracking steps (6-step stepper) -->
             <div class="relative flex items-start">
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-gray-200" :style="trackLineStyle" />
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-primary transition-all" :style="progressLineStyle" />
@@ -124,13 +124,14 @@
             v-if="order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant'"
             class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
           >
-            <div class="flex items-center gap-2 text-sm text-orange-700">
-              <i class="pi pi-clock shrink-0"></i>
-              <div>
-                <span class="font-semibold">Sisa waktu respon merchant: {{ merchantDeadlineRemaining }}</span>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs text-orange-700">
+                <i class="pi pi-clock shrink-0"></i>
+                <span>Menunggu konfirmasi UMKM</span>
               </div>
+              <span class="text-sm font-bold text-orange-700 font-mono">{{ merchantDeadlineRemaining }}</span>
             </div>
-            <p class="mt-1 text-xs text-orange-500">Merchant wajib merespon dalam 1x24 jam.</p>
+            <p class="mt-1 text-xs text-orange-500">Merchant wajib merespon dalam 60 menit. Jika terlewati, pesanan akan otomatis dibatalkan.</p>
           </div>
 
           <!-- SLA Countdown: menunggu_selesai (customer confirmation) -->
@@ -138,13 +139,14 @@
             v-if="order.status === 'menunggu_selesai' || order.status === 'menunggu_konfirmasi_selesai'"
             class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
           >
-            <div class="flex items-center gap-2 text-sm text-orange-700">
-              <i class="pi pi-clock shrink-0"></i>
-              <div>
-                <span class="font-semibold">Sisa waktu konfirmasi selesai: {{ completionDeadlineRemaining }}</span>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs text-orange-700">
+                <i class="pi pi-clock shrink-0"></i>
+                <span>Menunggu konfirmasi selesai</span>
               </div>
+              <span class="text-sm font-bold text-orange-700 font-mono">{{ completionDeadlineRemaining }}</span>
             </div>
-            <p class="mt-1 text-xs text-orange-500">Jika tidak dikonfirmasi dalam 1x24 jam, pesanan akan otomatis selesai.</p>
+            <p class="mt-1 text-xs text-orange-500">Jika tidak dikonfirmasi dalam 24 jam, pesanan akan otomatis selesai.</p>
           </div>
 
           <!-- Expired banner -->
@@ -159,121 +161,152 @@
             </div>
           </div>
 
-          <!-- Service detail card -->
+          <!-- Card UMKM (Merchant info matching product style) -->
           <div class="p-4 bg-white border border-gray-200 rounded-2xl">
-            <div class="text-sm font-semibold text-gray-700 mb-3">Detail Layanan</div>
-            <div class="flex gap-3">
-              <div class="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center">
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
                 <img
-                  v-if="serviceImageUrl"
-                  :src="serviceImageUrl"
-                  :alt="order.service_name"
-                  class="w-full h-full object-cover block"
+                  v-if="order.merchant?.logo_url || order.merchant?.logoUrl"
+                  :src="resolveImageUrl(order.merchant?.logo_url || order.merchant?.logoUrl)"
+                  class="object-cover w-full h-full"
+                  alt="Merchant logo"
                 />
-                <i v-else class="pi pi-image text-gray-400 text-xl"></i>
+                <i v-else class="pi pi-building text-gray-400 text-lg"></i>
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-bold text-black line-clamp-2">{{ order.service_name }}</div>
-                <div class="mt-1 text-xs text-muted-foreground">{{ order.merchant?.name || order.merchant_name }}</div>
-                <div class="mt-0.5 text-xs text-muted-foreground">{{ order.service_type_label }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Booking info (if applicable) -->
-          <div v-if="order.booking_date || order.booking_time" class="p-4 bg-white border border-gray-200 rounded-2xl">
-            <div class="text-sm font-semibold text-gray-700 mb-3">Jadwal Layanan</div>
-            <div class="space-y-2">
-              <div v-if="order.booking_date" class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Tanggal</div>
-                <div class="text-sm font-semibold text-black">{{ order.date_formatted }}</div>
-              </div>
-              <div v-if="order.booking_time" class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Waktu</div>
-                <div class="text-sm font-semibold text-black">{{ order.booking_time }}</div>
-              </div>
-              <div v-if="order.mekanisme_pemesanan" class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Mekanisme</div>
-                <div class="text-sm font-semibold text-black">{{ order.booking_type_label }}</div>
+              <div class="flex-1 min-w-0 mt-0.5">
+                <div class="text-xs text-muted-foreground">Penyedia Jasa</div>
+                <div class="text-sm font-extrabold text-black truncate">{{ order.merchant?.name || order.merchant_name }}</div>
+                <div class="text-xs text-muted-foreground mt-0.5">
+                  {{ order.merchant?.primary_address?.detail || order.merchant?.address || 'Alamat tidak tersedia' }}
+                </div>
+                <div class="mt-2" v-if="order.merchant?.phone">
+                  <a
+                    :href="`https://wa.me/${String(order.merchant.phone).replace(/^0/, '62')}`"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                  >
+                    <i class="pi pi-whatsapp" />
+                    Hubungi UMKM
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Customer info -->
+          <!-- Rincian Layanan & Ringkasan Biaya Card (matching product style) -->
+          <div class="overflow-hidden bg-white border border-gray-200 rounded-2xl">
+            <div class="px-4 py-3 border-b border-gray-200">
+              <div class="text-base font-extrabold text-black">Rincian Layanan</div>
+            </div>
+            <div class="px-4 py-3 space-y-4">
+              <div class="flex gap-3">
+                <div class="w-12 h-12 overflow-hidden bg-gray-200 rounded-xl shrink-0 flex items-center justify-center">
+                  <img
+                    v-if="serviceImageUrl"
+                    :src="serviceImageUrl"
+                    :alt="order.service_name"
+                    class="object-cover w-full h-full"
+                  />
+                  <i v-else class="pi pi-image text-gray-400 text-lg"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-bold leading-tight text-black">{{ order.service_name }}</div>
+                  <div class="mt-1 text-xs text-muted-foreground">Kategori: {{ order.category_name || 'Layanan Jasa' }}</div>
+                  <div class="mt-0.5 text-xs text-muted-foreground">Jumlah: 1x</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs text-muted-foreground">Rp {{ formatIDR(order.subtotal) }}</div>
+                </div>
+              </div>
+
+              <div class="pt-3 space-y-2 border-t border-gray-200">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="text-muted-foreground">Subtotal Layanan</div>
+                  <div class="text-muted-foreground">Rp {{ formatIDR(order.subtotal) }}</div>
+                </div>
+                <div v-if="!order.is_cod && order.payment_fee > 0" class="flex items-center justify-between text-xs">
+                  <div class="text-muted-foreground">Biaya Pembayaran</div>
+                  <div class="text-muted-foreground">Rp {{ formatIDR(order.payment_fee) }}</div>
+                </div>
+                <div class="flex items-end justify-between pt-2">
+                  <div class="text-xs text-muted-foreground"></div>
+                  <div class="text-xl font-extrabold text-black">Rp {{ formatIDR(order.total_payment) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Pemesan Card (matching product style) -->
           <div class="p-4 bg-white border border-gray-200 rounded-2xl">
             <div class="text-sm font-semibold text-gray-700 mb-3">Data Pemesan</div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Nama</div>
+                <div class="text-xs text-muted-foreground">Nama Pemesan</div>
                 <div class="text-sm font-semibold text-black">{{ order.customer_name }}</div>
               </div>
               <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Telepon</div>
+                <div class="text-xs text-muted-foreground">Nomor Telepon</div>
                 <div class="text-sm font-semibold text-black">{{ order.customer_phone }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Informasi Pesanan Card (matching product style) -->
+          <div class="overflow-hidden bg-white border border-gray-200 rounded-2xl">
+            <div class="px-4 py-3 border-b border-gray-200">
+              <div class="text-base font-extrabold text-black">Informasi Pesanan</div>
+            </div>
+            <div class="px-4 py-3 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">Catatan</div>
+                <div class="text-xs font-semibold text-black">{{ order.booking_note || "-" }}</div>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">No. Pesanan</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-xs font-semibold text-black">{{ order.order_number }}</div>
+                  <Button variant="primary-outline" size="sm" class="!p-1.5" @click="copyOrderCode">
+                    <i class="pi pi-copy text-xs" />
+                  </Button>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">Waktu Pemesanan</div>
+                <div class="text-xs font-semibold text-black">{{ order.created_at_formatted }}</div>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">Pembayaran</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-xs font-semibold text-black">{{ order.payment_method_display }}</div>
+                  <span
+                    class="px-2 py-0.5 text-[10px] font-semibold rounded-full"
+                    :class="order.is_payment_completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                  >
+                    {{ order.payment_status_display }}
+                  </span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">Tipe Layanan</div>
+                <div class="text-xs font-semibold text-black">{{ order.service_type_label }}</div>
               </div>
               <div v-if="order.display_address && order.display_address !== '-'" class="flex items-start justify-between gap-3">
                 <div class="text-xs text-muted-foreground shrink-0">{{ order.address_label }}</div>
-                <div class="text-sm font-semibold text-black text-right max-w-[60%]">{{ order.display_address }}</div>
+                <div class="text-xs font-semibold text-black text-right max-w-[60%]">{{ order.display_address }}</div>
               </div>
-              <div v-if="order.booking_note && order.booking_note !== '-'" class="flex items-start justify-between gap-3">
-                <div class="text-xs text-muted-foreground shrink-0">Catatan</div>
-                <div class="text-sm text-black text-right max-w-[60%]">{{ order.booking_note }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Payment info -->
-          <div class="p-4 bg-white border border-gray-200 rounded-2xl">
-            <div class="text-sm font-semibold text-gray-700 mb-3">Pembayaran</div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Metode</div>
-                <div class="text-sm font-semibold text-black">{{ order.payment_method_display }}</div>
-              </div>
-              <div v-if="order.payment_channel" class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Channel</div>
-                <div class="text-sm font-semibold text-black">{{ order.payment_channel }}</div>
-              </div>
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Status</div>
-                <span
-                  class="px-2 py-0.5 text-xs font-semibold rounded-full"
-                  :class="order.is_payment_completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                >
-                  {{ order.payment_status_display }}
-                </span>
-              </div>
-
-              <!-- Non-COD fee breakdown -->
-              <template v-if="!order.is_cod">
-                <div class="pt-2 border-t border-gray-100 space-y-1.5">
-                  <div class="flex items-center justify-between">
-                    <div class="text-xs text-muted-foreground">Subtotal Layanan</div>
-                    <div class="text-sm font-medium text-black">Rp {{ formatIDR(order.subtotal) }}</div>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <div class="text-xs text-muted-foreground">Biaya Pembayaran</div>
-                    <div class="text-sm font-medium text-black">Rp {{ formatIDR(order.payment_fee) }}</div>
-                  </div>
-                  <div class="flex items-center justify-between pt-1.5 border-t border-gray-100">
-                    <div class="text-sm font-semibold text-black">Total Pembayaran</div>
-                    <div class="text-lg font-extrabold text-black">Rp {{ formatIDR(order.total_payment) }}</div>
-                  </div>
+              <div v-if="order.date_formatted || order.booking_time" class="flex items-center justify-between gap-3">
+                <div class="text-xs text-muted-foreground">Jadwal Layanan</div>
+                <div class="text-xs font-semibold text-black text-right">
+                  {{ order.date_formatted || '' }} {{ order.booking_time || '' }}
                 </div>
-              </template>
-
-              <!-- COD Total -->
-              <div v-else class="flex items-center justify-between pt-2 border-t border-gray-100">
-                <div class="text-sm font-semibold text-black">Total Pembayaran</div>
-                <div class="text-lg font-extrabold text-black">Rp {{ formatIDR(order.total_payment) }}</div>
               </div>
             </div>
           </div>
 
-          <!-- Bukti Penyelesaian -->
+          <!-- Bukti Penyelesaian Card -->
           <div v-if="['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(order.status)" class="p-4 bg-white border border-gray-200 rounded-2xl">
             <div class="text-sm font-semibold text-gray-700 mb-3">Bukti Penyelesaian</div>
-            <!-- Completion note -->
             <div v-if="order.completion_note || order.jasa_order_item?.completion_note" class="mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
               <p class="text-xs text-purple-600">
                 <i class="pi pi-file mr-1"></i>
@@ -286,7 +319,6 @@
                 :key="idx"
                 class="overflow-hidden bg-gray-100 rounded-xl aspect-square"
               >
-                <!-- Image evidence -->
                 <img
                   v-if="isImageMedia(ev)"
                   v-show="!failedEvidenceImages.has(idx)"
@@ -296,14 +328,12 @@
                   @error="() => handleEvidenceImageError(idx)"
                   @click="() => openEvidencePreview(ev)"
                 />
-                <!-- Video evidence -->
                 <video
                   v-else-if="isVideoMedia(ev)"
                   :src="getMediaUrl(ev)"
                   controls
                   class="w-full h-full object-cover"
                 />
-                <!-- Fallback icon -->
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <i class="pi pi-file text-gray-400 text-xl"></i>
                 </div>
@@ -314,23 +344,6 @@
             </div>
           </div>
 
-          <!-- Order info -->
-          <div class="p-4 bg-white border border-gray-200 rounded-2xl">
-            <div class="text-sm font-semibold text-gray-700 mb-3">Informasi Pesanan</div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">No. Pesanan</div>
-                <div class="flex items-center gap-2">
-                  <div class="text-xs font-semibold text-black">{{ order.order_number }}</div>
-                </div>
-              </div>
-              <div class="flex items-center justify-between">
-                <div class="text-xs text-muted-foreground">Waktu Pemesanan</div>
-                <div class="text-xs font-semibold text-black">{{ order.created_at_formatted }}</div>
-              </div>
-            </div>
-          </div>
-
           <!-- Jasa Actions -->
           <div class="py-3 mx-auto max-w-7xl">
             <!-- Bayar Kembali (Xendit belum dibayar) -->
@@ -338,18 +351,18 @@
               v-if="needsPayment()"
               block
               @click="retryPayment"
-              customClass="mt-2 bg-blue-500 hover:bg-blue-600 text-white"
+              customClass="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold"
             >
               <i class="pi pi-credit-card mr-1"></i>
               Bayar Kembali
             </Button>
             <!-- Konfirmasi Selesai -->
             <Button
-              v-if="order.status === 'menunggu_konfirmasi_selesai'"
+              v-if="order.status === 'menunggu_konfirmasi_selesai' || order.status === 'menunggu_selesai'"
               block
               :loading="confirmingSelesai"
               @click="handleKonfirmasiSelesai"
-              customClass="mt-2 bg-green-500 hover:bg-green-600 text-white"
+              customClass="mt-2 bg-green-500 hover:bg-green-600 text-white font-semibold"
             >
               <i class="pi pi-check-circle mr-1"></i>
               Konfirmasi Selesai
@@ -359,10 +372,10 @@
               v-if="order.can_review"
               block
               @click="goToReview"
-              customClass="mt-2 bg-merchant-primary hover:bg-merchant-primary/90 text-white"
+              customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
             >
               <i class="pi pi-star mr-1"></i>
-              Beri Rating dan Ulasan
+              Beri Ulasan
             </Button>
             <!-- Perbarui Rating dan Ulasan -->
             <Button
@@ -461,7 +474,7 @@
             <Button
               block
               @click="$router.push('/orders')"
-              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
             >
               Kembali ke Pesanan Saya
             </Button>
@@ -472,7 +485,7 @@
               block
               :loading="cancelling"
               @click="handleCancel"
-              customClass="mt-2"
+              customClass="mt-2 font-semibold"
             >
               Batalkan Pesanan
             </Button>
@@ -759,14 +772,36 @@
             >
               Pesanan Diterima (Selesai)
             </Button>
-            <Button
-              v-if="order?.status === 'completed'"
-              block
-              @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
-              customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Beri Ulasan
-            </Button>
+            <template v-if="order?.status === 'completed'">
+              <!-- If reviewed and can still update review -->
+              <Button
+                v-if="order.items[0]?.is_reviewed && order.items[0]?.can_update_review"
+                block
+                @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId, orderItemId: order.items[0]?.id } })"
+                customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
+              >
+                <i class="pi pi-pencil mr-1"></i>
+                Perbarui Rating dan Ulasan
+              </Button>
+              <!-- If reviewed and can NOT update review anymore -->
+              <div
+                v-else-if="order.items[0]?.is_reviewed && !order.items[0]?.can_update_review"
+                class="mt-2 inline-flex items-center justify-center gap-2 w-full h-12 px-4 py-2 text-sm font-medium rounded-xl bg-green-100 text-green-700 border border-green-300 cursor-default"
+              >
+                <i class="pi pi-check-circle"></i>
+                Ulasan sudah diperbarui
+              </div>
+              <!-- If not reviewed yet -->
+              <Button
+                v-else
+                block
+                @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId, orderItemId: order.items[0]?.id } })"
+                customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <i class="pi pi-star mr-1"></i>
+                Beri Ulasan
+              </Button>
+            </template>
             <Button
               block
               @click="$router.push('/orders')"
@@ -798,6 +833,7 @@ import {
 import { createOrderInvoice, verifyOrderPayment } from "@/services/api/payment";
 import echo from "@/libs/echo";
 import api from "@/libs/axios";
+import { formatPaymentLabel } from "@/utils/payment";
 
 const route = useRoute();
 const router = useRouter();
@@ -825,15 +861,20 @@ let confirmTimer = null;
 
 let orderChannel = null;
 
+// ─── Ticking timer for Jasa real-time countdown ─────────────────────────────────
+const nowTime = ref(Date.now());
+let tickingTimer = null;
+
 // ─── SLA Countdown helpers (Jasa) ─────────────────────────────────────────────
 const merchantDeadlineRemaining = computed(() => {
   const o = rawOrder.value;
   if (!o) return null;
   if (o.status !== 'menunggu_konfirmasi' && o.status !== 'menunggu_konfirmasi_merchant') return null;
-  if (!o.merchant_response_deadline) return null;
-  const deadline = new Date(o.merchant_response_deadline);
-  if (deadline <= new Date()) return null;
-  return formatCountdown(o.merchant_response_deadline);
+  const deadline = o.confirm_deadline || o.merchant_response_deadline;
+  if (!deadline) return null;
+  const diff = new Date(deadline).getTime() - nowTime.value;
+  if (diff <= 0) return '00:00:00';
+  return formatCountdown(deadline);
 });
 
 const completionDeadlineRemaining = computed(() => {
@@ -841,21 +882,24 @@ const completionDeadlineRemaining = computed(() => {
   if (!o) return null;
   if (o.status !== 'menunggu_selesai' && o.status !== 'menunggu_konfirmasi_selesai') return null;
   if (!o.completion_deadline_at) return null;
+  const diff = new Date(o.completion_deadline_at).getTime() - nowTime.value;
+  if (diff <= 0) return '00:00:00';
   return formatCountdown(o.completion_deadline_at);
 });
 
 function formatCountdown(deadline) {
-  if (!deadline) return '00:00';
-  const now = new Date();
-  const end = new Date(deadline);
-  const diff = end - now;
-  if (diff <= 0) return '00:00';
+  if (!deadline) return '00:00:00';
+  const end = new Date(deadline).getTime();
+  const diff = end - nowTime.value;
+  if (diff <= 0) return '00:00:00';
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours > 0) {
-    return `${hours}j ${minutes}m`;
-  }
-  return `${minutes}m`;
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  return (
+    String(hours).padStart(2, '0') + ":" +
+    String(minutes).padStart(2, '0') + ":" +
+    String(seconds).padStart(2, '0')
+  );
 }
 
 // ─── Image helpers ─────────────────────────────────────────────────────────
@@ -1025,6 +1069,8 @@ function getPaymentStatusLabel(status) {
     PAID: "Lunas / Sudah Dibayar",
     SETTLED: "Lunas / Sudah Dibayar",
     SUCCEEDED: "Lunas / Sudah Dibayar",
+    SUDAH_BAYAR: "Lunas / Sudah Dibayar",
+    LUNAS: "Lunas / Sudah Dibayar",
     WAITING_CONFIRMATION: "Menunggu",
     UNPAID: "Belum Bayar",
     PENDING: "Menunggu",
@@ -1039,19 +1085,11 @@ const jasaOrder = computed(() => {
   if (!o) return null;
 
   const rawStatus = String(o.status || o.service_status || o.order_status || "").toLowerCase();
-  const stepIdx = STATUS_MAP[rawStatus] ?? 0;
   const isCod = String(o.payment_method || "").toUpperCase() === "COD";
   const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED'];
   const isPaid = paidStatuses.includes(String(o.payment_status || "").toUpperCase());
 
-  let paymentMethodDisplay = "—";
-  if (isCod) {
-    paymentMethodDisplay = "COD - Bayar di Tempat";
-  } else if (o.payment_channel) {
-    paymentMethodDisplay = `Xendit - ${getChannelLabel(o.payment_channel)}`;
-  } else {
-    paymentMethodDisplay = `Xendit - ${formatPaymentStatus(o.payment_status)}`;
-  }
+  const paymentMethodDisplay = formatPaymentLabel(o);
 
   const serviceTypeMap = {
     online: "Online", di_tempat_umkm: "Di Tempat UMKM", at_location: "Di Tempat UMKM",
@@ -1060,7 +1098,7 @@ const jasaOrder = computed(() => {
   const serviceTypeLabel = serviceTypeMap[o.service_type] || o.service_type || "";
 
   const bookingTypeMap = {
-    booking: "Booking (Pilih Tanggal& Jam)",
+    booking: "Booking (Pilih Tanggal & Jam)",
     keranjang: "Tanpa Jadwal",
     walk_in: "Walk-in",
     konsultasi: "Konsultasi",
@@ -1101,10 +1139,15 @@ const jasaOrder = computed(() => {
   };
   const statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
 
-  const tracking = TRACKING_STEPS.map((step, idx) => ({
-    ...step,
-    done: idx <= stepIdx,
-  }));
+  // 6-step tracking stepper for Jasa
+  const tracking = [
+    { key: "placed", icon: "pi-receipt", label: "Pesanan\nDibuat", done: true },
+    { key: "paid", icon: "pi-credit-card", label: "Pembayaran\nDiterima", done: isPaid || isCod || (rawStatus !== 'pending') },
+    { key: "confirmed", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: ['diterima', 'accepted', 'responsed', 'layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "working", icon: "pi-cog", label: "Layanan\nDikerjakan", done: ['layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "completion_pending", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: ['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "completed", icon: "pi-home", label: "Selesai", done: ['selesai', 'completed'].includes(rawStatus) }
+  ];
 
   const orderStatusKeys = [
     'diterima', 'accepted', 'responsed',
@@ -1122,7 +1165,7 @@ const jasaOrder = computed(() => {
 
   return {
     id: o.id,
-    order_number: o.order_number || `SO-${String(o.id).padStart(6, "0")}`,
+    order_number: o.invoice || o.order_number || `ORD-${String(o.id).padStart(6, "0")}`,
     jasa_order_item_id: o.jasa_order_item_id || null,
     is_reviewed: o.is_reviewed || false,
     can_review: o.can_review || false,
@@ -1275,6 +1318,10 @@ const productOrder = computed(() => {
       price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
       originalPrice: null,
       imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      is_reviewed: it.is_reviewed || false,
+      can_review: it.can_review || false,
+      can_update_review: it.can_update_review || false,
+      review: it.review || null,
     })),
 
     amounts: {
@@ -1449,7 +1496,7 @@ async function copyOrderCode() {
   try {
     const orderCode = order.value?.meta?.order_code || order.value?.order_number || "";
     await navigator.clipboard.writeText(String(orderCode));
-    toast.success("No. pesanan tersalin", { timeout: 1500 });
+    toast.success("Nomor pesanan berhasil disalin", { timeout: 1500 });
   } catch {
     toast.warning("Gagal menyalin", { timeout: 1500 });
   }
@@ -1483,14 +1530,17 @@ async function handleKonfirmasiSelesai() {
 function needsPayment() {
   const o = order.value;
   if (!o) return false;
+
+  // payment_status check (PAID / paid / sudah_bayar / lunas / dll)
+  const ps = String(o.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED', 'SUDAH_BAYAR', 'LUNAS'].includes(ps)) return false;
+
+  // payment_method check (COD)
   const method = String(o.payment_method || '').toUpperCase();
   if (method === 'COD') return false;
 
-  const ps = String(o.payment_status || '').toUpperCase();
-  if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
-
   const rawStatus = String(o.status || '').toLowerCase();
-  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed'];
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed', 'kadaluarsa'];
   if (terminalStatuses.includes(rawStatus)) return false;
 
   return true;
@@ -1647,6 +1697,8 @@ async function fetchOrder() {
 
 // ─── Pusher Channel ───────────────────────────────────────────────────────────
 const verifying = ref(false);
+const isVerifyingPayment = ref(false);
+
 async function verifyPaymentFromXendit(retryCount = 0) {
   const MAX_RETRY = 5;
   const RETRY_DELAY_MS = 3000;
@@ -1655,11 +1707,22 @@ async function verifyPaymentFromXendit(retryCount = 0) {
   try {
     const { data: res } = await verifyOrderPayment(orderId.value);
     const result = res?.data ?? res;
-    if (result?.already_paid || result?.order_status === "paid") {
+    
+    // Support paid/PAID and Jasa order status waiting confirmation
+    if (
+      result?.already_paid || 
+      result?.order_status === "paid" || 
+      result?.order_status === "menunggu_konfirmasi_merchant"
+    ) {
       toast.success("Pembayaran berhasil! Menunggu konfirmasi dari penjual.");
+      
+      // Remove query parameters from URL to avoid loop on refresh
+      router.replace({ path: route.path, query: {} });
+      
       await fetchOrder();
       return;
     }
+    
     if (retryCount < MAX_RETRY) {
       toast.info(`Mengkonfirmasi pembayaran... (${retryCount + 1}/${MAX_RETRY})`);
       setTimeout(() => {
@@ -1707,10 +1770,21 @@ onMounted(() => {
   fetchOrder();
   subscribeOrderChannel();
 
+  // Start Jasa ticking clock
+  tickingTimer = setInterval(() => {
+    nowTime.value = Date.now();
+  }, 1000);
+
   // Detect xendit redirect back
   const paymentStatus = route.query?.payment;
-  if (paymentStatus === "success") {
-    verifyPaymentFromXendit();
+  const qOrderId = route.query?.order_id;
+  const qExternalId = route.query?.external_id;
+  
+  if (paymentStatus === "success" || qOrderId || qExternalId) {
+    if (!isVerifyingPayment.value) {
+      isVerifyingPayment.value = true;
+      verifyPaymentFromXendit();
+    }
   } else if (paymentStatus === "failed") {
     toast.error("Pembayaran gagal. Silakan coba lagi.");
   }
@@ -1720,6 +1794,7 @@ onUnmounted(() => {
   leaveOrderChannel(orderId.value);
   if (timer) clearInterval(timer);
   if (confirmTimer) clearInterval(confirmTimer);
+  if (tickingTimer) clearInterval(tickingTimer);
 });
 
 watch(orderId, (next, prev) => {

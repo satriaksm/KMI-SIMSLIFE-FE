@@ -87,6 +87,8 @@
 import { computed } from "vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 
+import { formatPaymentLabel } from "@/utils/payment";
+
 const props = defineProps({
   order: {
     type: Object,
@@ -236,10 +238,7 @@ function formatPaymentStatus(status) {
 }
 
 const paymentMethodDisplay = computed(() => {
-  if (isCod.value) return "COD - Bayar di Tempat";
-  const channel = props.order.payment_channel || props.order.paid_channel;
-  if (channel) return `Xendit - ${getChannelLabel(channel)}`;
-  return "Xendit";
+  return formatPaymentLabel(props.order);
 });
 
 const paymentStatusDisplay = computed(() => {

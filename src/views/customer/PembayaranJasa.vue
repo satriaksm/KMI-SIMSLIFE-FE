@@ -1566,8 +1566,9 @@ const sendToChat = async () => {
       booking_note: cleanValue(form.value.catatan),
       // order_method: mekanisme pemesanan (PRIMARY - keranjang | booking | konsultasi)
       order_method: mappedOrderMethod,
-      payment_method: selectedPayment.value, // actual channel: COD, QRIS, BCA, etc.
-      payment_channel: paymentChannel.value, // null for COD, QRIS/BCA/etc. for Xendit
+      payment_method: selectedPayment.value?.toUpperCase() === 'COD' ? 'COD' : 'xendit', // abstract/consistent value
+      payment_channel: paymentChannel.value, // actual channel e.g. BCA, QRIS, etc.
+      channel_code: paymentChannel.value, // explicit channel code
       subtotal: toNumber(amounts.value.jasa), // service price before fee
       total_price: toNumber(total.value) || toNumber(order.price) || 0, // includes fee
       latitude: deviceCoordinates.value?.latitude ?? null,
@@ -1645,7 +1646,11 @@ const sendToChat = async () => {
       console.log('[PembayaranJasa] Calling PaymentController for Xendit invoice...');
 
       try {
-        const invoiceResponse = await api.post(`/api/payments/${orderId}/invoice`);
+        const invoiceResponse = await api.post(`/api/payments/${orderId}/invoice`, {
+          payment_method: selectedPayment.value?.toUpperCase() === 'COD' ? 'COD' : 'xendit',
+          payment_channel: paymentChannel.value,
+          channel_code: paymentChannel.value
+        });
         console.log('[PembayaranJasa] Invoice response:', invoiceResponse);
 
         const invoiceData = invoiceResponse.data?.data || invoiceResponse.data;
