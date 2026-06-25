@@ -78,9 +78,10 @@ export function updateOrderStatus(merchantSlug, orderId, payload) {
       }
     );
   }
-  
+  const data = typeof payload === 'object' && payload !== null ? payload : { status: payload };
+
   return api.post(
     `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
-    { status: payload },
+    data,
   );
 }
