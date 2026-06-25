@@ -57,174 +57,49 @@
           v-slot="{ errors, meta }"
         >
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <!-- Name Field -->
-            <div class="">
-              <label for="name" class="block mb-2 text-sm font-bold text-black">
-                Nama Lengkap
-              </label>
-              <Field
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Masukkan nama lengkap"
-                class="w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                :class="errors.name ? 'border-red-500' : 'border-primary'"
-              />
-              <ErrorMessage name="name" class="mt-1 text-xs text-red-500" />
-            </div>
+            <TextField
+              name="name"
+              label="Nama Lengkap"
+              placeholder="Masukkan nama lengkap"
+              required
+            />
 
-            <!-- Email Field -->
-            <div class="">
-              <label
-                for="email"
-                class="block mb-2 text-sm font-bold text-black"
-              >
-                Email
-              </label>
-              <Field
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Masukkan email"
-                class="w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                :class="errors.email ? 'border-red-500' : 'border-primary'"
-              />
-              <ErrorMessage name="email" class="mt-1 text-xs text-red-500" />
-            </div>
+            <TextField
+              name="email"
+              type="email"
+              label="Email"
+              placeholder="Masukkan email"
+              required
+            />
 
-            <!-- NIK Field -->
-            <div class="">
-              <label for="nik" class="block mb-2 text-sm font-bold text-black">
-                NIK
-              </label>
-              <Field
-                id="nik"
-                name="nik"
-                type="text"
-                placeholder="Masukkan NIK"
-                class="w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                :class="errors.nik ? 'border-red-500' : 'border-primary'"
-              />
-              <ErrorMessage name="nik" class="mt-1 text-xs text-red-500" />
-            </div>
+            <TextField
+              name="nik"
+              label="NIK (Opsional)"
+              placeholder="Masukkan NIK (opsional)"
+            />
 
-            <!-- Telepon Field -->
-            <div class="">
-              <label
-                for="telepon"
-                class="block mb-2 text-sm font-bold text-black"
-              >
-                No. Telepon
-              </label>
-              <Field
-                id="telepon"
-                name="telepon"
-                type="tel"
-                placeholder="Masukkan no. telepon"
-                class="w-full px-4 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                :class="errors.telepon ? 'border-red-500' : 'border-primary'"
-              />
-              <ErrorMessage name="telepon" class="mt-1 text-xs text-red-500" />
-            </div>
+            <TextField
+              name="telepon"
+              type="tel"
+              label="No. Telepon"
+              placeholder="Masukkan no. telepon"
+              required
+            />
 
-            <!-- Password Field -->
-            <div class="">
-              <label
-                for="password"
-                class="block mb-2 text-sm font-bold text-black"
-              >
-                Kata Sandi
-              </label>
-              <div class="relative">
-                <Field
-                  id="password"
-                  name="password"
-                  v-model="passwordValue"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="Masukkan kata sandi"
-                  class="w-full px-4 py-2.5 pr-10 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                  :class="errors.password ? 'border-red-500' : 'border-primary'"
-                />
-                <button
-                  type="button"
-                  @click="showPassword = !showPassword"
-                  class="absolute inset-y-0 flex items-center right-3 text-muted-foreground hover:text-gray-700"
-                  :aria-label="
-                    showPassword ? 'Sembunyikan password' : 'Tampilkan password'
-                  "
-                >
-                  <svg
-                    v-if="showPassword"
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      d="M2.036 12.322a1 1 0 010-.644C3.423 7.51 7.36 5 12 5c4.64 0 8.577 2.51 9.964 6.678a1 1 0 010 .644C20.577 16.49 16.64 19 12 19c-4.64 0-8.577-2.51-9.964-6.678z"
-                    />
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      d="M3 3l18 18M10.584 10.587A3 3 0 0113.414 13.41M9.88 4.603A9.76 9.76 0 0112 4.5c4.64 0 8.577 2.51 9.964 6.678a1 1 0 010 .644 10.21 10.21 0 01-2.126 3.358M6.228 6.232C4.48 7.38 3.152 9.01 2.036 11.678a1 1 0 000 .644c1.387 4.168 5.324 6.678 9.964 6.678 1.088 0 2.141-.15 3.144-.43"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <ErrorMessage name="password" class="mt-1 text-xs text-red-500" />
-            </div>
+            <PasswordField
+              name="password"
+              label="Kata Sandi"
+              placeholder="Masukkan kata sandi"
+              v-model="passwordValue"
+              required
+            />
 
-            <!-- Password Confirmation Field -->
-            <div class="">
-              <label
-                for="password_confirmation"
-                class="block mb-2 text-sm font-bold text-black"
-              >
-                Konfirmasi Kata Sandi
-              </label>
-              <div class="relative">
-                <Field
-                  id="password_confirmation"
-                  name="password_confirmation"
-                  :type="showPasswordConfirm ? 'text' : 'password'"
-                  placeholder="Ulangi kata sandi"
-                  class="w-full px-4 py-2.5 pr-10 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-black placeholder:text-gray-400 transition-all"
-                  :class="
-                    errors.password_confirmation
-                      ? 'border-red-500'
-                      : 'border-primary'
-                  "
-                  autocomplete="new-password"
-                  @paste.prevent
-                  @drop.prevent
-                  @contextmenu.prevent
-                />
-              </div>
-              <ErrorMessage
-                name="password_confirmation"
-                class="mt-1 text-xs text-red-500"
-              />
-            </div>
+            <PasswordField
+              name="password_confirmation"
+              label="Konfirmasi Kata Sandi"
+              placeholder="Ulangi kata sandi"
+              required
+            />
 
             <!-- Indicators -->
             <div
@@ -361,12 +236,8 @@
               </div>
             </div>
 
-            <!-- Error Message -->
-            <div
-              v-if="errorMessage"
-              class="p-3 mb-2 text-sm text-red-700 bg-red-100 border border-red-400 rounded-xl sm:col-span-2"
-            >
-              {{ errorMessage }}
+            <div class="sm:col-span-2">
+              <ErrorAlert :message="errorMessage" />
             </div>
 
             <!-- Submit Button -->
@@ -414,12 +285,15 @@
 <script setup>
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { Form, Field, ErrorMessage } from "vee-validate";
+import { Form } from "vee-validate";
 import * as yup from "yup";
 import api from "@/libs/axios";
 import { RouterLink } from "vue-router";
 import { useToast } from "vue-toastification"; // NEW
 import AppButton from "@/components/common/Button.vue";
+import TextField from "@/components/forms/TextField.vue";
+import PasswordField from "@/components/forms/PasswordField.vue";
+import ErrorAlert from "@/components/forms/ErrorAlert.vue";
 
 const router = useRouter();
 const toast = useToast(); // NEW
@@ -447,8 +321,9 @@ const schema = yup.object({
     .max(13, "No. Telepon maksimal 13 digit"),
   nik: yup
     .string()
-    .required("NIK wajib diisi")
-    .length(16, "NIK harus 16 karakter"),
+    .nullable()
+    .test("len", "NIK harus 16 karakter", (val) => !val || val.length === 16)
+    .test("num", "NIK harus berupa angka", (val) => !val || /^[0-9]+$/.test(val)),
   password: yup
     .string()
     .required("Kata sandi wajib diisi")
@@ -505,6 +380,4 @@ const handleRegister = async (values) => {
   }
 };
 
-const showPassword = ref(false);
-const showPasswordConfirm = ref(false);
 </script>
