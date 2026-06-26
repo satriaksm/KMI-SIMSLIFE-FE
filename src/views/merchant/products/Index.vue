@@ -1200,7 +1200,7 @@ const tableActions = [
                 <!-- ✅ FIXED: Gunakan helper getImageUrl -->
                 <img
                   v-if="item.cover_image?.src_url"
-                  :src="item.cover_image.src_url"
+                  :src="item.cover_image.thumb_url || item.cover_image.src_url"
                   :alt="item.name"
                   class="object-cover w-full h-full"
                   @error="(e) => (e.target.style.display = 'none')"

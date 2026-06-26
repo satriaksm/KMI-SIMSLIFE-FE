@@ -154,7 +154,7 @@ export function getMerchantBannerUrl(merchant) {
  * Get community post image URL via streaming API
  * Konsisten dengan event banner, merchant logo, dan user profile picture
  */
-export function getCommunityImageUrl(imageId) {
+export function getCommunityImageUrl(imageId, size = 'original') {
   if (!imageId) {
     return '/placeholder.png';
   }
@@ -164,5 +164,5 @@ export function getCommunityImageUrl(imageId) {
   // ✅ Cache-busting dengan timestamp
   const timestamp = Date.now();
 
-  return `${apiUrl}/api/community-images/${imageId}?t=${timestamp}`;
+  return `${apiUrl}/api/community-images/${imageId}?size=${size}&t=${timestamp}`;
 }

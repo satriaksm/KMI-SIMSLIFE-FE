@@ -66,11 +66,11 @@
         <div
           class="relative w-full overflow-hidden bg-linear-to-b from-gray-200 to-gray-100 aspect-24/9 lg:aspect-4/1"
         >
-          <img
+          <ResponsiveImage
             v-if="merchant.banner_url"
-            :src="merchant.banner_url"
+            :src="merchant.banner_urls?.original || merchant.banner_url"
             alt="Background"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
           />
           <div
             v-else
@@ -117,11 +117,11 @@
               <div
                 class="flex items-center justify-center w-20 h-20 overflow-hidden border shadow-inner rounded-2xl bg-white/20 backdrop-blur-sm shrink-0 border-white/30"
               >
-                <img
+                <ResponsiveImage
                   v-if="merchant.logo_url"
-                  :src="merchant.logo_url"
+                  :src="merchant.logo_urls?.thumb || merchant.logo_url"
                   alt="Logo Toko"
-                  class="object-cover w-full h-full"
+                  customClass="object-cover w-full h-full"
                 />
                 <span v-else>
                   <svg
@@ -513,6 +513,7 @@ import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import AppButton from "@/components/common/Button.vue";
 import ReviewSection from "@/components/common/ReviewSection.vue";
 import JasaRatingBadge from "@/components/common/JasaRatingBadge.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 

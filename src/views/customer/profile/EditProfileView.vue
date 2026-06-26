@@ -12,6 +12,7 @@ import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import AppButton from "@/components/common/Button.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 // =========================
 // STATE & REFS
@@ -238,14 +239,15 @@ onMounted(() => {
                   "
                   class="w-40 h-40 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
                 />
-                <img
+                <ResponsiveImage
                   v-if="
                     !isInitialProfileLoading && hasProfilePicture && !imgError
                   "
                   :src="formData.profile_picture"
+                  :urls="formData.profile_picture === userStore.user?.profile_picture ? userStore.user?.profile_picture_urls : null"
                   :alt="formData.name"
                   loading="lazy"
-                  class="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
+                  customClass="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
                   :class="imgLoaded ? '' : 'opacity-0'"
                   @load="onImgLoad"
                   @error="onImgError"
@@ -397,12 +399,13 @@ onMounted(() => {
               "
               class="w-32 h-32 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
             />
-            <img
+            <ResponsiveImage
               v-if="!isInitialProfileLoading && hasProfilePicture && !imgError"
               :src="formData.profile_picture"
+              :urls="formData.profile_picture === userStore.user?.profile_picture ? userStore.user?.profile_picture_urls : null"
               :alt="formData.name"
               loading="lazy"
-              class="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
+              customClass="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
               :class="imgLoaded ? '' : 'opacity-0'"
               @load="onImgLoad"
               @error="onImgError"

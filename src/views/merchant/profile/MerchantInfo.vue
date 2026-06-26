@@ -10,6 +10,7 @@ import { useMerchants } from "@/composables/useMerchants";
 import AppButton from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -201,10 +202,12 @@ onMounted(async () => {
         typeof data?.logo_url === "string" && data.logo_url.trim()
           ? data.logo_url
           : "",
+      logo_urls: data?.logo_urls || null,
       coverImage:
         typeof data?.banner_url === "string" && data.banner_url.trim()
           ? data.banner_url
           : "",
+      banner_urls: data?.banner_urls || null,
       NPWP: data.NPWP || "",
       bank_code: data.bank_code || "",
       bank_account_number: data.bank_account_number || "",
@@ -368,11 +371,12 @@ const goToEdit = () => {
         <div
           class="relative w-full overflow-hidden rounded-2xl aspect-24/9 lg:aspect-4/1"
         >
-          <img
+          <ResponsiveImage
             v-if="hasCover"
             :src="merchantInfo.coverImage"
+            :urls="merchantInfo.banner_urls"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
           />
           <div
             v-else
@@ -394,11 +398,12 @@ const goToEdit = () => {
         </div>
 
         <div class="absolute -bottom-10 sm:-bottom-12 left-10 sm:left-8">
-          <img
+          <ResponsiveImage
             v-if="hasLogo"
             :src="merchantInfo.logo"
+            :urls="merchantInfo.logo_urls"
             alt="Logo"
-            class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
+            customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
           />
           <span v-else>
             <svg

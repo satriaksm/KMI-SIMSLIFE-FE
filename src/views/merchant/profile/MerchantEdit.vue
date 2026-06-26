@@ -84,11 +84,12 @@
       >
         <!-- Cover Image -->
         <div class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1">
-          <img
+          <ResponsiveImage
             v-if="hasFormCover"
             :src="form.coverImage"
+            :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
             @error="onCoverImgError"
           />
           <div
@@ -118,11 +119,12 @@
         <div class="relative px-4 pb-4 pt-14">
           <div class="absolute -top-12 left-4">
             <div class="relative">
-              <img
+              <ResponsiveImage
                 v-if="hasFormLogo"
                 :src="form.logo"
+                :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
                 alt="Logo"
-                class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
+                customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
                 @error="onLogoImgError"
               />
               <span
@@ -159,11 +161,12 @@
           <div
             class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1"
           >
-            <img
+            <ResponsiveImage
               v-if="hasFormCover"
               :src="form.coverImage"
+              :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
               alt="Cover"
-              class="absolute inset-0 object-cover w-full h-full"
+              customClass="absolute inset-0 object-cover w-full h-full"
               @error="onCoverImgError"
             />
             <div
@@ -210,11 +213,12 @@
 
         <div class="absolute -bottom-12 left-8">
           <div class="relative">
-            <img
+            <ResponsiveImage
               v-if="hasFormLogo"
               :src="form.logo"
+              :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
               alt="Logo"
-              class="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
+              customClass="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
               @error="onLogoImgError"
             />
             <span
@@ -901,6 +905,7 @@ import { fetchBanks } from "@/services/api/bank";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
 import * as yup from "yup";
@@ -937,6 +942,13 @@ const breadcrumbItems = computed(() => [
     label: "Edit Profil UMKM",
   },
 ]);
+
+const initialData = ref({
+  logo_url: null,
+  logo_urls: null,
+  banner_url: null,
+  banner_urls: null,
+});
 
 const form = ref({
   name: "",
@@ -1297,6 +1309,13 @@ onMounted(async () => {
       typeof data?.banner_url === "string" && data.banner_url.trim()
         ? data.banner_url
         : "";
+
+    initialData.value = {
+      logo_url: form.value.logo,
+      logo_urls: data?.logo_urls || null,
+      banner_url: form.value.coverImage,
+      banner_urls: data?.banner_urls || null,
+    };
 
     const hours = data?.operational_hours ?? {};
 

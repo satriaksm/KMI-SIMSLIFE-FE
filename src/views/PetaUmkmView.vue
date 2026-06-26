@@ -30,8 +30,9 @@
               <div class="flex items-center min-w-0 gap-3">
                 <!-- IMAGE -->
                 <img
+                  loading="lazy"
                   v-if="item.logo_url"
-                  :src="item.logo_url"
+                  :src="getThumbLogoUrl(item.logo_url)"
                   class="object-cover w-12 h-12 bg-gray-200 rounded-lg shrink-0"
                   alt="Foto UMKM"
                 />
@@ -171,8 +172,9 @@
           class="flex gap-3 p-3 bg-white shadow rounded-xl active:bg-gray-100"
         >
           <img
+            loading="lazy"
             v-if="item.logo_url"
-            :src="item.logo_url"
+            :src="getThumbLogoUrl(item.logo_url)"
             class="object-cover w-20 h-20 bg-gray-200 rounded-2xl shrink-0"
             alt="Foto UMKM"
           />
@@ -253,6 +255,13 @@ export default {
   },
 
   methods: {
+    getThumbLogoUrl(url) {
+      const logo = url ? String(url) : "";
+      if (logo && logo.includes('/api/')) {
+        return `${logo.split('?')[0]}?size=thumb`;
+      }
+      return logo;
+    },
     toRad(deg) {
       return (deg * Math.PI) / 180;
     },
@@ -442,7 +451,7 @@ export default {
         const marker = L.marker([lat, lng], { icon }).addTo(this.map);
 
         const logoTag = item.logo_url
-          ? `<div class="popup-gmaps__img"><img src="${item.logo_url}" alt="${item.name}" /></div>`
+          ? `<div class="popup-gmaps__img"><img src="${this.getThumbLogoUrl(item.logo_url)}" alt="${item.name}" loading="lazy" /></div>`
           : `<div class="popup-gmaps__img" style="background: #f3f4f6; display: flex; align-items: center; justify-content: center;">
               <svg class="w-12 h-12 p-2 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />

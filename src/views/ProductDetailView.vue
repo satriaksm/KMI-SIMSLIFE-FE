@@ -257,12 +257,12 @@
               @touchmove="handleTouchMove"
               @touchend="handleTouchEnd"
             >
-              <img
+              <ResponsiveImage
                 v-if="selectedImage"
-                :src="selectedImage"
+                :src="selectedImage.src"
+                :urls="selectedImage.urls"
                 :alt="product?.name"
-                class="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
-                draggable="false"
+                customClass="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
               />
               <div v-else class="text-gray-400">No Image</div>
 
@@ -350,10 +350,11 @@
                   class="thumb-item"
                   :class="currentImageIndex === index ? 'active' : ''"
                 >
-                  <img
-                    :src="image"
+                  <ResponsiveImage
+                    :src="image.src"
+                    :urls="image.urls"
                     :alt="`${product?.name} - ${index + 1}`"
-                    class="object-cover w-full h-full"
+                    customClass="object-cover w-full h-full"
                   />
                 </button>
               </div>
@@ -430,13 +431,14 @@
                   <div class="flex flex-col items-center">
                     <!-- 🖼️ Image jika ada -->
                     <div
-                      v-if="getOptionValueSrcUrl(1, size.id)"
+                      v-if="getOptionValueImage(1, size.id)"
                       class="flex items-center justify-center w-12 h-12 overflow-hidden bg-gray-100 rounded-md"
                     >
-                      <img
-                        :src="getOptionValueSrcUrl(1, size.id)"
+                      <ResponsiveImage
+                        :src="getOptionValueImage(1, size.id).src"
+                        :urls="getOptionValueImage(1, size.id).urls"
                         :alt="size.name"
-                        class="object-cover w-full h-full"
+                        customClass="object-cover w-full h-full"
                       />
                     </div>
 
@@ -660,11 +662,12 @@
                   <div
                     class="flex-shrink-0 w-12 h-12 overflow-hidden bg-gray-200 rounded-full"
                   >
-                    <img
+                    <ResponsiveImage
                       v-if="product?.merchant?.logo_url"
                       :src="product.merchant.logo_url"
+                      :urls="product.merchant.logo_urls"
                       alt="UMKM logo"
-                      class="object-cover w-full h-full"
+                      customClass="object-cover w-full h-full"
                     />
                     <span v-else>
                       <svg
@@ -1172,6 +1175,7 @@ import Button from "@/components/common/Button.vue";
 import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ReviewSection from "@/components/common/ReviewSection.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import Textfield from "@/components/forms/TextField.vue";
 import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
 import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
@@ -1260,12 +1264,16 @@ function handleTouchEnd() {
   touchEndX.value = 0;
 }
 
-function getOptionValueSrcUrl(optionIndex, valueId) {
+function getOptionValueImage(optionIndex, valueId) {
   // optionIndex: 1 untuk option pertama, 2 untuk kedua
   const option = product.value?.options?.[optionIndex - 1];
   if (!option || !option.values) return null;
   const value = option.values.find((v) => Number(v.id) === Number(valueId));
-  return value?.src_url || null;
+  if (!value?.src_url && !value?.image_url) return null;
+  return {
+    src: value.thumb_url || value.src_url || value.image_url,
+    urls: null // Force using only the 150x thumbnail
+  };
 }
 
 async function addToCart() {
@@ -1643,21 +1651,33 @@ async function doFetchProduct(slug) {
     return images
       .map((img) => {
         if (!img) return null;
-        if (typeof img === "string") return img;
+        if (typeof img === "string") return { src: img, urls: null };
         if (typeof img === "object") {
+          let src = null;
           // jika sudah berupa absolute url
-          if (img.image_url) return img.image_url;
+          if (img.image_url) src = img.image_url;
           // jika id tersedia — gunakan getImageUrl helper (yang kamu import)
-          if (img.src_url) return img.src_url;
+          else if (img.src_url) src = img.src_url;
           // jika image_path tersedia, coba resolve
-          if (img.image_path) {
-            return typeof absoluteImagePath === "function"
+          else if (img.image_path) {
+            src = typeof absoluteImagePath === "function"
               ? absoluteImagePath(img.image_path)
               : _absoluteImagePath
                 ? _absoluteImagePath(img.image_path)
                 : `${
                     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
                   }/storage/${img.image_path}`;
+          }
+          
+          if (src) {
+            return {
+              src,
+              urls: img.image_urls || img.urls || img.src_urls || {
+                original: img.src_url,
+                medium: img.medium_url,
+                thumb: img.thumb_url
+              }
+            };
           }
         }
         return null;

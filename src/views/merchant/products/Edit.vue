@@ -331,7 +331,7 @@ const populateFormFromProduct = async (product) => {
   // IMAGES
   productImages.value = product.images.map((img) => ({
     id: img.id,
-    preview: img.src_url,
+    preview: img.medium_url || img.thumb_url || img.src_url,
     existing: true,
   }));
   const coverIdx = product.images.findIndex((i) => i.is_cover);
@@ -360,7 +360,7 @@ const populateFormFromProduct = async (product) => {
             ? [
                 {
                   id: v.id,
-                  preview: v.src_url,
+                  preview: v.thumb_url || v.src_url,
                   existing: true,
                   image_url: v.image_url ?? null,
                   image_path: v.image_path ?? null,

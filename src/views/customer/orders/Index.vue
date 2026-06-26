@@ -447,7 +447,7 @@ function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
-  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+  return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }
 
 function mapOrder(o) {

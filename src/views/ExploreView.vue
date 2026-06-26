@@ -74,13 +74,14 @@
             <div
               class="relative w-full h-full group cursor-grab active:cursor-grabbing"
             >
-              <img
+              <ResponsiveImage
                 :key="`banner-${event.id}-${event.updated_at}`"
                 :src="getEventBannerUrl(event)"
+                :urls="event.banner_urls"
                 :alt="event.event_name"
-                class="object-cover w-full h-full pointer-events-none select-none"
+                customClass="object-cover w-full h-full pointer-events-none select-none"
                 draggable="false"
-                @error="(e) => (e.target.src = '/placeholder-banner.png')"
+                @error="(e) => (e.target.src = '/placeholder.png')"
               />
             </div>
           </Slide>
@@ -384,6 +385,7 @@ import { useCartStore } from "@/stores/cart";
 import TextField from "@/components/forms/TextField.vue";
 import Button from "@/components/common/Button.vue";
 import ProductCard from "@/components/Card/ProductCard.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import CategoryCard from "@/components/Card/CategoryCard.vue";
 import MerchantCard from "@/components/Card/MerchantCard.vue";

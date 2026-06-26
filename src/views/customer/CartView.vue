@@ -175,10 +175,11 @@
               class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 group-hover:-translate-y-0.5 duration-200 transition-transform relative"
               @click="goToProductPage(item)"
             >
-              <img
-                :src="item.image"
+              <ResponsiveImage
+                :src="item.image_urls?.thumb || getThumbImageUrl(item.image)"
+                :urls="{ thumb: item.image_urls?.thumb }"
                 :alt="item.name"
-                class="object-cover w-full h-full"
+                customClass="object-cover w-full h-full"
               />
               <div
                 v-if="item.isUnavailable"
@@ -427,10 +428,11 @@
               "
             >
               <!-- IMAGE OPTION -->
-              <img
+              <ResponsiveImage
                 v-if="opt.uses_image && val.image_url"
-                :src="val.image_url"
-                class="object-cover w-8 h-8 rounded"
+                :src="val.image_urls?.thumb || getThumbImageUrl(val.image_url)"
+                :urls="{ thumb: val.image_urls?.thumb }"
+                customClass="object-cover w-8 h-8 rounded"
               />
 
               <div class="flex flex-col items-start">
@@ -595,6 +597,15 @@ import { useCart } from "@/composables/useCart";
 import { useCartStore } from "@/stores/cart";
 import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
 import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
+
+const getThumbImageUrl = (url) => {
+  const imgUrl = url ? String(url) : "";
+  if (imgUrl && imgUrl.includes('/api/')) {
+    return `${imgUrl.split('?')[0]}?size=thumb`;
+  }
+  return imgUrl;
+};
 
 // =========================
 // STATE & COMPOSABLES
@@ -1243,6 +1254,7 @@ const editItemVariant = (itemId, storeId) => {
     values: opt.values.map((v) => ({
       value: v.option_value,
       image_url: v.src_url,
+      image_urls: v.src_urls || v.image_urls || null,
       available: true, // nanti bisa dikunci via stok
     })),
   }));

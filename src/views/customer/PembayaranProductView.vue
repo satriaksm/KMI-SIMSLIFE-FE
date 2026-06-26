@@ -45,7 +45,7 @@
             >
               <div class="flex gap-3">
                 <div class="w-20 h-20 overflow-hidden bg-gray-100 rounded-lg">
-                  <img :src="item.image" class="object-cover w-full h-full" />
+                  <img :src="getThumbImageUrl(item.image)" class="object-cover w-full h-full" />
                 </div>
                 <div class="flex-1 min-w-0 space-y-1">
                   <h3 class="text-sm font-semibold text-gray-900">
@@ -499,6 +499,14 @@ import { getMyAddress } from "@/services/api/address";
 import { calculateShippingCost } from "@/services/api/shipping";
 import { fetchCart as fetchCartApi, addToCart as addToCartApi } from "@/services/api/cart";
 import api from "@/libs/axios";
+
+const getThumbImageUrl = (url) => {
+  const imgUrl = url ? String(url) : "";
+  if (imgUrl && imgUrl.includes('/api/')) {
+    return `${imgUrl.split('?')[0]}?size=thumb`;
+  }
+  return imgUrl;
+};
 
 const {
   fetchVouchersByMerchant,
