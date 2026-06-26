@@ -10,6 +10,7 @@ import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
+import CheckboxField from "@/components/forms/CheckboxField.vue";
 import InputDateField from "@/components/forms/InputDateField.vue";
 import Button from "@/components/common/Button.vue";
 import { useVouchers } from "@/composables/useVouchers";
@@ -25,6 +26,7 @@ const authStore = useAuthStore(); // ✅ ADD: Get auth store
 const voucher_name = ref("");
 const voucher_code = ref("");
 const voucher_description = ref("");
+const is_secret = ref(false);
 
 const value = ref(0);
 const min_purchase_amount = ref(0);
@@ -94,6 +96,7 @@ const schema = yup.object({
     }
   ),
   usage_limit_per_user: yup.number().required().min(1),
+  is_secret: yup.boolean(),
 });
 
 // ============================================================
@@ -119,6 +122,7 @@ const {
     usage_limit: 0,
     min_purchase_amount: 0,
     max_discount_amount: 0,
+    is_secret: false,
   },
 });
 
@@ -136,6 +140,7 @@ onMounted(async () => {});
 watch(voucher_name, (v) => setFieldValue("voucher_name", v));
 watch(voucher_code, (v) => setFieldValue("voucher_code", v));
 watch(voucher_description, (v) => setFieldValue("voucher_description", v));
+watch(is_secret, (v) => setFieldValue("is_secret", v));
 
 watch(voucher_type, (v) => setFieldValue("voucher_type", v));
 watch(value, (v) => setFieldValue("value", v));
@@ -174,6 +179,7 @@ const onSubmit = veeHandleSubmit(
       min_purchase_amount: min_purchase_amount.value,
       usage_limit_per_user: usage_limit_per_user.value,
       usage_limit: usage_limit.value,
+      is_secret: is_secret.value,
     };
 
     // hanya kirim max_discount kalau percent
@@ -299,6 +305,13 @@ const onSubmit = veeHandleSubmit(
             :rows="4"
             placeholder="Jelaskan detail voucher Anda"
             required
+          />
+
+          <CheckboxField
+            name="is_secret"
+            v-model="is_secret"
+            label="Jadikan Secret Voucher (tidak muncul di daftar voucher publik)"
+            variant="primary"
           />
 
           <!-- ✅ UPDATED: Kategori Section dengan Loading State -->

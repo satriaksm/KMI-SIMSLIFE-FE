@@ -9,6 +9,7 @@ import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
+import CheckboxField from "@/components/forms/CheckboxField.vue";
 import InputDateField from "@/components/forms/InputDateField.vue";
 import Button from "@/components/common/Button.vue";
 import { useVouchers } from "@/composables/useVouchers";
@@ -29,6 +30,7 @@ const authStore = useAuthStore(); // ✅ ADD: Get auth store
 const voucher_name = ref("");
 const voucher_code = ref("");
 const voucher_description = ref("");
+const is_secret = ref(false);
 
 const value = ref(0);
 const min_purchase_amount = ref(0);
@@ -109,6 +111,7 @@ const schema = yup.object({
       then: (s) => s.required(),
       otherwise: (s) => s.default(0),
     }),
+  is_secret: yup.boolean(),
 });
 
 // ============================================================
@@ -134,6 +137,7 @@ const {
     usage_limit: 0,
     min_purchase_amount: 0,
     max_discount_amount: 0,
+    is_secret: false,
   },
 });
 
@@ -163,6 +167,7 @@ onMounted(async () => {
     voucher_code.value = v.voucher_code ?? "";
     voucher_description.value = v.voucher_description ?? "";
     voucher_type.value = v.voucher_type ?? "percent";
+    is_secret.value = !!v.is_secret;
 
     value.value = Number(v.value ?? 0);
     min_purchase_amount.value = Number(v.min_purchase_amount ?? 0);
@@ -191,6 +196,7 @@ onMounted(async () => {
     setFieldValue("voucher_start_date", voucher_start_date.value);
     setFieldValue("voucher_end_date", voucher_end_date.value);
     setFieldValue("usage_limit_per_user", usage_limit_per_user.value);
+    setFieldValue("is_secret", is_secret.value);
 
     setFieldValue("max_discount_amount", max_discount_amount.value);
 
@@ -212,6 +218,7 @@ onMounted(async () => {
 watch(voucher_name, (v) => setFieldValue("voucher_name", v));
 watch(voucher_code, (v) => setFieldValue("voucher_code", v));
 watch(voucher_description, (v) => setFieldValue("voucher_description", v));
+watch(is_secret, (v) => setFieldValue("is_secret", v));
 
 watch(voucher_type, (v) => {
   setFieldValue("voucher_type", v);
@@ -256,10 +263,10 @@ const onSubmit = veeHandleSubmit(
       min_purchase_amount: min_purchase_amount.value,
       usage_limit_per_user: usage_limit_per_user.value,
       usage_limit: usage_limit.value,
-      max_discount_amount:
-        voucher_type.value === "percent"
+      max_discount_amount: voucher_type.value === "percent"
           ? Number(max_discount_amount.value ?? 0)
           : 0,
+      is_secret: is_secret.value,
     };
 
     try {
@@ -400,6 +407,13 @@ const onSubmit = veeHandleSubmit(
             :rows="4"
             placeholder="Jelaskan detail voucher Anda"
             required
+          />
+
+          <CheckboxField
+            name="is_secret"
+            v-model="is_secret"
+            label="Jadikan Secret Voucher (tidak muncul di daftar voucher publik)"
+            variant="primary"
           />
 
           <!-- ✅ UPDATED: Kategori Section dengan Loading State -->

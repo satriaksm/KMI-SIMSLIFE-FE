@@ -374,9 +374,14 @@
 
             <!-- Map Picker -->
             <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+              </div>
               <MapPicker
+                ref="mapRefMobile"
                 v-model:lat="latitude"
                 v-model:lng="longitude"
+                @manual-change="handleManualLocationChange"
                 :zoom="15"
                 height="192px"
                 variant="merchant"
@@ -658,9 +663,14 @@
 
               <!-- Map Picker (Langsung di halaman, bukan modal) -->
               <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+                </div>
                 <MapPicker
+                  ref="mapRefDesktop"
                   v-model:lat="latitude"
                   v-model:lng="longitude"
+                  @manual-change="handleManualLocationChange"
                   :zoom="15"
                   height="320px"
                   variant="merchant"
@@ -895,6 +905,7 @@ import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
 import * as yup from "yup";
 import { Form } from "vee-validate";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -1009,6 +1020,29 @@ const longitude = ref(null);
 const coverInput = ref(null);
 const logoInput = ref(null);
 
+const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
+const mapRefMobile = ref(null);
+const mapRefDesktop = ref(null);
+const isPrefilling = ref(false);
+
+const handleManualLocationChange = async ({ lat, lng }) => {
+  isPrefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => { form.value.province_id = id; },
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => { form.value.city_id = id; },
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => { form.value.district_id = id; },
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => { form.value.village_id = id; },
+    });
+  } finally {
+    isPrefilling.value = false;
+  }
+};
+
 const hasFormLogo = computed(() => {
   const val = form.value?.logo;
   return typeof val === "string" && val.trim().length > 0;
@@ -1056,6 +1090,7 @@ async function loadBanks() {
 watch(
   () => form.value.province_id,
   async (pid) => {
+    if (isPrefilling.value) return;
     form.value.city_id = null;
     form.value.district_id = null;
     form.value.village_id = null;
@@ -1073,6 +1108,7 @@ watch(
 watch(
   () => form.value.city_id,
   async (cid) => {
+    if (isPrefilling.value) return;
     form.value.district_id = null;
     form.value.village_id = null;
 
@@ -1088,6 +1124,7 @@ watch(
 watch(
   () => form.value.district_id,
   async (did) => {
+    if (isPrefilling.value) return;
     form.value.village_id = null;
     villages.value = [];
 
@@ -1095,6 +1132,28 @@ watch(
       await loadVillages(did);
     }
   },
+);
+
+watch(
+  () => form.value.village_id,
+  (val) => {
+    if (isPrefilling.value) return;
+    if (val) {
+      const provName = provinces.value.find((p) => p.id == form.value.province_id)?.name;
+      const cityName = cities.value.find((c) => c.id == form.value.city_id)?.name;
+      const distName = districts.value.find((d) => d.id == form.value.district_id)?.name;
+      const villName = villages.value.find((v) => v.id == val)?.name;
+
+      const combinedRef = {
+        panTo: (lat, lng, zoom) => {
+          if (mapRefMobile.value) mapRefMobile.value.panTo(lat, lng, zoom);
+          if (mapRefDesktop.value) mapRefDesktop.value.panTo(lat, lng, zoom);
+        }
+      };
+
+      syncAddressToMap([villName, distName, cityName, provName], combinedRef);
+    }
+  }
 );
 
 // Ambil data wilayah dari service
@@ -1191,6 +1250,7 @@ onMounted(async () => {
   // Kalau edit data lama (prefill)
 
   try {
+    isPrefilling.value = true;
     if (!merchantSlug.value) {
       toast.error("Merchant tidak valid");
       router.push("/merchant-register");
@@ -1266,6 +1326,8 @@ onMounted(async () => {
     isLoading.value = false;
   } catch (error) {
     isLoading.value = false;
+  } finally {
+    isPrefilling.value = false;
   }
 });
 

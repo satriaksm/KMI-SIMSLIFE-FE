@@ -477,6 +477,16 @@ async function confirmAction() {
         toast.error("Bukti foto wajib diunggah saat barang telah tiba.");
         actionLoading.value = false;
         return;
+    } else if (targetStatus === 'rejected' || targetStatus === 'cancelled') {
+        if (!failedReason.value) {
+            toast.error("Alasan penolakan wajib diisi.");
+            actionLoading.value = false;
+            return;
+        }
+        payload = {
+            status: targetStatus,
+            failed_reason: failedReason.value
+        };
     }
 
     await updateOrderStatus(
@@ -1035,9 +1045,9 @@ function leaveOrderChannel(id) {
       </div>
 
       <!-- Failed Reason -->
-      <div v-if="actionType === 'undelivered'" class="mt-4">
-        <label class="block text-sm font-semibold text-gray-700 mb-2">Alasan {{ rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil' : 'Gagal Kirim' }} (Wajib)</label>
-        <textarea v-model="failedReason" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary" rows="3" :placeholder="rawOrder?.delivery_type === 'pickup' ? 'Contoh: Pembeli tidak datang untuk mengambil pesanan hingga toko tutup...' : 'Contoh: Pembeli tidak dapat dihubungi dan rumah kosong...'"></textarea>
+      <div v-if="actionType === 'undelivered' || actionType === 'reject'" class="mt-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Alasan {{ actionType === 'reject' ? 'Penolakan' : (rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil' : 'Gagal Kirim') }} (Wajib)</label>
+        <textarea v-model="failedReason" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary" rows="3" :placeholder="actionType === 'reject' ? 'Contoh: Maaf, stok sedang habis...' : (rawOrder?.delivery_type === 'pickup' ? 'Contoh: Pembeli tidak datang untuk mengambil pesanan hingga toko tutup...' : 'Contoh: Pembeli tidak dapat dihubungi dan rumah kosong...')"></textarea>
       </div>
 
       <template #footer>

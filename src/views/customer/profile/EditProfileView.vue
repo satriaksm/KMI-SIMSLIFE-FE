@@ -35,9 +35,9 @@ const schema = yup.object({
   email: yup.string().required("Email wajib diisi").email("Format email tidak valid"),
   nik: yup
     .string()
-    .required("NIK wajib diisi")
-    .length(16, "NIK harus 16 digit")
-    .matches(/^[0-9]+$/, "NIK harus berupa angka"),
+    .nullable()
+    .test("len", "NIK harus 16 digit", (val) => !val || val.length === 16)
+    .test("num", "NIK harus berupa angka", (val) => !val || /^[0-9]+$/.test(val)),
 });
 
 // Form data
@@ -352,12 +352,11 @@ onMounted(() => {
                 <div class="lg:col-span-2">
                   <TextField
                     name="nik"
-                    label="NIK(Nomor Induk Kependudukan)"
+                    label="NIK (Opsional)"
                     v-model="formData.nik"
                     type="text"
                     :maxlength="16"
-                    required
-                    placeholder="16 digit NIK"
+                    placeholder="16 digit NIK (opsional)"
                   />
                 </div>
               </div>

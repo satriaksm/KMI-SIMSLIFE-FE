@@ -425,7 +425,7 @@ function leaveOrdersChannel(id) {
       <div class="flex gap-2 sm:gap-3 items-center">
       </div>
     </div>
-
+    <div class="h-24 sm:h-0"></div>
 
     <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
       <!-- STICKY WRAPPER UNTUK TABS DAN SEARCH -->

@@ -150,9 +150,14 @@
 
             <!-- Pemetaan Lokasi -->
             <div class="sm:col-span-2">
+              <div class="flex items-center justify-between mb-2">
+                <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+              </div>
               <MapPicker
+                ref="mapRef"
                 v-model:lat="latitude"
                 v-model:lng="longitude"
+                @manual-change="handleManualLocationChange"
                 :zoom="15"
               />
 
@@ -283,6 +288,7 @@ import ErrorAlert from "@/components/forms/ErrorAlert.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 const router = useRouter();
 const toast = useToast(); // NEW
@@ -294,6 +300,28 @@ const isDev = import.meta.env.DEV;
 
 const latitude = ref(null);
 const longitude = ref(null);
+
+const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
+const mapRef = ref(null);
+const isPrefilling = ref(false);
+
+const handleManualLocationChange = async ({ lat, lng }) => {
+  isPrefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => { provinceId.value = id; },
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => { cityId.value = id; },
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => { districtId.value = id; },
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => { villageId.value = id; },
+    });
+  } finally {
+    isPrefilling.value = false;
+  }
+};
 
 // Segmentation (Select dari API)
 const segmentations = ref([]);
@@ -453,6 +481,7 @@ async function loadBanks() {
 }
 
 watch(provinceId, async (val) => {
+  if (isPrefilling.value) return;
   cityId.value = "";
   districtId.value = "";
   villageId.value = "";
@@ -462,6 +491,7 @@ watch(provinceId, async (val) => {
   await loadCities(val);
 });
 watch(cityId, async (val) => {
+  if (isPrefilling.value) return;
   districtId.value = "";
   villageId.value = "";
   districts.value = [];
@@ -469,9 +499,21 @@ watch(cityId, async (val) => {
   await loadDistricts(val);
 });
 watch(districtId, async (val) => {
+  if (isPrefilling.value) return;
   villageId.value = "";
   villages.value = [];
   await loadVillages(val);
+});
+watch(villageId, (val) => {
+  if (isPrefilling.value) return;
+  if (val) {
+    const provName = provinces.value.find((p) => p.id == provinceId.value)?.name;
+    const cityName = cities.value.find((c) => c.id == cityId.value)?.name;
+    const distName = districts.value.find((d) => d.id == districtId.value)?.name;
+    const villName = villages.value.find((v) => v.id == val)?.name;
+
+    syncAddressToMap([villName, distName, cityName, provName], mapRef);
+  }
 });
 
 onMounted(() => {
