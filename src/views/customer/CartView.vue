@@ -245,6 +245,7 @@
 
               <!-- Edit Variant/Addon Button -->
               <button
+                v-if="showEditButton(item)"
                 @click="editItemVariant(item.id, store.id)"
                 class="cursor-pointer text-xs text-[#FFA30E] hover:text-[#e5920d] font-semibold mb-2 flex items-center gap-1"
                 :class="[
@@ -265,7 +266,7 @@
                     d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z"
                   />
                 </svg>
-                Ubah Varian
+                {{ getEditButtonText(item) }}
               </button>
 
               <!-- Price & Quantity -->
@@ -481,82 +482,32 @@
               v-if="group.max_selection === 1 && group.min_selection === 1"
               class="space-y-2"
             >
-              <label
-                v-for="addon in group.options"
-                :key="addon.addon_id"
-                class="flex items-center gap-3 p-3 text-sm border rounded-lg cursor-pointer"
-                :class="
-                  isAddonSelected(addon)
-                    ? 'border-[#FFA30E] bg-orange-50'
-                    : 'border-gray-200'
-                "
-              >
-                <span class="relative flex items-center shrink-0">
-                  <input
-                    type="radio"
-                    :name="`addon-group-${group.id}`"
-                    :checked="isAddonSelected(addon)"
-                    @change="selectSingleAddon(addon, group)"
-                    class="sr-only peer"
-                  />
-                  <span
-                    class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-full peer-checked:border-primary"
-                  >
-                    <span
-                      class="w-2.5 h-2.5 rounded-full transition-all bg-transparent peer-checked:bg-primary"
-                      :class="
-                        isAddonSelected(addon) ? 'bg-primary' : 'bg-transparent'
-                      "
-                    ></span>
-                  </span>
-                </span>
-
-                <span class="flex-1">{{ addon.name }}</span>
-                <span class="font-semibold">
-                  +Rp {{ formatIDR(addon.price) }}
-                </span>
-              </label>
+              <RadioGroupPills
+                :name="'addon_group_' + group.id"
+                :options="group.options.map(addon => ({
+                  value: addon.addon_id,
+                  label: addon.name,
+                  suffix: '+Rp ' + formatIDR(addon.price)
+                }))"
+                layout="grid"
+                :modelValue="getSelectedSingleAddon(group.id)"
+                @update:modelValue="val => setSelectedSingleAddon(val, group)"
+              />
             </div>
 
             <!-- MULTIPLE (CHECKBOX) -->
             <div v-else class="space-y-2">
-              <label
-                v-for="addon in group.options"
-                :key="addon.addon_id"
-                class="flex items-center gap-3 p-3 text-sm border rounded-lg cursor-pointer"
-                :class="
-                  isAddonSelected(addon)
-                    ? 'border-[#FFA30E] bg-orange-50'
-                    : 'border-gray-200'
-                "
-              >
-                <span class="relative flex items-center shrink-0">
-                  <input
-                    type="checkbox"
-                    :checked="isAddonSelected(addon)"
-                    @change="toggleAddon(addon, group)"
-                    class="sr-only peer"
-                  />
-                  <span
-                    class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md"
-                    :class="
-                      isAddonSelected(addon) ? 'bg-primary border-primary' : ''
-                    "
-                  >
-                    <i
-                      class="text-[10px] text-white pi pi-check transition-opacity"
-                      :class="
-                        isAddonSelected(addon) ? 'opacity-100' : 'opacity-0'
-                      "
-                    ></i>
-                  </span>
-                </span>
-
-                <span class="flex-1">{{ addon.name }}</span>
-                <span class="font-semibold">
-                  +Rp {{ formatIDR(addon.price) }}
-                </span>
-              </label>
+              <CheckboxGroupPills
+                :name="'addon_group_' + group.id"
+                :options="group.options.map(addon => ({
+                  value: addon.addon_id,
+                  label: addon.name,
+                  suffix: '+Rp ' + formatIDR(addon.price)
+                }))"
+                layout="grid"
+                :modelValue="getSelectedMultipleAddons(group.id)"
+                @update:modelValue="vals => setSelectedMultipleAddons(vals, group)"
+              />
             </div>
           </div>
         </div>
@@ -642,6 +593,8 @@ import { useCheckoutStore } from "@/stores/checkout";
 import debounce from "lodash/debounce";
 import { useCart } from "@/composables/useCart";
 import { useCartStore } from "@/stores/cart";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
+import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
 
 // =========================
 // STATE & COMPOSABLES
@@ -759,6 +712,29 @@ const getVariantLabel = (item) => {
 
   // contoh hasil: "Ukuran: Large, Level: Pedas"
   return variant.option_values.map((ov) => ov.option_value).join(" - ");
+};
+
+const hasVariants = (item) => {
+  const product = item.productDetails;
+  return product && product.variants && product.variants.length > 1;
+};
+
+const hasAddons = (item) => {
+  const product = item.productDetails;
+  return product && product.addon_groups && product.addon_groups.length > 0;
+};
+
+const getEditButtonText = (item) => {
+  const v = hasVariants(item);
+  const a = hasAddons(item);
+  if (v && a) return "Ubah Varian dan Addon";
+  if (v) return "Ubah Varian";
+  if (a) return "Ubah Addon";
+  return "";
+};
+
+const showEditButton = (item) => {
+  return hasVariants(item) || hasAddons(item);
 };
 
 const initRequiredAddons = () => {
@@ -1058,6 +1034,33 @@ const toggleAddon = (addon, group) => {
       addon_id: toNumberOrNull(addon?.addon_id),
     });
   }
+};
+
+const getSelectedSingleAddon = (groupId) => {
+  const found = tempAddons.value.find((a) => toNumberOrNull(a?.addon_group_id) === toNumberOrNull(groupId));
+  return found ? toNumberOrNull(found.addon_id) : null;
+};
+const setSelectedSingleAddon = (val, group) => {
+  const addon = group.options.find((a) => toNumberOrNull(a?.addon_id) === toNumberOrNull(val));
+  if (addon) selectSingleAddon(addon, group);
+};
+const getSelectedMultipleAddons = (groupId) => {
+  return tempAddons.value
+    .filter((a) => toNumberOrNull(a?.addon_group_id) === toNumberOrNull(groupId))
+    .map((a) => toNumberOrNull(a?.addon_id));
+};
+const setSelectedMultipleAddons = (vals, group) => {
+  if (!Array.isArray(vals)) return;
+  tempAddons.value = tempAddons.value.filter((a) => toNumberOrNull(a?.addon_group_id) !== toNumberOrNull(group.id));
+  vals.forEach((val) => {
+    const addon = group.options.find((a) => toNumberOrNull(a?.addon_id) === toNumberOrNull(val));
+    if (addon) {
+      tempAddons.value.push({
+        addon_group_id: toNumberOrNull(group?.id),
+        addon_id: toNumberOrNull(addon?.addon_id),
+      });
+    }
+  });
 };
 
 // Calculate store subtotal

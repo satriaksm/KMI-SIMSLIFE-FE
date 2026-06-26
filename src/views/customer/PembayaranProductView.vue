@@ -181,20 +181,23 @@
             <div class="text-sm font-semibold text-gray-800">
               {{ selectedPromo ? selectedPromo.name : "Belum ada voucher dipilih" }}
             </div>
-            <button
+            <Button
               v-if="!selectedPromo"
-              class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
+              size="sm"
+              customClass="rounded-full"
               @click="openPromo = true"
             >
               Pilih
-            </button>
-            <button
+            </Button>
+            <Button
               v-else
-              class="px-3 py-1 text-xs font-semibold text-red-700 transition bg-red-100 rounded-full hover:bg-red-200"
+              variant="danger"
+              size="sm"
+              customClass="rounded-full"
               @click="clearPromo"
             >
               Batalkan
-            </button>
+            </Button>
           </div>
           
           <div v-if="selectedPromo" class="text-xs text-gray-600 space-y-1 mt-1">
@@ -221,20 +224,21 @@
       <section class="p-4 bg-white border border-gray-200 rounded-xl">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-semibold text-gray-800">Metode Pembayaran</h2>
-          <button
-            class="text-xs font-semibold text-[#FFA30E] hover:text-[#e5920d] transition"
+          <Button
+            variant="primary"
+            size="sm"
             @click="openPaymentMethod = true"
           >
             Ubah
-          </button>
+          </Button>
         </div>
         <div class="space-y-3">
           <div v-if="paymentFeesLoading" class="w-full h-12 bg-gray-100 rounded-xl animate-pulse"></div>
-          <div v-else class="flex items-center gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50">
-            <i :class="['pi', selectedPaymentMethod?.icon || 'pi-wallet', 'text-gray-500 text-lg']"></i>
+          <div v-else class="flex items-center gap-3 p-3 border rounded-xl transition-all" :class="selectedPaymentMethod ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 bg-gray-50 text-gray-800'">
+            <i :class="['pi', selectedPaymentMethod?.icon || 'pi-wallet', 'text-lg', selectedPaymentMethod ? 'text-inherit opacity-80' : 'text-gray-500']"></i>
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-gray-800">{{ selectedPaymentMethod?.name || 'Pilih Metode Pembayaran' }}</div>
-              <div v-if="selectedPaymentMethod?.description" class="text-[11px] text-gray-500">{{ selectedPaymentMethod.description }}</div>
+              <div class="text-sm font-semibold">{{ selectedPaymentMethod?.name || 'Pilih Metode Pembayaran' }}</div>
+              <div v-if="selectedPaymentMethod?.description" class="text-[11px] text-gray-500 mt-1">{{ selectedPaymentMethod.description }}</div>
             </div>
           </div>
           <p
@@ -479,6 +483,7 @@
 import { computed, ref, watch, onMounted } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
+import Button from "@/components/common/Button.vue";
 import TextField from "@/components/forms/TextField.vue";
 import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";

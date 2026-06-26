@@ -928,121 +928,34 @@
         <!-- Group Items -->
         <div class="space-y-2">
           <div v-if="isSingleRequired(group)" class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- RADIO -->
-                <input
-                  type="radio"
-                  :name="'group-' + group.id"
-                  :checked="isAddonSelected(addon)"
-                  @change="selectSingleAddon(addon, group)"
-                  :disabled="!addon.available"
-                  class="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <RadioGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available
+              }))"
+              layout="grid"
+              :modelValue="getSelectedSingleAddon(group.id)"
+              @update:modelValue="val => setSelectedSingleAddon(val, group)"
+            />
           </div>
           <div v-else class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between gap-3 p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- CHECKBOX -->
-                <input
-                  type="checkbox"
-                  :checked="isAddonSelected(addon)"
-                  @change="toggleAddon(addon, group)"
-                  :disabled="!addon.available || isGroupMaxed(group, addon)"
-                  class="mt-0.5 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <CheckboxGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available || isGroupMaxed(group, addon)
+              }))"
+              layout="grid"
+              :modelValue="getSelectedMultipleAddons(group.id)"
+              @update:modelValue="vals => setSelectedMultipleAddons(vals, group)"
+            />
           </div>
         </div>
       </div>
@@ -1260,6 +1173,8 @@ import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ReviewSection from "@/components/common/ReviewSection.vue";
 import Textfield from "@/components/forms/TextField.vue";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
+import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
 import { useProducts } from "@/composables/useProducts.js";
 import { useToast } from "vue-toastification";
 import { useCartStore } from "@/stores/cart";
@@ -2231,6 +2146,39 @@ function toggleAddon(addon, group) {
     });
   }
 }
+
+// Helpers untuk komponen Radio/CheckboxGroupPills
+const getSelectedSingleAddon = (groupId) => {
+  const found = tempSelectedAddons.value.find((a) => Number(a.addon_group_id) === Number(groupId));
+  return found ? found.addon_id : null;
+};
+
+const setSelectedSingleAddon = (val, group) => {
+  const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+  if (addon) selectSingleAddon(addon, group);
+};
+
+const getSelectedMultipleAddons = (groupId) => {
+  return tempSelectedAddons.value
+    .filter((a) => Number(a.addon_group_id) === Number(groupId))
+    .map((a) => a.addon_id);
+};
+
+const setSelectedMultipleAddons = (vals, group) => {
+  if (!Array.isArray(vals)) return;
+  tempSelectedAddons.value = tempSelectedAddons.value.filter((a) => Number(a.addon_group_id) !== Number(group.id));
+  vals.forEach((val) => {
+    const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+    if (addon) {
+      tempSelectedAddons.value.push({
+        addon_group_id: group.id,
+        addon_id: addon.addon_id ?? addon.id,
+        name: addon.name,
+        price: Number(addon.price || 0),
+      });
+    }
+  });
+};
 
 // Pilih single untuk group maxSelection === 1 (radio)
 function selectSingleAddon(addon, group) {
