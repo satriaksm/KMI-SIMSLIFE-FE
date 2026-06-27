@@ -839,6 +839,15 @@ const router = useRouter();
 const toast = useToast();
 
 const orderId = computed(() => String(route.params.orderId || ""));
+
+// Order type from query parameter - determines which API endpoint to use
+// Set by Index.vue when navigating to detail page
+const orderType = computed(() => {
+  const type = route.query?.type;
+  if (type === 'jasa') return 'jasa';
+  return 'product'; // Default to product order
+});
+
 const loading = ref(true);
 const rawOrder = ref(null);
 const isJasaOrder = ref(false);
@@ -1330,7 +1339,7 @@ const productOrder = computed(() => {
       })),
       price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
       originalPrice: null,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      imageUrl: getProductImage(it),
       is_reviewed: it.is_reviewed || false,
       can_review: it.can_review || false,
       can_update_review: it.can_update_review || false,
@@ -1376,6 +1385,58 @@ function formatDateTime(dateStr) {
     " " +
     d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
   );
+}
+
+// ─── Product Image Resolver (SAFE - only used for PRODUCT orders) ───────────────
+/**
+ * Resolves product image from various possible field names.
+ * Checks multiple sources in priority order.
+ * NOTE: This function is ONLY called for PRODUCT orders, NOT JASA orders.
+ */
+function getProductImage(item) {
+  if (!item) return '/placeholder.png';
+
+  // Priority 1: Direct image fields
+  const directImage =
+    item.image ||
+    item.product_image ||
+    item.photo ||
+    item.thumbnail;
+
+  if (directImage) {
+    if (String(directImage).startsWith('http')) return directImage;
+    return resolveImageUrl(directImage);
+  }
+
+  // Priority 2: Nested product object (common API pattern)
+  const productImage =
+    item.product?.image ||
+    item.product?.photo ||
+    item.product?.thumbnail ||
+    item.product?.cover_image;
+
+  if (productImage) {
+    if (String(productImage).startsWith('http')) return productImage;
+    return resolveImageUrl(productImage);
+  }
+
+  // Priority 3: Media array (polymorphic relation)
+  const mediaImage =
+    item.product?.media?.[0]?.url ||
+    item.product?.media?.[0]?.file_url ||
+    item.media?.[0]?.url;
+
+  if (mediaImage) {
+    if (String(mediaImage).startsWith('http')) return mediaImage;
+    return resolveImageUrl(mediaImage);
+  }
+
+  // Priority 4: Snapshot path (original implementation)
+  const snapshotUrl = getOrderSnapshotUrl(item.id, item.image_snapshot_path);
+  if (snapshotUrl) return snapshotUrl;
+
+  // Fallback: placeholder
+  return '/placeholder.png';
 }
 
 function getOrderSnapshotUrl(orderItemId, path) {
@@ -1679,32 +1740,42 @@ async function fetchOrder() {
   }
   loading.value = true;
   failedEvidenceImages.value = new Set();
-  
+
   if (timer) clearInterval(timer);
   if (confirmTimer) clearInterval(confirmTimer);
 
+  // Use the correct endpoint based on order type from query parameter
+  // This is set by Index.vue when navigating to detail page
+  const currentOrderType = orderType.value;
+  console.log('[Detail] Fetching order:', { id, orderType: currentOrderType });
+
   try {
-    // 1. Try Jasa Order
-    const { data: res } = await getCustomerOrderDetail(id);
-    rawOrder.value = res?.data ?? res ?? null;
-    console.log('[Detail] Jasa order raw response:', rawOrder.value);
-    console.log('[Detail] Jasa order review data:', rawOrder.value?.review || rawOrder.value?.jasa_order_item?.review || rawOrder.value?.jasaOrderItem?.review);
-    isJasaOrder.value = true;
-  } catch (e) {
-    console.log('[Detail] Jasa order fetch failed/not found, falling back to product order:', e);
-    try {
-      // 2. Fallback to Product Order
+    if (currentOrderType === 'jasa') {
+      // JASA ORDER: use /api/jasa-orders/{id}
+      console.log('[Detail] Calling jasa-orders endpoint');
+      const { data: res } = await getCustomerOrderDetail(id);
+      rawOrder.value = res?.data ?? res ?? null;
+      console.log('[Detail] Jasa order raw response:', rawOrder.value);
+      console.log('[Detail] Jasa order review data:', rawOrder.value?.review || rawOrder.value?.jasa_order_item?.review || rawOrder.value?.jasaOrderItem?.review);
+      isJasaOrder.value = true;
+    } else {
+      // PRODUCT ORDER: use /api/orders/{id}
+      console.log('[Detail] Calling product orders endpoint');
       const { data: res } = await api.get(`/api/orders/${id}`);
       rawOrder.value = res?.data ?? res ?? null;
       isJasaOrder.value = false;
-      
+
       startCountdown();
       startConfirmCountdown();
-    } catch (err) {
-      console.error("Gagal memuat detail pesanan product/jasa:", err);
-      toast.error("Gagal memuat detail pesanan");
-      rawOrder.value = null;
     }
+  } catch (err) {
+    console.error('[Detail] Failed to fetch order:', {
+      orderType: currentOrderType,
+      error: err?.response?.data || err.message,
+      status: err?.response?.status
+    });
+    toast.error("Gagal memuat detail pesanan");
+    rawOrder.value = null;
   } finally {
     loading.value = false;
   }

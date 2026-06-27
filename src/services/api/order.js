@@ -80,6 +80,52 @@ export function getMerchantOrderDetail(merchantSlug, orderId) {
 }
 
 /**
+ * List merchant PRODUCT orders (for toko/kuliner merchants)
+ * Endpoint: GET /api/merchant/orders?merchant={slug}
+ * @param {string} merchantSlug
+ * @param {Object} params - { status?, per_page?, page?, start_date?, end_date?, sort_by? }
+ */
+export async function getMerchantProductOrders(merchantSlug, params = {}) {
+  const queryParams = {
+    merchant: merchantSlug,
+    ...params,
+  };
+
+  try {
+    const response = await api.get('/api/merchant/orders', { params: queryParams });
+    return response;
+  } catch (error) {
+    // Graceful fallback - return empty if 405/404
+    if (error?.response?.status === 405 || error?.response?.status === 404) {
+      console.warn('[getMerchantProductOrders] Route not implemented - returning empty');
+      return { data: { data: [], meta: { total: 0 } } };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Detail of a single PRODUCT order (merchant)
+ * Endpoint: GET /api/merchant/orders/{id}?merchant={slug}
+ */
+export async function getMerchantProductOrderDetail(merchantSlug, orderId) {
+  const queryParams = {
+    merchant: merchantSlug,
+  };
+
+  try {
+    const response = await api.get(`/api/merchant/orders/${orderId}`, { params: queryParams });
+    return response;
+  } catch (error) {
+    if (error?.response?.status === 405 || error?.response?.status === 404) {
+      console.warn('[getMerchantProductOrderDetail] Route not implemented');
+      return { data: null };
+    }
+    throw error;
+  }
+}
+
+/**
  * Update order status (merchant)
  * Endpoint: PATCH /api/merchant/{merchantSlug}/jasa-orders/{orderId}/status
  * @param {string} merchantSlug

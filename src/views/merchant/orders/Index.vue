@@ -11,7 +11,7 @@ import StatusLabel from "@/components/common/StatusLabel.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import MobilePagination from "@/components/common/MobilePagination.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
-import { getMerchantOrders } from "@/services/api/order";
+import { getMerchantOrders, getMerchantProductOrders } from "@/services/api/order";
 import { useToast } from "vue-toastification";
 import echo from "@/libs/echo";
 import api from "@/libs/axios";
@@ -247,7 +247,7 @@ async function fetchOrders() {
     return;
   }
 
-  // Default: fetch produk orders
+  // Default: fetch produk orders from /api/merchant/orders
   ordersLoading.value = true;
   try {
     const params = {
@@ -260,9 +260,25 @@ async function fetchOrders() {
       per_page: perPage.value
     };
 
-    const { data: res } = await getMerchantOrders(currentMerchantSlug.value, params);
-    const list = res?.data ?? res ?? [];
-    allOrders.value = (Array.isArray(list) ? list : []).map(mapMerchantOrder);
+    // Use product orders endpoint (separate from jasa)
+    const { data: res } = await getMerchantProductOrders(currentMerchantSlug.value, params);
+
+    // Parse response - handle multiple possible structures
+    let list = [];
+    if (Array.isArray(res)) {
+      list = res;
+    } else if (res?.data && Array.isArray(res.data)) {
+      list = res.data;
+    } else if (res?.data?.data && Array.isArray(res.data.data)) {
+      list = res.data.data;
+    }
+
+    console.log('[fetchOrders] PRODUCT ORDERS:', {
+      merchantSlug: currentMerchantSlug.value,
+      totalItems: list.length
+    });
+
+    allOrders.value = list.map(mapMerchantOrder);
 
     const meta = res?.meta?.pagination || res?.pagination || {};
     totalPages.value = meta.last_page || 1;

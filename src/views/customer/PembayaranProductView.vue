@@ -913,9 +913,18 @@ async function fetchShippingCost() {
       note: result?.note ?? null,
     };
   } catch (e) {
-    console.error("Gagal menghitung ongkir:", e);
-    amounts.value.ongkir = 0;
-    shippingInfo.value = null;
+    // Shipping API failed - use safe fallback with default flat rate
+    // DO NOT block checkout, just use default fee
+    console.warn("[Checkout] Shipping API failed, using default flat rate:", e?.message || e);
+    const DEFAULT_SHIPPING_FEE = 15000; // Default Rp 15.000
+    amounts.value.ongkir = DEFAULT_SHIPPING_FEE;
+    shippingInfo.value = {
+      distanceKm: 0,
+      baseCost: DEFAULT_SHIPPING_FEE,
+      costPerKm: 0,
+      note: 'Biaya pengiriman standar',
+    };
+    // Note: Checkout will still work - backend will recalculate the actual fee
   } finally {
     shippingLoading.value = false;
   }
