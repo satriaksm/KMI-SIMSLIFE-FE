@@ -57,7 +57,7 @@
           <div class="text-sm font-semibold text-black">
             {{ paymentMethodDisplay }}
           </div>
-          <div v-if="paymentStatusDisplay" class="mt-0.5">
+          <div v-if="paymentStatusDisplay && !isFinished" class="mt-0.5">
             <span
               class="px-2 py-0.5 text-[10px] font-semibold rounded-full"
               :class="isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
@@ -206,6 +206,11 @@ const isPaid = computed(() => {
 
 const isCod = computed(() => {
   return String(props.order.payment_method || "").toUpperCase() === "COD";
+});
+
+const isFinished = computed(() => {
+  const status = String(props.order.status || props.order.service_status || props.order.order_status || "").toLowerCase();
+  return ['selesai', 'completed', 'ditolak', 'rejected', 'dibatalkan', 'cancelled', 'batal', 'expired', 'kadaluarsa'].includes(status);
 });
 
 // ========================

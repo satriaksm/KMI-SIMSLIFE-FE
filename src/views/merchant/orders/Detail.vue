@@ -222,6 +222,11 @@ const order = computed(() => {
       completion_evidences: o.completion_evidences || [],
       review: o.review || null,
       merchant_reply: o.merchant_reply || null,
+      is_paid: o.is_paid,
+      is_cod: o.is_cod,
+      can_merchant_confirm: o.can_merchant_confirm,
+      show_merchant_countdown: o.show_merchant_countdown,
+      status_label: o.status_label,
       items: [
         {
           id: itemJasaId,
@@ -558,23 +563,58 @@ const currentStatusConfig = computed(() => {
 // ========================
 // ORDER TIMELINE
 // ========================
+const isJasaUnpaidOnline = (order) => {
+  if (!order) return false;
+  if (order.order_type !== 'jasa') return false;
+
+  const isCod = order.is_cod === true;
+  const isPaid = order.is_paid === true;
+
+  const isCancelledOrExpired = [
+    'batal',
+    'cancelled',
+    'canceled',
+    'expired',
+    'kadaluarsa',
+    'ditolak',
+    'dibatalkan',
+    'rejected'
+  ].includes(String(order.status || '').toLowerCase());
+
+  return !isCod && !isPaid && !isCancelledOrExpired;
+};
+
 const timeline = computed(() => {
   if (!order.value) return [];
   let status = order.value.status;
 
   // Jasa Stepper Map
   if (order.value.order_type === 'jasa') {
+    const isUnpaid = isJasaUnpaidOnline(order.value);
+    const isCod = order.value.is_cod === true;
+    const isPaid = order.value.is_paid === true;
+
     if (status === 'pending') {
+      status = isUnpaid ? 'menunggu_pembayaran' : 'menunggu_konfirmasi_merchant';
+    } else if (status === 'menunggu_konfirmasi' || status === 'menunggu_konfirmasi_merchant') {
       status = 'menunggu_konfirmasi_merchant';
-    } else if (status === 'proses' || status === 'processing') {
+    } else if (['diterima', 'accepted', 'responsed'].includes(status)) {
+      status = 'diterima';
+    } else if (['proses', 'processing', 'layanan_dikerjakan', 'dikerjakan'].includes(status)) {
       status = 'layanan_dikerjakan';
-    } else if (status === 'menunggu_selesai') {
+    } else if (['menunggu_selesai', 'menunggu_konfirmasi_selesai'].includes(status)) {
       status = 'menunggu_konfirmasi_selesai';
-    } else if (status === 'completed') {
+    } else if (['completed', 'selesai'].includes(status)) {
       status = 'selesai';
     }
 
     const steps = [
+      {
+        key: "menunggu_pembayaran",
+        label: isCod ? "Pesanan Dibuat" : "Menunggu Pembayaran",
+        desc: isCod ? "Pesanan dibuat (COD)" : (isPaid ? "Pembayaran diterima" : "Menunggu pembayaran customer"),
+        icon: "pi-wallet",
+      },
       {
         key: "menunggu_konfirmasi_merchant",
         label: "Menunggu Konfirmasi",
@@ -608,6 +648,7 @@ const timeline = computed(() => {
     ];
 
     const statusOrder = [
+      "menunggu_pembayaran",
       "menunggu_konfirmasi_merchant",
       "diterima",
       "layanan_dikerjakan",
@@ -820,15 +861,18 @@ async function submitJasaRejection() {
     return;
   }
   actionLoading.value = true;
+  const payload = {
+    status: 'ditolak',
+    rejection_reason: rejectReason.value,
+  };
+  console.log('[submitJasaRejection] Payload:', payload);
   try {
-    await updateOrderStatus(currentMerchantSlug.value, order.value.id, {
-      status: 'ditolak',
-      rejection_reason: rejectReason.value,
-    });
+    await updateOrderStatus(currentMerchantSlug.value, order.value.id, payload);
     toast.success("Pesanan berhasil ditolak");
     showJasaRejectModal.value = false;
     await fetchOrder();
   } catch (e) {
+    console.error('[submitJasaRejection] Error response:', e.response?.data || e);
     toast.error(e.response?.data?.message || "Gagal menolak pesanan");
   } finally {
     actionLoading.value = false;
@@ -837,10 +881,10 @@ async function submitJasaRejection() {
 
 async function updateJasaStatusAction(status) {
   actionLoading.value = true;
+  const payload = { status: status };
+  console.log('[updateJasaStatusAction] Payload:', payload);
   try {
-    await updateOrderStatus(currentMerchantSlug.value, order.value.id, {
-      status: status
-    });
+    await updateOrderStatus(currentMerchantSlug.value, order.value.id, payload);
     toast.success(
       status === 'layanan_dikerjakan'
         ? "Pesanan mulai dikerjakan"
@@ -848,6 +892,7 @@ async function updateJasaStatusAction(status) {
     );
     await fetchOrder();
   } catch (e) {
+    console.error('[updateJasaStatusAction] Error response:', e.response?.data || e);
     toast.error(e.response?.data?.message || "Gagal memperbarui status");
   } finally {
     actionLoading.value = false;
@@ -1313,6 +1358,20 @@ function leaveOrderChannel(id) {
         </div>
       </div>
 
+      <!-- Unpaid online Jasa order info banner -->
+      <div
+        v-if="order.order_type === 'jasa' && isJasaUnpaidOnline(order)"
+        class="flex items-center gap-3 p-4 border border-blue-200 bg-blue-50 rounded-2xl"
+      >
+        <i class="text-xl text-blue-500 pi pi-info-circle shrink-0"></i>
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Menunggu Pembayaran</p>
+          <p class="text-xs text-blue-600 mt-0.5">
+            Pesanan akan masuk ke konfirmasi merchant setelah customer menyelesaikan pembayaran.
+          </p>
+        </div>
+      </div>
+
       <!-- Cancelled banner -->
       <div
         v-if="['cancelled', 'rejected', 'undelivered', 'ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(order.status)"
@@ -1684,7 +1743,7 @@ function leaveOrderChannel(id) {
       <!-- ======================== -->
       <div v-if="order.order_type === 'jasa'" class="pb-6 space-y-2">
         <!-- 1. Menunggu Konfirmasi -->
-        <template v-if="order.status === 'menunggu_konfirmasi_merchant'">
+        <template v-if="order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant'">
           <Button
             variant="merchant"
             block

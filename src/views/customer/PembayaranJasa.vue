@@ -728,7 +728,12 @@ const {
   isCodEnabled,
 } = usePaymentMethods();
 
-const XENDIT_CHANNELS = ['QRIS', 'BCA', 'BNI', 'BRI', 'MANDIRI', 'OVO', 'DANA', 'SHOPEEPAY', 'ALFAMART'];
+const XENDIT_CHANNELS = [
+  'QRIS',
+  'BCA', 'BNI', 'BRI', 'MANDIRI', 'PERMATA', 'CIMB',
+  'OVO', 'DANA', 'SHOPEEPAY', 'LINKAJA',
+  'ALFAMART', 'INDOMARET'
+];
 
 // selectedPayment: variabel utama yang berubah saat user klik metode
 const selectedPayment = ref(null);

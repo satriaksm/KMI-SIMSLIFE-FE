@@ -354,7 +354,26 @@
               customClass="mt-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold"
             >
               <i class="pi pi-credit-card mr-1"></i>
-              Bayar Kembali
+              Bayar Sekarang
+            </Button>
+            <!-- Kembali ke Pesanan Saya -->
+            <Button
+              block
+              @click="$router.push('/orders')"
+              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
+            >
+              Kembali ke Pesanan Saya
+            </Button>
+            <!-- Batalkan Pesanan (Jasa) -->
+            <Button
+              v-if="order.status === 'pending'"
+              block
+              :loading="cancelling"
+              @click="handleCancel"
+              customClass="mt-2 border border-red-500 text-red-500 hover:bg-red-50 font-semibold"
+            >
+              <i class="pi pi-times mr-1"></i>
+              Batalkan Pesanan
             </Button>
             <!-- Konfirmasi Selesai -->
             <Button
@@ -469,26 +488,6 @@
                 {{ formatDate(order.review.merchant_reply_at) }} {{ formatTime(order.review.merchant_reply_at) }}
               </p>
             </div>
-
-            <!-- Kembali ke Pesanan Saya -->
-            <Button
-              block
-              @click="$router.push('/orders')"
-              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
-            >
-              Kembali ke Pesanan Saya
-            </Button>
-            <!-- Batalkan Pesanan -->
-            <Button
-              v-if="['pending', 'menunggu_konfirmasi_merchant'].includes(order.status)"
-              variant="danger-outline"
-              block
-              :loading="cancelling"
-              @click="handleCancel"
-              customClass="mt-2 font-semibold"
-            >
-              Batalkan Pesanan
-            </Button>
           </div>
         </template>
 
@@ -1085,7 +1084,7 @@ const jasaOrder = computed(() => {
   if (!o) return null;
 
   const rawStatus = String(o.status || o.service_status || o.order_status || "").toLowerCase();
-  const isCod = String(o.payment_method || "").toUpperCase() === "COD";
+  const isOrderCod = String(o.payment_method || "").toUpperCase() === "COD";
   const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED'];
   const isPaid = paidStatuses.includes(String(o.payment_status || "").toUpperCase());
 
@@ -1137,13 +1136,21 @@ const jasaOrder = computed(() => {
     expired: "Kadaluarsa",
     kadaluarsa: "Kadaluarsa",
   };
-  const statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
+  const isUnpaidOnline = !isPaid && !isOrderCod;
 
-  // 6-step tracking stepper for Jasa
+  let statusLabel;
+  if (isUnpaidOnline) {
+    statusLabel = "Pesanan Dibuat";
+  } else if (['pending', 'unpaid', 'waiting_payment', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'paid'].includes(rawStatus)) {
+    statusLabel = "Menunggu Konfirmasi UMKM";
+  } else {
+    statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
+  }
+
+  // 5-step tracking stepper for Jasa
   const tracking = [
     { key: "placed", icon: "pi-receipt", label: "Pesanan\nDibuat", done: true },
-    { key: "paid", icon: "pi-credit-card", label: "Pembayaran\nDiterima", done: isPaid || isCod || (rawStatus !== 'pending') },
-    { key: "confirmed", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: ['diterima', 'accepted', 'responsed', 'layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
+    { key: "confirmed", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: isPaid || isOrderCod || ['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'diterima', 'accepted', 'responsed', 'layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
     { key: "working", icon: "pi-cog", label: "Layanan\nDikerjakan", done: ['layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
     { key: "completion_pending", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: ['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
     { key: "completed", icon: "pi-home", label: "Selesai", done: ['selesai', 'completed'].includes(rawStatus) }
@@ -1167,9 +1174,9 @@ const jasaOrder = computed(() => {
     id: o.id,
     order_number: o.invoice || o.order_number || `ORD-${String(o.id).padStart(6, "0")}`,
     jasa_order_item_id: o.jasa_order_item_id || null,
-    is_reviewed: o.is_reviewed || false,
-    can_review: o.can_review || false,
-    can_update_review: o.can_update_review || false,
+    is_reviewed: o.is_reviewed || o.jasa_order_item?.is_reviewed || o.jasaOrderItem?.isReviewed || false,
+    can_review: o.can_review !== undefined ? o.can_review : (rawStatus === 'selesai' && !(o.is_reviewed || o.jasa_order_item?.is_reviewed)),
+    can_update_review: o.can_update_review !== undefined ? o.can_update_review : (o.is_reviewed && (o.review?.update_count ?? 0) < 1),
     service_name: o.service_name || o.jasa?.title || "Layanan",
     service_image: o.service_image || o.jasa?.image || null,
     service_type: o.service_type || "",
@@ -1195,18 +1202,24 @@ const jasaOrder = computed(() => {
     subtotal: Number(o.subtotal ?? o.total_price ?? 0),
     platform_fee: Number(o.platform_fee ?? 0),
     payment_fee: Number(o.payment_fee ?? 0),
-    is_cod: isCod,
+    is_cod: isOrderCod,
     total_payment: Number(o.total_payment ?? o.total_price ?? 0),
-    payment_status_display: isCod
+    payment_status_display: isOrderCod
       ? (['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(rawStatus) ? 'Dibayar di Tempat' : 'COD - Menunggu Bayar')
       : getPaymentStatusLabel(o.payment_status),
-    is_payment_completed: isPaid || (isCod && ['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(rawStatus)),
+    is_payment_completed: isPaid || (isOrderCod && ['selesai', 'ditolak', 'dibatalkan', 'expired'].includes(rawStatus)),
     total_price: Number(o.total_price || 0),
     status: rawStatus,
     status_label: statusLabel,
     created_at: o.created_at,
     created_at_formatted: createdAtFormatted,
-    review: o.review || null,
+    review: o.review || o.jasa_order_item?.review || o.jasaOrderItem?.review || null,
+    completion_note:
+      o.completion_note ||
+      o.jasa_order_item?.completion_note ||
+      o.jasaOrderItem?.completionNote ||
+      (o.jasaItems?.[0]?.completion_note) ||
+      null,
     completion_evidences:
       o.completion_evidences ||
       o.completionEvidences ||
@@ -1674,6 +1687,8 @@ async function fetchOrder() {
     // 1. Try Jasa Order
     const { data: res } = await getCustomerOrderDetail(id);
     rawOrder.value = res?.data ?? res ?? null;
+    console.log('[Detail] Jasa order raw response:', rawOrder.value);
+    console.log('[Detail] Jasa order review data:', rawOrder.value?.review || rawOrder.value?.jasa_order_item?.review || rawOrder.value?.jasaOrderItem?.review);
     isJasaOrder.value = true;
   } catch (e) {
     console.log('[Detail] Jasa order fetch failed/not found, falling back to product order:', e);
@@ -1712,7 +1727,8 @@ async function verifyPaymentFromXendit(retryCount = 0) {
     if (
       result?.already_paid || 
       result?.order_status === "paid" || 
-      result?.order_status === "menunggu_konfirmasi_merchant"
+      result?.order_status === "menunggu_konfirmasi_merchant" ||
+      result?.order_status === "menunggu_konfirmasi"
     ) {
       toast.success("Pembayaran berhasil! Menunggu konfirmasi dari penjual.");
       

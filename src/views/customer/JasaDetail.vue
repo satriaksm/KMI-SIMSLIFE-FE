@@ -157,6 +157,15 @@
         </div>
       </div>
 
+      <!-- Banner: Merchant sedang tutup -->
+      <div
+        v-if="showMerchantClosedBanner"
+        class="mt-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2"
+      >
+        <i class="pi pi-info-circle"></i>
+        UMKM sedang tutup. Anda tidak dapat membuat pesanan saat ini.
+      </div>
+
       <!-- Info Jasa -->
       <div class="mt-3">
         <h1 class="text-lg font-semibold leading-snug text-gray-900 sm:text-xl">
@@ -476,7 +485,13 @@
       class="fixed left-0 right-0 bottom-16 sm:bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] px-4 py-3"
     >
       <div class="flex items-center max-w-3xl gap-4 mx-auto lg:max-w-5xl">
-        <template v-if="isBookingMode">
+        <!-- Jika merchant sedang tutup, tampilkan tombol nonaktif -->
+        <div v-if="!merchantIsOpen" class="flex-1 py-3 text-center text-sm text-gray-400 bg-gray-100 rounded-full">
+          <i class="pi pi-clock mr-1"></i>
+          UMKM sedang tutup — pesanan tidak tersedia
+        </div>
+
+        <template v-else-if="isBookingMode">
           <!-- Jika jam layanan belum diatur merchant -->
           <div v-if="!hasOperatingTimes" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
             <i class="pi pi-clock mr-1"></i>
@@ -1139,6 +1154,15 @@ const merchantAddress = computed(() => {
 });
 
 // ----- harga display -----
+// ----- merchant open status (is_open_now dari API) -----
+// Mengikuti pola produk: backend adalah sumber kebenaran utama
+const merchantIsOpen = computed(() => {
+  return jasa.value?.merchant?.is_open_now === true;
+});
+
+const showMerchantClosedBanner = computed(() => {
+  return jasa.value?.merchant?.is_open_now === false;
+});
 const priceTypeLabel = computed(() => {
   if (!jasa.value) return "";
   if (jasa.value.fixed_price && jasa.value.fixed_price > 0) return "Harga Tetap";

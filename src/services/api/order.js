@@ -63,30 +63,33 @@ export function completeOrder(orderId) {
 
 /**
  * List merchant orders (paginated)
+ * Endpoint: GET /api/merchant/{merchantSlug}/jasa-orders
  * @param {string} merchantSlug
- * @param {Object} params - { status?, per_page?, page? }
+ * @param {Object} params - { status?, per_page?, page?, start_date?, end_date?, sort_by? }
  */
 export function getMerchantOrders(merchantSlug, params = {}) {
-  return api.get(`/api/merchant/${merchantSlug}/orders`, { params });
+  return api.get(`/api/merchant/${merchantSlug}/jasa-orders`, { params });
 }
 
 /**
  * Detail of a single order (merchant)
+ * Endpoint: GET /api/merchant/{merchantSlug}/jasa-orders/{orderId}
  */
 export function getMerchantOrderDetail(merchantSlug, orderId) {
-  return api.get(`/api/merchant/${merchantSlug}/orders/${orderId}`);
+  return api.get(`/api/merchant/${merchantSlug}/jasa-orders/${orderId}`);
 }
 
 /**
  * Update order status (merchant)
+ * Endpoint: PATCH /api/merchant/{merchantSlug}/jasa-orders/{orderId}/status
  * @param {string} merchantSlug
  * @param {number} orderId
- * @param {string} status - responsed|delivered|completed|cancelled
+ * @param {string|FormData} payload - status string or FormData with status + evidences
  */
 export function updateOrderStatus(merchantSlug, orderId, payload) {
   if (payload instanceof FormData) {
-    return api.post(
-      `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
+    return api.patch(
+      `/api/merchant/${merchantSlug}/jasa-orders/${orderId}/status`,
       payload,
       {
         headers: {
@@ -95,9 +98,11 @@ export function updateOrderStatus(merchantSlug, orderId, payload) {
       }
     );
   }
-  
-  return api.post(
-    `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
-    { status: payload },
+
+  const data = typeof payload === 'object' && payload !== null ? payload : { status: payload };
+
+  return api.patch(
+    `/api/merchant/${merchantSlug}/jasa-orders/${orderId}/status`,
+    data
   );
 }

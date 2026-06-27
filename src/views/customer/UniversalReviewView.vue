@@ -192,10 +192,10 @@ const submitReview = async () => {
     };
     console.log('[UniversalReview] Review Payload:', payload);
 
-    // Add media files — key must be 'media' not 'media[]' to match backend validation
+    // Add media files — key must be 'media[]' to match backend validation
     // Backend: 'media' => 'nullable|array|max:5'
     for (const file of selectedFiles.value) {
-      formData.append('media', file);
+      formData.append('media[]', file);
     }
 
     // Determine endpoint based on type
@@ -230,11 +230,22 @@ const submitReview = async () => {
       }
     }
 
-    console.log("[UniversalReview] Submitting review with media:", selectedFiles.value.length, "files");
+    console.log("[UniversalReview] Submitting review with selectedFiles:", selectedFiles.value.map(f => ({ name: f.name, size: f.size })));
+    
+    // Log FormData entries for review submission
+    const entries = {};
+    for (const [key, val] of formData.entries()) {
+      if (val instanceof File) {
+        entries[key] = `File: name=${val.name}, size=${val.size}`;
+      } else {
+        entries[key] = val;
+      }
+    }
+    console.log("[UniversalReview] FormData Entries:", entries);
 
     const { data } = await api.post(endpoint, formData, config);
 
-    console.log("[UniversalReview] Response received:", data);
+    console.log("[UniversalReview] Response received from submit:", data);
 
     // ApiResponse::success returns { message, data } — NOT { success }
     // data = axios response.data = { message: "...", data: { review, order } }

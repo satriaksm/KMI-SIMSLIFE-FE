@@ -423,6 +423,26 @@ const canJasaAccept = (order) => {
   return true;
 };
 const canJasaReject = (order) => canJasaAccept(order);
+
+const isJasaUnpaidOnline = (order) => {
+  if (!order) return false;
+  const prefix = getJasaPaymentMethodPrefix(order);
+  const isOnline = prefix === 'Xendit' || prefix === 'Transfer';
+  const isUnpaid = !['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'].includes(String(order.payment_status || '').toUpperCase());
+  return isOnline && isUnpaid && !isJasaTerminal(order);
+};
+
+const shouldShowJasaCountdown = (order) => {
+  if (!order) return false;
+  const rawStatus = String(order.status || '').toLowerCase();
+  const isWaiting = ['menunggu_konfirmasi', 'menunggu', 'menunggu_konfirmasi_merchant', 'pending'].includes(rawStatus);
+  if (!isWaiting) return false;
+
+  // If online unpaid, do not show countdown
+  if (isJasaUnpaidOnline(order)) return false;
+
+  return true;
+};
 const canJasaStart = (order) => {
   const status = getJasaDisplayStatus(order);
   return status === 'diterima';
@@ -504,7 +524,8 @@ const getJasaSlaBadgeColorClass = (order) => {
 
 // Get simple payment line 1 (method name only)
 const getJasaPaymentLine1 = (order) => {
-  return formatPaymentLabel(order);
+  // Pass raw order_status as status so formatPaymentLabel gets the correct raw backend status
+  return formatPaymentLabel({ ...order, status: order.order_status });
 };
 
 // Get simple payment line 2 (status text)
@@ -719,29 +740,38 @@ const getJasaPaymentColor = (order) => {
   return getPaymentStatusColorClass(order?.payment_status);
 };
 
-// Get service type label for display (accepts order object)
-const getServiceTypeLabel = (orderOrType) => {
-  // If backend already provides the label, use it
-  if (orderOrType?.service_type_label) return orderOrType.service_type_label;
-  const type = (
-    orderOrType?.service_type ||
-    orderOrType?.tipe_layanan ||
-    orderOrType?.service_location_type ||
-    orderOrType?.order_type ||
-    orderOrType?.jasa_order_item?.service_type ||
-    orderOrType?.jasa_order_item?.jasa?.service_type ||
-    orderOrType?.jasa?.service_type ||
-    orderOrType?._raw?.service_type ||
-    orderOrType?._raw?.jasa?.service_type ||
-    (typeof orderOrType === 'string' ? orderOrType : '') ||
-    ''
-  );
+// Format service type to user-friendly label
+const formatServiceType = (type) => {
   if (!type) return '—';
   const val = String(type).toLowerCase().trim();
-  if (['di_tempat_umkm', 'ditempat_umkm', 'ditempat', 'di_tempat', 'di tempat', 'at_merchant'].includes(val)) return 'Di Tempat UMKM';
-  if (['ke_rumah_pelanggan', 'ke_tempat_pelanggan', 'kerumah', 'ke_rumah', 'customer_location'].includes(val)) return 'Ke Tempat Pelanggan';
   if (val === 'online') return 'Online';
+  if (['di_tempat_umkm', 'ditempat_umkm', 'ditempat', 'di_tempat', 'di tempat', 'at_merchant'].includes(val)) return 'Di Tempat UMKM';
+  if (['ke_rumah_pelanggan', 'ke_tempat_pelanggan', 'kerumah', 'ke_rumah', 'customer_location'].includes(val)) return 'Ke Rumah Pelanggan';
+  
   return type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ');
+};
+
+// Get service type label for display (accepts order object)
+const getServiceTypeLabel = (orderOrType) => {
+  if (!orderOrType) return '—';
+  if (typeof orderOrType === 'string') return formatServiceType(orderOrType);
+
+  const label = orderOrType.service_type_label || '';
+  if (label && label !== '—' && label !== '-') return formatServiceType(label);
+
+  const type = (
+    orderOrType.service_type ||
+    orderOrType.tipe_layanan ||
+    orderOrType.service_location_type ||
+    orderOrType.order_type ||
+    orderOrType.jasa_order_item?.service_type ||
+    orderOrType.jasa_order_item?.jasa?.service_type ||
+    orderOrType.jasa?.service_type ||
+    orderOrType._raw?.service_type ||
+    orderOrType._raw?.jasa?.service_type ||
+    ''
+  );
+  return formatServiceType(type);
 };
 
 // Map service order to unified format
@@ -750,9 +780,31 @@ function mapJasaOrder(o) {
   console.log('[mapJasaOrder] Order:', o.id, '| completion_evidences:', o.completion_evidences);
   console.log('[mapJasaOrder] Evidence count:', (o.completion_evidences || []).length);
 
+  // Extract service type using all possible fields
+  const item = o.jasa_order_item || o.items?.[0] || {};
+  const rawServiceType = (
+    o.service_type ||
+    o.tipe_layanan ||
+    item.service_type ||
+    item.service?.service_type ||
+    item.jasa?.service_type ||
+    o.jasa?.service_type ||
+    o._raw?.service_type ||
+    ''
+  );
+
+  const rawServiceTypeLabel = (
+    o.service_type_label ||
+    item.service_type_label ||
+    ''
+  );
+
+  const finalServiceType = rawServiceType || rawServiceTypeLabel;
+  const service_type_label = rawServiceTypeLabel ? formatServiceType(rawServiceTypeLabel) : formatServiceType(rawServiceType);
+
   return {
     id: o.id,
-    invoice: o.order_number || o.formatted_order_number || `ORD-${String(o.id).padStart(6, '0')}`,
+    invoice: o.order_number || o.formatted_order_number || o.order_code || `ORD-${String(o.id).padStart(6, '0')}`,
     order_id: o.order_id,
     customer: {
       name: o.customer_name || o.customer?.name || o.user?.name || "Pelanggan",
@@ -762,14 +814,14 @@ function mapJasaOrder(o) {
     status: getJasaDisplayStatus(o),
     service_status: o.service_status || o.status,
     order_status: o.order_status,
-    payment_method: formatPaymentLabel(o),
+    payment_method: formatPaymentLabel({ ...o, status: o.order_status }),
     payment_status: o.payment_status,
     created_at: o.created_at,
-    // Service info
-    service_name: o.service_name || o.jasa?.title || "Layanan Jasa",
+    // Service info - backend returns service_title and jasa.title
+    service_name: o.service_title || o.service_name || o.jasa?.title || "Layanan Jasa",
     category_name: o.category_name || o.service_category || o.jasa_category || o.jasa_order_item?.category_name || o.jasa_order_item?.jasa?.categories?.[0]?.name || o.jasa?.categories?.[0]?.name || '',
-    service_type: o.service_type || o.tipe_layanan || o.service_location_type || o.order_type || o.jasa_order_item?.service_type || o.jasa_order_item?.jasa?.service_type || o.jasa?.service_type || '',
-    service_type_label: o.service_type_label || '',
+    service_type: finalServiceType,
+    service_type_label: service_type_label,
     cara_pemesanan: o.cara_pemesanan || o.booking_type || '',
     cara_pemesanan_label: o.cara_pemesanan_label || '',
     // Addresses (from API — already computed by backend based on service_type)
@@ -787,7 +839,7 @@ function mapJasaOrder(o) {
     consultation: o.consultation,
     items: [{
       id: o.jasa_order_item_id,
-      name: o.service_name || o.jasa?.title || "Layanan Jasa",
+      name: o.service_title || o.service_name || o.jasa?.title || "Layanan Jasa",
       variant: formatJasaType(o.order_type || o.service_type),
       addons: [],
       qty: 1,
@@ -821,8 +873,8 @@ async function fetchJasaOrders() {
   jasaOrdersLoading.value = true;
   try {
     const merchantSlug = currentMerchantSlug.value;
-    // Use new endpoint: /api/merchant/{merchant}/orders
-    const url = `/api/merchant/${merchantSlug}/orders`;
+    // Use new endpoint: /api/merchant/{merchant}/jasa-orders (from JasaOrderController)
+    const url = `/api/merchant/${merchantSlug}/jasa-orders`;
 
     console.log('[fetchJasaOrders] Merchant slug:', merchantSlug);
     console.log('[fetchJasaOrders] Full URL:', url);
@@ -839,9 +891,6 @@ async function fetchJasaOrders() {
       page: currentPage.value,
       per_page: perPage.value,
       q: query.value || undefined,
-      sort_by: filters.value.sort_by,
-      start_date: filters.value.start_date || undefined,
-      end_date: filters.value.end_date || undefined,
     };
 
     const { data: res } = await api.get(url, { params });
@@ -1047,9 +1096,21 @@ async function copyJasaInvoice(invoice) {
 }
 
 // Get status badge class for service orders
-const getJasaStatusClass = (status) => {
+// Get status badge class for service orders
+const getJasaStatusClass = (status, order = {}) => {
+  const isCod = String(order.payment_method || '').toUpperCase() === 'COD';
+  const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'];
+  const isPaid = paidStatuses.includes(String(order.payment_status || '').toUpperCase()) || order.is_paid === true;
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'batal', 'selesai', 'completed', 'kadaluarsa'];
+
+  if (!isCod && !isPaid && !terminalStatuses.includes(status)) {
+    return 'bg-yellow-100 text-yellow-700'; // Menunggu Pembayaran
+  }
+
+  const rawStatus = String(status || '').toLowerCase();
+  const normalized = jasaStatusMap[rawStatus] || rawStatus;
   const classes = {
-    'menunggu': 'bg-yellow-100 text-yellow-700',
+    'menunggu': 'bg-blue-100 text-blue-700',
     'diterima': 'bg-blue-100 text-blue-700',
     'dikerjakan': 'bg-amber-100 text-amber-700',
     'tunggu_selesai': 'bg-purple-100 text-purple-700',
@@ -1059,10 +1120,12 @@ const getJasaStatusClass = (status) => {
     'expired': 'bg-pink-100 text-pink-700',
     'kadaluarsa': 'bg-pink-100 text-pink-700',
   };
-  return classes[status] || 'bg-gray-100 text-gray-700';
+  return classes[normalized] || 'bg-gray-100 text-gray-700';
 };
 
 const getJasaStatusLabel = (status, order = {}) => {
+  if (order.status_label) return order.status_label;
+
   // For expired/kadaluarsa
   if (status === 'expired' || status === 'kadaluarsa') return 'Kadaluarsa';
 
@@ -1092,8 +1155,8 @@ const getJasaStatusLabel = (status, order = {}) => {
 const acceptJasaOrder = async (orderId) => {
   submittingJasa.value = true;
   try {
-    // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    // Use JasaOrderController endpoint: /api/merchant/{merchant}/jasa-orders/{id}/status
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`, {
       status: 'diterima'
     });
 
@@ -1140,8 +1203,8 @@ const submitJasaRejection = async () => {
   submittingJasa.value = true;
   try {
     const orderId = getOrderId(selectedJasaOrder.value);
-    // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    // Use JasaOrderController endpoint: /api/merchant/{merchant}/jasa-orders/{id}/status
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`, {
       status: 'ditolak',
       rejection_reason: rejectReason.value,
     });
@@ -1175,8 +1238,8 @@ const submitJasaRejection = async () => {
 const startJasaWorking = async (orderId) => {
   submittingJasa.value = true;
   try {
-    // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, {
+    // Use JasaOrderController endpoint: /api/merchant/{merchant}/jasa-orders/{id}/status
+    const response = await api.patch(`/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`, {
       status: 'layanan_dikerjakan'
     });
 
@@ -1263,8 +1326,8 @@ const submitJasaEvidence = async () => {
       formData.append('evidences[]', file);
     });
 
-    // Use new endpoint: /api/merchant/{merchant}/orders/{id}/status
-    await api.post(`/api/merchant/${currentMerchantSlug.value}/orders/${orderId}/status`, formData);
+    // Use JasaOrderController endpoint: /api/merchant/{merchant}/jasa-orders/{id}/status (PATCH)
+    await api.patch(`/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`, formData);
     toast.success('Bukti pengerjaan berhasil dikirim');
     showJasaEvidenceModal.value = false;
     showJasaDetailModal.value = false;
@@ -2060,7 +2123,7 @@ function leaveOrdersChannel(id) {
                       </td>
                       <td class="px-4 py-3">
                         <div class="space-y-1">
-                          <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getJasaStatusClass(order.status)]">
+                          <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getJasaStatusClass(order.status, order)]">
                             {{ getJasaStatusLabel(order.status, order) }}
                           </span>
                           <div v-if="getJasaSlaBadgeText(order)" :class="['inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full', getJasaSlaBadgeColorClass(order)]">
@@ -2320,7 +2383,7 @@ function leaveOrdersChannel(id) {
               </p>
             </div>
             <div class="flex flex-col items-end gap-1 shrink-0">
-              <span :class="['px-2 py-0.5 rounded-full text-[11px] font-medium', getJasaStatusClass(order.status)]">
+              <span :class="['px-2 py-0.5 rounded-full text-[11px] font-medium', getJasaStatusClass(order.status, order)]">
                 {{ getJasaStatusLabel(order.status, order) }}
               </span>
               <span v-if="getJasaSlaBadgeText(order)" :class="['inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full', getJasaSlaBadgeColorClass(order)]">
@@ -2572,20 +2635,34 @@ function leaveOrdersChannel(id) {
             </div>
 
             <!-- 2. SLA COUNTDOWNS & WARNING BANNER -->
-            <!-- SLA Countdown: menunggu_konfirmasi -->
-            <div
-              v-if="String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu' || String(selectedJasaOrder.status || '').toLowerCase() === 'menunggu_konfirmasi_merchant'"
-              class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs text-orange-700">
-                  <i class="pi pi-clock shrink-0"></i>
-                  <span>Batas waktu respon merchant</span>
-                </div>
-                <span class="text-sm font-bold text-orange-700 font-mono">{{ getJasaMerchantDeadlineRemaining(selectedJasaOrder) || '00:00:00' }}</span>
-              </div>
-              <p class="mt-1 text-[10px] text-orange-500">UMKM wajib merespon dalam 60 menit. Jika terlewati, pesanan akan otomatis dibatalkan.</p>
-            </div>
+             <!-- SLA Countdown: menunggu_konfirmasi -->
+             <div
+               v-if="shouldShowJasaCountdown(selectedJasaOrder)"
+               class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
+             >
+               <div class="flex items-center justify-between">
+                 <div class="flex items-center gap-2 text-xs text-orange-700">
+                   <i class="pi pi-clock shrink-0"></i>
+                   <span>Batas waktu respon merchant</span>
+                 </div>
+                 <span class="text-sm font-bold text-orange-700 font-mono">{{ getJasaMerchantDeadlineRemaining(selectedJasaOrder) || '00:00:00' }}</span>
+               </div>
+               <p class="mt-1 text-[10px] text-orange-500">UMKM wajib merespon dalam 60 menit. Jika terlewati, pesanan akan otomatis dibatalkan.</p>
+             </div>
+
+             <!-- Info banner: unpaid online order -->
+             <div
+               v-if="isJasaUnpaidOnline(selectedJasaOrder)"
+               class="p-3 bg-yellow-50 border border-yellow-200 rounded-2xl"
+             >
+               <div class="flex items-start gap-2.5">
+                 <i class="pi pi-info-circle text-yellow-600 mt-0.5 shrink-0 text-sm"></i>
+                 <div>
+                   <p class="text-xs font-semibold text-yellow-800">Menunggu Pembayaran Customer</p>
+                   <p class="mt-0.5 text-[10px] text-yellow-600">Pesanan akan masuk ke konfirmasi merchant setelah customer menyelesaikan pembayaran.</p>
+                 </div>
+               </div>
+             </div>
 
             <!-- SLA Countdown: menunggu_selesai (customer confirmation) -->
             <div
@@ -3290,7 +3367,7 @@ function leaveOrdersChannel(id) {
 
             <!-- Order Status -->
             <div class="flex items-center gap-2">
-              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getJasaStatusClass(selectedJasaOrder.status)]">
+              <span :class="['inline-block px-3 py-1.5 rounded-full text-xs font-medium', getJasaStatusClass(selectedJasaOrder.status, selectedJasaOrder)]">
                 {{ getJasaStatusLabel(selectedJasaOrder.status, selectedJasaOrder) }}
               </span>
             </div>

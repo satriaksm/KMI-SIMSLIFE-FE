@@ -8,8 +8,8 @@
 export function formatPaymentLabel(order) {
   if (!order) return "—";
 
-  // Resolve method and channel, checking snapshots first
-  const method = String(
+  // Resolve raw method
+  const rawMethod = String(
     order.payment_method_snapshot ||
     order.payment_method ||
     order.meta?.payment_method ||
@@ -17,50 +17,64 @@ export function formatPaymentLabel(order) {
     ""
   ).toUpperCase().trim();
 
-  const channel = String(
-    order.payment_channel_snapshot ||
-    order.payment_channel ||
-    order.channel_code ||
-    order.paid_channel ||
-    order.payment?.payment_channel ||
-    order.payment?.channel_code ||
-    order.payment?.payment_method || // in some formats, payment_method in relation holds channel
-    ""
-  ).toUpperCase().trim();
+  // Resolve actual payment channel based on strict priority order:
+  // 1. order.payment?.paid_channel
+  // 2. order.paid_channel
+  // 3. order.payment_channel
+  // 4. order.channel
+  // 5. order.payment?.channel
+  // 6. order.payment?.payment_channel
+  // 7. order.payment?.xendit_payment_method
+  // 8. order.payment?.payment_method
+  let rawChannel = "";
+  const priorities = [
+    order.payment?.paid_channel,
+    order.paid_channel,
+    order.payment_channel,
+    order.channel,
+    order.payment?.channel,
+    order.payment?.payment_channel,
+    order.payment?.xendit_payment_method,
+    order.payment?.payment_method
+  ];
+
+  for (const val of priorities) {
+    if (val && typeof val === "string") {
+      const cleanVal = val.toUpperCase().trim();
+      if (cleanVal && cleanVal !== "XENDIT" && cleanVal !== "ONLINE" && cleanVal !== "ONLINE_XENDIT" && cleanVal !== "TRANSFER") {
+        rawChannel = cleanVal;
+        break;
+      }
+    }
+  }
 
   // Handle Cash on Delivery
-  if (method === "COD" || method.includes("COD") || method === "TUNAI" || method === "BAYAR DI TEMPAT") {
+  if (rawMethod === "COD" || rawMethod.includes("COD") || rawMethod === "TUNAI" || rawMethod === "BAYAR DI TEMPAT" || rawChannel === "COD") {
     return "COD - Bayar di Tempat";
   }
 
-  // Determine the primary code to map
-  // If the method is a generic/gateway name, prefer the specific channel
-  const genericGatewayNames = ["XENDIT", "ONLINE", "ONLINE_XENDIT", "TRANSFER", "BANK", "ONLINE_PAYMENT"];
-  const isGeneric = genericGatewayNames.includes(method) || method === "";
-  const primaryCode = (isGeneric && channel) ? channel : (method || channel);
-
-  // Label mapping table
+  // Formatting mapping table
   const labels = {
     QRIS: "QRIS",
-    BCA: "BCA",
-    BCA_VA: "BCA",
-    "BCA VA": "BCA",
-    BNI: "BNI",
-    BNI_VA: "BNI",
-    "BNI VA": "BNI",
-    BRI: "BRI",
-    BRI_VA: "BRI",
-    "BRI VA": "BRI",
-    MANDIRI: "MANDIRI",
-    MANDIRI_VA: "MANDIRI",
-    "MANDIRI VA": "MANDIRI",
-    PERMATA: "PERMATA",
-    PERMATA_VA: "PERMATA",
-    "PERMATA VA": "PERMATA",
-    CIMB: "CIMB",
-    CIMB_VA: "CIMB",
-    "CIMB VA": "CIMB",
-    SAHABAT_SAMPOERNA: "Sahabat Sampoerna",
+    BCA: "BCA VA",
+    BCA_VA: "BCA VA",
+    "BCA VA": "BCA VA",
+    BNI: "BNI VA",
+    BNI_VA: "BNI VA",
+    "BNI VA": "BNI VA",
+    BRI: "BRI VA",
+    BRI_VA: "BRI VA",
+    "BRI VA": "BRI VA",
+    MANDIRI: "Mandiri VA",
+    MANDIRI_VA: "Mandiri VA",
+    "MANDIRI VA": "Mandiri VA",
+    PERMATA: "Permata VA",
+    PERMATA_VA: "Permata VA",
+    "PERMATA VA": "Permata VA",
+    CIMB: "CIMB VA",
+    CIMB_VA: "CIMB VA",
+    "CIMB VA": "CIMB VA",
+    SAHABAT_SAMPOERNA: "Sahabat Sampoerna VA",
     OVO: "OVO",
     DANA: "DANA",
     SHOPEEPAY: "ShopeePay",
@@ -70,15 +84,38 @@ export function formatPaymentLabel(order) {
     INDOMARET: "Indomaret",
   };
 
-  const matchedLabel = labels[primaryCode];
-  if (matchedLabel) {
-    return matchedLabel;
+  // If a valid channel is resolved, format it
+  if (rawChannel) {
+    const matchedLabel = labels[rawChannel];
+    if (matchedLabel) {
+      return matchedLabel;
+    }
+    const cleanStr = rawChannel.replace(/^(XENDIT|ONLINE|ONLINE_XENDIT|TRANSFER)\s*[-_]\s*/i, "").trim();
+    if (cleanStr && cleanStr !== "PENDING" && cleanStr !== "UNPAID" && cleanStr !== "PAID") {
+      if (["BCA", "BNI", "BRI", "MANDIRI", "PERMATA", "CIMB"].includes(cleanStr)) {
+        return cleanStr + " VA";
+      }
+      if (cleanStr === "SHOPEEPAY") return "ShopeePay";
+      return cleanStr.charAt(0).toUpperCase() + cleanStr.slice(1).toLowerCase();
+    }
   }
 
-  // Fallback cleanup: remove gateway prefix if any
-  const cleanStr = primaryCode.replace(/^(XENDIT|ONLINE|ONLINE_XENDIT|TRANSFER)\s*[-_]\s*/i, "").trim();
-  if (cleanStr && cleanStr !== "PENDING" && cleanStr !== "UNPAID" && cleanStr !== "PAID") {
-    return cleanStr;
+  // If only generic provider like XENDIT exists without actual channel yet
+  const genericGatewayNames = ["XENDIT", "ONLINE", "ONLINE_XENDIT", "TRANSFER", "BANK", "ONLINE_PAYMENT"];
+  const isGeneric = genericGatewayNames.includes(rawMethod) || rawMethod === "";
+
+  if (isGeneric) {
+    const orderStatus = String(order.status || order.order_status || "").toLowerCase().trim();
+    if (['waiting_confirmation', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant'].includes(orderStatus)) {
+      return "Menunggu Konfirmasi";
+    }
+    return "Menunggu Pembayaran";
+  }
+
+  // Fallback to method label if not generic
+  const matchedMethodLabel = labels[rawMethod];
+  if (matchedMethodLabel) {
+    return matchedMethodLabel;
   }
 
   return "Transfer Bank";

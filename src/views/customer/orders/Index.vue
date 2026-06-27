@@ -103,6 +103,14 @@
               @click="openOrder"
             >
               <template #action="{ order: o }">
+                <!-- Payment Status Badge - shown for paid orders -->
+                <div
+                  v-if="getPaymentStatusLabel(o) === 'Sudah Dibayar' && !['selesai', 'completed', 'ditolak', 'rejected', 'dibatalkan', 'cancelled', 'batal', 'expired', 'kadaluarsa'].includes(String(o.status || '').toLowerCase())"
+                  class="flex items-center gap-1.5 mb-2 text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200"
+                >
+                  <i class="pi pi-check-circle"></i>
+                  {{ getPaymentStatusLabel(o) }}
+                </div>
                 <!-- SLA Countdown: merchant response deadline -->
                 <div
                   v-if="getMerchantDeadlineRemaining(o)"
@@ -126,7 +134,7 @@
                   class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
                 >
                   <i class="pi pi-credit-card mr-1"></i>
-                  Bayar Kembali
+                  Bayar Sekarang
                 </Button>
                 <!-- Konfirmasi Selesai (merchant sudah upload bukti) -->
                 <Button
@@ -179,7 +187,7 @@
                   class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
                 >
                   <i class="pi pi-credit-card mr-1"></i>
-                  Bayar Kembali
+                  Bayar Sekarang
                 </Button>
               </template>
             </OrderCard>
@@ -459,30 +467,92 @@ function getOrderSnapshotUrl(orderItemId, path) {
   return `${baseUrl}/api/order-snapshots/${orderItemId}`;
 }
 
+// Normalize array: handle backend pagination response { data: [...] }
+function normalizeArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value && Array.isArray(value.data)) return value.data;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+}
+
+// Check if order is valid (not a corrupted/legacy order)
+function isValidOrder(o) {
+  // Filter out orders that look like corrupted/legacy service_orders
+  // Backend returns service_title for jasa orders, not service_name
+  const merchantName = o.merchant?.name || o.merchant_name || '';
+  const serviceTitle = o.service_title || o.service_name || '';
+  if (merchantName.toLowerCase().includes('umkm') || merchantName === 'Merchant') {
+    // If merchant name is generic, check if service is also generic
+    if (serviceTitle === 'Layanan' || serviceTitle === 'Layanan') {
+      // Check if this is a valid jasa order with actual data
+      const hasValidJasaItems = normalizeArray(o.jasa_items || o.jasaItems || o.services).length > 0;
+      if (!hasValidJasaItems) {
+        return false;
+      }
+    }
+  }
+  // Filter out orders with zero total that have no valid items
+  const hasProductItems = o.items && o.items.length > 0;
+  const hasJasaItems = normalizeArray(o.jasa_items || o.jasaItems || o.services).length > 0;
+  if (!hasProductItems && !hasJasaItems && (o.total === 0 || o.gross_amount === 0)) {
+    return false;
+  }
+  // Filter out orders with generic merchant and no actual content
+  if (merchantName === 'Merchant' || merchantName === 'UMKM' || merchantName === 'UMJM') {
+    if (!hasJasaItems && !hasProductItems) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function mapOrder(o) {
+  // Products use o.items directly (from order_items table)
+  // Jasa use o.jasaItems/o.jasa_items (from jasa_order_items table)
+  const hasJasaItems = normalizeArray(o.jasa_items || o.jasaItems || o.services).length > 0;
+  const isJasaOrder = o.order_type === 'jasa' || o.type === 'jasa' || hasJasaItems;
+
+  // For products: use items array from order_items
+  // For jasa: use jasaItems/jasa_items from jasa_order_items
+  let rawItems;
+  if (isJasaOrder) {
+    rawItems = normalizeArray(o.jasa_items || o.jasaItems || o.services);
+  } else {
+    // Products - use items directly from order_items
+    rawItems = normalizeArray(o.items);
+  }
+
   return {
     id: o.id,
-    storeName: o.merchant?.name || "Toko",
+    storeName: o.merchant?.name || o.merchant_name || "Toko",
     dateLabel: formatDateLabel(o.created_at),
     status: mapApiStatus(o.status, o),
     total: o.gross_amount || o.total_price || 0,
     delivery_type: o.delivery_type || "delivery",
-    items: (o.items || []).map((it) => ({
+    items: rawItems.map((it) => ({
       id: it.id,
-      productId: it.product_id,
-      title: it.product_name_snapshot || "Produk",
-      qty: it.quantity,
+      productId: it.product_id || it.jasa_id,
+      title: it.product_name_snapshot || it.service_name || it.jasa?.title || "Item",
+      qty: it.quantity || 1,
       variant: it.product_variant_snapshot || "",
-      addons: (it.addons || []).map((a) => ({
+      addons: normalizeArray(it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.unit_price_snapshot,
+      price: it.unit_price_snapshot || it.price,
       imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
       productSlug: it.product?.slug,
     })),
-    order_type: o.order_type || 'product',
+    order_type: isJasaOrder ? 'jasa' : 'product',
     created_at: o.created_at,
+    // CRITICAL: Include payment fields for needsPayment() to work correctly
+    payment_status: o.payment_status,
+    payment_method: o.payment_method,
+    payment_channel: o.payment_channel,
+    payment: o.payment,
+    invoice_url: o.invoice_url || o.payment?.invoice_url,
+    xendit_invoice_url: o.xendit_invoice_url,
+    expired_at: o.expired_at,
     _raw: o,
   };
 }
@@ -520,6 +590,7 @@ async function fetchOrders() {
       api.get("/api/orders", { params: { per_page: 100 } }),
     ]);
 
+    // Get raw lists
     const rawJasaOrders = getOrdersList(resJasa).map((item) => ({
       ...item,
       id: item.id || item.order_id,
@@ -527,19 +598,42 @@ async function fetchOrders() {
       order_type: 'jasa',
     }));
 
-    const rawProductOrders = getOrdersList(resProducts).map(mapOrder);
+    const rawProductOrders = getOrdersList(resProducts)
+      .map(mapOrder)
+      // Filter out orders that are actually jasa orders to prevent duplicates
+      // The /api/orders endpoint returns ALL orders including jasa ones
+      .filter(o => {
+        // If order_type is explicitly 'jasa', exclude from product list (jasa already in rawJasaOrders)
+        if (o.order_type === 'jasa') return false;
+        // If has jasa_items/jasaItems/services, it's a jasa order
+        const hasJasaItems = normalizeArray(o.jasa_items || o.jasaItems || o.services || []).length > 0;
+        if (hasJasaItems) return false;
+        return true;
+      });
 
-    const merged = [...rawJasaOrders, ...rawProductOrders];
+    // Filter out invalid orders
+    const validJasaOrders = rawJasaOrders.filter(o => isValidOrder(o));
+    const validProductOrders = rawProductOrders.filter(o => isValidOrder(o));
+
+    // Merge and deduplicate by order.id
+    const merged = [...validJasaOrders, ...validProductOrders];
+    const seen = new Set();
+    const deduplicated = merged.filter(o => {
+      if (seen.has(o.id)) return false;
+      seen.add(o.id);
+      return true;
+    });
 
     // Sort by created_at desc
-    merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    deduplicated.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    orders.value = merged;
+    orders.value = deduplicated;
 
     console.log('[Pesanan Saya] Unified Orders loaded:', {
       total: orders.value.length,
-      jasa: rawJasaOrders.length,
-      product: rawProductOrders.length,
+      jasa: validJasaOrders.length,
+      product: validProductOrders.length,
+      filteredOut: (rawJasaOrders.length - validJasaOrders.length) + (rawProductOrders.length - validProductOrders.length),
     });
   } catch (e) {
     console.error("[Pesanan Saya] Gagal memuat pesanan:", e);
@@ -569,7 +663,7 @@ const filteredOrders = computed(() => {
         ].join(" ").toLowerCase();
         return haystack.includes(q);
       } else {
-        const itemText = (o.items || [])
+        const itemText = normalizeArray(o.items)
           .map((it) => `${it.title || ""} ${it.variant || ""}`)
           .join(" ");
         const haystack = [
@@ -631,6 +725,7 @@ function openOrder(order) {
     resolvedId: orderId,
     idField: order?.id,
     orderIdField: order?.order_id,
+    order_type: order?.order_type,
   });
 
   if (!orderId || orderId === 'undefined' || orderId === 'null') {
@@ -639,8 +734,17 @@ function openOrder(order) {
     return;
   }
 
-  // Use named route for type-safe navigation
-  router.push({ name: 'Detail Pesanan', params: { orderId } });
+  // Determine order_type - check multiple possible sources
+  const orderType = order?.order_type || order?.type || (order?._raw?.order_type) || null;
+
+  // Navigate based on order_type to use correct detail endpoint
+  if (orderType === 'jasa') {
+    // Jasa orders: pass ?type=jasa so Detail.vue knows to use /api/jasa-orders/{id}
+    router.push({ name: 'Detail Pesanan', params: { orderId }, query: { type: 'jasa' } });
+  } else {
+    // Product/Kuliner orders: use standard /api/orders/{id}
+    router.push({ name: 'Detail Pesanan', params: { orderId } });
+  }
 }
 
 function goToReview(order) {
@@ -673,13 +777,24 @@ function openOrderConfirmSelesai(order) {
     toast.error('ID pesanan tidak ditemukan');
     return;
   }
-  router.push({ name: 'Detail Pesanan', params: { orderId } });
+  // Pass type=jasa for jasa orders to use correct detail endpoint
+  const orderType = order?.order_type || order?.type || null;
+  if (orderType === 'jasa') {
+    router.push({ name: 'Detail Pesanan', params: { orderId }, query: { type: 'jasa' } });
+  } else {
+    router.push({ name: 'Detail Pesanan', params: { orderId } });
+  }
 }
 
 // ─── Bayar Kembali ─────────────────────────────────────────────────────
 
 /**
  * Check if order needs payment (Xendit, unpaid)
+ * CRITICAL: Must check BOTH payment.status AND order.payment_status
+ *
+ * For order_type = 'jasa':
+ * - Payment is successful when: payment.status = 'PAID' OR order.payment_status = 'PAID'
+ * - When paid: status = 'menunggu_konfirmasi', display "Sudah Dibayar" badge
  */
 function needsPayment(order) {
   if (!order) return false;
@@ -688,16 +803,80 @@ function needsPayment(order) {
   const method = String(order.payment_method || '').toUpperCase();
   if (method === 'COD') return false;
 
-  // Already paid
-  const ps = String(order.payment_status || '').toUpperCase();
-  if (['PAID', 'SETTLED', 'SUCCEEDED'].includes(ps)) return false;
+  // ─── CHECK PAYMENT STATUS (Priority 1: from orders.payment_status) ───
+  const orderPaymentStatus = String(order.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'].includes(orderPaymentStatus)) {
+    console.log('[needsPayment] Order payment_status is PAID:', { orderId: order.id, paymentStatus: orderPaymentStatus });
+    return false;
+  }
 
-  // Terminal statuses
+  // ─── CHECK PAYMENT RECORD STATUS (Priority 2: from payments.status) ───
+  const paymentRecordStatus = String(order.payment?.status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'].includes(paymentRecordStatus)) {
+    console.log('[needsPayment] Payment record status is PAID:', { orderId: order.id, paymentStatus: paymentRecordStatus });
+    return false;
+  }
+
+  // ─── CHECK ORDER STATUS (for cases where payment_status not set yet) ───
+  // If order has a status that indicates payment was received, no need to pay
   const rawStatus = String(order.status || '').toLowerCase();
-  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'selesai', 'completed'];
-  if (terminalStatuses.includes(rawStatus)) return false;
+  const paidOrderStatuses = ['paid', 'diterima', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant',
+                        'layanan_dikerjakan', 'dikerjakan', 'processing',
+                        'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'];
+  if (paidOrderStatuses.includes(rawStatus)) {
+    // Only return false if payment status is NOT pending/unpaid
+    if (!['PENDING', 'WAITING_CONFIRMATION', 'UNPAID'].includes(orderPaymentStatus)) {
+      console.log('[needsPayment] Order has paid status:', { orderId: order.id, status: rawStatus });
+      return false;
+    }
+  }
 
+  // ─── TERMINAL STATUSES - no payment needed ───
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'batal'];
+  if (terminalStatuses.includes(rawStatus)) {
+    return false;
+  }
+
+  console.log('[needsPayment] Order needs payment:', { orderId: order.id, paymentStatus: orderPaymentStatus, paymentRecordStatus, status: rawStatus });
   return true;
+}
+
+/**
+ * Get payment status display label for order card
+ */
+function getPaymentStatusLabel(order) {
+  if (!order) return '';
+
+  const method = String(order.payment_method || '').toUpperCase();
+  if (method === 'COD') {
+    // Check if COD order is paid/completed
+    const status = String(order.status || '').toLowerCase();
+    const terminalStatuses = ['selesai', 'completed', 'ditolak', 'dibatalkan', 'expired'];
+    if (terminalStatuses.includes(status)) {
+      return 'COD - Dibayar di Tempat';
+    }
+    return 'COD - Bayar di Tempat';
+  }
+
+  // Check payment_status from orders table
+  const orderPaymentStatus = String(order.payment_status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'].includes(orderPaymentStatus)) {
+    return 'Sudah Dibayar';
+  }
+
+  // Check payment record status
+  const paymentRecordStatus = String(order.payment?.status || '').toUpperCase();
+  if (['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'].includes(paymentRecordStatus)) {
+    return 'Sudah Dibayar';
+  }
+
+  // Check if invoice exists (waiting for payment)
+  const hasInvoice = order.invoice_url || order.payment?.invoice_url || order.xendit_invoice_url;
+  if (hasInvoice) {
+    return 'Menunggu Pembayaran';
+  }
+
+  return 'Belum Bayar';
 }
 
 // ─── SLA Countdown ───────────────────────────────────────────────────────
@@ -733,6 +912,7 @@ function getCompletionDeadlineRemaining(order) {
 
 /**
  * Retry payment for unpaid Xendit orders
+ * Includes fallback to verify payment status from backend
  */
 async function retryPayment(order) {
   const orderId = order.order_id || order.id;
@@ -754,6 +934,7 @@ async function retryPayment(order) {
 
   try {
     // Check if we already have a valid invoice URL
+    // Priority: order.invoice_url > order.payment.invoice_url > order.xendit_invoice_url
     const existingInvoiceUrl = order.invoice_url || order.payment?.invoice_url || order.xendit_invoice_url;
     if (existingInvoiceUrl) {
       // Check if invoice is expired
@@ -772,6 +953,24 @@ async function retryPayment(order) {
         window.location.href = existingInvoiceUrl;
         return;
       }
+    }
+
+    // First, try to verify if payment was already successful
+    // This handles the case where webhook was delayed
+    console.log('[retryPayment] Verifying payment status before creating new invoice...');
+    try {
+      const { data: verifyData } = await api.get(`/api/payments/${orderId}/status`);
+      console.log('[retryPayment] Payment status check:', verifyData);
+
+      // If payment is already PAID, show success and refresh orders
+      const verifyStatus = verifyData?.data?.payment_status || verifyData?.payment_status;
+      if (verifyStatus === 'PAID') {
+        toast.success('Pembayaran sudah berhasil! Memperbarui daftar pesanan...');
+        await fetchOrders();
+        return;
+      }
+    } catch (verifyErr) {
+      console.log('[retryPayment] Payment status check failed, proceeding to create invoice:', verifyErr);
     }
 
     // Create new invoice
