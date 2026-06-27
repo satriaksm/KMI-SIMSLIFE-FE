@@ -25,7 +25,7 @@ import Button from "@/components/common/Button.vue";
 import jasaIcon from "@/assets/icons/Jasa.svg";
 import kulinerIcon from "@/assets/icons/Kuliner.svg";
 import tokoIcon from "@/assets/icons/Toko.svg";
-import komunitasIcon from "@/assets/icons/Komunitas.svg";
+import umkmIcon from "@/assets/icons/merchant.svg";
 import WhiteWithText from "@/assets/icons/White-with-Text.png";
 
 import api from "@/libs/axios.js";
@@ -132,6 +132,11 @@ const carouselConfig = {
 
 const navigates = ref([
   {
+    label: "UMKM",
+    icon: umkmIcon,
+    to: { path: "/explore", query: { mode: "umkm" } },
+  },
+  {
     label: "Kuliner",
     icon: kulinerIcon,
     to: { path: "/explore", query: { mode: "kuliner" } },
@@ -145,11 +150,6 @@ const navigates = ref([
     label: "Jasa",
     icon: jasaIcon,
     to: { path: "/explore", query: { mode: "jasa" } },
-  },
-  {
-    label: "Komunitas",
-    icon: komunitasIcon,
-    to: { name: "community" },
   },
 ]);
 

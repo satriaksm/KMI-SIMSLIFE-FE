@@ -534,13 +534,13 @@ const goToEdit = () => {
             </h3>
 
             <div
-              class="w-full overflow-hidden bg-white border border-gray-100 rounded-xl"
+              class="w-full overflow-hidden border border-gray-100 bg-gray-100 rounded-xl"
             >
               <div
-                class="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-2 lg:grid-cols-3 sm:divide-y-0 sm:divide-x"
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-flow-row sm:grid-flow-col sm:grid-rows-4 lg:grid-rows-3 gap-[1px]"
               >
                 <template v-for="day in operationalHours" :key="day.name">
-                  <div class="flex items-center justify-between p-3 sm:p-4">
+                  <div class="flex items-center justify-between p-3 bg-white sm:p-4 h-full">
                     <div class="flex items-center gap-3">
                       <span
                         class="inline-block text-sm font-medium w-28 text-merchant-primary"

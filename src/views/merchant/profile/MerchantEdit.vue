@@ -296,6 +296,7 @@
               label="Kontak"
               placeholder="Masukkan nomor kontak"
               variant="merchant"
+              required
             />
           </div>
 
@@ -327,7 +328,7 @@
                   label="NPWP"
                   placeholder="Contoh: 12.345.678.9-012.345"
                   variant="merchant"
-                                required
+                                
 
                 />
               </div>
@@ -403,6 +404,7 @@
                     provinces.map((p) => ({ value: p.id, label: p.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="city_id"
@@ -412,6 +414,7 @@
                   :disabled="!form.province_id"
                   :options="cities.map((c) => ({ value: c.id, label: c.name }))"
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="district_id"
@@ -423,6 +426,7 @@
                     districts.map((d) => ({ value: d.id, label: d.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="village_id"
@@ -434,6 +438,7 @@
                     villages.map((v) => ({ value: v.id, label: v.name }))
                   "
                   variant="merchant"
+                  required
                 />
               </div>
               <!-- Detail alamat -->
@@ -615,7 +620,7 @@
                     label="NPWP"
                     placeholder="Contoh: 12.345.678.9-012.345"
                     variant="merchant"
-                                  required
+                                  
 
                   />
                 </div>
@@ -854,17 +859,23 @@
             Simpan
           </AppButton>
         </div>
+        
+        <!-- Hidden submit for mobile fallback -->
+        <button ref="hiddenSubmitBtn" type="submit" class="hidden"></button>
 
         <!-- Mobile Action Button - Fixed at Bottom -->
         <div
-          class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
+          class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <button
-            type="submit"
-            class="w-full py-3 text-sm font-semibold text-center text-white transition-opacity bg-merchant-primary rounded-xl hover:opacity-90"
+          <AppButton 
+            type="button" 
+            @click="triggerSubmit"
+            :loading="isSaving" 
+            variant="merchant"
+            block
           >
             Simpan
-          </button>
+          </AppButton>
         </div>
       </Form>
     </div>
@@ -888,7 +899,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
@@ -1031,6 +1042,13 @@ const latitude = ref(null);
 const longitude = ref(null);
 const coverInput = ref(null);
 const logoInput = ref(null);
+const hiddenSubmitBtn = ref(null);
+
+const triggerSubmit = () => {
+  if (hiddenSubmitBtn.value) {
+    hiddenSubmitBtn.value.click();
+  }
+};
 
 const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
 const mapRefMobile = ref(null);
@@ -1271,8 +1289,11 @@ onMounted(async () => {
 
     const data = await fetchMerchantProfile(merchantSlug.value);
 
-    latitude.value = data?.primary_address?.latitude ?? null;
-    longitude.value = data?.primary_address?.longitude ?? null;
+    const latRaw = data?.primary_address?.latitude ?? data?.latitude ?? null;
+    const lngRaw = data?.primary_address?.longitude ?? data?.longitude ?? null;
+
+    latitude.value = latRaw !== null && latRaw !== undefined ? Number(latRaw) : null;
+    longitude.value = lngRaw !== null && lngRaw !== undefined ? Number(lngRaw) : null;
 
     form.value.name = data?.name ?? "";
     form.value.contact = data?.phone ?? "";
@@ -1346,7 +1367,9 @@ onMounted(async () => {
   } catch (error) {
     isLoading.value = false;
   } finally {
-    isPrefilling.value = false;
+    nextTick(() => {
+      isPrefilling.value = false;
+    });
   }
 });
 
@@ -1443,7 +1466,7 @@ const buildOperationalHoursPayload = () => {
 const editProfileSchema = yup.object().shape({
   name: yup.string().required("Nama UMKM wajib diisi"),
   contact: yup.string().required("Kontak wajib diisi"),
-  NPWP: yup.string().required("NPWP wajib diisi"),
+  NPWP: yup.string().nullable(),
   bank_code: yup.string().required("Bank wajib dipilih"),
   bank_account_number: yup.string().required("Nomor rekening wajib diisi"),
   bank_account_name: yup.string().required("Nama pemilik rekening wajib diisi"),

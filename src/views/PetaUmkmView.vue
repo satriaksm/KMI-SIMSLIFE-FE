@@ -241,7 +241,7 @@ export default {
   },
 
   mounted() {
-    this.map = L.map("map", { zoomControl: false }).setView(
+    this.map = L.map("map", { zoomControl: false, attributionControl: false }).setView(
       [-7.5420536, 110.8082958],
       15,
     );
