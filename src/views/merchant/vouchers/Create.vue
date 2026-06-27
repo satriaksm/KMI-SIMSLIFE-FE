@@ -24,6 +24,7 @@ const authStore = useAuthStore(); // ✅ ADD: Get auth store
 const voucher_name = ref("");
 const voucher_code = ref("");
 const voucher_description = ref("");
+const is_hidden = ref(false);
 
 const value = ref(0);
 const min_purchase_amount = ref(0);
@@ -76,7 +77,18 @@ const schema = yup.object({
   voucher_code: yup.string().required("Kode voucher wajib diisi"),
   voucher_description: yup.string().required("Deskripsi wajib diisi"),
   voucher_type: yup.string().required(),
-  value: yup.number().required().min(1),
+  value: yup
+    .number()
+    .required()
+    .min(1)
+    .test(
+      "max-percent",
+      "Maksimal persentase adalah 100",
+      (val) => {
+        if (voucher_type.value === "percent" && val > 100) return false;
+        return true;
+      },
+    ),
   voucher_start_date: yup.string().required(),
   voucher_end_date: yup.string().required(),
   usage_limit_per_user: yup.number().required().min(1),
@@ -91,12 +103,14 @@ const {
   values,
   setFieldValue,
   validate,
+  validateField,
 } = useForm({
   validationSchema: schema,
   initialValues: {
     voucher_name: "",
     voucher_code: "",
     voucher_description: "",
+    is_hidden: false,
     voucher_type: "percent",
     value: 0,
     voucher_start_date: "",
@@ -122,8 +136,13 @@ onMounted(async () => {});
 watch(voucher_name, (v) => setFieldValue("voucher_name", v));
 watch(voucher_code, (v) => setFieldValue("voucher_code", v));
 watch(voucher_description, (v) => setFieldValue("voucher_description", v));
+watch(is_hidden, (v) => setFieldValue("is_hidden", v));
 
-watch(voucher_type, (v) => setFieldValue("voucher_type", v));
+watch(voucher_type, (v) => {
+  setFieldValue("voucher_type", v);
+  // Re-validate value field when type changes (percent <-> fixed)
+  validateField("value");
+});
 watch(value, (v) => setFieldValue("value", v));
 
 watch(voucher_start_date, (v) => setFieldValue("voucher_start_date", v));
@@ -152,6 +171,7 @@ const onSubmit = veeHandleSubmit(async () => {
     voucher_name: voucher_name.value,
     voucher_code: voucher_code.value,
     voucher_description: voucher_description.value,
+    is_hidden: is_hidden.value,
     voucher_type: voucher_type.value,
     value: value.value,
     voucher_start_date: voucher_start_date.value,
@@ -322,7 +342,6 @@ const onSubmit = veeHandleSubmit(async () => {
               label="Nilai"
               type="number"
               placeholder="0"
-              max="100"
               suffix="%"
               v-model.number="value"
               required
@@ -401,6 +420,24 @@ const onSubmit = veeHandleSubmit(async () => {
             :min="new Date().toISOString().split('T')[0]"
             required
           />
+        </div>
+
+        <div
+          class="p-4 mb-2 space-y-3 bg-white sm:mb-4 sm:p-6 sm:rounded-xl sm:shadow-sm"
+        >
+          <h3 class="flex items-center gap-2 text-sm font-semibold text-black">
+            <i class="pi pi-eye-slash text-merchant-primary"></i>
+            Pengaturan Lainnya
+          </h3>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+              <input type="checkbox" v-model="is_hidden" class="w-4 h-4 rounded text-merchant-primary focus:ring-merchant-primary" />
+              <div class="flex flex-col">
+                <span class="text-sm font-medium text-gray-900">Voucher Tersembunyi</span>
+                <span class="text-xs text-gray-500">Voucher tidak akan muncul di daftar promo pelanggan. Pelanggan harus memasukkan kode secara manual.</span>
+              </div>
+            </label>
+          </div>
         </div>
 
         <!-- ✅ FIXED: Desktop Submit Button -->

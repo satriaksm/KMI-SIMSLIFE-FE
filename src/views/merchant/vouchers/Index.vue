@@ -807,6 +807,12 @@ onBeforeRouteLeave(() => {
             >
               Event: {{ item.event?.event_name }}
             </span>
+            <span
+              v-if="item.is_hidden"
+              class="inline-block mt-1 text-xs font-semibold text-gray-500 bg-gray-100 rounded-md px-2 py-0.5 w-fit"
+            >
+              Tersembunyi
+            </span>
           </div>
         </template>
         <template #cell-voucher_code="{ value }">
@@ -907,6 +913,12 @@ onBeforeRouteLeave(() => {
               >
                 <i class="mr-2 pi pi-box"></i>Pemakaian:
                 {{ item.usage || "-" }}
+              </span>
+              <span
+                v-if="item.is_hidden"
+                class="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-500 rounded-md text-xs font-medium whitespace-nowrap"
+              >
+                <i class="mr-2 pi pi-eye-slash"></i>Tersembunyi
               </span>
             </div>
           </template>

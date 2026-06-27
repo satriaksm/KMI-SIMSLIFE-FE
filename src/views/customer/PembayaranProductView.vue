@@ -460,6 +460,23 @@
       subtitle="Gunakan promo untuk mendapat potongan harga"
     >
       <div class="space-y-3">
+        <!-- Manual Voucher Input -->
+        <div class="flex gap-2 pb-3 mb-3 border-b border-gray-200">
+          <input
+            v-model="voucherCodeInput"
+            type="text"
+            placeholder="Masukkan kode voucher"
+            class="flex-1 px-3 py-2 text-sm border border-gray-300 uppercase rounded-lg focus:ring-[#FFA30E] focus:border-[#FFA30E]"
+          />
+          <button
+            @click="applyManualVoucher"
+            :disabled="!voucherCodeInput || validatingVoucher"
+            class="px-4 py-2 text-sm font-semibold text-white transition rounded-lg bg-[#FFA30E] hover:bg-[#e5920d] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ validatingVoucher ? 'Memeriksa...' : 'Terapkan' }}
+          </button>
+        </div>
+
         <div
           v-if="voucherLoading"
           class="py-6 text-sm text-center text-gray-500"
@@ -799,6 +816,49 @@ const pay = ref({ method: "COD" });
 
 // Promo state harus didefinisikan sebelum watcher (immediate)
 const selectedPromo = ref(null);
+const voucherCodeInput = ref("");
+const validatingVoucher = ref(false);
+
+async function applyManualVoucher() {
+  if (!voucherCodeInput.value) return;
+  validatingVoucher.value = true;
+  try {
+    const merchantId = checkout.store?.id || order.value.store?.id;
+    if (!merchantId) {
+      toast.error("Gagal mendapatkan ID toko.");
+      return;
+    }
+    const { data } = await api.post("/api/checkout/vouchers/validate", {
+      voucher_code: voucherCodeInput.value,
+      order_amount: amounts.value.product,
+      merchant_id: merchantId,
+    });
+    
+    const v = data.voucher;
+    const p = {
+      code: v.voucher_code,
+      name: v.voucher_name,
+      desc: v.voucher_description,
+      type: v.voucher_type, // percent | fixed
+      value: Number(v.value),
+      max_discount: Number(v.max_discount_amount || 0),
+      min_purchase: Number(v.min_purchase_amount || 0),
+      usage: "0 / " + (v.usage_limit || "∞"),
+      usage_limit: v.usage_limit === null ? null : Number(v.usage_limit),
+      usages_count: Number(v.usages_count || 0),
+      is_expired: false,
+    };
+    
+    usePromo(p);
+    voucherCodeInput.value = "";
+    toast.success("Voucher berhasil diterapkan");
+  } catch (error) {
+    const message = error.response?.data?.message || "Voucher tidak valid";
+    toast.error(message);
+  } finally {
+    validatingVoucher.value = false;
+  }
+}
 
 watch(
   () => form.value.metodePengiriman,
