@@ -309,6 +309,17 @@ const checkExistingReview = async () => {
     try {
       const { data } = await api.get(`/api/jasa-orders/${orderId.value}`);
       const order = data.data || data;
+
+      const jasaItem = order.jasa_items?.[0] || order.jasa_item || {};
+      const title = jasaItem.jasa_title_snapshot || jasaItem.jasa?.title || "Layanan Jasa";
+      const image = jasaItem.jasa_image_snapshot || jasaItem.jasa?.image_url || null;
+      itemInfo.value = {
+        name: title,
+        image: image,
+        icon: "pi-wrench",
+        typeLabel: "Layanan"
+      };
+
       if (order.review) {
         existingReview.value = order.review;
         
@@ -344,6 +355,15 @@ const checkExistingReview = async () => {
       
       // Find the specific item being reviewed
       const item = (o.items || []).find(it => it.id === orderItemIdVal || it.product_id === reviewableId.value);
+      if (item) {
+        itemInfo.value = {
+          name: item.name || "Produk",
+          image: item.image || item.product?.image_url || null,
+          icon: "pi-shopping-bag",
+          typeLabel: "Produk"
+        };
+      }
+
       if (item && item.review) {
         existingReview.value = item.review;
         
@@ -377,28 +397,9 @@ const checkExistingReview = async () => {
   }
 };
 
-// Load item info for item card
-const loadItemInfo = async () => {
-  const type = reviewableType.value;
-  const id = reviewableId.value;
-  if (!id) return;
-  if (type === "service") return;
-  try {
-    if (type === "product") {
-      const { data: pd } = await api.get(`/api/public/products/${id}`);
-      const p = pd?.data ?? pd ?? {};
-      itemInfo.value = { name: p.name || "Produk", image: p.image_url || p.logo_url || null, icon: "pi-shopping-bag", typeLabel: "Produk" };
-    } else if (type === "jasa") {
-      const { data: jd } = await api.get(`/api/public/jasas/${id}`);
-      const j = jd?.data ?? jd ?? {};
-      itemInfo.value = { name: j.title || j.name || "Jasa", image: j.image_url || j.logo_url || null, icon: "pi-wrench", typeLabel: "Layanan" };
-    }
-  } catch(e) { console.warn("[UniversalReview] loadItemInfo:", e); }
-};
-
 // Initialize
 onMounted(async () => {
-  await Promise.all([checkExistingReview(), loadItemInfo()]);
+  await checkExistingReview();
 });
 
 // Watch for route param changes

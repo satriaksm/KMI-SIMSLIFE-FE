@@ -57,14 +57,6 @@
           <div class="text-sm font-semibold text-black">
             {{ paymentMethodDisplay }}
           </div>
-          <div v-if="paymentStatusDisplay && !isFinished" class="mt-0.5">
-            <span
-              class="px-2 py-0.5 text-[10px] font-semibold rounded-full"
-              :class="isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-            >
-              {{ paymentStatusDisplay }}
-            </span>
-          </div>
         </div>
 
         <div class="text-right">
@@ -226,7 +218,7 @@ function formatPaymentStatus(status) {
   if (['paid', 'lunas', 'settled', 'success'].includes(value)) {
     return 'Sudah Bayar';
   }
-  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu'].includes(value)) {
+  if (['unpaid', 'pending', 'waiting', 'menunggu_pembayaran', 'menunggu', 'waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
     return 'Menunggu Pembayaran';
   }
   if (['expired', 'kadaluarsa'].includes(value)) {
@@ -234,9 +226,6 @@ function formatPaymentStatus(status) {
   }
   if (['failed', 'gagal'].includes(value)) {
     return 'Gagal';
-  }
-  if (['waiting_confirmation', 'menunggu_konfirmasi'].includes(value)) {
-    return 'Menunggu Konfirmasi';
   }
 
   return 'Menunggu Pembayaran';
@@ -296,10 +285,11 @@ const resolvedStatusProps = computed(() => {
   const ps = String(props.order.payment_status || "").toUpperCase();
 
   // Payment-related statuses
-  if (raw === "pending" && !isCod.value && ps !== "PAID") {
+  const terminalStatuses = ['selesai', 'completed', 'ditolak', 'rejected', 'dibatalkan', 'cancelled', 'batal', 'expired', 'kadaluarsa'];
+  if (!isCod.value && ps !== "PAID" && ps !== "SETTLED" && ps !== "SUCCESS" && !terminalStatuses.includes(raw)) {
     return { variant: "payment", status: "pending", label: "Menunggu Pembayaran", size: "sm", showIcon: true };
   }
-  if (raw === "pending" || raw === "menunggu_konfirmasi_merchant") {
+  if (raw === "pending" || raw === "menunggu_konfirmasi" || raw === "menunggu_konfirmasi_merchant") {
     return { variant: "order", status: "pending", label: "Menunggu Konfirmasi", size: "sm", showIcon: true };
   }
   if (raw === "diterima" || raw === "accepted" || raw === "responsed") {

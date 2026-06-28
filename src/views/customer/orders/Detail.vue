@@ -129,7 +129,7 @@
 
           <!-- SLA Countdown: menunggu_konfirmasi -->
           <div
-            v-if="order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant'"
+            v-if="order.order_type === 'jasa' && (order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant') && (order.is_paid || order.is_cod)"
             class="p-3 bg-orange-50 border border-orange-200 rounded-2xl"
           >
             <div class="flex items-center justify-between">
@@ -1166,7 +1166,9 @@ const jasaOrder = computed(() => {
 
   // 6-step tracking stepper for Jasa
   let activeStepKey = 'menunggu_pembayaran';
-  if (['pending', 'unpaid', 'waiting_payment'].includes(rawStatus)) {
+  if (!isPaid && !isOrderCod) {
+    activeStepKey = 'menunggu_pembayaran';
+  } else if (['pending', 'unpaid', 'waiting_payment'].includes(rawStatus)) {
     activeStepKey = 'menunggu_pembayaran';
   } else if (['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'paid'].includes(rawStatus)) {
     activeStepKey = 'menunggu_konfirmasi_merchant';
@@ -1193,8 +1195,8 @@ const jasaOrder = computed(() => {
   const isCanceledOrExpired = ['ditolak', 'dibatalkan', 'expired', 'kadaluarsa', 'cancelled', 'rejected', 'batal'].includes(rawStatus);
 
   const tracking = [
-    { key: "menunggu_pembayaran", icon: "pi-wallet", label: isOrderCod ? "Pesanan\nDibuat" : "Menunggu\nPembayaran", done: !isCanceledOrExpired && activeIndex >= 0 },
-    { key: "menunggu_konfirmasi_merchant", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: !isCanceledOrExpired && activeIndex >= 1 },
+    { key: "menunggu_pembayaran", icon: "pi-wallet", label: "Pesanan\nDibuat", done: !isCanceledOrExpired && activeIndex >= 0 },
+    { key: "menunggu_konfirmasi_merchant", icon: "pi-clock", label: isOrderCod ? "Menunggu\nKonfirmasi" : "Pembayaran\nDiterima", done: !isCanceledOrExpired && activeIndex >= 1 },
     { key: "diterima", icon: "pi-check-circle", label: "Pesanan\nDiterima", done: !isCanceledOrExpired && activeIndex >= 2 },
     { key: "layanan_dikerjakan", icon: "pi-cog", label: "Layanan\nDikerjakan", done: !isCanceledOrExpired && activeIndex >= 3 },
     { key: "menunggu_konfirmasi_selesai", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: !isCanceledOrExpired && activeIndex >= 4 },
@@ -1216,6 +1218,8 @@ const jasaOrder = computed(() => {
   const statusLabelStatus = (!isOrderStatus && !isPaid) ? "pending" : (isPaid ? "completed" : rawStatus);
 
   return {
+    is_paid: isPaid,
+    is_cod: isOrderCod,
     id: o.id,
     order_number: o.invoice || o.order_number || `ORD-${String(o.id).padStart(6, "0")}`,
     jasa_order_item_id: o.jasa_order_item_id || null,

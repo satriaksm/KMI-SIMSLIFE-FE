@@ -1165,6 +1165,15 @@ const getJasaStatusClass = (status, order = {}) => {
 const getJasaStatusLabel = (status, order = {}) => {
   if (order.status_label) return order.status_label;
 
+  const isCod = String(order.payment_method || '').toUpperCase() === 'COD';
+  const paidStatuses = ['PAID', 'SETTLED', 'SUCCEEDED', 'COMPLETED'];
+  const isPaid = paidStatuses.includes(String(order.payment_status || '').toUpperCase()) || order.is_paid === true;
+  const terminalStatuses = ['cancelled', 'dibatalkan', 'ditolak', 'expired', 'batal', 'selesai', 'completed', 'kadaluarsa'];
+
+  if (!isCod && !isPaid && !terminalStatuses.includes(status)) {
+    return 'Menunggu Pembayaran';
+  }
+
   // For expired/kadaluarsa
   if (status === 'expired' || status === 'kadaluarsa') return 'Kadaluarsa';
 
@@ -1180,6 +1189,10 @@ const getJasaStatusLabel = (status, order = {}) => {
     if (order.rejected_by === 'customer') return 'Ditolak Customer';
     return 'Ditolak';
   }
+
+  const rawStatus = String(status || '').toLowerCase();
+  const normalized = jasaStatusMap[rawStatus] || rawStatus;
+
   const labels = {
     'menunggu': 'Menunggu Konfirmasi',
     'diterima': 'Diterima',
@@ -1187,7 +1200,7 @@ const getJasaStatusLabel = (status, order = {}) => {
     'tunggu_selesai': 'Menunggu Selesai',
     'selesai': 'Selesai',
   };
-  return labels[status] || status || '-';
+  return labels[normalized] || normalized || '-';
 };
 
 // Service order actions

@@ -105,11 +105,7 @@ export function formatPaymentLabel(order) {
   const isGeneric = genericGatewayNames.includes(rawMethod) || rawMethod === "";
 
   if (isGeneric) {
-    const orderStatus = String(order.status || order.order_status || "").toLowerCase().trim();
-    if (['waiting_confirmation', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant'].includes(orderStatus)) {
-      return "Menunggu Konfirmasi";
-    }
-    return "Menunggu Pembayaran";
+    return "Xendit";
   }
 
   // Fallback to method label if not generic
