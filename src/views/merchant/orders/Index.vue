@@ -218,6 +218,29 @@ function mapMerchantOrder(o) {
       subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
       image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
     })),
+    order_items: (o.order_items || o.orderItems || []).map((it) => {
+      console.log('[merchant/Index] product data:', it.product);
+      const imageUrl = it.product?.image;
+      const finalImage = (imageUrl !== undefined && imageUrl !== null) ? imageUrl : it.service_image;
+      let resolvedImage = null;
+      if (finalImage) {
+        if (finalImage.startsWith('http')) {
+          resolvedImage = finalImage;
+        } else {
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          const cleanPath = finalImage.startsWith('/') ? finalImage : `/${finalImage}`;
+          resolvedImage = `${baseUrl}/storage${cleanPath}`;
+        }
+      }
+      return {
+        id: it.id,
+        price: it.price,
+        product: {
+          name: it.product?.name || "Item",
+          image: resolvedImage,
+        }
+      };
+    }),
     amounts: {
       subtotal: Number(o.subtotal || 0),
       discount: Number(o.discount_total || 0),
@@ -2008,7 +2031,7 @@ function leaveOrdersChannel(id) {
             <template #cell-itemsSummary="{ item }">
               <div class="max-w-xs">
                 <div class="text-sm text-gray-800 truncate">
-                  {{ item.items[0].name }}
+                  {{ item.order_items?.[0]?.product?.name || item.items[0].name || "Item" }}
                   <span v-if="item.items.length > 1" class="text-gray-400">
                     +{{ item.items.length - 1 }} lainnya
                   </span>
@@ -2307,7 +2330,7 @@ function leaveOrdersChannel(id) {
               <i class="text-xs text-gray-400 pi pi-box shrink-0"></i>
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-600 truncate block">
-                  {{ order.items[0].name }}
+                  {{ order.order_items?.[0]?.product?.name || order.items[0].name || "Item" }}
                   <span v-if="order.items.length > 1" class="text-gray-400">
                     +{{ order.items.length - 1 }} lainnya
                   </span>

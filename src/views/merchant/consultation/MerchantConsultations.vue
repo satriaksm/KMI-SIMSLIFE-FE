@@ -409,6 +409,9 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Mobile Header Spacer -->
+    <div class="h-24 sm:h-0"></div>
+
     <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
       <!-- STICKY WRAPPER -->
       <div class="z-10 top-[88px] sm:top-0 bg-gray-50 pt-0 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 space-y-2">

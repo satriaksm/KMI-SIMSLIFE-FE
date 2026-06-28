@@ -117,6 +117,14 @@
                 </div>
               </div>
             </div>
+
+            <!-- Notice: Menunggu Pembayaran -->
+            <div v-if="order.order_type === 'jasa' && !order.is_paid && !order.is_cod && !['cancelled', 'rejected', 'batal', 'expired', 'kadaluarsa'].includes(order._rawStatus)" class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-2.5 items-start">
+              <i class="pi pi-exclamation-circle text-amber-600 mt-0.5 shrink-0"></i>
+              <div class="text-xs text-amber-800 font-medium leading-relaxed">
+                Pesanan akan masuk ke konfirmasi merchant setelah customer menyelesaikan pembayaran
+              </div>
+            </div>
           </div>
 
           <!-- SLA Countdown: menunggu_konfirmasi -->
@@ -366,7 +374,7 @@
             </Button>
             <!-- Batalkan Pesanan (Jasa) -->
             <Button
-              v-if="order.status === 'pending'"
+              v-if="order?.status === 'pending'"
               block
               :loading="cancelling"
               @click="handleCancel"
@@ -377,7 +385,7 @@
             </Button>
             <!-- Konfirmasi Selesai -->
             <Button
-              v-if="order.status === 'menunggu_konfirmasi_selesai' || order.status === 'menunggu_selesai'"
+              v-if="order?.status === 'menunggu_konfirmasi_selesai' || order?.status === 'menunggu_selesai'"
               block
               :loading="confirmingSelesai"
               @click="handleKonfirmasiSelesai"
@@ -388,7 +396,7 @@
             </Button>
             <!-- Beri Ulasan (belum pernah review) -->
             <Button
-              v-if="order.can_review"
+              v-if="order?.can_review"
               block
               @click="goToReview"
               customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
@@ -398,7 +406,7 @@
             </Button>
             <!-- Perbarui Rating dan Ulasan -->
             <Button
-              v-if="order.is_reviewed && order.can_update_review"
+              v-if="order?.is_reviewed && order?.can_update_review"
               block
               @click="goToReview"
               customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
@@ -636,29 +644,29 @@
             </div>
 
             <div class="px-4 py-3 space-y-4">
-              <div v-for="(it, idx) in order.items" :key="idx" class="flex gap-3">
-                <div class="w-12 h-12 overflow-hidden bg-gray-200 rounded-xl shrink-0">
+              <div v-for="(item, idx) in order.items" :key="idx" class="flex gap-3">
+                <div class="w-12 h-12 overflow-hidden bg-gray-200 rounded-xl shrink-0 flex items-center justify-center">
                   <img
-                    v-if="it.imageUrl"
-                    :src="it.imageUrl"
-                    :alt="it.title"
+                    v-if="item.product?.image"
+                    :src="item.product.image.startsWith('http') ? item.product.image : 'http://localhost:8000/storage/' + item.product.image.replace(/^\/+/, '')"
+                    :alt="item.product?.name || 'Item'"
                     class="object-cover w-full h-full"
-                    crossorigin="use-credentials"
                   />
+                  <img v-else src="/placeholder.png" class="object-cover w-full h-full" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-bold leading-tight text-black">
-                    <span>{{ it.title }}</span>
+                    <span>{{ item.product?.name || 'Item' }}</span>
                   </div>
-                  <div v-if="it.variant" class="mt-1 text-xs text-muted-foreground">{{ it.variant }}</div>
-                  <div v-if="it.addons && it.addons.length" class="mt-0.5 text-xs text-muted-foreground">
-                    <span class="text-primary">+</span> {{ it.addons.map(a => a.name).join(', ') }}
+                  <div v-if="item.variant" class="mt-1 text-xs text-muted-foreground">{{ item.variant }}</div>
+                  <div v-if="item.addons && item.addons.length" class="mt-0.5 text-xs text-muted-foreground">
+                    <span class="text-primary">+</span> {{ item.addons.map(a => a.name).join(', ') }}
                   </div>
-                  <div class="mt-1 text-xs text-muted-foreground">{{ it.qty }} x</div>
+                  <div class="mt-1 text-xs text-muted-foreground">{{ item.qty }} x</div>
                 </div>
 
                 <div class="text-right">
-                  <div class="text-xs text-muted-foreground">Rp {{ formatIDR(it.price) }}</div>
+                  <div class="text-xs text-muted-foreground">Rp {{ formatIDR(item.price || 0) }}</div>
                 </div>
               </div>
 
@@ -1127,9 +1135,9 @@ const jasaOrder = computed(() => {
   const statusLabelMap = {
     menunggu_konfirmasi_merchant: "Menunggu Konfirmasi",
     pending: "Menunggu Konfirmasi",
-    diterima: "Diterima",
-    accepted: "Diterima",
-    responsed: "Diterima",
+    diterima: "Pesanan Diterima",
+    accepted: "Pesanan Diterima",
+    responsed: "Pesanan Diterima",
     layanan_dikerjakan: "Sedang Dikerjakan",
     dikerjakan: "Sedang Dikerjakan",
     processing: "Sedang Dikerjakan",
@@ -1149,20 +1157,48 @@ const jasaOrder = computed(() => {
 
   let statusLabel;
   if (isUnpaidOnline) {
-    statusLabel = "Pesanan Dibuat";
+    statusLabel = "Menunggu Pembayaran";
   } else if (['pending', 'unpaid', 'waiting_payment', 'menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'paid'].includes(rawStatus)) {
     statusLabel = "Menunggu Konfirmasi UMKM";
   } else {
     statusLabel = statusLabelMap[rawStatus] || o.status_label || rawStatus.replace(/_/g, " ");
   }
 
-  // 5-step tracking stepper for Jasa
+  // 6-step tracking stepper for Jasa
+  let activeStepKey = 'menunggu_pembayaran';
+  if (['pending', 'unpaid', 'waiting_payment'].includes(rawStatus)) {
+    activeStepKey = 'menunggu_pembayaran';
+  } else if (['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'paid'].includes(rawStatus)) {
+    activeStepKey = 'menunggu_konfirmasi_merchant';
+  } else if (['diterima', 'accepted', 'responsed'].includes(rawStatus)) {
+    activeStepKey = 'diterima';
+  } else if (['layanan_dikerjakan', 'dikerjakan', 'processing'].includes(rawStatus)) {
+    activeStepKey = 'layanan_dikerjakan';
+  } else if (['menunggu_konfirmasi_selesai', 'menunggu_selesai'].includes(rawStatus)) {
+    activeStepKey = 'menunggu_konfirmasi_selesai';
+  } else if (['selesai', 'completed'].includes(rawStatus)) {
+    activeStepKey = 'selesai';
+  }
+
+  const stepKeys = [
+    'menunggu_pembayaran',
+    'menunggu_konfirmasi_merchant',
+    'diterima',
+    'layanan_dikerjakan',
+    'menunggu_konfirmasi_selesai',
+    'selesai'
+  ];
+
+  const activeIndex = stepKeys.indexOf(activeStepKey);
+  const isCanceledOrExpired = ['ditolak', 'dibatalkan', 'expired', 'kadaluarsa', 'cancelled', 'rejected', 'batal'].includes(rawStatus);
+
   const tracking = [
-    { key: "placed", icon: "pi-receipt", label: "Pesanan\nDibuat", done: true },
-    { key: "confirmed", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: isPaid || isOrderCod || ['menunggu_konfirmasi', 'menunggu_konfirmasi_merchant', 'diterima', 'accepted', 'responsed', 'layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
-    { key: "working", icon: "pi-cog", label: "Layanan\nDikerjakan", done: ['layanan_dikerjakan', 'dikerjakan', 'processing', 'menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
-    { key: "completion_pending", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: ['menunggu_konfirmasi_selesai', 'menunggu_selesai', 'selesai', 'completed'].includes(rawStatus) },
-    { key: "completed", icon: "pi-home", label: "Selesai", done: ['selesai', 'completed'].includes(rawStatus) }
+    { key: "menunggu_pembayaran", icon: "pi-wallet", label: isOrderCod ? "Pesanan\nDibuat" : "Menunggu\nPembayaran", done: !isCanceledOrExpired && activeIndex >= 0 },
+    { key: "menunggu_konfirmasi_merchant", icon: "pi-clock", label: "Menunggu\nKonfirmasi", done: !isCanceledOrExpired && activeIndex >= 1 },
+    { key: "diterima", icon: "pi-check-circle", label: "Pesanan\nDiterima", done: !isCanceledOrExpired && activeIndex >= 2 },
+    { key: "layanan_dikerjakan", icon: "pi-cog", label: "Layanan\nDikerjakan", done: !isCanceledOrExpired && activeIndex >= 3 },
+    { key: "menunggu_konfirmasi_selesai", icon: "pi-check-circle", label: "Menunggu\nSelesai", done: !isCanceledOrExpired && activeIndex >= 4 },
+    { key: "selesai", icon: "pi-home", label: "Selesai", done: !isCanceledOrExpired && activeIndex >= 5 }
   ];
 
   const orderStatusKeys = [
@@ -1327,24 +1363,29 @@ const productOrder = computed(() => {
           .join(", ") || "-",
     },
 
-    items: (o.items || []).map((it) => ({
-      id: it.id,
-      productId: it.product_id,
-      title: it.product_name_snapshot || "Produk",
-      qty: it.quantity,
-      variant: it.product_variant_snapshot || "",
-      addons: (it.addons || []).map((a) => ({
-        name: a.addon_name_snapshot || a.addon?.name || "Addon",
-        price: Number(a.addon_price_snapshot || 0),
-      })),
-      price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      originalPrice: null,
-      imageUrl: getProductImage(it),
-      is_reviewed: it.is_reviewed || false,
-      can_review: it.can_review || false,
-      can_update_review: it.can_update_review || false,
-      review: it.review || null,
-    })),
+    items: (o.order_items || o.orderItems || o.items || []).map((it) => {
+      console.log('[customer/Detail] product data:', it.product);
+      return {
+        id: it.id,
+        productId: it.product_id,
+        product: it.product ? {
+          name: it.product.name,
+          image: it.product.image
+        } : null,
+        qty: it.quantity,
+        variant: it.product_variant_snapshot || "",
+        addons: (it.addons || []).map((a) => ({
+          name: a.addon_name_snapshot || a.addon?.name || "Addon",
+          price: Number(a.addon_price_snapshot || 0),
+        })),
+        price: it.price !== undefined && it.price !== null ? it.price : 0,
+        originalPrice: null,
+        is_reviewed: it.is_reviewed || false,
+        can_review: it.can_review || false,
+        can_update_review: it.can_update_review || false,
+        review: it.review || null,
+      };
+    }),
 
     amounts: {
       subtotal: Number(o.subtotal || 0),

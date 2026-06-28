@@ -103,14 +103,6 @@
               @click="openOrder"
             >
               <template #action="{ order: o }">
-                <!-- Payment Status Badge - shown for paid orders -->
-                <div
-                  v-if="getPaymentStatusLabel(o) === 'Sudah Dibayar' && !['selesai', 'completed', 'ditolak', 'rejected', 'dibatalkan', 'cancelled', 'batal', 'expired', 'kadaluarsa'].includes(String(o.status || '').toLowerCase())"
-                  class="flex items-center gap-1.5 mb-2 text-xs font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200"
-                >
-                  <i class="pi pi-check-circle"></i>
-                  {{ getPaymentStatusLabel(o) }}
-                </div>
                 <!-- SLA Countdown: merchant response deadline -->
                 <div
                   v-if="getMerchantDeadlineRemaining(o)"
@@ -519,7 +511,7 @@ function mapOrder(o) {
     rawItems = normalizeArray(o.jasa_items || o.jasaItems || o.services);
   } else {
     // Products - use items directly from order_items
-    rawItems = normalizeArray(o.items);
+    rawItems = normalizeArray(o.order_items || o.orderItems || o.items);
   }
 
   return {
@@ -532,17 +524,52 @@ function mapOrder(o) {
     items: rawItems.map((it) => ({
       id: it.id,
       productId: it.product_id || it.jasa_id,
-      title: it.product_name_snapshot || it.service_name || it.jasa?.title || "Item",
+      title: it.product_name_snapshot || it.product?.name || it.service_name || it.jasa?.title || "Item",
       qty: it.quantity || 1,
       variant: it.product_variant_snapshot || "",
       addons: normalizeArray(it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.unit_price_snapshot || it.price,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      price: it.price !== undefined && it.price !== null ? it.price : (it.unit_price_snapshot || 0),
+      imageUrl: (() => {
+        const snap = it.image_snapshot_path ? getOrderSnapshotUrl(it.id, it.image_snapshot_path) : null;
+        if (snap) return snap;
+        const prodImg = it.product?.image;
+        const fallbackImg = (prodImg !== undefined && prodImg !== null) ? prodImg : it.service_image;
+        if (fallbackImg) {
+          if (fallbackImg.startsWith('http')) return fallbackImg;
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          const cleanPath = fallbackImg.startsWith('/') ? fallbackImg : `/${fallbackImg}`;
+          return `${baseUrl}/storage${cleanPath}`;
+        }
+        return '/placeholder.png';
+      })(),
       productSlug: it.product?.slug,
     })),
+    order_items: (o.order_items || o.orderItems || []).map((it) => {
+      console.log('[customer/Index] product data:', it.product);
+      const imageUrl = it.product?.image;
+      const finalImage = (imageUrl !== undefined && imageUrl !== null) ? imageUrl : it.service_image;
+      let resolvedImage = null;
+      if (finalImage) {
+        if (finalImage.startsWith('http')) {
+          resolvedImage = finalImage;
+        } else {
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          const cleanPath = finalImage.startsWith('/') ? finalImage : `/${finalImage}`;
+          resolvedImage = `${baseUrl}/storage${cleanPath}`;
+        }
+      }
+      return {
+        id: it.id,
+        price: it.price,
+        product: {
+          name: it.product?.name || "Item",
+          image: resolvedImage,
+        }
+      };
+    }),
     order_type: isJasaOrder ? 'jasa' : 'product',
     created_at: o.created_at,
     // CRITICAL: Include payment fields for needsPayment() to work correctly

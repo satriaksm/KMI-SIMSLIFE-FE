@@ -261,7 +261,9 @@ const paymentStatusDisplay = computed(() => {
   if (isCod.value) return null;
 
   // Use helper function for case-insensitive matching
-  return formatPaymentStatus(props.order.payment_status);
+  const status = formatPaymentStatus(props.order.payment_status);
+  if (status === 'Sudah Bayar') return null;
+  return status;
 });
 
 function getChannelLabel(channel) {

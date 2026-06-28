@@ -54,6 +54,7 @@ const showJasaRejectModal = ref(false);
 const rejectReason = ref("");
 
 const showJasaEvidenceModal = ref(false);
+const showJasaEvidenceViewModal = ref(false);
 const completionNote = ref("");
 const evidenceFiles = ref([]);
 const evidenceInputRef = ref(null);
@@ -95,10 +96,14 @@ const order = computed(() => {
   if (!o) return null;
 
   // Adapt for Jasa Order robustly
-  const isJasa = o.order_type === 'jasa' || !!o.jasa_order_item_id || !!o.service_name || !!o.service_type || (o.items && o.items.length === 1 && o.items[0].jasa);
+  const isJasa = o.order_type === 'jasa' || !!o.jasa_order_item_id || !!o.service_name || !!o.service_type || (o.items && o.items.length === 1 && o.items[0].jasa) || (o.jasa_items && o.jasa_items.length > 0) || (o.jasaItems && o.jasaItems.length > 0);
   if (isJasa) {
+    const firstJasaItem = o.jasa_items?.[0] || o.jasaItems?.[0] || null;
     const imageRaw = o.service_image_snapshot
       || o.service_image
+      || firstJasaItem?.jasa_image_snapshot
+      || firstJasaItem?.jasa?.image
+      || firstJasaItem?.jasa?.image_url
       || o.service?.image_url
       || o.service?.image
       || o.jasa?.image_url
@@ -177,9 +182,12 @@ const order = computed(() => {
     const resolvedPlatformFee = Number(o.platform_fee || o.admin_fee || o.amounts?.platform_fee || 0);
 
     // Items mapping
-    const itemJasaId = o.jasa_order_item_id || (o.items?.[0]?.id);
+    const itemJasaId = o.jasa_order_item_id || firstJasaItem?.id || (o.items?.[0]?.id);
     const itemJasaName = o.service_name 
       || o.service_name_snapshot 
+      || firstJasaItem?.jasa_title_snapshot
+      || firstJasaItem?.jasa?.title
+      || firstJasaItem?.jasa?.name
       || o.jasa?.name 
       || o.jasa?.title
       || (o.items?.[0]?.name)
@@ -190,6 +198,7 @@ const order = computed(() => {
 
     const itemJasaCategory = o.category_name 
       || o.category_name_snapshot 
+      || firstJasaItem?.jasa?.category?.name
       || o.jasa?.category?.name 
       || (o.items?.[0]?.category)
       || (o.items?.[0]?.category_name)
@@ -269,19 +278,24 @@ const order = computed(() => {
     _rawStatus: o.status,
     payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
     created_at: o.created_at,
-    items: (o.items || []).map((it) => ({
-      id: it.id,
-      name: it.product_name_snapshot || "Produk",
-      variant: it.product_variant_snapshot || "",
-      addons: (it.addons || []).map((a) => ({
-        name: a.addon_name_snapshot || a.addon?.name || "Addon",
-        price: Number(a.addon_price_snapshot || 0),
-      })),
-      qty: it.quantity,
-      price: it.unit_price_snapshot,
-      subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
-    })),
+    items: (o.order_items || o.orderItems || o.items || []).map((it) => {
+      console.log('[merchant/Detail] product data:', it.product);
+      return {
+        id: it.id,
+        product: it.product ? {
+          name: it.product.name,
+          image: it.product.image
+        } : null,
+        variant: it.product_variant_snapshot || "",
+        addons: (it.addons || []).map((a) => ({
+          name: a.addon_name_snapshot || a.addon?.name || "Addon",
+          price: Number(a.addon_price_snapshot || 0),
+        })),
+        qty: it.quantity,
+        price: it.price !== undefined && it.price !== null ? it.price : 0,
+        subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
+      };
+    }),
     amounts: {
       subtotal: Number(o.subtotal || 0),
       discount: Number(o.discount_total || 0),
@@ -960,9 +974,7 @@ async function submitJasaEvidence() {
 }
 
 function openJasaEvidenceViewModal() {
-  if (order.value.completion_evidences?.length > 0) {
-    openLightbox(order.value.completion_evidences[0]);
-  }
+  showJasaEvidenceViewModal.value = true;
 }
 
 function openJasaReviewReplyModal() {
@@ -1195,7 +1207,7 @@ function leaveOrderChannel(id) {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <MerchantMobileHeader title="Detail Pesanan" />
+    <MerchantMobileHeader title="Detail Pesanan" :backRoute="`/merchant-center/${currentMerchantSlug}/orders`" />
 
     <div
       class="top-0 left-0 right-0 z-10 items-center justify-between hidden px-4 py-4 bg-white border-b border-gray-100 sm:flex sm:fixed sm:static sm:px-6"
@@ -1308,7 +1320,7 @@ function leaveOrderChannel(id) {
       <!-- TIMELINE                 -->
       <!-- ======================== -->
       <div
-        v-if="!['cancelled', 'rejected', 'ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(order.status)"
+        v-if="order && !['cancelled', 'rejected', 'ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(order.status)"
         class="p-4 bg-white shadow-sm rounded-2xl"
       >
         <div class="flex items-center justify-between mb-4">
@@ -1358,23 +1370,10 @@ function leaveOrderChannel(id) {
         </div>
       </div>
 
-      <!-- Unpaid online Jasa order info banner -->
-      <div
-        v-if="order.order_type === 'jasa' && isJasaUnpaidOnline(order)"
-        class="flex items-center gap-3 p-4 border border-blue-200 bg-blue-50 rounded-2xl"
-      >
-        <i class="text-xl text-blue-500 pi pi-info-circle shrink-0"></i>
-        <div>
-          <p class="text-sm font-semibold text-blue-700">Menunggu Pembayaran</p>
-          <p class="text-xs text-blue-600 mt-0.5">
-            Pesanan akan masuk ke konfirmasi merchant setelah customer menyelesaikan pembayaran.
-          </p>
-        </div>
-      </div>
 
       <!-- Cancelled banner -->
       <div
-        v-if="['cancelled', 'rejected', 'undelivered', 'ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(order.status)"
+        v-if="order && ['cancelled', 'rejected', 'undelivered', 'ditolak', 'dibatalkan', 'expired', 'kadaluarsa'].includes(order.status)"
         class="flex flex-col gap-3 p-4 border rounded-2xl"
         :class="order.status === 'undelivered' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'"
       >
@@ -1393,7 +1392,7 @@ function leaveOrderChannel(id) {
 
       <!-- Countdown konfirmasi UMKM -->
       <div
-        v-if="confirmCountdownText && (order.status === 'waiting_review' || order.status === 'menunggu_konfirmasi_merchant')"
+        v-if="order && confirmCountdownText && (order.status === 'waiting_review' || order.status === 'menunggu_konfirmasi_merchant')"
         class="p-4 bg-white shadow-sm rounded-2xl"
       >
         <div v-if="isConfirmExpired" class="flex items-center gap-3">
@@ -1543,35 +1542,6 @@ function leaveOrderChannel(id) {
         </div>
       </div>
 
-      <!-- ======================== -->
-      <!-- BUKTI PENYELESAIAN (JASA) -->
-      <!-- ======================== -->
-      <div v-if="order.order_type === 'jasa' && order.completion_evidences && order.completion_evidences.length > 0" class="p-4 bg-white shadow-sm rounded-2xl">
-        <h2 class="pb-2 text-sm font-semibold text-gray-700 border-b border-gray-100">
-          Bukti Penyelesaian Layanan
-        </h2>
-        <div v-if="order.completion_note || rawOrder?.completion_note" class="mt-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Catatan Pengerjaan</p>
-          <p class="italic">"{{ order.completion_note || rawOrder?.completion_note }}"</p>
-        </div>
-        <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div v-for="(ev, idx) in order.completion_evidences" :key="ev.id || idx" class="relative group aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer" @click="openLightbox(ev)">
-            <img v-if="isImageEvidence(ev)" :src="getEvidenceUrl(ev)" class="object-cover w-full h-full hover:scale-105 transition duration-300" alt="Bukti Foto" />
-            <div v-else-if="isVideoEvidence(ev)" class="w-full h-full flex items-center justify-center bg-black relative">
-              <video :src="getEvidenceUrl(ev)" class="object-cover w-full h-full"></video>
-              <div class="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition">
-                <div class="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center text-gray-800 shadow-md">
-                  <i class="pi pi-play text-sm ml-0.5"></i>
-                </div>
-              </div>
-            </div>
-            <div v-else class="w-full h-full flex flex-col items-center justify-center text-gray-400 p-2">
-              <i class="pi pi-file text-2xl mb-1"></i>
-              <span class="text-[10px] text-center truncate w-full">{{ ev.file_path || 'File' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- ======================== -->
       <!-- ULASAN PELANGGAN (JASA)   -->
@@ -1631,16 +1601,16 @@ function leaveOrderChannel(id) {
               class="flex items-center justify-center overflow-hidden bg-gray-100 w-14 h-14 rounded-xl shrink-0"
             >
               <img
-                v-if="item.image"
-                :src="item.image"
-                :alt="item.name"
+                v-if="item.product?.image || item.image"
+                :src="item.product?.image ? (item.product.image.startsWith('http') ? item.product.image : 'http://localhost:8000/storage/' + item.product.image.replace(/^\/+/, '')) : item.image"
+                :alt="item.product?.name || item.name || 'Item'"
                 class="object-cover w-full h-full"
               />
-              <i v-else class="text-xl text-gray-300 pi pi-box"></i>
+              <img v-else src="/placeholder.png" class="object-cover w-full h-full" />
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-800 truncate">
-                {{ item.name }}
+                {{ item.product?.name || item.name || 'Item' }}
               </p>
               <p v-if="order.order_type === 'jasa' && item.category" class="text-xs text-purple-500 font-medium mt-0.5">
                 {{ item.category }}
@@ -1652,7 +1622,7 @@ function leaveOrderChannel(id) {
                 <span class="text-merchant-primary">+</span> {{ item.addons.map(a => a.name).join(', ') }}
               </p>
               <p class="text-xs text-gray-500 mt-0.5">
-                {{ item.qty }}x × Rp {{ formatIDR(item.price) }}
+                {{ item.qty }}x × Rp {{ formatIDR(item.price || 0) }}
               </p>
             </div>
             <p class="text-sm font-semibold text-gray-800 shrink-0">
@@ -1741,7 +1711,7 @@ function leaveOrderChannel(id) {
       <!-- ======================== -->
       <!-- ACTION BUTTON (JASA)     -->
       <!-- ======================== -->
-      <div v-if="order.order_type === 'jasa'" class="pb-6 space-y-2">
+      <div v-if="order && order.order_type === 'jasa'" class="pb-6 space-y-2">
         <!-- 1. Menunggu Konfirmasi -->
         <template v-if="order.status === 'menunggu_konfirmasi' || order.status === 'menunggu_konfirmasi_merchant'">
           <Button
@@ -2103,6 +2073,47 @@ function leaveOrderChannel(id) {
           </p>
         </template>
       </div>
+    </ResponsiveModal>
+
+    <!-- ======================== -->
+    <!-- JASA EVIDENCE VIEW MODAL -->
+    <!-- ======================== -->
+    <ResponsiveModal
+      v-model:show="showJasaEvidenceViewModal"
+      title="Bukti Penyelesaian Layanan"
+      subtitle="Berikut adalah catatan dan bukti foto/video penyelesaian layanan yang telah diunggah."
+      :showFooter="true"
+    >
+      <div class="mt-4 space-y-4 text-left">
+        <div v-if="order && (order.completion_note || rawOrder?.completion_note)" class="p-3 bg-purple-50 border border-purple-100 rounded-xl">
+          <p class="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">Catatan Pengerjaan</p>
+          <p class="italic text-sm text-purple-700">"{{ order.completion_note || rawOrder?.completion_note }}"</p>
+        </div>
+
+        <div v-if="order && order.completion_evidences && order.completion_evidences.length > 0" class="space-y-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase">Bukti Foto / Video ({{ order.completion_evidences.length }}):</p>
+          <div class="grid grid-cols-2 gap-3">
+            <div v-for="(ev, idx) in order.completion_evidences" :key="ev.id || idx" class="relative group aspect-video rounded-xl overflow-hidden border border-gray-200 bg-gray-50 cursor-pointer" @click="openLightbox(ev)">
+              <img v-if="isImageEvidence(ev)" :src="getEvidenceUrl(ev)" class="object-cover w-full h-full hover:scale-105 transition duration-300" alt="Bukti Foto" />
+              <div v-else-if="isVideoEvidence(ev)" class="w-full h-full flex items-center justify-center bg-black relative">
+                <video :src="getEvidenceUrl(ev)" class="object-cover w-full h-full"></video>
+                <div class="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <i class="pi pi-play text-white text-lg"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          variant="muted-outline"
+          block
+          @click="showJasaEvidenceViewModal = false"
+        >
+          Tutup
+        </Button>
+      </template>
     </ResponsiveModal>
   </div>
 </template>

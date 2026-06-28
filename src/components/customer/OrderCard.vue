@@ -29,34 +29,60 @@
     <!-- Body -->
     <div class="px-4 py-3">
       <div class="space-y-3">
-        <div
-          v-for="(it, idx) in expanded ? order.items : order.items.slice(0, 1)"
-          :key="idx"
-          class="flex gap-3"
-        >
-          <div
-            class="w-16 h-16 overflow-hidden bg-gray-200 rounded-xl shrink-0"
-          >
+        <!-- Collapsed / Single item view -->
+        <div v-if="!expanded" class="flex gap-3">
+          <div class="w-16 h-16 overflow-hidden bg-gray-200 rounded-xl shrink-0 flex items-center justify-center">
             <img
-              v-if="it.imageUrl"
-              :src="it.imageUrl"
-              :alt="it.title"
+              v-if="item?.product?.image"
+              :src="item.product.image.startsWith('http') ? item.product.image : 'http://localhost:8000/storage/' + item.product.image.replace(/^\/+/, '')"
+              :alt="item.product?.name || 'Item'"
               class="object-cover w-full h-full"
-              crossorigin="use-credentials"
             />
+            <img v-else src="/placeholder.png" class="object-cover w-full h-full" />
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-bold text-black truncate">
-              {{ it.title }}
+              {{ item?.product?.name || "Item" }}
             </div>
-            <div v-if="it.variant" class="text-xs text-muted-foreground">{{ it.variant }}</div>
-            <div v-if="it.addons && it.addons.length" class="text-xs text-muted-foreground">
-              <span class="text-primary">+</span> {{ it.addons.map(a => a.name).join(', ') }}
+            <div v-if="order.items?.[0]?.variant" class="text-xs text-muted-foreground">{{ order.items?.[0]?.variant }}</div>
+            <div v-if="order.items?.[0]?.addons && order.items?.[0]?.addons.length" class="text-xs text-muted-foreground">
+              <span class="text-primary">+</span> {{ order.items?.[0]?.addons.map(a => a.name).join(', ') }}
             </div>
-            <div class="text-xs text-muted-foreground">{{ it.qty }}x</div>
+            <div class="text-xs text-muted-foreground">{{ order.items?.[0]?.qty || 1 }}x</div>
           </div>
           <div class="flex items-center text-xs text-muted-foreground">
-            Rp {{ formatIDR(it.price) }}
+            Rp {{ formatIDR(item?.price || 0) }}
+          </div>
+        </div>
+
+        <!-- Expanded view -->
+        <div v-else class="space-y-3">
+          <div
+            v-for="(it, idx) in order.items"
+            :key="idx"
+            class="flex gap-3"
+          >
+            <div class="w-16 h-16 overflow-hidden bg-gray-200 rounded-xl shrink-0">
+              <img
+                v-if="it.imageUrl"
+                :src="it.imageUrl"
+                :alt="it.title"
+                class="object-cover w-full h-full"
+              />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-bold text-black truncate">
+                {{ it.title }}
+              </div>
+              <div v-if="it.variant" class="text-xs text-muted-foreground">{{ it.variant }}</div>
+              <div v-if="it.addons && it.addons.length" class="text-xs text-muted-foreground">
+                <span class="text-primary">+</span> {{ it.addons.map(a => a.name).join(', ') }}
+              </div>
+              <div class="text-xs text-muted-foreground">{{ it.qty }}x</div>
+            </div>
+            <div class="flex items-center text-xs text-muted-foreground">
+              Rp {{ formatIDR(it.price) }}
+            </div>
           </div>
         </div>
       </div>
@@ -187,6 +213,13 @@ const resolvedStatusProps = computed(() => {
     };
   }
   return { variant: "order", status: "pending", size: "sm", showIcon: true };
+});
+
+const item = computed(() => {
+  console.log('[OrderCard] order data:', props.order);
+  const it = props.order?.order_items?.[0] || props.order?.orderItems?.[0] || null;
+  console.log('[OrderCard] resolved first item:', it);
+  return it;
 });
 
 function formatIDR(value) {

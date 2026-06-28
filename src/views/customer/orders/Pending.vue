@@ -141,18 +141,53 @@ function mapOrder(o) {
     dateLabel: formatDateLabel(o.created_at),
     status: "pending_payment",
     total: o.gross_amount,
-    items: (o.items || []).map((it) => ({
+    items: (o.order_items || o.orderItems || o.items || []).map((it) => ({
       id: it.id,
-      title: it.product_name_snapshot || "Produk",
+      title: it.product_name_snapshot || it.product?.name || "Produk",
       qty: it.quantity,
       variant: it.product_variant_snapshot || "",
       addons: (it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.unit_price_snapshot,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      price: it.price !== undefined && it.price !== null ? it.price : (it.unit_price_snapshot || 0),
+      imageUrl: (() => {
+        const snap = it.image_snapshot_path ? getOrderSnapshotUrl(it.id, it.image_snapshot_path) : null;
+        if (snap) return snap;
+        const prodImg = it.product?.image;
+        const fallbackImg = (prodImg !== undefined && prodImg !== null) ? prodImg : it.service_image;
+        if (fallbackImg) {
+          if (fallbackImg.startsWith('http')) return fallbackImg;
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          const cleanPath = fallbackImg.startsWith('/') ? fallbackImg : `/${fallbackImg}`;
+          return `${baseUrl}/storage${cleanPath}`;
+        }
+        return '/placeholder.png';
+      })(),
     })),
+    order_items: (o.order_items || o.orderItems || []).map((it) => {
+      console.log('[customer/Pending] product data:', it.product);
+      const imageUrl = it.product?.image;
+      const finalImage = (imageUrl !== undefined && imageUrl !== null) ? imageUrl : it.service_image;
+      let resolvedImage = null;
+      if (finalImage) {
+        if (finalImage.startsWith('http')) {
+          resolvedImage = finalImage;
+        } else {
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+          const cleanPath = finalImage.startsWith('/') ? finalImage : `/${finalImage}`;
+          resolvedImage = `${baseUrl}/storage${cleanPath}`;
+        }
+      }
+      return {
+        id: it.id,
+        price: it.price,
+        product: {
+          name: it.product?.name || "Item",
+          image: resolvedImage,
+        }
+      };
+    }),
     _raw: o,
   };
 }

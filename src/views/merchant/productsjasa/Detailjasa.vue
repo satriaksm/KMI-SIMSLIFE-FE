@@ -312,7 +312,7 @@ const getSelectionTypeLabel = (group) => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <MerchantMobileHeader title="Detail Jasa" />
+    <MerchantMobileHeader title="Detail Jasa" :backRoute="`/merchant-center/${currentMerchantSlug}/jasas`" />
 
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 sm:block">

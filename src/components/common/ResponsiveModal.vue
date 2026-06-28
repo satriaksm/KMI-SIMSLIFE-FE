@@ -92,8 +92,9 @@ const handleBackdropClick = () => {
 </script>
 
 <template>
-  <!-- Backdrop -->
-  <transition
+  <teleport to="body">
+    <!-- Backdrop -->
+    <transition
     enter-active-class="transition-opacity duration-300"
     enter-from-class="opacity-0"
     enter-to-class="opacity-100"
@@ -129,7 +130,7 @@ const handleBackdropClick = () => {
         // Desktop: Centered without top constraint
         'sm:fixed sm:inset-x-0 sm:inset-y-0 sm:m-auto',
         'sm:max-h-[85vh] sm:min-h-[560px] sm:h-auto',
-        sizeClass.value,
+        sizeClass,
         // Base styles
         'bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl',
         'flex flex-col z-[70]',
@@ -194,6 +195,7 @@ const handleBackdropClick = () => {
       </div>
     </div>
   </transition>
+</teleport>
 </template>
 
 <style scoped>

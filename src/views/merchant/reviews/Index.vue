@@ -13,7 +13,6 @@
         </button>
         <div>
           <Breadcrumb :items="breadcrumbItems" :merchantId="currentMerchantSlug" />
-          <h1 class="text-lg font-bold text-gray-900 mt-1 sm:hidden">Rating dan Ulasan</h1>
           <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
             Kelola dan pantau ulasan dari pelanggan untuk semua segmen usaha Anda.
           </p>
