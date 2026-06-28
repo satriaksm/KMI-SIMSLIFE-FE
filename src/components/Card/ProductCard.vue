@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import ReportButton from "@/components/ReportButton.vue";
+import { getImageUrl } from "@/libs/getImageUrl.js";
 
 const imageError = ref(false);
 
@@ -64,9 +65,17 @@ const formattedPrice = computed(() => {
 const productImageUrl = computed(() => {
   if (imageError.value) return null;
 
-  if (props.product.cover_image) {
-    return props.product.cover_image.src_url || props.product.cover_image;
+  const img = props.product.cover_image;
+  if (!img) return null;
+
+  if (typeof img === "string") {
+    return getImageUrl(img);
   }
+
+  if (typeof img === "object") {
+    return getImageUrl(img.src_url || img.url || img.id || img.image_path);
+  }
+
   return null;
 });
 

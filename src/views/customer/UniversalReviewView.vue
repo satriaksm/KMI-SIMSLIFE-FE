@@ -28,6 +28,7 @@ const itemInfo = ref(null);
 const submitting = ref(false);
 const alreadyReviewed = ref(false);
 const existingReview = ref(null);
+const removedMediaIds = ref([]);
 
 // Allowed file types
 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -145,11 +146,19 @@ const handleFileSelect = (event) => {
 
 // Remove file from selection
 const removeFile = (index) => {
-  // Revoke object URL to free memory
-  if (previewFiles.value[index]?.url) {
-    URL.revokeObjectURL(previewFiles.value[index].url);
+  const item = previewFiles.value[index];
+  if (item.isExisting) {
+    removedMediaIds.value.push(item.id);
+  } else {
+    // Revoke object URL to free memory
+    if (item.url) {
+      URL.revokeObjectURL(item.url);
+    }
+    const fileIndex = selectedFiles.value.indexOf(item.file);
+    if (fileIndex > -1) {
+      selectedFiles.value.splice(fileIndex, 1);
+    }
   }
-  selectedFiles.value.splice(index, 1);
   previewFiles.value.splice(index, 1);
 };
 
@@ -202,31 +211,34 @@ const submitReview = async () => {
     let endpoint = "";
     let config = { headers: { 'Content-Type': 'multipart/form-data' } };
 
-    if (reviewableType.value === "service") {
-      endpoint = `/api/jasa-orders/${orderId.value}/review`;
+    if (existingReview.value && existingReview.value.id) {
+      endpoint = `/api/ratings/${existingReview.value.id}`;
+      formData.append('_method', 'PUT');
+      if (removedMediaIds.value.length > 0) {
+        formData.append('removed_media_ids', JSON.stringify(removedMediaIds.value));
+      }
     } else {
-      // For product, food, or general review
-      if (existingReview.value && existingReview.value.id) {
-        endpoint = `/api/ratings/${existingReview.value.id}`;
-        formData.append('_method', 'PUT');
+      if (reviewableType.value === "service") {
+        endpoint = `/api/jasa-orders/${orderId.value}/review`;
       } else {
         endpoint = `/api/ratings`;
-      }
-      formData.append('rateable_id', reviewableId.value);
-      
-      const typeMapping = {
-        'product': 'App\\Models\\Product',
-        'jasa': 'App\\Models\\Jasa'
-      };
-      formData.append('rateable_type', typeMapping[reviewableType.value] || reviewableType.value);
-      if (route.query.merchantId) {
-        formData.append('merchant_id', route.query.merchantId);
-      }
-      if (orderId.value) {
-        formData.append('order_id', orderId.value);
-      }
-      if (route.query.orderItemId) {
-        formData.append('order_item_id', route.query.orderItemId);
+        formData.append('rateable_id', reviewableId.value);
+        
+        const typeMapping = {
+          'product': 'App\\Models\\Product',
+          'jasa': 'App\\Models\\Jasa'
+        };
+        formData.append('rateable_type', typeMapping[reviewableType.value] || reviewableType.value);
+        
+        if (route.query.merchantId) {
+          formData.append('merchant_id', route.query.merchantId);
+        }
+        if (orderId.value) {
+          formData.append('order_id', orderId.value);
+        }
+        if (route.query.orderItemId) {
+          formData.append('order_item_id', route.query.orderItemId);
+        }
       }
     }
 
@@ -298,9 +310,27 @@ const checkExistingReview = async () => {
       const { data } = await api.get(`/api/jasa-orders/${orderId.value}`);
       const order = data.data || data;
       if (order.review) {
-        alreadyReviewed.value = true;
         existingReview.value = order.review;
-        toast.info('Pesanan ini sudah diberi penilaian');
+        
+        if (order.can_update_review) {
+          reviewForm.value.rating = order.review.rating || 5;
+          reviewForm.value.comment = order.review.comment || "";
+          reviewForm.value.is_anonymous = !!order.review.is_anonymous;
+          
+          if (Array.isArray(order.review.media)) {
+            previewFiles.value = order.review.media.map(m => ({
+              id: m.id,
+              url: m.media_url || m.file_url,
+              type: m.file_type || 'image',
+              name: m.original_name || 'image',
+              isExisting: true
+            }));
+          }
+          alreadyReviewed.value = false;
+        } else {
+          alreadyReviewed.value = true;
+          toast.info('Pesanan ini sudah diberi penilaian dan tidak dapat diubah lagi');
+        }
       }
     } catch (err) {
       console.log("[UniversalReview] Could not check existing review:", err);
@@ -322,7 +352,17 @@ const checkExistingReview = async () => {
           reviewForm.value.rating = item.review.rating || 5;
           reviewForm.value.comment = item.review.comment || "";
           reviewForm.value.title = item.review.title || "";
-          reviewForm.value.is_anonymous = item.review.is_anonymous || false;
+          reviewForm.value.is_anonymous = !!item.review.is_anonymous;
+          
+          if (Array.isArray(item.review.media)) {
+            previewFiles.value = item.review.media.map(m => ({
+              id: m.id,
+              url: m.media_url || m.file_url,
+              type: m.file_type || 'image',
+              name: m.original_name || 'image',
+              isExisting: true
+            }));
+          }
           // Set alreadyReviewed to false so they can submit update
           alreadyReviewed.value = false;
         } else {
@@ -345,11 +385,11 @@ const loadItemInfo = async () => {
   if (type === "service") return;
   try {
     if (type === "product") {
-      const { data: pd } = await api.get(`/api/products/${id}`);
+      const { data: pd } = await api.get(`/api/public/products/${id}`);
       const p = pd?.data ?? pd ?? {};
       itemInfo.value = { name: p.name || "Produk", image: p.image_url || p.logo_url || null, icon: "pi-shopping-bag", typeLabel: "Produk" };
     } else if (type === "jasa") {
-      const { data: jd } = await api.get(`/api/jasas/${id}`);
+      const { data: jd } = await api.get(`/api/public/jasas/${id}`);
       const j = jd?.data ?? jd ?? {};
       itemInfo.value = { name: j.title || j.name || "Jasa", image: j.image_url || j.logo_url || null, icon: "pi-wrench", typeLabel: "Layanan" };
     }
