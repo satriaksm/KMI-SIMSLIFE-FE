@@ -1108,6 +1108,7 @@ async function confirmAction() {
       currentMerchantSlug.value,
       rawOrder.value.id,
       payload,
+      rawOrder.value?.order_type === 'jasa',
     );
     toast.success("Status pesanan berhasil diperbarui");
     showConfirmModal.value = false;

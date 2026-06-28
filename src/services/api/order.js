@@ -76,23 +76,18 @@ export function getMerchantOrders(merchantSlug, params = {}) {
  * Endpoint: GET /api/merchant/{merchantSlug}/jasa-orders/{orderId}
  */
 export function getMerchantOrderDetail(merchantSlug, orderId) {
-  return api.get(`/api/merchant/${merchantSlug}/jasa-orders/${orderId}`);
+  return api.get(`/api/merchant/${merchantSlug}/orders/${orderId}`);
 }
 
 /**
  * List merchant PRODUCT orders (for toko/kuliner merchants)
- * Endpoint: GET /api/merchant/orders?merchant={slug}
+ * Endpoint: GET /api/merchant/{merchantSlug}/orders
  * @param {string} merchantSlug
  * @param {Object} params - { status?, per_page?, page?, start_date?, end_date?, sort_by? }
  */
 export async function getMerchantProductOrders(merchantSlug, params = {}) {
-  const queryParams = {
-    merchant: merchantSlug,
-    ...params,
-  };
-
   try {
-    const response = await api.get('/api/merchant/orders', { params: queryParams });
+    const response = await api.get(`/api/merchant/${merchantSlug}/orders`, { params });
     return response;
   } catch (error) {
     // Graceful fallback - return empty if 405/404
@@ -106,15 +101,11 @@ export async function getMerchantProductOrders(merchantSlug, params = {}) {
 
 /**
  * Detail of a single PRODUCT order (merchant)
- * Endpoint: GET /api/merchant/orders/{id}?merchant={slug}
+ * Endpoint: GET /api/merchant/{merchantSlug}/orders/{id}
  */
 export async function getMerchantProductOrderDetail(merchantSlug, orderId) {
-  const queryParams = {
-    merchant: merchantSlug,
-  };
-
   try {
-    const response = await api.get(`/api/merchant/orders/${orderId}`, { params: queryParams });
+    const response = await api.get(`/api/merchant/${merchantSlug}/orders/${orderId}`);
     return response;
   } catch (error) {
     if (error?.response?.status === 405 || error?.response?.status === 404) {
@@ -132,7 +123,26 @@ export async function getMerchantProductOrderDetail(merchantSlug, orderId) {
  * @param {number} orderId
  * @param {string|FormData} payload - status string or FormData with status + evidences
  */
-export function updateOrderStatus(merchantSlug, orderId, payload) {
+export function updateOrderStatus(merchantSlug, orderId, payload, isJasa = true) {
+  if (!isJasa) {
+    if (payload instanceof FormData) {
+      return api.post(
+        `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
+        payload,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+    }
+    const data = typeof payload === 'object' && payload !== null ? payload : { status: payload };
+    return api.post(
+      `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
+      data
+    );
+  }
+
   if (payload instanceof FormData) {
     return api.patch(
       `/api/merchant/${merchantSlug}/jasa-orders/${orderId}/status`,
