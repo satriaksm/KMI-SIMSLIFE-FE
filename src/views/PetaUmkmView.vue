@@ -484,6 +484,16 @@ export default {
 
         marker.bindPopup(popup);
 
+        // Tambahkan event click agar saat marker di-klik, popup-nya juga ke tengah layar
+        marker.on('click', () => {
+          const currentZoom = this.map.getZoom();
+          const targetPoint = this.map.project([lat, lng], currentZoom);
+          targetPoint.y -= 150; // offset ke atas
+          const targetLatLng = this.map.unproject(targetPoint, currentZoom);
+          
+          this.map.setView(targetLatLng, currentZoom, { animate: true });
+        });
+
         // Klik di dalam popup => navigasi ke detail merchant
         marker.on("popupopen", () => {
           const popupEl = marker.getPopup()?.getElement();
@@ -523,7 +533,15 @@ export default {
       const lng = parseFloat(item.longitude);
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
 
-      this.map.setView([lat, lng], 18);
+      const targetZoom = 18;
+      
+      // Gunakan project/unproject untuk menggeser center point agar popup berada di tengah layar
+      const targetPoint = this.map.project([lat, lng], targetZoom);
+      // Popup kita cukup tinggi + ada anchor marker, geser center map ke atas sekitar 150px
+      targetPoint.y -= 150; 
+      const targetLatLng = this.map.unproject(targetPoint, targetZoom);
+
+      this.map.setView(targetLatLng, targetZoom);
 
       // Cari marker yang sudah ada berdasarkan koordinat
       const existingMarker = this.markers.find((marker) => {
