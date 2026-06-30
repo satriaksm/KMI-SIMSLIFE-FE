@@ -266,7 +266,8 @@ const submitReview = async () => {
     existingReview.value = data?.data?.review || data?.data || {};
     // Redirect back to order detail
     if (orderId.value) {
-      router.push(`/orders/${orderId.value}`);
+      const typeQuery = reviewableType.value === "service" ? "?type=jasa" : "";
+      router.push(`/orders/${orderId.value}${typeQuery}`);
     } else {
       router.push("/orders");
     }
@@ -278,7 +279,8 @@ const submitReview = async () => {
       toast.info('Pesanan ini sudah diberi penilaian sebelumnya');
       alreadyReviewed.value = true;
       if (orderId.value) {
-        setTimeout(() => router.push(`/orders/${orderId.value}`), 1500);
+        const typeQuery = reviewableType.value === "service" ? "?type=jasa" : "";
+        setTimeout(() => router.push(`/orders/${orderId.value}${typeQuery}`), 1500);
       } else {
         setTimeout(() => router.push('/orders'), 1500);
       }

@@ -74,7 +74,7 @@
           </div>
 
           <!-- Status header card -->
-          <div class="p-4 bg-white border border-gray-200 rounded-2xl">
+          <div v-if="!['cancelled', 'dibatalkan', 'rejected', 'ditolak', 'expired', 'kadaluarsa', 'batal'].includes(order.status)" class="p-4 bg-white border border-gray-200 rounded-2xl">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
@@ -94,7 +94,7 @@
             </div>
 
             <!-- Service order tracking steps (6-step stepper) -->
-            <div class="relative flex items-start">
+            <div v-if="!['cancelled', 'dibatalkan', 'rejected', 'ditolak', 'expired', 'kadaluarsa', 'batal'].includes(order.status)" class="relative flex items-start">
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-gray-200" :style="trackLineStyle" />
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-primary transition-all" :style="progressLineStyle" />
               <div
@@ -374,11 +374,12 @@
             </Button>
             <!-- Batalkan Pesanan (Jasa) -->
             <Button
-              v-if="order?.status === 'pending'"
+              v-if="order?.status === 'pending' || order?.status === 'menunggu_konfirmasi'"
+              variant="danger-outline"
               block
               :loading="cancelling"
               @click="handleCancel"
-              customClass="mt-2 border border-red-500 text-red-500 hover:bg-red-50 font-semibold"
+              customClass="mt-2 font-semibold"
             >
               <i class="pi pi-times mr-1"></i>
               Batalkan Pesanan
@@ -523,7 +524,7 @@
           </div>
 
           <!-- Status header -->
-          <div v-if="order.status !== 'cancelled'" class="p-4 bg-white border border-gray-200 rounded-2xl">
+          <div v-if="!['cancelled', 'rejected', 'undelivered'].includes(order.status)" class="p-4 bg-white border border-gray-200 rounded-2xl">
             <h2 class="mb-4 text-sm font-semibold text-gray-700">Status Pesanan</h2>
 
             <!-- Countdown konfirmasi UMKM -->
@@ -546,7 +547,7 @@
             </div>
 
             <!-- Tracking row -->
-            <div class="relative flex items-start">
+            <div v-if="!['cancelled', 'dibatalkan', 'rejected', 'ditolak', 'expired', 'kadaluarsa', 'batal'].includes(order.status)" class="relative flex items-start">
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-gray-200" :style="trackLineStyle" />
               <div class="absolute h-0.5 top-[18px] -translate-y-1/2 bg-primary transition-all" :style="progressLineStyle" />
               <div
@@ -1848,8 +1849,13 @@ async function verifyPaymentFromXendit(retryCount = 0) {
     ) {
       toast.success("Pembayaran berhasil! Menunggu konfirmasi dari penjual.");
       
-      // Remove query parameters from URL to avoid loop on refresh
-      router.replace({ path: route.path, query: {} });
+      // Remove query parameters from URL to avoid loop on refresh, but preserve type and other non-payment params
+      const newQuery = { ...route.query };
+      delete newQuery.payment;
+      delete newQuery.order_id;
+      delete newQuery.external_id;
+      delete newQuery.payment_status;
+      router.replace({ path: route.path, query: newQuery });
       
       await fetchOrder();
       return;
