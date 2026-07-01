@@ -79,7 +79,7 @@ export const getImageUrlJasa = (imageIdOrPath) => {
  * @param {Object} event - Event object with id
  * @returns {string} Event banner URL
  */
-export function getEventBannerUrl(event) {
+export function getEventBannerUrl(event, size = 'original') {
   if (!event?.id) {
     return null;
   }
@@ -96,14 +96,14 @@ export function getEventBannerUrl(event) {
     ? new Date(event.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/event-banners/${event.id}?t=${timestamp}`;
+  return `${apiUrl}/api/event-banners/${event.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get merchant logo URL via streaming API
  * Konsisten dengan event banner dan user profile picture
  */
-export function getMerchantLogoUrl(merchant) {
+export function getMerchantLogoUrl(merchant, size = 'original') {
   if (!merchant?.id) {
     return '/placeholder.png';
   }
@@ -114,14 +114,14 @@ export function getMerchantLogoUrl(merchant) {
     ? new Date(merchant.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/merchant-logo/${merchant.id}?t=${timestamp}`;
+  return `${apiUrl}/api/merchant-logo/${merchant.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get user profile picture URL via streaming API
  * Konsisten dengan event banner dan merchant logo
  */
-export function getUserProfileUrl(user) {
+export function getUserProfileUrl(user, size = 'original') {
   if (!user?.id) {
     console.warn('getUserProfileUrl: user.id is missing', user);
     return '/placeholder.png';
@@ -139,15 +139,15 @@ export function getUserProfileUrl(user) {
     ? new Date(user.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/user-profile/${user.id}?t=${timestamp}`;
+  return `${apiUrl}/api/user-profile/${user.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get merchant banner URL via streaming API
  */
-export function getMerchantBannerUrl(merchant) {
+export function getMerchantBannerUrl(merchant, size = 'original') {
   if (!merchant?.id) return "/placeholder.png";
-  return `${API_BASE_URL}/api/merchant-banner/${merchant.id}`;
+  return `${API_BASE_URL}/api/merchant-banner/${merchant.id}?size=${size}`;
 }
 
 /**

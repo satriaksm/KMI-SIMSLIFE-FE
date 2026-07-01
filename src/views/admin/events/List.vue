@@ -301,7 +301,7 @@ onMounted(() => {
                 <div class="w-24 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm group relative">
                   <img
                     v-if="item.banner_img_path"
-                    :src="getEventBannerUrl(item)"
+                    :src="getEventBannerUrl(item, 'thumb')"
                     :alt="item.event_name"
                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     @error="(e) => (e.target.src = '/placeholder.png')"
@@ -424,7 +424,7 @@ onMounted(() => {
             <div class="relative h-32 w-full bg-gray-100">
               <img
                 v-if="event.banner_img_path"
-                :src="getEventBannerUrl(event)"
+                :src="getEventBannerUrl(event, 'thumb')"
                 class="w-full h-full object-cover"
                 @error="(e) => (e.target.src = '/placeholder.png')"
               />

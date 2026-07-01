@@ -419,7 +419,7 @@ onMounted(async () => {
           <div class="absolute -bottom-10 sm:-bottom-12 left-6 sm:left-8">
             <div v-if="merchant.logo_path" class="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl bg-merchant-primary/10 flex items-center justify-center overflow-hidden border-4 border-white shadow-lg">
               <img 
-                :src="getMerchantLogoUrl(merchant)"
+                :src="getMerchantLogoUrl(merchant, 'thumb')"
                 alt="Logo"
                 class="w-full h-full object-cover"
                 @error="(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = `<span class='text-3xl sm:text-5xl font-bold text-merchant-primary'>${merchant.name?.charAt(0).toUpperCase()}</span>`; }"
@@ -689,7 +689,7 @@ onMounted(async () => {
               <div class="relative w-full overflow-hidden bg-gray-100 aspect-[4/1]">
                 <img
                   v-if="event.banner_img_path"
-                  :src="getEventBannerUrl(event)"
+                  :src="getEventBannerUrl(event, 'thumb')"
                   :alt="event.event_name"
                   class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                   @error="(e) => (e.target.src = '/placeholder-banner.png')"
