@@ -257,12 +257,12 @@
               @touchmove="handleTouchMove"
               @touchend="handleTouchEnd"
             >
-              <img
+              <ResponsiveImage
                 v-if="selectedImage"
-                :src="selectedImage"
+                :src="selectedImage.src"
+                :urls="selectedImage.urls"
                 :alt="product?.name"
-                class="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
-                draggable="false"
+                customClass="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
               />
               <div v-else class="text-gray-400">No Image</div>
 
@@ -350,10 +350,11 @@
                   class="thumb-item"
                   :class="currentImageIndex === index ? 'active' : ''"
                 >
-                  <img
-                    :src="image"
+                  <ResponsiveImage
+                    :src="image.src"
+                    :urls="image.urls"
                     :alt="`${product?.name} - ${index + 1}`"
-                    class="object-cover w-full h-full"
+                    customClass="object-cover w-full h-full"
                   />
                 </button>
               </div>
@@ -362,8 +363,19 @@
 
           <!-- Kolom Kanan: Info Produk -->
           <div class="px-4 py-4 sm:px-0 sm:py-0">
-            <!-- Nama & Harga -->
+            <!-- Nama, Kategori & Harga -->
             <div class="pb-4 border-b border-gray-200">
+              <!-- Kategori -->
+              <div v-if="product?.categories?.length" class="flex flex-wrap gap-2 mb-3">
+                <span 
+                  v-for="cat in product.categories" 
+                  :key="cat.id" 
+                  class="px-2.5 py-1 text-xs font-semibold rounded-full"
+                  :class="cat.parent_id === null ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-700'"
+                >
+                  {{ cat.name }}
+                </span>
+              </div>
               <h1 class="mb-2 text-xl font-bold text-gray-900 sm:text-3xl">
                 {{ product?.name || "Nama Produk" }}
               </h1>
@@ -430,13 +442,14 @@
                   <div class="flex flex-col items-center">
                     <!-- 🖼️ Image jika ada -->
                     <div
-                      v-if="getOptionValueSrcUrl(1, size.id)"
+                      v-if="getOptionValueImage(1, size.id)"
                       class="flex items-center justify-center w-12 h-12 overflow-hidden bg-gray-100 rounded-md"
                     >
-                      <img
-                        :src="getOptionValueSrcUrl(1, size.id)"
+                      <ResponsiveImage
+                        :src="getOptionValueImage(1, size.id).src"
+                        :urls="getOptionValueImage(1, size.id).urls"
                         :alt="size.name"
-                        class="object-cover w-full h-full"
+                        customClass="object-cover w-full h-full"
                       />
                     </div>
 
@@ -660,11 +673,12 @@
                   <div
                     class="flex-shrink-0 w-12 h-12 overflow-hidden bg-gray-200 rounded-full"
                   >
-                    <img
+                    <ResponsiveImage
                       v-if="product?.merchant?.logo_url"
                       :src="product.merchant.logo_url"
+                      :urls="product.merchant.logo_urls"
                       alt="UMKM logo"
-                      class="object-cover w-full h-full"
+                      customClass="object-cover w-full h-full"
                     />
                     <span v-else>
                       <svg
@@ -722,7 +736,7 @@
               </h3>
               <div
                 v-if="relatedProducts.length > 0"
-                class="flex gap-3 pb-2 overflow-x-auto no-scrollbar"
+                class="flex gap-3 py-2 -mt-2 overflow-x-auto no-scrollbar"
               >
                 <ProductCard
                   v-for="item in relatedProducts"
@@ -928,121 +942,34 @@
         <!-- Group Items -->
         <div class="space-y-2">
           <div v-if="isSingleRequired(group)" class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- RADIO -->
-                <input
-                  type="radio"
-                  :name="'group-' + group.id"
-                  :checked="isAddonSelected(addon)"
-                  @change="selectSingleAddon(addon, group)"
-                  :disabled="!addon.available"
-                  class="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <RadioGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available
+              }))"
+              layout="grid"
+              :modelValue="getSelectedSingleAddon(group.id)"
+              @update:modelValue="val => setSelectedSingleAddon(val, group)"
+            />
           </div>
           <div v-else class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between gap-3 p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- CHECKBOX -->
-                <input
-                  type="checkbox"
-                  :checked="isAddonSelected(addon)"
-                  @change="toggleAddon(addon, group)"
-                  :disabled="!addon.available || isGroupMaxed(group, addon)"
-                  class="mt-0.5 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <CheckboxGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available || isGroupMaxed(group, addon)
+              }))"
+              layout="grid"
+              :modelValue="getSelectedMultipleAddons(group.id)"
+              @update:modelValue="vals => setSelectedMultipleAddons(vals, group)"
+            />
           </div>
         </div>
       </div>
@@ -1259,7 +1186,10 @@ import Button from "@/components/common/Button.vue";
 import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ReviewSection from "@/components/common/ReviewSection.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import Textfield from "@/components/forms/TextField.vue";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
+import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
 import { useProducts } from "@/composables/useProducts.js";
 import { useToast } from "vue-toastification";
 import { useCartStore } from "@/stores/cart";
@@ -1345,12 +1275,16 @@ function handleTouchEnd() {
   touchEndX.value = 0;
 }
 
-function getOptionValueSrcUrl(optionIndex, valueId) {
+function getOptionValueImage(optionIndex, valueId) {
   // optionIndex: 1 untuk option pertama, 2 untuk kedua
   const option = product.value?.options?.[optionIndex - 1];
   if (!option || !option.values) return null;
   const value = option.values.find((v) => Number(v.id) === Number(valueId));
-  return value?.src_url || null;
+  if (!value?.src_url && !value?.image_url) return null;
+  return {
+    src: value.thumb_url || value.src_url || value.image_url,
+    urls: null // Force using only the 150x thumbnail
+  };
 }
 
 async function addToCart() {
@@ -1728,21 +1662,33 @@ async function doFetchProduct(slug) {
     return images
       .map((img) => {
         if (!img) return null;
-        if (typeof img === "string") return img;
+        if (typeof img === "string") return { src: img, urls: null };
         if (typeof img === "object") {
+          let src = null;
           // jika sudah berupa absolute url
-          if (img.image_url) return img.image_url;
+          if (img.image_url) src = img.image_url;
           // jika id tersedia — gunakan getImageUrl helper (yang kamu import)
-          if (img.src_url) return img.src_url;
+          else if (img.src_url) src = img.src_url;
           // jika image_path tersedia, coba resolve
-          if (img.image_path) {
-            return typeof absoluteImagePath === "function"
+          else if (img.image_path) {
+            src = typeof absoluteImagePath === "function"
               ? absoluteImagePath(img.image_path)
               : _absoluteImagePath
                 ? _absoluteImagePath(img.image_path)
                 : `${
                     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
                   }/storage/${img.image_path}`;
+          }
+          
+          if (src) {
+            return {
+              src,
+              urls: img.image_urls || img.urls || img.src_urls || {
+                original: img.src_url,
+                medium: img.medium_url,
+                thumb: img.thumb_url
+              }
+            };
           }
         }
         return null;
@@ -2231,6 +2177,39 @@ function toggleAddon(addon, group) {
     });
   }
 }
+
+// Helpers untuk komponen Radio/CheckboxGroupPills
+const getSelectedSingleAddon = (groupId) => {
+  const found = tempSelectedAddons.value.find((a) => Number(a.addon_group_id) === Number(groupId));
+  return found ? found.addon_id : null;
+};
+
+const setSelectedSingleAddon = (val, group) => {
+  const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+  if (addon) selectSingleAddon(addon, group);
+};
+
+const getSelectedMultipleAddons = (groupId) => {
+  return tempSelectedAddons.value
+    .filter((a) => Number(a.addon_group_id) === Number(groupId))
+    .map((a) => a.addon_id);
+};
+
+const setSelectedMultipleAddons = (vals, group) => {
+  if (!Array.isArray(vals)) return;
+  tempSelectedAddons.value = tempSelectedAddons.value.filter((a) => Number(a.addon_group_id) !== Number(group.id));
+  vals.forEach((val) => {
+    const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+    if (addon) {
+      tempSelectedAddons.value.push({
+        addon_group_id: group.id,
+        addon_id: addon.addon_id ?? addon.id,
+        name: addon.name,
+        price: Number(addon.price || 0),
+      });
+    }
+  });
+};
 
 // Pilih single untuk group maxSelection === 1 (radio)
 function selectSingleAddon(addon, group) {

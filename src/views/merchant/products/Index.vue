@@ -1200,7 +1200,7 @@ const tableActions = [
                 <!-- ✅ FIXED: Gunakan helper getImageUrl -->
                 <img
                   v-if="item.cover_image?.src_url"
-                  :src="item.cover_image.src_url"
+                  :src="item.cover_image.thumb_url || item.cover_image.src_url"
                   :alt="item.name"
                   class="object-cover w-full h-full"
                   @error="(e) => (e.target.style.display = 'none')"
@@ -1943,10 +1943,10 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForDelete.cover_image?.src_url"
-              :src="selectedProductForDelete.cover_image.src_url"
+              v-if="selectedProductForDelete.cover_image"
+              :src="selectedProductForDelete.cover_image.thumb_url || selectedProductForDelete.cover_image.src_url"
               :alt="selectedProductForDelete.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -2041,10 +2041,10 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image?.src_url"
-                :src="product.cover_image.src_url"
+                v-if="product.cover_image"
+                :src="product.cover_image.thumb_url || product.cover_image.src_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"
@@ -2129,10 +2129,10 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForStatusChange.cover_image?.src_url"
-              :src="selectedProductForStatusChange.cover_image.src_url"
+              v-if="selectedProductForStatusChange.cover_image"
+              :src="selectedProductForStatusChange.cover_image.thumb_url || selectedProductForStatusChange.cover_image.src_url"
               :alt="selectedProductForStatusChange.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -2271,10 +2271,10 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image?.src_url"
-                :src="product.cover_image.src_url"
+                v-if="product.cover_image"
+                :src="product.cover_image.thumb_url || product.cover_image.src_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"

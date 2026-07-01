@@ -402,7 +402,7 @@ watch(searchQuery, () => {
           >
             <img
               v-if="item.profile_picture_path"
-              :src="getUserProfileUrl(item)"
+              :src="getUserProfileUrl(item, 'thumb')"
               :alt="item.name"
               class="w-full h-full object-cover"
               @error="
@@ -528,7 +528,7 @@ watch(searchQuery, () => {
             >
               <img
                 v-if="u.profile_picture_path"
-                :src="getUserProfileUrl(u)"
+                :src="getUserProfileUrl(u, 'thumb')"
                 :alt="u.name"
                 class="w-full h-full object-cover"
                 @error="

@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth";
 import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import {
   getSubscriptionState,
   subscribePushNotifications,
@@ -260,12 +261,13 @@ onMounted(async () => {
                   "
                   class="w-40 h-40 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
                 />
-                <img
+                <ResponsiveImage
                   v-else-if="hasProfilePictureUrl && !imgError"
                   :src="user.profile_picture"
+                  :urls="user.profile_picture_urls"
                   :alt="user.name"
                   loading="lazy"
-                  class="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
+                  customClass="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
                   :class="imgLoaded ? '' : 'opacity-0'"
                   @load="imgLoaded = true"
                   @error="
@@ -637,12 +639,13 @@ onMounted(async () => {
                 "
                 class="w-32 h-32 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
               />
-              <img
+              <ResponsiveImage
                 v-else-if="hasProfilePictureUrl && !imgError"
                 :src="user.profile_picture"
+                :urls="user.profile_picture_urls"
                 :alt="user.name"
                 loading="lazy"
-                class="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
+                customClass="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
                 :class="imgLoaded ? '' : 'opacity-0'"
                 @load="imgLoaded = true"
                 @error="

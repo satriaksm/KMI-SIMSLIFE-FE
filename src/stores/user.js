@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import UserService from "@/services/api/user";
+import { useAuthStore } from "@/stores/auth";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -49,6 +50,10 @@ export const useUserStore = defineStore("user", {
         }
 
         await this.fetchProfile();
+        
+        const authStore = useAuthStore();
+        authStore.updateLocalUser(this.user);
+        
         return this.user;
       } catch (error) {
         this.error =

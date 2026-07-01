@@ -227,11 +227,10 @@ const transformedOptions = computed(() => {
     option_name: option.option_name,
     uses_image: option.uses_image,
     values: (option.values || []).map((value) => {
-      // Prioritas:
-      // 1) value.src_url dari API (langsung pakai jika ada)
-      // 2) fallback value.image_url (absolute dari backend)
-      // 3) fallback getVariantImageUrl(value.id) — uses product_option_value.id
-      const imageSrc = value.src_url || null;
+      // 1) value.thumb_url dari API (thumbnail)
+      // 2) fallback value.src_url (langsung pakai jika ada)
+      // 3) fallback value.image_url (absolute dari backend)
+      const imageSrc = value.thumb_url || value.src_url || null;
 
       return {
         id: value.id,

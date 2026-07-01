@@ -5,6 +5,7 @@ import StatusLabel from "@/components/common/StatusLabel.vue";
 import Button from "@/components/common/Button.vue";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import {
   getMerchantOrderDetail,
   updateOrderStatus,
@@ -80,6 +81,7 @@ const order = computed(() => {
       phone: o.user_phone_snapshot || "-",
       email: o.user?.email || "",
       profile_picture: o.user?.profile_picture || null,
+      profile_picture_urls: o.user?.profile_picture_urls || null,
     },
     status: mapApiStatus(o.status, o),
     _rawStatus: o.status,
@@ -129,7 +131,7 @@ function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
-  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+  return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }
 
 async function fetchOrder() {
@@ -842,7 +844,7 @@ function leaveOrderChannel(id) {
         </h2>
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 overflow-hidden bg-gray-100 rounded-full shrink-0 flex items-center justify-center border border-gray-200">
-            <img v-if="order.customer.profile_picture" :src="order.customer.profile_picture" class="object-cover w-full h-full" alt="Customer avatar" crossorigin="use-credentials" />
+            <ResponsiveImage v-if="order.customer.profile_picture" :src="order.customer.profile_picture" :urls="order.customer.profile_picture_urls" customClass="object-cover w-full h-full" alt="Customer avatar" />
             <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
             </svg>
@@ -895,7 +897,7 @@ function leaveOrderChannel(id) {
           Bukti Foto
         </h2>
         <div class="mt-3">
-          <img :src="order.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" crossorigin="use-credentials" />
+          <ResponsiveImage :src="order.proof_image_url" customClass="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
         </div>
       </div>
 
@@ -918,12 +920,11 @@ function leaveOrderChannel(id) {
             <div
               class="flex items-center justify-center overflow-hidden bg-gray-100 w-14 h-14 rounded-xl shrink-0"
             >
-              <img
+              <ResponsiveImage
                 v-if="item.image"
                 :src="item.image"
                 :alt="item.name"
-                class="object-cover w-full h-full"
-                crossorigin="use-credentials"
+                customClass="object-cover w-full h-full"
               />
               <i v-else class="text-xl text-gray-300 pi pi-box"></i>
             </div>

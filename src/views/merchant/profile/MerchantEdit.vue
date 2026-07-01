@@ -84,11 +84,12 @@
       >
         <!-- Cover Image -->
         <div class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1">
-          <img
+          <ResponsiveImage
             v-if="hasFormCover"
             :src="form.coverImage"
+            :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
             @error="onCoverImgError"
           />
           <div
@@ -118,11 +119,12 @@
         <div class="relative px-4 pb-4 pt-14">
           <div class="absolute -top-12 left-4">
             <div class="relative">
-              <img
+              <ResponsiveImage
                 v-if="hasFormLogo"
                 :src="form.logo"
+                :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
                 alt="Logo"
-                class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
+                customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
                 @error="onLogoImgError"
               />
               <span
@@ -159,11 +161,12 @@
           <div
             class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1"
           >
-            <img
+            <ResponsiveImage
               v-if="hasFormCover"
               :src="form.coverImage"
+              :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
               alt="Cover"
-              class="absolute inset-0 object-cover w-full h-full"
+              customClass="absolute inset-0 object-cover w-full h-full"
               @error="onCoverImgError"
             />
             <div
@@ -210,11 +213,12 @@
 
         <div class="absolute -bottom-12 left-8">
           <div class="relative">
-            <img
+            <ResponsiveImage
               v-if="hasFormLogo"
               :src="form.logo"
+              :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
               alt="Logo"
-              class="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
+              customClass="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
               @error="onLogoImgError"
             />
             <span
@@ -292,6 +296,7 @@
               label="Kontak"
               placeholder="Masukkan nomor kontak"
               variant="merchant"
+              required
             />
           </div>
 
@@ -323,7 +328,7 @@
                   label="NPWP"
                   placeholder="Contoh: 12.345.678.9-012.345"
                   variant="merchant"
-                                required
+                                
 
                 />
               </div>
@@ -399,6 +404,7 @@
                     provinces.map((p) => ({ value: p.id, label: p.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="city_id"
@@ -408,6 +414,7 @@
                   :disabled="!form.province_id"
                   :options="cities.map((c) => ({ value: c.id, label: c.name }))"
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="district_id"
@@ -419,6 +426,7 @@
                     districts.map((d) => ({ value: d.id, label: d.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="village_id"
@@ -430,6 +438,7 @@
                     villages.map((v) => ({ value: v.id, label: v.name }))
                   "
                   variant="merchant"
+                  required
                 />
               </div>
               <!-- Detail alamat -->
@@ -611,7 +620,7 @@
                     label="NPWP"
                     placeholder="Contoh: 12.345.678.9-012.345"
                     variant="merchant"
-                                  required
+                                  
 
                   />
                 </div>
@@ -850,17 +859,23 @@
             Simpan
           </AppButton>
         </div>
+        
+        <!-- Hidden submit for mobile fallback -->
+        <button ref="hiddenSubmitBtn" type="submit" class="hidden"></button>
 
         <!-- Mobile Action Button - Fixed at Bottom -->
         <div
-          class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
+          class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <button
-            type="submit"
-            class="w-full py-3 text-sm font-semibold text-center text-white transition-opacity bg-merchant-primary rounded-xl hover:opacity-90"
+          <AppButton 
+            type="button" 
+            @click="triggerSubmit"
+            :loading="isSaving" 
+            variant="merchant"
+            block
           >
             Simpan
-          </button>
+          </AppButton>
         </div>
       </Form>
     </div>
@@ -884,7 +899,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
@@ -901,6 +916,7 @@ import { fetchBanks } from "@/services/api/bank";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
 import * as yup from "yup";
@@ -937,6 +953,13 @@ const breadcrumbItems = computed(() => [
     label: "Edit Profil UMKM",
   },
 ]);
+
+const initialData = ref({
+  logo_url: null,
+  logo_urls: null,
+  banner_url: null,
+  banner_urls: null,
+});
 
 const form = ref({
   name: "",
@@ -1019,6 +1042,13 @@ const latitude = ref(null);
 const longitude = ref(null);
 const coverInput = ref(null);
 const logoInput = ref(null);
+const hiddenSubmitBtn = ref(null);
+
+const triggerSubmit = () => {
+  if (hiddenSubmitBtn.value) {
+    hiddenSubmitBtn.value.click();
+  }
+};
 
 const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
 const mapRefMobile = ref(null);
@@ -1259,8 +1289,11 @@ onMounted(async () => {
 
     const data = await fetchMerchantProfile(merchantSlug.value);
 
-    latitude.value = data?.primary_address?.latitude ?? null;
-    longitude.value = data?.primary_address?.longitude ?? null;
+    const latRaw = data?.primary_address?.latitude ?? data?.latitude ?? null;
+    const lngRaw = data?.primary_address?.longitude ?? data?.longitude ?? null;
+
+    latitude.value = latRaw !== null && latRaw !== undefined ? Number(latRaw) : null;
+    longitude.value = lngRaw !== null && lngRaw !== undefined ? Number(lngRaw) : null;
 
     form.value.name = data?.name ?? "";
     form.value.contact = data?.phone ?? "";
@@ -1298,6 +1331,13 @@ onMounted(async () => {
         ? data.banner_url
         : "";
 
+    initialData.value = {
+      logo_url: form.value.logo,
+      logo_urls: data?.logo_urls || null,
+      banner_url: form.value.coverImage,
+      banner_urls: data?.banner_urls || null,
+    };
+
     const hours = data?.operational_hours ?? {};
 
     form.value.operationalHours = DAYS.map((day) => {
@@ -1327,7 +1367,9 @@ onMounted(async () => {
   } catch (error) {
     isLoading.value = false;
   } finally {
-    isPrefilling.value = false;
+    nextTick(() => {
+      isPrefilling.value = false;
+    });
   }
 });
 
@@ -1424,7 +1466,7 @@ const buildOperationalHoursPayload = () => {
 const editProfileSchema = yup.object().shape({
   name: yup.string().required("Nama UMKM wajib diisi"),
   contact: yup.string().required("Kontak wajib diisi"),
-  NPWP: yup.string().required("NPWP wajib diisi"),
+  NPWP: yup.string().nullable(),
   bank_code: yup.string().required("Bank wajib dipilih"),
   bank_account_number: yup.string().required("Nomor rekening wajib diisi"),
   bank_account_name: yup.string().required("Nama pemilik rekening wajib diisi"),

@@ -181,6 +181,27 @@ export function useAddressMapSync() {
           } else if (mapRef && mapRef.value && mapRef.value.panTo) {
              mapRef.value.panTo(parseFloat(lat), parseFloat(lon), 16);
           }
+        } else if (validParts.length > 1) {
+          // Jika kelurahan tidak ketemu, fallback pencarian tanpa kelurahan (dari kecamatan)
+          const fallbackParts = validParts.slice(1);
+          const fallbackQuery = fallbackParts.join(", ") + ", Indonesia";
+          const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fallbackQuery)}&limit=1&accept-language=id`;
+          
+          try {
+            const fbRes = await fetch(fallbackUrl);
+            const fbData = await fbRes.json();
+            
+            if (fbData && fbData.length > 0) {
+              const { lat, lon } = fbData[0];
+              if (mapRef && mapRef.panTo) {
+                 mapRef.panTo(parseFloat(lat), parseFloat(lon), 15);
+              } else if (mapRef && mapRef.value && mapRef.value.panTo) {
+                 mapRef.value.panTo(parseFloat(lat), parseFloat(lon), 15);
+              }
+            }
+          } catch (fbErr) {
+            console.error("Geocoding fallback error:", fbErr);
+          }
         }
       } catch (e) {
         console.error("Geocoding error:", e);

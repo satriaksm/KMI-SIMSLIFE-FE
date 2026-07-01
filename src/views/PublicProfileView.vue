@@ -152,7 +152,7 @@ const formatDate = (dateStr) => {
                   <div class="flex gap-4">
                     <div v-if="post.image_id || post.thumbnail_url" class="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
                       <img 
-                        :src="post.image_id ? getCommunityImageUrl(post.image_id) : post.thumbnail_url" 
+                        :src="post.image_id ? getCommunityImageUrl(post.image_id, 'thumb') : post.thumbnail_url" 
                         class="w-full h-full object-cover" 
                         @error="(e) => { e.target.src = '/placeholder.png' }"
                       />

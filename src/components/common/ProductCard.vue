@@ -47,9 +47,8 @@ const formatPrice = (min, max) => {
 };
 
 const imageSrc = computed(() => {
-  return props.product?.cover_image?.id
-    ? props.product.cover_image.src_url
-    : "";
+  return props.product?.cover_image?.thumb_url || 
+         (props.product?.cover_image?.id ? props.product.cover_image.src_url : "");
 });
 
 const imageAlt = computed(() => props.product?.name || "");

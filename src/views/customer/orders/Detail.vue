@@ -165,7 +165,7 @@
             <template v-if="order.meta.delivery_type === 'pickup'">
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" crossorigin="use-credentials" />
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" :urls="order.pickup.logoUrls" customClass="object-cover w-full h-full" alt="Store logo" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -195,7 +195,7 @@
             <template v-else>
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <img v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" class="object-cover w-full h-full" alt="Store logo" crossorigin="use-credentials" />
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" :urls="order.pickup.logoUrls" customClass="object-cover w-full h-full" alt="Store logo" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -250,12 +250,12 @@
               <div
                 class="w-12 h-12 overflow-hidden bg-gray-200 rounded-xl shrink-0"
               >
-                <img
+                <ResponsiveImage
                   v-if="it.imageUrl"
                   :src="it.imageUrl"
+                  :urls="it.imageUrls"
                   :alt="it.title"
-                  class="object-cover w-full h-full"
-                  crossorigin="use-credentials"
+                  customClass="object-cover w-full h-full"
                 />
               </div>
               <div class="flex-1 min-w-0">
@@ -339,7 +339,7 @@
             </div>
           </div>
           <div class="p-4 flex justify-center">
-            <img :src="order.meta.proof_image_url" class="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
+            <ResponsiveImage :src="order.meta.proof_image_url" customClass="w-full max-w-sm rounded-xl border border-gray-200" alt="Bukti Foto" />
           </div>
         </div>
 
@@ -454,6 +454,10 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import OrderTrackDialog from './OrderTrackDialog.vue'
+import OrderReviewDialog from './OrderReviewDialog.vue'
+import AppButton from '@/components/common/Button.vue'
+import ResponsiveImage from '@/components/common/ResponsiveImage.vue'
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
@@ -570,6 +574,7 @@ const order = computed(() => {
         : "Alamat toko belum diatur",
       phone: o.merchant?.phone || null,
       logoUrl: o.merchant?.logo_url || o.merchant?.logoUrl || null,
+      logoUrls: o.merchant?.logo_urls || o.merchant?.logoUrls || null,
     },
 
     dropoff: {
@@ -599,6 +604,7 @@ const order = computed(() => {
       price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
       originalPrice: null,
       imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      imageUrls: null,
     })),
 
     amounts: {
@@ -639,7 +645,7 @@ function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
-  return `${baseUrl}/api/order-snapshots/${orderItemId}`;
+  return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }
 
 async function fetchOrder() {

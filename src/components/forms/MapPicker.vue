@@ -217,7 +217,7 @@ onMounted(() => {
   const startLat = props.lat ?? -7.539493;
   const startLng = props.lng ?? 110.80573;
 
-  map = L.map(mapEl.value).setView([startLat, startLng], props.zoom);
+  map = L.map(mapEl.value, { attributionControl: false }).setView([startLat, startLng], props.zoom);
   L.tileLayer(tileUrl, { attribution }).addTo(map);
 
   if (props.lat != null && props.lng != null) {
