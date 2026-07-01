@@ -147,22 +147,29 @@ export function getUserProfileUrl(user, size = 'original') {
  */
 export function getMerchantBannerUrl(merchant, size = 'original') {
   if (!merchant?.id) return "/placeholder.png";
-  return `${API_BASE_URL}/api/merchant-banner/${merchant.id}?size=${size}`;
+
+  const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const timestamp = merchant.updated_at
+    ? new Date(merchant.updated_at).getTime()
+    : Date.now();
+
+  return `${apiUrl}/api/merchant-banner/${merchant.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get community post image URL via streaming API
  * Konsisten dengan event banner, merchant logo, dan user profile picture
  */
-export function getCommunityImageUrl(imageId, size = 'original') {
+export function getCommunityImageUrl(imageId, size = 'original', timestamp = null) {
   if (!imageId) {
     return '/placeholder.png';
   }
 
   const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-  // ✅ Cache-busting dengan timestamp
-  const timestamp = Date.now();
+  // Jika ada timestamp gunakan itu, jika tidak, kita bisa biarkan statis agar bisa di-cache dengan baik
+  // Jangan pakai Date.now() secara default karena akan merusak sistem cache browser
+  const query = timestamp ? `&t=${timestamp}` : '';
 
-  return `${apiUrl}/api/community-images/${imageId}?size=${size}&t=${timestamp}`;
+  return `${apiUrl}/api/community-images/${imageId}?size=${size}${query}`;
 }

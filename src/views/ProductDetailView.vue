@@ -363,8 +363,19 @@
 
           <!-- Kolom Kanan: Info Produk -->
           <div class="px-4 py-4 sm:px-0 sm:py-0">
-            <!-- Nama & Harga -->
+            <!-- Nama, Kategori & Harga -->
             <div class="pb-4 border-b border-gray-200">
+              <!-- Kategori -->
+              <div v-if="product?.categories?.length" class="flex flex-wrap gap-2 mb-3">
+                <span 
+                  v-for="cat in product.categories" 
+                  :key="cat.id" 
+                  class="px-2.5 py-1 text-xs font-semibold rounded-full"
+                  :class="cat.parent_id === null ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-700'"
+                >
+                  {{ cat.name }}
+                </span>
+              </div>
               <h1 class="mb-2 text-xl font-bold text-gray-900 sm:text-3xl">
                 {{ product?.name || "Nama Produk" }}
               </h1>
@@ -725,7 +736,7 @@
               </h3>
               <div
                 v-if="relatedProducts.length > 0"
-                class="flex gap-3 pb-2 overflow-x-auto no-scrollbar"
+                class="flex gap-3 py-2 -mt-2 overflow-x-auto no-scrollbar"
               >
                 <ProductCard
                   v-for="item in relatedProducts"

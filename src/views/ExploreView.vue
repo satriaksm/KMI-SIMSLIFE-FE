@@ -101,11 +101,11 @@
 
       <!-- Search Bar Container -->
       <div
-        class="relative z-10 flex justify-center px-4 mx-auto mt-2 sm:-mt-10 max-w-7xl"
+        class="relative z-20 flex justify-center px-4 mx-auto -mt-6 sm:-mt-10 max-w-7xl"
       >
         <div class="w-full sm:w-[906px]">
           <div
-            class="overflow-hidden bg-white border border-gray-100 shadow-xl rounded-2xl"
+            class="overflow-hidden bg-white border border-gray-200 shadow-lg sm:rounded-2xl rounded-xl"
           >
             <div class="p-4 border-b border-gray-100 sm:p-5">
               <Form @submit="onSearch">
@@ -131,7 +131,7 @@
               </Form>
             </div>
 
-            <div class="p-4 sm:p-5">
+            <div class="p-4 sm:p-5 bg-gray-50/50">
               <div class="grid grid-cols-4 gap-3 sm:gap-4">
                 <button
                   v-for="nav in segmentNavigates"
@@ -939,7 +939,11 @@ const currentCardItems = computed(() => {
   return activeMode.value === "jasa" ? cardItems.value : productCardItems.value;
 });
 
+const isPageLoading = ref(true);
+
 const loadingItems = computed(() => {
+  if (isPageLoading.value) return true;
+  if (isLoadingMore.value) return false;
   if (activeMode.value === "umkm") return loadingMerchants.value;
   return loadingProducts.value;
 });
@@ -1091,12 +1095,14 @@ async function queueLoadMore() {
   if (isLoadMoreQueued.value) return;
 
   isLoadMoreQueued.value = true;
+  isLoadingMore.value = true;
   currentPage.value += 1;
 
   try {
     await loadMore();
   } finally {
     isLoadMoreQueued.value = false;
+    isLoadingMore.value = false;
   }
 }
 
@@ -1202,6 +1208,7 @@ watch(
   () => activeMode.value,
   async () => {
     isModeChanging = true;
+    isPageLoading.value = true;
     // reset UI filters saat mode berganti
     selectedCategoryId.value = null;
     showAllCategories.value = false;
@@ -1228,6 +1235,7 @@ watch(
     await nextTick();
     setupObserver();
     isModeChanging = false;
+    isPageLoading.value = false;
   },
 );
 
@@ -1325,6 +1333,8 @@ onMounted(async () => {
   } else {
     await fetchProductsByMode();
   }
+
+  isPageLoading.value = false;
 
   await nextTick();
   setupObserver();
