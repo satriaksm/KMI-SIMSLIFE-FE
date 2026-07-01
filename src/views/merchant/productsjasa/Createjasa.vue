@@ -308,10 +308,36 @@ const addCustomOperatingTime = () => {
 const loadCategories = fetchLevel1Categories;
 const loadSubcategories = fetchSubCategories;
 
-const handleCategoryChange = async (value) => {
-  formData.value.jasa_category_id = value;
-  formData.value.jasa_subcategory_id = null;
-  await loadSubcategories(value);
+const JASA_ROOT_CATEGORY_NAME = "Jasa & Layanan";
+
+const findJasaRootCategory = () => {
+  const list = Array.isArray(jasaCategories.value) ? jasaCategories.value : [];
+
+  return list.find((category) => {
+    const name = String(category?.name || category?.label || "").trim().toLowerCase();
+    return name === JASA_ROOT_CATEGORY_NAME.toLowerCase();
+  });
+};
+
+const ensureJasaRootCategorySelected = async () => {
+  if (!Array.isArray(jasaCategories.value) || jasaCategories.value.length === 0) {
+    await loadCategories();
+  }
+
+  const jasaRootCategory = findJasaRootCategory();
+
+  if (!jasaRootCategory) {
+    toast.error("Kategori Jasa & Layanan tidak ditemukan");
+    return false;
+  }
+
+  const categoryId = jasaRootCategory.value ?? jasaRootCategory.id;
+
+  formData.value.jasa_category_id = categoryId;
+
+  await loadSubcategories(categoryId);
+
+  return true;
 };
 
 // Auto-save form — skip if submitting (prevents race condition with clearFormDraft)
@@ -396,6 +422,8 @@ const removeSelectedImage = (index) => {
   buildImagePreviews(imageFiles.value);
 };
 
+
+
 const submitForm = async () => {
   console.log('=== SUBMIT START ===');
   console.log('1. currentMerchantSlug:', currentMerchantSlug.value);
@@ -467,6 +495,9 @@ const submitForm = async () => {
   isSubmitting.value = true;
   loading.value = true;
   try {
+    const categoryReady = await ensureJasaRootCategorySelected();
+    if (!categoryReady) return;
+
     const fd = new FormData();
 
     // Text fields - use ?? for proper 0 handling
@@ -478,8 +509,22 @@ const submitForm = async () => {
     // Legacy price field mirrors whichever price is set
     fd.set("price", String(fixedPrice > 0 ? fixedPrice : basePrice));
     fd.set("service_type", formData.value.service_type || "di_tempat_umkm");
-    // HANYA booking_type yang dikirim — backend yang menormalisasi
-    fd.set("booking_type", formData.value.booking_type || "keranjang");
+
+    const bookingType = formData.value.booking_type || "keranjang";
+
+    const caraPemesananMap = {
+      keranjang: "langsung_pesan",
+      booking: "booking",
+      konsultasi: "memerlukan_konsultasi",
+    };
+
+    const caraPemesanan = caraPemesananMap[bookingType] || "langsung_pesan";
+
+    // Kirim semua field kompatibel agar create tidak jatuh ke default keranjang
+    fd.set("booking_type", bookingType);
+    fd.set("order_method", bookingType);
+    fd.set("cara_pemesanan", caraPemesanan);
+
     fd.set("location_address", formData.value.location_address || "");
     // Operating times: send as JSON array for booking, empty for others
     if (formData.value.booking_type === 'booking') {
@@ -582,9 +627,10 @@ onMounted(async () => {
     queryParamsCleared.value = true;
   }
 
-  loadCategories();
+  await ensureJasaRootCategorySelected();
   loadMerchantProfileAddress();
   restoreFormDraft();
+  await ensureJasaRootCategorySelected();
 });
 
 onBeforeUnmount(() => {
@@ -629,9 +675,21 @@ onBeforeUnmount(() => {
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <SelectField name="jasa_category_id" label="Kategori" placeholder="Pilih..." :options="jasaCategories.map((c) => ({ value: c.value ?? c.id, label: c.label ?? c.name }))" v-model="formData.jasa_category_id" @update:modelValue="handleCategoryChange" required />
-                <SelectField name="jasa_subcategory_id" label="Jenis Layanan" :placeholder="jasaSubcategories.length ? 'Pilih...' : 'Tidak tersedia'" :options="jasaSubcategories.map((s) => ({ value: s.value ?? s.id, label: s.label ?? s.name }))" v-model="formData.jasa_subcategory_id" :disabled="!jasaSubcategories.length" />
+              <div>
+                <SelectField
+                  name="jasa_subcategory_id"
+                  label="Jenis Layanan"
+                  :placeholder="jasaSubcategories.length ? 'Pilih jenis layanan...' : 'Tidak tersedia'"
+                  :options="jasaSubcategories.map((s) => ({
+                    value: s.value ?? s.id,
+                    label: s.label ?? s.name
+                  }))"
+                  v-model="formData.jasa_subcategory_id"
+                  :disabled="!jasaSubcategories.length"
+                />
+                <p class="mt-1 text-xs text-slate-400">
+                  Kategori utama otomatis: Jasa & Layanan
+                </p>
               </div>
 
               <div>

@@ -419,11 +419,32 @@ const addCustomOperatingTime = (setFieldValue) => {
   customOperatingTime.value = "";
 };
 
+const JASA_ROOT_CATEGORY_NAME = "Jasa & Layanan";
+const jasaRootCategoryId = ref(null);
+
+const findJasaRootCategory = () => {
+  const list = Array.isArray(jasaCategories.value) ? jasaCategories.value : [];
+
+  return list.find((category) => {
+    const name = String(category?.name || category?.label || "")
+      .trim()
+      .toLowerCase();
+
+    return name === JASA_ROOT_CATEGORY_NAME.toLowerCase();
+  });
+};
+
 const loadCategories = async () => {
   try {
     const { data } = await api.get("/api/public/categories/level-1");
-    // Backend mengembalikan { success, message, data: [...] }
     jasaCategories.value = data.data ?? data;
+
+    const jasaRootCategory = findJasaRootCategory();
+    jasaRootCategoryId.value = jasaRootCategory?.value ?? jasaRootCategory?.id ?? null;
+
+    if (jasaRootCategoryId.value) {
+      formData.value.jasa_category_id = jasaRootCategoryId.value;
+    }
   } catch (error) {
     console.error("Error loading categories:", error);
   }
@@ -434,12 +455,12 @@ const loadSubcategories = async (categoryId) => {
     jasaSubcategories.value = [];
     return;
   }
+
   try {
-    console.log("Loading subcategories for category:", categoryId);
     const { data } = await api.get(
       `/api/public/categories/${categoryId}/sub-categories`
     );
-    console.log("Subcategories loaded:", data);
+
     jasaSubcategories.value = data.data ?? data;
   } catch (error) {
     console.error("Error loading subcategories:", error);
@@ -447,11 +468,32 @@ const loadSubcategories = async (categoryId) => {
   }
 };
 
-const handleCategoryChange = async (value) => {
-  console.log("Category changed to:", value);
-  formData.value.jasa_category_id = value;
-  formData.value.jasa_subcategory_id = null;
-  await loadSubcategories(value);
+const ensureJasaRootCategorySelected = async (resetSubcategory = false) => {
+  if (!Array.isArray(jasaCategories.value) || jasaCategories.value.length === 0) {
+    await loadCategories();
+  }
+
+  const categoryId = jasaRootCategoryId.value || (findJasaRootCategory()?.value ?? findJasaRootCategory()?.id ?? null);
+
+  if (!categoryId) {
+    toast.error("Kategori Jasa & Layanan tidak ditemukan");
+    return false;
+  }
+
+  formData.value.jasa_category_id = categoryId;
+
+  if (resetSubcategory) {
+    formData.value.jasa_subcategory_id = null;
+  }
+
+  await loadSubcategories(categoryId);
+
+  return true;
+};
+
+// Tidak dipakai di template lagi, tapi aman jika masih ada referensi lama
+const handleCategoryChange = async () => {
+  await ensureJasaRootCategorySelected(true);
 };
 
 // Auto-save form data to localStorage (debounced)
@@ -669,7 +711,7 @@ const loadJasa = async () => {
     formData.value = {
       title: jasaData.title || "",
       description: jasaData.description || "",
-      jasa_category_id: jasaData.jasa_category_id || null,
+      jasa_category_id: jasaRootCategoryId.value || jasaData.jasa_category_id || null,
       jasa_subcategory_id: jasaData.jasa_subcategory_id || null,
       fixed_price: Number(jasaData.fixed_price ?? 0) || Number(jasaData.price ?? 0) || 0,
       base_price: Number(jasaData.base_price ?? 0) || 0,
@@ -685,9 +727,10 @@ const loadJasa = async () => {
     };
 
     // Load subcategories if category is selected
-    if (formData.value.jasa_category_id) {
-      await loadSubcategories(formData.value.jasa_category_id);
-    }
+    // if (formData.value.jasa_category_id) {
+    //  await loadSubcategories(formData.value.jasa_category_id);
+    // }
+    await ensureJasaRootCategorySelected(false);
 
     // Force form re-render
     formKey.value += 1;
@@ -718,6 +761,9 @@ const submitForm = async (values = null) => {
 
   loading.value = true;
   try {
+    const categoryReady = await ensureJasaRootCategorySelected(false);
+    if (!categoryReady) return;
+
     // Build FormData for multipart submission
     const fd = new FormData();
 
@@ -873,10 +919,16 @@ const submitForm = async (values = null) => {
 };
 
 onMounted(async () => {
-  loadCategories();
+  await loadCategories();
   await loadJasa();
   restoreFormDraft();
+
+  const shouldResetSubcategory =
+    String(formData.value.jasa_category_id || "") !== String(jasaRootCategoryId.value || "");
+
+  await ensureJasaRootCategorySelected(shouldResetSubcategory);
 });
+
 </script>
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -931,22 +983,16 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Kategori + Jenis -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <SelectField
-                name="jasa_category_id"
-                label="Kategori"
-                placeholder="Pilih..."
-                :options="jasaCategories.map(c => ({ value: c.value ?? c.id, label: c.label ?? c.name }))"
-                v-model="formData.jasa_category_id"
-                @update:modelValue="handleCategoryChange"
-                required
-              />
+            <!-- Jenis Layanan saja, kategori utama otomatis Jasa & Layanan -->
+            <div>
               <SelectField
                 name="jasa_subcategory_id"
                 label="Jenis Layanan"
-                :placeholder="jasaSubcategories.length ? 'Pilih...' : 'Tidak tersedia'"
-                :options="jasaSubcategories.map(s => ({ value: s.value ?? s.id, label: s.label ?? s.name }))"
+                :placeholder="jasaSubcategories.length ? 'Pilih jenis layanan...' : 'Tidak tersedia'"
+                :options="jasaSubcategories.map(s => ({
+                  value: s.value ?? s.id,
+                  label: s.label ?? s.name
+                }))"
                 v-model="formData.jasa_subcategory_id"
                 :disabled="!jasaSubcategories.length"
               />

@@ -87,12 +87,16 @@ export function getMerchantOrderDetail(merchantSlug, orderId) {
  */
 export async function getMerchantProductOrders(merchantSlug, params = {}) {
   try {
-    const response = await api.get(`/api/merchant/${merchantSlug}/orders`, { params });
+    const response = await api.get(`/api/merchant/${merchantSlug}/orders`, {
+      params,
+    });
     return response;
   } catch (error) {
     // Graceful fallback - return empty if 405/404
     if (error?.response?.status === 405 || error?.response?.status === 404) {
-      console.warn('[getMerchantProductOrders] Route not implemented - returning empty');
+      console.warn(
+        "[getMerchantProductOrders] Route not implemented - returning empty",
+      );
       return { data: { data: [], meta: { total: 0 } } };
     }
     throw error;
@@ -105,11 +109,13 @@ export async function getMerchantProductOrders(merchantSlug, params = {}) {
  */
 export async function getMerchantProductOrderDetail(merchantSlug, orderId) {
   try {
-    const response = await api.get(`/api/merchant/${merchantSlug}/orders/${orderId}`);
+    const response = await api.get(
+      `/api/merchant/${merchantSlug}/orders/${orderId}`,
+    );
     return response;
   } catch (error) {
     if (error?.response?.status === 405 || error?.response?.status === 404) {
-      console.warn('[getMerchantProductOrderDetail] Route not implemented');
+      console.warn("[getMerchantProductOrderDetail] Route not implemented");
       return { data: null };
     }
     throw error;
@@ -123,42 +129,58 @@ export async function getMerchantProductOrderDetail(merchantSlug, orderId) {
  * @param {number} orderId
  * @param {string|FormData} payload - status string or FormData with status + evidences
  */
-export function updateOrderStatus(merchantSlug, orderId, payload, isJasa = true) {
+export function updateOrderStatus(
+  merchantSlug,
+  orderId,
+  payload,
+  isJasa = true,
+) {
+  // ========================
+  // PRODUCT ORDER
+  // ========================
   if (!isJasa) {
     if (payload instanceof FormData) {
       return api.post(
         `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
         payload,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
       );
     }
-    const data = typeof payload === 'object' && payload !== null ? payload : { status: payload };
+
+    const data =
+      typeof payload === "object" && payload !== null
+        ? payload
+        : { status: payload };
+
     return api.post(
       `/api/merchant/${merchantSlug}/orders/${orderId}/update-status`,
-      data
+      data,
     );
   }
 
+  // ========================
+  // JASA ORDER
+  // ========================
+
+  // Jika payload FormData/upload file, jangan pakai PATCH langsung.
+  // Pakai POST + _method=PATCH agar Laravel bisa membaca status dan file.
   if (payload instanceof FormData) {
-    return api.patch(
+    if (!payload.has("_method")) {
+      payload.append("_method", "PATCH");
+    }
+
+    return api.post(
       `/api/merchant/${merchantSlug}/jasa-orders/${orderId}/status`,
       payload,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
     );
   }
 
-  const data = typeof payload === 'object' && payload !== null ? payload : { status: payload };
+  const data =
+    typeof payload === "object" && payload !== null
+      ? payload
+      : { status: payload };
 
   return api.patch(
     `/api/merchant/${merchantSlug}/jasa-orders/${orderId}/status`,
-    data
+    data,
   );
 }

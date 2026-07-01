@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toastification';
 import api from '@/libs/axios';
@@ -19,6 +19,9 @@ const sending = ref(false);
 const messageListRef = ref(null);
 const fileInputRef = ref(null);
 const selectedFiles = ref([]);
+const showCloseModal = ref(false);
+const closeReason = ref('');
+let autoRefreshTimer = null;
 
 // Response modals
 const showOfferModal = ref(false);
@@ -38,25 +41,53 @@ const openOfferModal = () => {
 
 // Status config
 const statusConfig = {
-  pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700', icon: 'pi-clock' },
-  dapat_dikerjakan: { label: 'Dapat Dikerjakan', color: 'bg-blue-100 text-blue-700', icon: 'pi-check' },
-  perlu_penyesuaian: { label: 'Perlu Penyesuaian', color: 'bg-purple-100 text-purple-700', icon: 'pi-comments' },
-  ditolak: { label: 'Ditolak', color: 'bg-red-100 text-red-700', icon: 'pi-times' },
-  accepted: { label: 'Disepakati', color: 'bg-green-100 text-green-700', icon: 'pi-check-circle' },
-  closed: { label: 'Ditutup', color: 'bg-gray-100 text-gray-700', icon: 'pi-minus-circle' },
+  pending: { label: 'Chat Dengan Merchant', color: 'bg-yellow-100 text-yellow-700', icon: 'pi-clock' },
+  dapat_dikerjakan: { label: 'Pengajuan', color: 'bg-blue-100 text-blue-700', icon: 'pi-check' },
+  perlu_penyesuaian: { label: 'Pengajuan', color: 'bg-purple-100 text-purple-700', icon: 'pi-comments' },
+  ditolak: { label: 'Ditolak Merchant', color: 'bg-red-100 text-red-700', icon: 'pi-times' },
+  accepted: { label: 'Pembayaran Berhasil', color: 'bg-green-100 text-green-700', icon: 'pi-check-circle' },
+  closed: { label: 'Percakapan Dihentikan', color: 'bg-gray-100 text-gray-700', icon: 'pi-minus-circle' },
   penawaran_ditolak: { label: 'Penawaran Ditolak', color: 'bg-red-100 text-red-700', icon: 'pi-times-circle' },
 };
 
-const getStatusLabel = (status) => statusConfig[status]?.label || status || '—';
 const getStatusColor = (status) => statusConfig[status]?.color || 'bg-gray-100 text-gray-700';
+
+const isPaid = computed(() =>
+  String(consultation.value?.payment_status || consultation.value?.order_payment_status || '').toUpperCase() === 'PAID'
+  || consultation.value?.is_paid === true
+);
+
+const isOrderCompleted = computed(() => {
+  const orderStatus = String(consultation.value?.order_status || '').toLowerCase();
+  return ['selesai', 'completed'].includes(orderStatus);
+});
+
+const conversationStatusLabel = computed(() => {
+  if (consultation.value?.conversation_status_label) return consultation.value.conversation_status_label;
+  const orderStatus = String(consultation.value?.order_status || '').toLowerCase();
+  if (isPaid.value) {
+    if (['layanan_dikerjakan', 'dikerjakan', 'processing'].includes(orderStatus)) return 'Layanan Diproses';
+    if (['menunggu_konfirmasi_selesai', 'menunggu_selesai'].includes(orderStatus)) return 'Menunggu Persetujuan';
+    if (['selesai', 'completed'].includes(orderStatus)) return 'Selesai';
+    return 'Pembayaran Berhasil';
+  }
+  return statusConfig[consultation.value?.status]?.label || consultation.value?.status || '—';
+});
 
 // Computed actions
 const canRespond = computed(() => consultation.value?.status === 'pending');
-const canCreateOffer = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian'].includes(consultation.value?.status));
-const canAccept = computed(() => consultation.value?.status === 'dapat_dikerjakan' || consultation.value?.status === 'perlu_penyesuaian');
-const canClose = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian', 'ditolak', 'penawaran_ditolak'].includes(consultation.value?.status));
-const isTerminal = computed(() => ['accepted', 'closed', 'penawaran_ditolak'].includes(consultation.value?.status));
-const canSendMessage = computed(() => !['ditolak', 'closed', 'accepted', 'penawaran_ditolak'].includes(consultation.value?.status));
+const canCreateOffer = computed(() => ['dapat_dikerjakan', 'perlu_penyesuaian'].includes(consultation.value?.status) && !isPaid.value);
+const canAccept = computed(() => false);
+const canClose = computed(() => {
+  const status = String(consultation.value?.status || '').toLowerCase();
+
+  return consultation.value?.can_stop_conversation === true
+    && !isPaid.value
+    && !isOrderCompleted.value
+    && !['closed', 'ditolak', 'penawaran_ditolak'].includes(status);
+});
+const isTerminal = computed(() => isOrderCompleted.value || ['closed', 'penawaran_ditolak', 'ditolak'].includes(consultation.value?.status));
+const canSendMessage = computed(() => !isOrderCompleted.value && !['ditolak', 'closed', 'penawaran_ditolak'].includes(consultation.value?.status));
 const initialMessage = computed(() =>
   consultation.value?.messages?.find(m => m.message_type === 'initial')
 );
@@ -158,12 +189,23 @@ const getResponseExplanation = (response) => {
 };
 
 // Fetch consultation detail
-const fetchConsultation = async () => {
-  loading.value = true;
+const fetchConsultation = async (silent = false) => {
+  if (!silent) loading.value = true;
   try {
     const { data } = await api.get(`/api/merchant/${merchantSlug.value}/service-consultations/${route.params.id}`);
     consultation.value = data?.data || data;
     messages.value = consultation.value?.messages || [];
+
+    const latestStatus = String(consultation.value?.status || '').toLowerCase();
+    const latestOrderStatus = String(consultation.value?.order_status || '').toLowerCase();
+
+    if (
+      ['closed', 'ditolak', 'penawaran_ditolak'].includes(latestStatus) ||
+      ['selesai', 'completed'].includes(latestOrderStatus)
+    ) {
+      showCloseModal.value = false;
+      closeReason.value = '';
+    }
 
     // Debug: Log consultation data and service image
     console.log('CONSULTATION DATA:', consultation.value);
@@ -173,9 +215,11 @@ const fetchConsultation = async () => {
     scrollToBottom();
   } catch (error) {
     console.error('Gagal memuat konsultasi:', error);
-    toast.error('Gagal memuat detail konsultasi');
+    if (!silent) {
+      toast.error('Gagal memuat detail konsultasi');
+    }
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 };
 
@@ -368,20 +412,52 @@ const submitAccept = async () => {
 };
 
 // Close consultation (without creating order)
+const openCloseModal = () => {
+  closeReason.value = '';
+  showCloseModal.value = true;
+};
+
 const submitClose = async () => {
   if (sending.value) return;
+
   sending.value = true;
 
   try {
-    const { data } = await api.post(
-      `/api/merchant/${merchantSlug.value}/service-consultations/${route.params.id}/close`
+    const payload = closeReason.value.trim()
+      ? { reason: closeReason.value.trim() }
+      : {};
+
+    await api.post(
+      `/api/merchant/${merchantSlug.value}/service-consultations/${route.params.id}/close`,
+      payload
     );
-    if (data.success) {
-      toast.success('Konsultasi ditutup');
-      await fetchConsultation();
-    }
+
+    showCloseModal.value = false;
+    closeReason.value = '';
+
+    toast.success('Percakapan berhasil dihentikan');
+
+    await fetchConsultation(true);
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Gagal menutup konsultasi');
+    const message = error.response?.data?.message || '';
+
+    if (
+      message.toLowerCase().includes('sudah ditutup') ||
+      message.toLowerCase().includes('sudah dihentikan') ||
+      message.toLowerCase().includes('tidak aktif') ||
+      error.response?.status === 400 ||
+      error.response?.status === 409
+    ) {
+      showCloseModal.value = false;
+      closeReason.value = '';
+
+      toast.success('Percakapan berhasil dihentikan');
+
+      await fetchConsultation(true);
+      return;
+    }
+
+    toast.error(message || 'Gagal menutup konsultasi');
   } finally {
     sending.value = false;
   }
@@ -396,7 +472,21 @@ const scrollToBottom = () => {
   });
 };
 
-onMounted(fetchConsultation);
+onMounted(async () => {
+  await fetchConsultation();
+  autoRefreshTimer = window.setInterval(() => {
+    if (!document.hidden && !sending.value) {
+      fetchConsultation(true);
+    }
+  }, 5000);
+});
+
+onBeforeUnmount(() => {
+  if (autoRefreshTimer) {
+    window.clearInterval(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+});
 </script>
 
 <template>
@@ -423,8 +513,16 @@ onMounted(fetchConsultation);
           v-if="consultation?.status"
           :class="['px-2 py-0.5 rounded-full text-xs font-medium shrink-0', getStatusColor(consultation.status)]"
         >
-          {{ getStatusLabel(consultation.status) }}
+          {{ conversationStatusLabel }}
         </span>
+        <button
+          v-if="canClose"
+          @click="openCloseModal"
+          :disabled="sending"
+          class="ml-2 hidden sm:inline-flex px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+        >
+          Hentikan Percakapan
+        </button>
       </div>
     </header>
 
@@ -495,7 +593,7 @@ onMounted(fetchConsultation);
 
             <!-- Customer accepted - merchant confirms and creates order -->
             <button
-              v-if="canAccept && consultation.customer_accepted"
+              v-if="false && canAccept && consultation.customer_accepted"
               @click="submitAccept"
               :disabled="sending"
               class="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500 text-white hover:bg-green-600 transition disabled:opacity-50"
@@ -506,17 +604,17 @@ onMounted(fetchConsultation);
             <!-- Close (only when customer hasn't accepted) -->
             <button
               v-if="canClose && !consultation.customer_accepted"
-              @click="submitClose"
+              @click="openCloseModal"
               class="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
             >
-              Tutup
+              Hentikan Percakapan
             </button>
           </div>
 
           <!-- Terminal notice -->
           <p v-else-if="isTerminal" class="text-xs text-gray-500 mt-1">
             <i class="pi pi-info-circle mr-1"></i>
-            {{ consultation.status === 'accepted' ? 'Pesanan berhasil dibuat.' : 'Konsultasi ditutup.' }}
+            {{ conversationStatusLabel }}
           </p>
         </div>
       </div>
@@ -739,6 +837,7 @@ onMounted(fetchConsultation);
 
         <!-- Quick offer button -->
         <button
+          v-if="canSendMessage && !isPaid"
           @click="openOfferModal"
           class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center hover:bg-purple-200 transition shrink-0"
           title="Kirim Harga"
@@ -760,8 +859,60 @@ onMounted(fetchConsultation);
     <!-- Cannot send notice -->
     <div v-else class="bg-gray-50 border-t border-gray-200 lg:pl-4 px-4 py-2 text-center text-xs text-gray-400 shrink-0">
       <i class="pi pi-info-circle mr-1"></i>
-      {{ consultation?.status === 'penawaran_ditolak' ? 'Penawaran ditolak' : consultation?.status === 'ditolak' ? 'Konsultasi ditolak' : consultation?.status === 'accepted' ? 'Sudah disepakati' : 'Konsultasi ditutup' }}
+      {{ conversationStatusLabel }}
     </div>
+
+
+    <!-- Close Conversation Modal -->
+    <teleport to="body">
+      <transition name="fade">
+        <div
+          v-if="showCloseModal"
+          class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          @click.self="showCloseModal = false"
+        >
+          <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 class="font-bold text-gray-900">Hentikan Percakapan?</h3>
+              <button @click="showCloseModal = false" class="text-gray-400 hover:text-gray-600">
+                <i class="pi pi-times"></i>
+              </button>
+            </div>
+            <div class="p-5 space-y-4">
+              <p class="text-sm text-gray-600">
+                Percakapan akan dihentikan. Order yang belum dibayar juga akan dibatalkan.
+              </p>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Alasan (opsional)</label>
+                <textarea
+                  v-model="closeReason"
+                  rows="3"
+                  maxlength="500"
+                  placeholder="Contoh: Customer tidak jadi melanjutkan"
+                  class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400"
+                ></textarea>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  @click="showCloseModal = false"
+                  class="flex-1 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm font-medium hover:bg-gray-50 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  @click="submitClose"
+                  :disabled="sending"
+                  class="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                >
+                  <i v-if="sending" class="pi pi-spin pi-spinner"></i>
+                  {{ sending ? 'Memproses...' : 'Hentikan' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
 
     <!-- Offer Modal -->
     <teleport to="body">

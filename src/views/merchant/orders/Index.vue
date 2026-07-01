@@ -1363,38 +1363,67 @@ const removeEvidenceFile = (index) => {
   evidenceFiles.value.splice(index, 1);
 };
 
-const submitJasaEvidence = async () => {
-  if (evidenceFiles.value.length === 0) {
-    toast.error('Minimal 1 bukti pengerjaan wajib diunggah');
+async function submitJasaEvidence() {
+  if (!selectedJasaOrder.value) {
+    toast.error("Pesanan tidak ditemukan");
     return;
   }
+
+  if (!evidenceFiles.value || evidenceFiles.value.length === 0) {
+    toast.error("Minimal 1 bukti pengerjaan wajib diunggah");
+    return;
+  }
+
   submittingJasa.value = true;
+
   try {
     const orderId = getOrderId(selectedJasaOrder.value);
+
     const formData = new FormData();
-    formData.append('status', 'menunggu_konfirmasi_selesai');
-    formData.append('completion_note', completionNote.value || '');
+
+    formData.append("_method", "PATCH");
+    formData.append("status", "menunggu_konfirmasi_selesai");
+    formData.append("completion_note", completionNote.value || "");
+
     evidenceFiles.value.forEach((file) => {
-      formData.append('evidences[]', file);
+      formData.append("evidences[]", file);
     });
 
-    // Use JasaOrderController endpoint: /api/merchant/{merchant}/jasa-orders/{id}/status (PATCH)
-    await api.patch(`/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`, formData);
-    toast.success('Bukti pengerjaan berhasil dikirim');
+    const response = await api.post(
+      `/api/merchant/${currentMerchantSlug.value}/jasa-orders/${orderId}/status`,
+      formData,
+      {
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      }
+    );
+
+    toast.success("Bukti pengerjaan berhasil dikirim");
+
     showJasaEvidenceModal.value = false;
-    showJasaDetailModal.value = false;
-    completionNote.value = '';
     evidenceFiles.value = [];
-    selectedJasaOrder.value = null;
-    fetchJasaOrders();
+    completionNote.value = "";
+
+    if (response.data?.data) {
+      selectedJasaOrder.value = mapJasaOrder(response.data.data);
+    }
+
+    await fetchJasaOrders();
   } catch (e) {
-    console.error('[submitJasaEvidence] Error:', e);
-    console.error('[submitJasaEvidence] Response:', e.response?.data);
-    toast.error(e.response?.data?.message || 'Gagal mengirim bukti pengerjaan');
+    console.error("[submitJasaEvidence] Error:", e.response?.data || e);
+
+    toast.error(
+      e.response?.data?.message ||
+        e.response?.data?.errors?.status?.[0] ||
+        e.response?.data?.errors?.evidences?.[0] ||
+        "Gagal mengirim bukti pengerjaan"
+    );
   } finally {
     submittingJasa.value = false;
   }
-};
+}
 
 const openJasaDetailModal = (order) => {
   selectedJasaOrder.value = order;

@@ -54,36 +54,36 @@ const sortOptions = [
 // Filter tabs - simplified for merchant
 const filterTabs = [
   { key: 'all', label: 'Semua' },
-  { key: 'pending', label: 'Menunggu' },
-  { key: 'waiting_customer', label: 'Menunggu Customer' },
-  { key: 'accepted', label: 'Disepakati' },
+  { key: 'pending', label: 'Chat' },
+  { key: 'waiting_customer', label: 'Pengajuan' },
+  { key: 'accepted', label: 'Pembayaran / Proses' },
   { key: 'rejected', label: 'Ditolak' },
 ];
 
 // Status config - simplified labels for merchant
 const statusConfig = {
   // Pending - waiting for merchant response
-  'pending': { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
-  'menunggu': { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-700' },
+  'pending': { label: 'Chat Dengan Merchant', color: 'bg-yellow-100 text-yellow-700' },
+  'menunggu': { label: 'Chat Dengan Merchant', color: 'bg-yellow-100 text-yellow-700' },
 
   // Waiting Customer - merchant sent offer, waiting for customer response
-  'dapat_dikerjakan': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
-  'perlu_penyesuaian': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
-  'penyesuaian': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
-  'offer_sent': { label: 'Menunggu Customer', color: 'bg-blue-100 text-blue-700' },
+  'dapat_dikerjakan': { label: 'Pengajuan', color: 'bg-blue-100 text-blue-700' },
+  'perlu_penyesuaian': { label: 'Pengajuan', color: 'bg-blue-100 text-blue-700' },
+  'penyesuaian': { label: 'Pengajuan', color: 'bg-blue-100 text-blue-700' },
+  'offer_sent': { label: 'Pengajuan', color: 'bg-blue-100 text-blue-700' },
 
   // Rejected - closed/rejected consultations
   'ditolak': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
   'rejected': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
   'penawaran_ditolak': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
   'offer_rejected': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
-  'closed': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
-  'ditutup': { label: 'Ditolak', color: 'bg-red-100 text-red-700' },
+  'closed': { label: 'Percakapan Dihentikan', color: 'bg-red-100 text-red-700' },
+  'ditutup': { label: 'Percakapan Dihentikan', color: 'bg-red-100 text-red-700' },
 
   // Accepted - customer accepted the offer
-  'accepted': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
-  'disepakati': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
-  'selesai': { label: 'Disepakati', color: 'bg-green-100 text-green-700' },
+  'accepted': { label: 'Pembayaran Berhasil', color: 'bg-green-100 text-green-700' },
+  'disepakati': { label: 'Pembayaran Berhasil', color: 'bg-green-100 text-green-700' },
+  'selesai': { label: 'Selesai', color: 'bg-green-100 text-green-700' },
 };
 
 const getStatusLabel = (status) => statusConfig[status]?.label || status || '—';
@@ -547,7 +547,7 @@ onMounted(() => {
                     </td>
                     <td class="px-4 py-3">
                       <span :class="['inline-block px-2.5 py-1 rounded-full text-xs font-medium', getStatusColor(consultation.status)]">
-                        {{ getStatusLabel(consultation.status) }}
+                        {{ consultation.conversation_status_label || getStatusLabel(consultation.status) }}
                       </span>
                     </td>
                     <td class="px-4 py-3" @click.stop>
@@ -637,7 +637,7 @@ onMounted(() => {
                   {{ getJasaTitle(consultation) }}
                 </p>
                 <span :class="['shrink-0 px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(consultation.status)]">
-                  {{ getStatusLabel(consultation.status) }}
+                  {{ consultation.conversation_status_label || getStatusLabel(consultation.status) }}
                 </span>
               </div>
               <p class="text-xs text-gray-500 mt-0.5">

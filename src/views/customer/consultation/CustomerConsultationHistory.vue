@@ -14,8 +14,8 @@ const activeFilter = ref('all');
 // ─── Filter tabs with counts ───────────────────────────────────────────────────
 const filters = [
   { key: 'all', label: 'Semua' },
-  { key: 'menunggu', label: 'Menunggu' },
-  { key: 'negosiasi', label: 'Negosiasi' },
+  { key: 'menunggu', label: 'Chat' },
+  { key: 'negosiasi', label: 'Pengajuan' },
   { key: 'selesai', label: 'Selesai' },
 ];
 
@@ -61,21 +61,21 @@ function normalizeConsultationStatus(status) {
 function getConsultationStatusLabel(status) {
   const s = String(status || '').toLowerCase().trim();
   const map = {
-    pending: 'Menunggu Respon',
-    menunggu: 'Menunggu Respon',
-    menunggu_respon: 'Menunggu Respon',
-    menunggu_konfirmasi: 'Menunggu Respon',
+    pending: 'Chat Dengan Merchant',
+    menunggu: 'Chat Dengan Merchant',
+    menunggu_respon: 'Chat Dengan Merchant',
+    menunggu_konfirmasi: 'Chat Dengan Merchant',
     
-    perlu_penyesuaian: 'Perlu Penyesuaian',
-    penyesuaian: 'Perlu Penyesuaian',
-    negosiasi: 'Perlu Penyesuaian',
+    perlu_penyesuaian: 'Pengajuan',
+    penyesuaian: 'Pengajuan',
+    negosiasi: 'Pengajuan',
     
-    offer_sent: 'Penawaran Dikirim',
-    penawaran_dikirim: 'Penawaran Dikirim',
-    dapat_dikerjakan: 'Penawaran Dikirim',
+    offer_sent: 'Pengajuan',
+    penawaran_dikirim: 'Pengajuan',
+    dapat_dikerjakan: 'Pengajuan',
     
-    accepted: 'Penawaran Diterima',
-    diterima: 'Penawaran Diterima',
+    accepted: 'Pembayaran Berhasil',
+    diterima: 'Pembayaran Berhasil',
     
     rejected: 'Ditolak',
     ditolak: 'Ditolak',
@@ -83,7 +83,7 @@ function getConsultationStatusLabel(status) {
     offer_rejected: 'Penawaran Ditolak',
     penawaran_ditolak: 'Penawaran Ditolak',
     
-    closed: 'Selesai',
+    closed: 'Percakapan Dihentikan',
     selesai: 'Selesai'
   };
   
@@ -301,7 +301,7 @@ onMounted(() => fetchConsultations());
             <div class="flex items-center justify-between gap-3 mt-2">
               <!-- Status individual -->
               <span :class="['px-1.5 py-0.5 rounded text-[10px] font-medium', getConsultationStatusBg(consultation.status)]">
-                {{ getConsultationStatusLabel(consultation.status) }}
+                {{ consultation.conversation_status_label || getConsultationStatusLabel(consultation.status) }}
               </span>
 
               <!-- Price -->
