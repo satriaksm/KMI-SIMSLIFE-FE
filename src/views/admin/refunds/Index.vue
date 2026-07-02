@@ -6,12 +6,12 @@
     >
       <div class="flex items-center gap-3 min-w-0">
         <button
-          @click="emit('toggle-sidebar')"
-          class="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:bg-muted-background transition sm:hidden"
+          @click="$emit('toggle-sidebar')"
+          class="lg:hidden w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center shrink-0"
           aria-label="Toggle sidebar"
           type="button"
         >
-          <i class="pi pi-bars text-muted-foreground"></i>
+          <i class="pi pi-bars text-gray-600"></i>
         </button>
 
         <div class="min-w-0">
