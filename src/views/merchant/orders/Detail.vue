@@ -55,6 +55,8 @@ function mapApiStatus(beStatus, o) {
     case "responsed":
     case "accepted":
       return "processing";
+    case "ready_to_pickup":
+      return "ready";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
@@ -65,6 +67,8 @@ function mapApiStatus(beStatus, o) {
       return "rejected";
     case "undelivered":
       return "undelivered";
+    case "unpicked":
+      return "unpicked";
     default:
       return beStatus;
   }
@@ -252,6 +256,16 @@ const statusConfig = {
     },
     nextAction: null,
   },
+  unpicked: {
+    props: {
+      variant: "order",
+      status: "cancelled",
+      label: "Tidak Diambil",
+      size: "sm",
+      showIcon: true,
+    },
+    nextAction: null,
+  },
 };
 
 const currentStatusConfig = computed(() => {
@@ -359,8 +373,9 @@ function getNextStatus() {
       return null; // Transfer pending = belum bayar
     case "responsed":
     case "accepted":
-      return "delivered";
+      return rawOrder.value?.delivery_type === 'pickup' ? 'ready_to_pickup' : 'delivered';
     case "delivered":
+    case "ready_to_pickup":
       // UMKM (penjual) bisa menekan "completed" (Pesanan Tiba) untuk semua jenis pesanan
       return "completed";
     default:
@@ -375,7 +390,9 @@ const nextActionLabel = computed(() => {
     case "accepted":
       return "Terima & Proses Pesanan";
     case "delivered":
-      return isPickup ? "Tandai Siap Diambil" : "Tandai Dikirim";
+      return "Tandai Dikirim";
+    case "ready_to_pickup":
+      return "Tandai Siap Diambil";
     case "completed":
       return isPickup ? "Tandai Selesai / Sudah Diambil" : "Pesanan Tiba & Selesai";
     default:
@@ -392,7 +409,7 @@ const canCancel = computed(() => {
 // Apakah bisa ditandai gagal kirim (undelivered) / tidak diambil
 const canUndelivered = computed(() => {
   const s = rawOrder.value?.status;
-  return s === "delivered";
+  return s === "delivered" || s === "ready_to_pickup";
 });
 
 function onFileChange(e) {
@@ -456,7 +473,9 @@ function startConfirmCountdown() {
 async function confirmAction() {
   let targetStatus;
   if (actionType.value === 'reject') targetStatus = 'rejected';
-  else if (actionType.value === 'undelivered') targetStatus = 'undelivered';
+  else if (actionType.value === 'undelivered') {
+    targetStatus = rawOrder.value?.delivery_type === 'pickup' ? 'unpicked' : 'undelivered';
+  }
   else targetStatus = getNextStatus();
   
   if (!targetStatus || !currentMerchantSlug.value || !rawOrder.value?.id) return;
@@ -475,8 +494,8 @@ async function confirmAction() {
         toast.error("Bukti foto wajib diunggah untuk pesanan gagal kirim.");
         actionLoading.value = false;
         return;
-    } else if (targetStatus === 'completed' && !proofImage.value && rawOrder.value?.delivery_type !== 'pickup') {
-        toast.error("Bukti foto wajib diunggah saat barang telah tiba.");
+    } else if (targetStatus === 'completed' && !proofImage.value) {
+        toast.error("Bukti foto wajib diunggah saat barang diserahkan/diambil.");
         actionLoading.value = false;
         return;
     } else if (targetStatus === 'rejected' || targetStatus === 'cancelled') {
@@ -764,8 +783,8 @@ function leaveOrderChannel(id) {
             <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
               {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? (rawOrder?.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
             </p>
-            <p v-if="order.note || order.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
-              {{ order.failed_reason || order.note }}
+            <p v-if="order.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
+              {{ order.failed_reason }}
             </p>
           </div>
         </div>
@@ -1040,7 +1059,7 @@ function leaveOrderChannel(id) {
       <!-- Upload Proof Image -->
       <div v-if="(actionType === 'next' && getNextStatus() === 'completed') || actionType === 'undelivered'" class="mt-4">
         <label class="block text-sm font-semibold text-gray-700 mb-2">
-          Bukti Foto {{ actionType === 'undelivered' ? (rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil (Wajib)' : 'Gagal Kirim (Wajib)') : (rawOrder?.delivery_type === 'pickup' ? 'Selesai (Opsional)' : 'Barang Tiba (Wajib)') }}
+          Bukti Foto {{ actionType === 'undelivered' ? (rawOrder?.delivery_type === 'pickup' ? 'Tidak Diambil (Wajib)' : 'Gagal Kirim (Wajib)') : (rawOrder?.delivery_type === 'pickup' ? 'Selesai (Wajib)' : 'Barang Tiba (Wajib)') }}
         </label>
         <input type="file" @change="onFileChange" accept="image/*" class="w-full text-sm text-gray-500 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-l-lg file:border-0 file:text-sm file:font-semibold file:bg-merchant-primary file:text-white hover:file:bg-merchant-primary/90" />
       </div>
