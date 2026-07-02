@@ -127,6 +127,7 @@ const breadcrumbItems = computed(() => [
 // State
 const loading = ref(false);
 const loadingData = ref(true);
+const statusActionLoading = ref(false);
 const jasaCategories = ref([]);
 const jasaSubcategories = ref([]);
 const formKey = ref(0);
@@ -746,6 +747,45 @@ const loadJasa = async () => {
 // dan/atau area layanan yang diinput merchant. Kita tidak lagi mengambil
 // lokasi perangkat customer di sini; lokasi customer hanya diminta saat booking.
 
+const updateJasaStatusOnly = async (nextStatus) => {
+  if (!currentJasaId.value || statusActionLoading.value) return;
+
+  const confirmMessage =
+    nextStatus === "archived"
+      ? "Yakin ingin mengarsipkan layanan ini? Layanan tidak akan tampil ke pelanggan."
+      : "Yakin ingin mempublikasikan kembali layanan ini? Layanan akan tampil ke pelanggan.";
+
+  if (!window.confirm(confirmMessage)) return;
+
+  statusActionLoading.value = true;
+
+  try {
+    const fd = new FormData();
+    fd.append("_method", "PUT");
+    fd.append("status", nextStatus);
+
+    await api.post(`/api/jasa/${currentJasaId.value}`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    formData.value.status = nextStatus;
+
+    toast.success(
+      nextStatus === "archived"
+        ? "Layanan berhasil diarsipkan."
+        : "Layanan berhasil dipublikasikan kembali."
+    );
+  } catch (error) {
+    console.error("[Editjasa] Gagal update status jasa:", error);
+    toast.error(
+      error.response?.data?.message ||
+        "Gagal mengubah status layanan. Silakan coba lagi."
+    );
+  } finally {
+    statusActionLoading.value = false;
+  }
+};
+
 const submitForm = async (values = null) => {
   if (!currentJasaId.value) {
     toast.error("Jasa ID tidak ditemukan");
@@ -1345,19 +1385,90 @@ onMounted(async () => {
         </div>
 
         <!-- Info Status -->
-        <div class="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+        <div
+          class="rounded-2xl p-4 border"
+          :class="
+            formData.status === 'archived'
+              ? 'bg-red-50 border-red-200'
+              : 'bg-amber-50 border-amber-200'
+          "
+        >
           <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-              <i class="pi pi-file-edit text-sm"></i>
+            <div
+              class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+              :class="
+                formData.status === 'archived'
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-amber-100 text-amber-600'
+              "
+            >
+              <i
+                class="pi text-sm"
+                :class="formData.status === 'archived' ? 'pi-box' : 'pi-file-edit'"
+              ></i>
             </div>
-            <div>
-              <p class="text-sm font-semibold text-amber-800">Status saat ini:
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                  :class="formData.status === 'draft' ? 'bg-yellow-100 text-yellow-800' : formData.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'">
-                  {{ formData.status === 'draft' ? '📝 Draft' : formData.status === 'published' ? '✅ Dipublish' : '🔒 Diarsipkan' }}
+
+            <div class="flex-1">
+              <p
+                class="text-sm font-semibold"
+                :class="formData.status === 'archived' ? 'text-red-800' : 'text-amber-800'"
+              >
+                Status saat ini:
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                  :class="
+                    formData.status === 'draft'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : formData.status === 'published'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-red-100 text-red-700'
+                  "
+                >
+                  {{
+                    formData.status === 'draft'
+                      ? '📝 Draft'
+                      : formData.status === 'published'
+                        ? '✅ Dipublish'
+                        : '🔒 Diarsipkan'
+                  }}
                 </span>
               </p>
-              <p class="text-xs text-amber-600 mt-0.5">Draft: belum tampil ke customer. Dipublish: bisa dipesan customer.</p>
+
+              <p
+                class="text-xs mt-0.5"
+                :class="formData.status === 'archived' ? 'text-red-600' : 'text-amber-600'"
+              >
+                Draft: belum tampil ke customer. Dipublish: bisa dipesan customer. Diarsipkan:
+                disembunyikan dari pelanggan.
+              </p>
+
+              <button
+                v-if="formData.status !== 'archived'"
+                type="button"
+                class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                :disabled="statusActionLoading"
+                @click="updateJasaStatusOnly('archived')"
+              >
+                <i
+                  class="pi"
+                  :class="statusActionLoading ? 'pi-spin pi-spinner' : 'pi-box'"
+                ></i>
+                {{ statusActionLoading ? 'Mengarsipkan...' : 'Arsipkan Layanan' }}
+              </button>
+
+              <button
+                v-else
+                type="button"
+                class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                :disabled="statusActionLoading"
+                @click="updateJasaStatusOnly('published')"
+              >
+                <i
+                  class="pi"
+                  :class="statusActionLoading ? 'pi-spin pi-spinner' : 'pi-check'"
+                ></i>
+                {{ statusActionLoading ? 'Memproses...' : 'Publikasikan Kembali' }}
+              </button>
             </div>
           </div>
         </div>

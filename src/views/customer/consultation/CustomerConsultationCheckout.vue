@@ -5,11 +5,13 @@ import { useToast } from 'vue-toastification';
 import api from '@/libs/axios';
 import { usePaymentMethods } from '@/composables/usePaymentMethods';
 import { useAuthStore } from '@/stores/auth';
+import { useUserStore } from '@/stores/user';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const authStore = useAuthStore();
+const userStore = useUserStore();
 const consultationId = computed(() => route.params.consultationId);
 
 const {
@@ -120,6 +122,129 @@ const useProfileContact = () => {
   toast.success('Data profil digunakan');
 };
 
+const getAddressPart = (value) => {
+  if (!value) return '';
+
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (typeof value === 'object') {
+    return String(
+      value.name ||
+      value.nama ||
+      value.label ||
+      value.value ||
+      ''
+    ).trim();
+  }
+
+  return String(value).trim();
+};
+
+const buildProfileAddress = () => {
+  const user = authStore.user || {};
+  const profileUser = userStore.user || {};
+  const profile = user.profile || profileUser.profile || {};
+
+  const directCandidates = [
+    profileUser.full_address,
+    profileUser.fullAddress,
+    profileUser.address,
+    profileUser.alamat,
+    user.full_address,
+    user.fullAddress,
+    user.address,
+    user.alamat,
+    profile.full_address,
+    profile.fullAddress,
+    profile.address,
+    profile.alamat,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  const addressObject =
+    profileUser.primary_address ||
+    profileUser.primaryAddress ||
+    profileUser.address_detail ||
+    profileUser.addressDetail ||
+    user.primary_address ||
+    user.primaryAddress ||
+    user.address_detail ||
+    user.addressDetail ||
+    profile.primary_address ||
+    profile.primaryAddress ||
+    profile.address_detail ||
+    profile.addressDetail ||
+    null;
+
+  if (addressObject && typeof addressObject === 'object') {
+    const objectParts = [
+      addressObject.detail,
+      addressObject.address_detail,
+      addressObject.detail_alamat,
+      addressObject.alamat,
+      addressObject.village,
+      addressObject.village_name,
+      addressObject.district,
+      addressObject.district_name,
+      addressObject.city,
+      addressObject.city_name,
+      addressObject.regency,
+      addressObject.regency_name,
+      addressObject.province,
+      addressObject.province_name,
+    ]
+      .map(getAddressPart)
+      .filter(Boolean);
+
+    if (objectParts.length) {
+      return objectParts.join(', ');
+    }
+  }
+
+  const parts = [
+    profileUser.detail_address || profileUser.address_detail || profileUser.detail_alamat || profileUser.detail,
+    profileUser.village || profileUser.village_name,
+    profileUser.district || profileUser.district_name,
+    profileUser.city || profileUser.city_name || profileUser.regency || profileUser.regency_name,
+    profileUser.province || profileUser.province_name,
+
+    user.detail_address || user.address_detail || user.detail_alamat || user.detail,
+    user.village || user.village_name,
+    user.district || user.district_name,
+    user.city || user.city_name || user.regency || user.regency_name,
+    user.province || user.province_name,
+
+    profile.detail_address || profile.address_detail || profile.detail_alamat || profile.detail,
+    profile.village || profile.village_name,
+    profile.district || profile.district_name,
+    profile.city || profile.city_name || profile.regency || profile.regency_name,
+    profile.province || profile.province_name,
+  ]
+    .map(getAddressPart)
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(', ');
+};
+
+const useProfileAddress = () => {
+  const address = buildProfileAddress();
+
+  if (!address) {
+    toast.error('Alamat profil belum tersedia. Silakan lengkapi alamat profil terlebih dahulu.');
+    return;
+  }
+
+  form.value.customer_address = address;
+  toast.success('Alamat profil berhasil digunakan');
+};
+
 const setDefaultPaymentMethod = () => {
   if (!availablePaymentMethods.value.length) return;
   if (form.value.payment_method && availablePaymentMethods.value.some((m) => m.id === form.value.payment_method)) return;
@@ -167,6 +292,54 @@ const fetchConsultation = async () => {
   }
 };
 
+const reverseGeocode = async (lat, lng) => {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(
+      lat
+    )}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.display_name) {
+      return data.display_name;
+    }
+
+    if (data.address) {
+      const address = data.address;
+
+      const parts = [
+        address.road,
+        address.neighbourhood,
+        address.suburb,
+        address.village || address.town || address.city,
+        address.county,
+        address.state,
+        address.postcode,
+        address.country,
+      ].filter(Boolean);
+
+      if (parts.length) {
+        return parts.join(', ');
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[CustomerConsultationCheckout] Reverse geocode error:', error);
+    return null;
+  }
+};
+
 const requestDeviceLocation = () => {
   if (!navigator.geolocation) {
     toast.warning('Perangkat tidak mendukung GPS');
@@ -174,19 +347,45 @@ const requestDeviceLocation = () => {
   }
 
   locating.value = true;
+
   navigator.geolocation.getCurrentPosition(
     async (position) => {
-      coordinates.value.latitude = position.coords.latitude;
-      coordinates.value.longitude = position.coords.longitude;
-      form.value.customer_address = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+
+      coordinates.value.latitude = latitude;
+      coordinates.value.longitude = longitude;
+
+      const address = await reverseGeocode(latitude, longitude);
+
+      if (address) {
+        form.value.customer_address = address;
+        toast.success('Lokasi berhasil terdeteksi dan alamat terisi otomatis');
+      } else {
+        form.value.customer_address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        toast.success('Koordinat berhasil diambil. Silakan lengkapi alamat secara manual');
+      }
+
       locating.value = false;
-      toast.success('Lokasi berhasil diambil');
     },
-    () => {
+    (error) => {
       locating.value = false;
-      toast.error('Gagal mengambil lokasi');
+
+      if (error.code === 1) {
+        toast.error('Izin lokasi ditolak. Silakan isi alamat secara manual.');
+      } else if (error.code === 2) {
+        toast.error('Lokasi tidak tersedia. Silakan isi alamat secara manual.');
+      } else if (error.code === 3) {
+        toast.error('Waktu mengambil lokasi habis. Silakan coba lagi.');
+      } else {
+        toast.error('Gagal mengambil lokasi');
+      }
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    }
   );
 };
 
@@ -377,15 +576,35 @@ onMounted(async () => {
               placeholder="Masukkan alamat lengkap layanan"
               class="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-merchant-primary/30"
             ></textarea>
-            <button
-              type="button"
-              @click="requestDeviceLocation"
-              :disabled="locating"
-              class="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 disabled:opacity-60"
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                @click="useProfileAddress"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition"
+              >
+                <i class="pi pi-home mr-1"></i>
+                Ambil Alamat dari Profil
+              </button>
+
+              <button
+                type="button"
+                @click="requestDeviceLocation"
+                :disabled="locating"
+                class="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 disabled:opacity-60 hover:bg-emerald-100 transition"
+              >
+                <i :class="['pi', locating ? 'pi-spin pi-spinner' : 'pi-map-marker', 'mr-1']"></i>
+                {{ locating ? 'Mengambil...' : 'Ambil Lokasi Perangkat' }}
+              </button>
+            </div>
+
+            <p
+              v-if="coordinates.latitude && coordinates.longitude"
+              class="mt-1 text-xs text-gray-500"
             >
-              <i :class="['pi', locating ? 'pi-spin pi-spinner' : 'pi-map-marker', 'mr-1']"></i>
-              {{ locating ? 'Mengambil...' : 'Ambil Lokasi Saat Ini' }}
-            </button>
+              <i class="pi pi-globe mr-1"></i>
+              Koordinat: {{ Number(coordinates.latitude).toFixed(6) }},
+              {{ Number(coordinates.longitude).toFixed(6) }}
+            </p>
           </div>
         </section>
 

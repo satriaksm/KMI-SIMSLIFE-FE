@@ -388,6 +388,17 @@
           <i class="pi pi-clock text-merchant-primary"></i>
           Pilih Waktu
         </h3>
+        <div class="flex flex-wrap items-center gap-4 mb-3 text-xs text-gray-500">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+            <span>Menunggu konfirmasi UMKM</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+            <span>Sudah disetujui UMKM</span>
+          </div>
+        </div>
         <div class="p-4 border border-gray-200 rounded-2xl bg-gray-50/60">
         <!-- Pagi -->
         <div v-if="times.morning && times.morning.length > 0" class="mb-3">
@@ -401,14 +412,23 @@
               class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
                 isSlotBooked(t)
-                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
                   : (t === activeTime
                     ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
                     : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
-              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
         </div>
@@ -425,14 +445,23 @@
               class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
                 isSlotBooked(t)
-                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
                   : (t === activeTime
                     ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
                     : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
-              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
         </div>
@@ -449,14 +478,23 @@
               class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
                 isSlotBooked(t)
-                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
                   : (t === activeTime
                     ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
                     : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
-              <span v-if="isSlotBooked(t)" class="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full"></span>
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
         </div>
@@ -497,6 +535,10 @@
             <i class="pi pi-clock mr-1"></i>
             Jam layanan belum diatur oleh merchant
           </div>
+          <div v-else-if="isActiveTimeBooked" class="flex-1 py-3 text-center text-sm text-red-500 bg-red-50 rounded-full">
+            <i class="pi pi-ban mr-1"></i>
+            Jadwal pada jam ini sudah terisi
+          </div>
           <!-- Jika jam sudah ada tapi belum dipilih -->
           <div v-else-if="!canBook" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
             <i class="pi pi-calendar mr-1"></i>
@@ -521,7 +563,7 @@
                 alamat:
                   (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
                     ? ''
-                    : jasa?.location_address || merchantAddress || '',
+                    : merchantAddress || jasa?.location_address || '',
                 price_type:
                   jasa?.fixed_price && jasa.fixed_price > 0
                     ? 'fixed'
@@ -568,7 +610,7 @@
                 alamat:
                   (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
                     ? ''
-                    : jasa?.location_address || merchantAddress || '',
+                    : merchantAddress || jasa?.location_address || '',
                 price_type:
                   jasa?.fixed_price && jasa.fixed_price > 0
                     ? 'fixed'
@@ -723,6 +765,7 @@ const getMerchantLogo = (logo) => {
 const selectedDate = ref(new Date());
 const calendarOpen = ref(false);
 const bookedSlots = ref([]);
+const bookedSlotStatuses = ref({});
 const loadingBookedSlots = ref(false);
 
 // Format tanggal ke YYYY-MM-DD untuk API
@@ -747,46 +790,102 @@ const fetchBookedSlots = async (date) => {
   if (!dateStr) return;
 
   loadingBookedSlots.value = true;
+
   try {
-    // Endpoint ada di dalam prefix 'public', jadi URL lengkap adalah /api/public/jasas/{id}/available-slots
     const { data } = await api.get(`/api/public/jasas/${jasa.value.id}/available-slots`, {
-      params: { date: dateStr }
+      params: { date: dateStr },
     });
 
-    console.log('[JasaDetail] Booked slots API response:', {
-      date: dateStr,
-      booked_slots: data?.booked_slots,
+    const rawBookedSlots = Array.isArray(data?.booked_slots)
+      ? data.booked_slots
+      : [];
+
+    const rawSlotStatuses = Array.isArray(data?.slot_statuses)
+      ? data.slot_statuses
+      : [];
+
+    bookedSlots.value = rawBookedSlots;
+
+    const nextStatuses = {};
+
+    rawSlotStatuses.forEach((slot) => {
+      const normalizedTime = normalizeTime(slot?.time || slot?.booking_time || "");
+
+      if (!normalizedTime) return;
+
+      nextStatuses[normalizedTime] = {
+        type: slot?.type || "pending",
+        label: slot?.label || "Jadwal sudah terisi",
+        status: slot?.status || null,
+        payment_status: slot?.payment_status || null,
+      };
     });
 
-    // Store booked slots - will be normalized during comparison
-    bookedSlots.value = Array.isArray(data?.booked_slots) ? data.booked_slots : [];
+    // Fallback jika backend lama hanya mengirim booked_slots
+    rawBookedSlots.forEach((slotTime) => {
+      const normalizedTime = normalizeTime(slotTime);
+
+      if (!normalizedTime || nextStatuses[normalizedTime]) return;
+
+      nextStatuses[normalizedTime] = {
+        type: "approved",
+        label: "Jadwal sudah terisi",
+        status: null,
+        payment_status: null,
+      };
+    });
+
+    bookedSlotStatuses.value = nextStatuses;
+
+    ensureActiveTimeAvailable();
   } catch (e) {
-    // Endpoint tidak ada (404) atau error lainnya - tampilkan jam layanan tanpa info slot terisi
-    // Biarkan bookedSlots tetap kosong agar semua jam dapat dipilih
-    console.warn('[JasaDetail] Gagal mengambil slot terisi, tampilkan semua jam:', e?.message || e);
+    console.warn("[JasaDetail] Gagal mengambil slot terisi:", e?.message || e);
     bookedSlots.value = [];
+    bookedSlotStatuses.value = {};
   } finally {
     loadingBookedSlots.value = false;
   }
 };
 
 // Cek apakah sebuah slot jam sudah terisi
-const isSlotBooked = (time) => {
+const getSlotStatus = (time) => {
   const normalized = normalizeTime(time);
-  const booked = bookedSlots.value.some(slot => normalizeTime(slot) === normalized);
-
-  console.log('[JasaDetail] Slot booking check:', {
-    time,
-    normalized,
-    bookedSlots: bookedSlots.value,
-    bookedSlotsNormalized: bookedSlots.value.map(s => normalizeTime(s)),
-    result: booked,
-  });
-
-  return booked;
+  return bookedSlotStatuses.value[normalized] || null;
 };
 
-// Cek apakah slot aktif adalah slot yang sudah terisi
+const isSlotBooked = (time) => {
+  return Boolean(getSlotStatus(time));
+};
+
+const isSlotPending = (time) => {
+  return getSlotStatus(time)?.type === "pending";
+};
+
+const isSlotApproved = (time) => {
+  return getSlotStatus(time)?.type === "approved";
+};
+
+const getSlotStatusLabel = (time) => {
+  return getSlotStatus(time)?.label || "";
+};
+
+const ensureActiveTimeAvailable = () => {
+  const allTimes = [
+    ...times.value.morning,
+    ...times.value.afternoon,
+    ...(times.value.evening || []),
+  ];
+
+  if (allTimes.length === 0) {
+    activeTime.value = "";
+    return;
+  }
+
+  if (!activeTime.value || isSlotBooked(activeTime.value)) {
+    activeTime.value = allTimes.find((time) => !isSlotBooked(time)) || "";
+  }
+};
+
 const isActiveTimeBooked = computed(() => {
   return activeTime.value ? isSlotBooked(activeTime.value) : false;
 });
@@ -830,10 +929,12 @@ const quickDays = computed(() => {
 const monthShort = computed(() =>
   selectedDate.value.toLocaleString("id-ID", { month: "short" })
 );
-const selectQuick = (d, available) => {
-  if (!available) return; // Tidak bisa pilih hari yang tidak tersedia
+const selectQuick = async (d, available) => {
+  if (!available) return;
+
   selectedDate.value = new Date(d);
-  fetchBookedSlots(d);
+  await fetchBookedSlots(d);
+  ensureActiveTimeAvailable();
 };
 
 // ----- waktu -----
@@ -869,25 +970,20 @@ const activeTime = ref("");
 
 // Cek apakah booking sudah lengkap (tanggal dan jam dipilih)
 const canBook = computed(() => {
-  // Untuk booking mode, wajib pilih jam
   if (isBookingMode.value) {
-    return hasOperatingTimes.value && Boolean(activeTime.value.trim());
+    return (
+      hasOperatingTimes.value &&
+      Boolean(activeTime.value.trim()) &&
+      !isActiveTimeBooked.value
+    );
   }
-  // Untuk cart/consultation mode, tidak perlu validasi jam
+
   return true;
 });
 
 // Set active time ketika times berubah
 const initActiveTime = () => {
-  const allTimes = [...times.value.morning, ...times.value.afternoon, ...(times.value.evening || [])];
-  if (allTimes.length > 0 && !activeTime.value) {
-    activeTime.value = allTimes[0];
-    return;
-  }
-
-  if (allTimes.length === 0) {
-    activeTime.value = "";
-  }
+  ensureActiveTimeAvailable();
 };
 
 // Handle klik pada slot waktu
@@ -1329,12 +1425,12 @@ onMounted(async () => {
         const dbDay = jsToDbDay(checkDate.getDay());
         if (operatingDays.includes(dbDay)) {
           selectedDate.value = checkDate;
-          fetchBookedSlots(checkDate);
+          await fetchBookedSlots(checkDate);
           break;
         }
       }
     } else {
-      fetchBookedSlots(selectedDate.value);
+      await fetchBookedSlots(selectedDate.value);
     }
 
     // Set active time ke waktu pertama yang tersedia

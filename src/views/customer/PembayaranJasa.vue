@@ -144,7 +144,16 @@
             ></textarea>
 
             <!-- Tombol ambil lokasi + koordinat -->
-            <div class="flex items-center gap-2 mt-2">
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-sky-300 text-sky-700 bg-sky-50 hover:bg-sky-100 transition"
+                @click="useProfileAddress"
+              >
+                <i class="pi pi-home text-[10px]"></i>
+                Ambil Alamat dari Profil
+              </button>
+
               <button
                 type="button"
                 class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
@@ -580,7 +589,16 @@
                       class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"
                     ></textarea>
                   </div>
-                  <div class="flex items-center gap-2">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-sky-300 text-sky-700 bg-sky-50 hover:bg-sky-100 transition"
+                      @click="useProfileAddress"
+                    >
+                      <i class="pi pi-home text-[10px]"></i>
+                      Ambil Alamat dari Profil
+                    </button>
+
                     <button
                       type="button"
                       class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50"
@@ -1150,11 +1168,13 @@ import { computed, ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { useToast } from "vue-toastification";
 import api from "@/libs/axios.js";
 import { usePaymentMethods } from "@/composables/usePaymentMethods";
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 
 // ===== Payment Methods =====
 const {
@@ -1517,27 +1537,65 @@ const addressRequired = computed(
   () => !isOnlineService.value && !isAtMerchantLocation.value,
 );
 
-function resolveMerchantAddress(merchant, jasaLocationAddress = "") {
-  const locationCandidate = String(jasaLocationAddress || "").trim();
-  if (locationCandidate) return locationCandidate;
+function getAddressPart(value) {
+  if (!value) return "";
 
-  if (!merchant) return "";
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "object") {
+    return String(
+      value.name ||
+      value.nama ||
+      value.label ||
+      value.value ||
+      ""
+    ).trim();
+  }
+
+  return String(value).trim();
+}
+
+function resolveMerchantAddress(merchant, jasaLocationAddress = "") {
+  if (!merchant) {
+    return String(jasaLocationAddress || "").trim();
+  }
+
+  if (merchant.full_address) {
+    return String(merchant.full_address).trim();
+  }
 
   const primaryAddress = merchant.primary_address || merchant.primaryAddress;
+
   if (primaryAddress) {
+    if (primaryAddress.full_address) {
+      return String(primaryAddress.full_address).trim();
+    }
+
     const parts = [
       primaryAddress.detail,
       primaryAddress.village,
       primaryAddress.district,
       primaryAddress.city,
       primaryAddress.province,
-    ].filter(Boolean);
+    ]
+      .map(getAddressPart)
+      .filter(Boolean);
 
     const formatted = parts.join(", ").trim();
-    if (formatted) return formatted;
+
+    if (formatted) {
+      return formatted;
+    }
   }
 
-  return String(merchant.address || merchant.alamat || "").trim();
+  return String(
+    merchant.address ||
+    merchant.alamat ||
+    jasaLocationAddress ||
+    ""
+  ).trim();
 }
 
 // Validasi sederhana form sebelum lanjut pembayaran
@@ -1738,28 +1796,136 @@ const submitting = ref(false);
 const openAlamatOptions = ref(false);
 
 // Coba gunakan alamat dari profil user (jika ada)
-function useProfileAddress() {
-  const user = authStore.user;
-  const profileUser = userStore.user;
-  // Prioritas: alamat lengkap dari profil user (full_address), lalu address/alamat biasa
-  const candidate =
-    profileUser?.full_address ||
-    profileUser?.address ||
-    profileUser?.alamat ||
-    user?.address ||
-    user?.alamat ||
-    user?.profile?.address ||
-    user?.profile?.alamat ||
-    "";
+function getProfileAddressPart(value) {
+  if (!value) return "";
 
-  if (candidate) {
-    form.value.alamat = candidate;
-    openAlamatOptions.value = false;
-    successMessage.value = "Alamat berhasil diisi dari profil.";
-  } else {
-    errorMessage.value =
-      "Alamat profil belum tersedia. Silakan lengkapi profil terlebih dahulu.";
+  if (typeof value === "string") {
+    return value.trim();
   }
+
+  if (typeof value === "object") {
+    return String(
+      value.name ||
+      value.nama ||
+      value.label ||
+      value.value ||
+      ""
+    ).trim();
+  }
+
+  return String(value).trim();
+}
+
+function buildProfileAddress() {
+  const user = authStore.user || {};
+  const profileUser = userStore.user || {};
+  const profile = user.profile || profileUser.profile || {};
+
+  const directCandidates = [
+    profileUser.full_address,
+    profileUser.fullAddress,
+    profileUser.address,
+    profileUser.alamat,
+    user.full_address,
+    user.fullAddress,
+    user.address,
+    user.alamat,
+    profile.full_address,
+    profile.fullAddress,
+    profile.address,
+    profile.alamat,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  const addressObject =
+    profileUser.primary_address ||
+    profileUser.primaryAddress ||
+    profileUser.address_detail ||
+    profileUser.addressDetail ||
+    user.primary_address ||
+    user.primaryAddress ||
+    user.address_detail ||
+    user.addressDetail ||
+    profile.primary_address ||
+    profile.primaryAddress ||
+    profile.address_detail ||
+    profile.addressDetail ||
+    null;
+
+  if (addressObject && typeof addressObject === "object") {
+    const objectParts = [
+      addressObject.detail,
+      addressObject.address_detail,
+      addressObject.detail_alamat,
+      addressObject.alamat,
+      addressObject.village,
+      addressObject.village_name,
+      addressObject.district,
+      addressObject.district_name,
+      addressObject.city,
+      addressObject.city_name,
+      addressObject.regency,
+      addressObject.regency_name,
+      addressObject.province,
+      addressObject.province_name,
+    ]
+      .map(getProfileAddressPart)
+      .filter(Boolean);
+
+    if (objectParts.length) {
+      return objectParts.join(", ");
+    }
+  }
+
+  const parts = [
+    profileUser.detail_address || profileUser.address_detail || profileUser.detail_alamat || profileUser.detail,
+    profileUser.village || profileUser.village_name,
+    profileUser.district || profileUser.district_name,
+    profileUser.city || profileUser.city_name || profileUser.regency || profileUser.regency_name,
+    profileUser.province || profileUser.province_name,
+
+    user.detail_address || user.address_detail || user.detail_alamat || user.detail,
+    user.village || user.village_name,
+    user.district || user.district_name,
+    user.city || user.city_name || user.regency || user.regency_name,
+    user.province || user.province_name,
+
+    profile.detail_address || profile.address_detail || profile.detail_alamat || profile.detail,
+    profile.village || profile.village_name,
+    profile.district || profile.district_name,
+    profile.city || profile.city_name || profile.regency || profile.regency_name,
+    profile.province || profile.province_name,
+  ]
+    .map(getProfileAddressPart)
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(", ");
+}
+
+function useProfileAddress() {
+  const address = buildProfileAddress();
+
+  if (address) {
+    form.value.alamat = address;
+    openAlamatOptions.value = false;
+
+    // Jangan pakai successMessage karena itu memunculkan popup tengah
+    clearNotification();
+    toast.success("Alamat profil berhasil digunakan");
+
+    return;
+  }
+
+  openAlamatOptions.value = false;
+
+  // Jangan pakai errorMessage agar tidak muncul popup tengah
+  clearNotification();
+  toast.error("Alamat profil belum tersedia. Silakan lengkapi alamat profil terlebih dahulu.");
 }
 
 // Helper: reverse geocode lat,lng menjadi alamat teks (best effort)
@@ -1830,28 +1996,24 @@ async function requestDeviceLocation() {
     const address = await reverseGeocode(latitude, longitude);
     if (address) {
       form.value.alamat = address;
-      successMessage.value =
-        "Lokasi berhasil terdeteksi dan alamat terisi otomatis.";
+      toast.success("Lokasi berhasil terdeteksi dan alamat terisi otomatis");
     } else {
       form.value.alamat = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-      successMessage.value =
-        "Koordinat ditemukan. Silakan lengkapi alamat secara manual.";
+      toast.success("Lokasi berhasil diambil");
     }
   } catch (error) {
     console.error("[PembayaranJasa] Gagal mengambil lokasi device", error);
     if (error.code === 1) {
-      locatingError.value =
-        "Izin lokasi ditolak. Silakan isi alamat secara manual.";
+      locatingError.value = "Izin lokasi ditolak. Silakan isi alamat secara manual.";
     } else if (error.code === 2) {
-      locatingError.value =
-        "Lokasi tidak tersedia. Silakan isi alamat secara manual.";
+      locatingError.value = "Lokasi tidak tersedia. Silakan isi alamat secara manual.";
     } else if (error.code === 3) {
-      locatingError.value =
-        " Waktu habis. Silakan coba lagi atau isi alamat manual.";
+      locatingError.value = "Waktu habis. Silakan coba lagi atau isi alamat manual.";
     } else {
-      locatingError.value =
-        "Gagal mengambil lokasi. Silakan isi alamat secara manual.";
+      locatingError.value = "Gagal mengambil lokasi. Silakan isi alamat secara manual.";
     }
+
+    toast.error(locatingError.value);
   } finally {
     locatingDevice.value = false;
   }
@@ -1930,9 +2092,18 @@ onMounted(async () => {
     }
 
     // Otomatis isi alamat berdasarkan service_type
-    if (payload?.service_type === "at_location") {
+    const fetchedServiceType = String(payload?.service_type || "").toLowerCase();
+
+    if (
+      fetchedServiceType === "at_location" ||
+      fetchedServiceType === "di_tempat_umkm" ||
+      fetchedServiceType === "ditempat_umkm"
+    ) {
       form.value.alamat = fetchedMerchantAddr;
-    } else if (payload?.service_type === "on_site") {
+    } else if (
+      fetchedServiceType === "on_site" ||
+      fetchedServiceType === "ke_rumah_pelanggan"
+    ) {
       form.value.alamat = "";
     }
 
