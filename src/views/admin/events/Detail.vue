@@ -12,6 +12,7 @@ import { useEventVouchers } from "@/composables/useEventVouchers";
 import { useEventMerchants } from "@/composables/useEventMerchants";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 import api from "@/libs/axios";
+import LogoText from "@/assets/icons/LogoWithText.png";
 
 const router = useRouter();
 const route = useRoute();
@@ -50,6 +51,9 @@ const voucherToDelete = ref(null);
 // Removed merchants state
 const showRemoveMerchantModal = ref(false);
 const merchantToRemove = ref(null);
+const removalReason = ref("");
+const removedMerchants = ref([]);
+const showRemovedMerchantsModal = ref(false);
 const breadcrumbItems = computed(() => [
   { label: "Events", to: { name: "Admin - Events" } },
   { label: event.value?.event_name || "Detail Event" },
@@ -65,7 +69,7 @@ const displayedVouchers = computed(() => {
 
 const eventBannerUrl = computed(() => {
   if (!event.value?.id || !event.value?.banner_img_path) {
-    return "/placeholder.png";
+    return LogoText;
   }
   return getEventBannerUrl(event.value);
 });
@@ -352,7 +356,7 @@ const filteredAvailableMerchants = computed(() => {
 
   // Segmentation filter
   if (filterSegmentation.value) {
-    filtered = filtered.filter(m => m.segmentation_id === parseInt(filterSegmentation.value));
+    filtered = filtered.filter(m => m.segmentation?.id === parseInt(filterSegmentation.value) || m.segmentation_id === parseInt(filterSegmentation.value));
   }
 
   return filtered;
@@ -482,12 +486,10 @@ onMounted(async () => {
               <img
                 :src="eventBannerUrl"
                 alt="Event banner"
-                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                @error="(e) => (e.target.src = '/placeholder.png')"
+                class="w-full h-full transition-transform duration-700 group-hover:scale-105"
+                :class="eventBannerUrl === LogoText ? 'object-contain p-4' : 'object-cover'"
+                @error="(e) => (e.target.src = LogoText)"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
-                <p class="text-white text-sm font-medium">Banner Event KMI Simslife</p>
-              </div>
             </div>
             <div class="p-6 sm:p-8">
               <div class="flex items-center gap-4 mb-6">
@@ -743,7 +745,7 @@ onMounted(async () => {
       size="xl"
     >
       <div class="p-1 space-y-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <TextField
             name="search_merchant_invite"
             v-model="searchMerchantQuery"
@@ -751,11 +753,12 @@ onMounted(async () => {
             variant="muted"
             :hide-label="true"
             icon="pi pi-search"
+            customClass="mb-0 h-full"
           />
-          <div class="relative">
+          <div class="relative h-[42px]">
             <select
               v-model="filterSegmentation"
-              class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
+              class="w-full h-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
             >
               <option value="">Semua Segmentasi</option>
               <option value="1">UMKM Toko</option>
@@ -764,24 +767,25 @@ onMounted(async () => {
             </select>
             <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
           </div>
-        </div>
 
-        <div v-if="filteredAvailableMerchants.length > 0" class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl border border-gray-100">
-          <label class="flex items-center gap-3 cursor-pointer group">
-            <div class="relative w-5 h-5 flex items-center justify-center">
-              <input
-                type="checkbox"
-                :checked="selectedMerchantsCount === filteredAvailableMerchants.length && filteredAvailableMerchants.length > 0"
-                @change="selectAllMerchants"
-                class="peer absolute opacity-0 w-full h-full cursor-pointer"
-              />
-              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
-                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+          <!-- Select All -->
+          <div class="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 h-[42px]">
+            <label class="flex items-center gap-3 cursor-pointer group w-full">
+              <div class="relative w-5 h-5 flex items-center justify-center shrink-0">
+                <input
+                  type="checkbox"
+                  :checked="selectedMerchantsCount === filteredAvailableMerchants.length && filteredAvailableMerchants.length > 0"
+                  @change="selectAllMerchants"
+                  class="peer absolute opacity-0 w-full h-full cursor-pointer"
+                />
+                <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                  <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+                </div>
               </div>
-            </div>
-            <span class="text-sm font-bold text-gray-700">Pilih Semua Merchant</span>
-          </label>
-          <p class="text-xs font-bold text-merchant-primary" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Merchant Dipilih</p>
+              <span class="text-sm font-bold text-gray-700 truncate">Pilih Semua</span>
+            </label>
+            <span class="text-[10px] font-bold text-merchant-primary whitespace-nowrap ml-2" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Terpilih</span>
+          </div>
         </div>
 
         <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
