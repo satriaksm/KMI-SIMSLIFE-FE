@@ -80,15 +80,15 @@
       <template v-else>
         
         <!-- Cancelled banner -->
-        <div v-if="['cancelled', 'rejected', 'undelivered'].includes(order.status)" class="flex flex-col gap-3 p-4 border bg-red-50 rounded-2xl mb-4" :class="order.status === 'undelivered' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'">
+        <div v-if="['cancelled', 'rejected', 'undelivered', 'unpicked'].includes(order.status)" class="flex flex-col gap-3 p-4 border bg-red-50 rounded-2xl mb-4" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'border-orange-200 bg-orange-50' : 'border-red-200 bg-red-50'">
           <div class="flex items-center gap-3">
-            <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
+            <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
             <div>
-              <p class="text-sm font-semibold" :class="order.status === 'undelivered' ? 'text-orange-700' : 'text-red-700'">
-                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : order.status === 'undelivered' ? (order.meta.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
+              <p class="text-sm font-semibold" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'text-orange-700' : 'text-red-700'">
+                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : (order.status === 'undelivered' || order.status === 'unpicked') ? (order.meta.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
               </p>
-              <p v-if="order.meta.note || order.meta.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' ? 'text-orange-600' : 'text-red-500'">
-                {{ order.meta.failed_reason || order.meta.note }}
+              <p v-if="order.meta.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'text-orange-600' : 'text-red-500'">
+                {{ order.meta.failed_reason }}
               </p>
             </div>
           </div>
@@ -454,8 +454,6 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import OrderTrackDialog from './OrderTrackDialog.vue'
-import OrderReviewDialog from './OrderReviewDialog.vue'
 import AppButton from '@/components/common/Button.vue'
 import ResponsiveImage from '@/components/common/ResponsiveImage.vue'
 import MobileHeader from "@/components/customer/MobileHeader.vue";
@@ -519,11 +517,13 @@ const order = computed(() => {
     paid: [true, true, false, false, false],
     responsed: [true, true, true, false, false],
     accepted: [true, true, true, false, false],
+    ready_to_pickup: [true, true, true, true, false],
     delivered: [true, true, true, true, false],
     completed: [true, true, true, true, true],
     cancelled: [false, false, false, false, false],
     rejected: [false, false, false, false, false],
     undelivered: [false, false, false, false, false],
+    unpicked: [false, false, false, false, false],
   };
   const dones = trackingMap[status] || [false, false, false, false, false];
   const merchantAddressObj = o.merchant?.primary_address || o.merchant?.primaryAddress;

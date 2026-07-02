@@ -191,6 +191,7 @@ const toast = useToast();
 
 const tabs = [
   { name: 'Butuh Manual (Failed)', value: 'failed' },
+  { name: 'Sedang Diproses (Processing)', value: 'processing' },
   { name: 'Berhasil (Succeeded)', value: 'succeeded' },
 ];
 
