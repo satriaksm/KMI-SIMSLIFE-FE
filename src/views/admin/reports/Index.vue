@@ -33,32 +33,17 @@ const breadcrumbItems = computed(() => [
 ]);
 
 const tableColumns = [
-  { key: "no", label: "No", sortable: false },
-  { key: "reporter.name", label: "Pelapor", sortable: false },
-  { key: "reportable_type", label: "Tipe", sortable: false },
-  { key: "reason.reason_title", label: "Alasan", sortable: false },
-  { key: "status", label: "Status", sortable: false },
-  { key: "created_at", label: "Tanggal", sortable: false },
-  { key: "actions", label: "Aksi", sortable: false },
+  { key: "no", label: "No", sortable: true, filterable: false, class: "w-16" },
+  { key: "created_at", label: "Tanggal", sortable: true, filterable: true },
+  { key: "reporter.name", label: "Pelapor", sortable: true, filterable: true },
+  { key: "reportable_type", label: "Tipe", sortable: true, filterable: true, filterFormat: (val) => getTypeLabel(val) },
+  { key: "reason.reason_title", label: "Alasan", sortable: true, filterable: true },
+  { key: "status", label: "Status", sortable: true, filterable: true, filterFormat: (val) => getStatusLabel(val) },
+  { key: "action_taken", label: "Tindakan Moderasi", sortable: false, filterable: true, filterFormat: (val) => getActionInfo(val).label, class: "w-[400px] min-w-[320px]" },
+  { key: "actions", label: "Aksi", sortable: false, filterable: false, class: "w-28 text-right" },
 ];
 
-const statusOptions = [
-  { value: "", label: "Semua Status" },
-  { value: "pending", label: "Menunggu" },
-  { value: "in_review", label: "Dalam Peninjauan" },
-  { value: "resolved", label: "Terselesaikan" },
-  { value: "dismissed", label: "Ditolak" },
-];
 
-const typeOptions = [
-  { value: "", label: "Semua Tipe" },
-  { value: "product", label: "Produk" },
-  { value: "service", label: "Jasa" },
-  { value: "merchant", label: "Merchant" },
-  { value: "post", label: "Postingan" },
-  { value: "post_comment", label: "Komentar" },
-  { value: "user", label: "Pengguna" },
-];
 
 const paginationInfo = computed(() => {
   const current = pagination.value?.current_page ?? currentPage.value;
@@ -82,6 +67,16 @@ const normalizeReportableType = (type) => {
   return lower;
 };
 
+const getStatusLabel = (status) => {
+  const labels = {
+    pending: "Menunggu",
+    in_review: "Dalam Peninjauan",
+    resolved: "Terselesaikan",
+    dismissed: "Ditolak",
+  };
+  return labels[status] || status;
+};
+
 const getTypeLabel = (type) => {
   const labels = {
     product: "Produk",
@@ -92,6 +87,23 @@ const getTypeLabel = (type) => {
     user: "Pengguna",
   };
   return labels[normalizeReportableType(type)] || type;
+};
+
+const getActionInfo = (actionType) => {
+  const map = {
+    'send_warning': { label: 'Peringatan', icon: 'pi-envelope', color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
+    'warn_user': { label: 'Peringatan Pengguna', icon: 'pi-exclamation-triangle', color: 'text-yellow-600', bg: 'bg-yellow-50 border-yellow-200' },
+    'suspend_user': { label: 'Suspend Pengguna', icon: 'pi-lock', color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
+    'deactivate_user': { label: 'Nonaktifkan Pengguna', icon: 'pi-times-circle', color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
+    'warn_merchant': { label: 'Peringatan UMKM', icon: 'pi-exclamation-triangle', color: 'text-yellow-600', bg: 'bg-yellow-50 border-yellow-200' },
+    'suspend_merchant': { label: 'Suspend UMKM', icon: 'pi-lock', color: 'text-orange-600', bg: 'bg-orange-50 border-orange-200' },
+    'archive_merchant': { label: 'Arsipkan UMKM', icon: 'pi-box', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+    'archive_product': { label: 'Arsipkan Produk', icon: 'pi-eye-slash', color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200' },
+    'archive_service': { label: 'Arsipkan Jasa', icon: 'pi-eye-slash', color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
+    'delete_post': { label: 'Hapus Postingan', icon: 'pi-trash', color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200' },
+    'delete_comment': { label: 'Hapus Komentar', icon: 'pi-trash', color: 'text-slate-600', bg: 'bg-slate-50 border-slate-200' },
+  };
+  return map[actionType] || { label: actionType, icon: 'pi-check', color: 'text-gray-600', bg: 'bg-gray-50 border-gray-200' };
 };
 
 const formatDate = (date) => {
@@ -183,6 +195,12 @@ watch([searchQuery, statusFilter, typeFilter], () => {
   loadReports();
 });
 
+const tableRef = ref(null);
+const resetAll = () => {
+  searchQuery.value = "";
+  tableRef.value?.resetFiltersAndSort();
+};
+
 onMounted(() => {
   loadReports();
 });
@@ -231,34 +249,25 @@ onMounted(() => {
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <!-- Filters -->
         <div class="p-4 space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-4 border-b border-gray-100">
-          <div class="flex-1">
-            <TextField
-              name="search"
-              variant="merchant"
-              v-model="searchQuery"
-              placeholder="Cari laporan..."
-              icon="pi pi-search"
-            />
-          </div>
-          <div class="flex gap-2">
-            <SelectField
-              name="filter-status"
-              v-model="statusFilter"
-              :options="statusOptions"
-              variant="merchant"
-              placeholder="Status"
-            />
-            <SelectField
-              name="filter-type"
-              v-model="typeFilter"
-              :options="typeOptions"
-              variant="merchant"
-              placeholder="Tipe"
-            />
+          <div class="flex-1 flex gap-2 w-full">
+            <div class="flex-1 w-full">
+              <TextField
+                name="search"
+                variant="merchant"
+                v-model="searchQuery"
+                placeholder="Cari laporan..."
+                icon="pi pi-search"
+              />
+            </div>
+            <Button @click="resetAll" variant="merchant-outline" customClass="h-[42px] px-4 whitespace-nowrap !border-gray-200 hover:!bg-gray-50 flex-shrink-0">
+              <i class="pi pi-filter-slash text-gray-500 mr-1 text-sm"></i> 
+              <span class="text-gray-600 text-sm font-medium">Reset</span>
+            </Button>
           </div>
         </div>
 
         <AdminTable
+          ref="tableRef"
           :items="reports"
           :columns="tableColumns"
           :loading="loading"
@@ -302,6 +311,30 @@ onMounted(() => {
             <span class="text-sm text-gray-600">
               {{ formatDate(value) }}
             </span>
+          </template>
+
+          <template #cell-action_taken="{ item }">
+            <div v-if="item.action_taken" class="flex flex-col gap-1.5">
+              <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold w-max" :class="[getActionInfo(item.action_taken).bg, getActionInfo(item.action_taken).color]">
+                <i class="pi" :class="getActionInfo(item.action_taken).icon"></i>
+                <span>{{ getActionInfo(item.action_taken).label }}</span>
+              </div>
+              <span class="text-xs text-gray-600 font-medium">
+                {{ item.admin_note || item.action_reason || '-' }}
+              </span>
+            </div>
+            <div v-else-if="item.admin_note || item.reviewer?.name" class="flex flex-col gap-1.5">
+              <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-semibold w-max bg-gray-50 border-gray-200 text-gray-600">
+                <i class="pi pi-check"></i>
+                <span>Ditinjau oleh {{ item.reviewer?.name || 'Admin' }}</span>
+              </div>
+              <span class="text-xs text-gray-600 font-medium">
+                {{ item.admin_note || '-' }}
+              </span>
+            </div>
+            <div v-else>
+              <span class="text-xs text-gray-400">-</span>
+            </div>
           </template>
 
           <template #cell-actions="{ item }">

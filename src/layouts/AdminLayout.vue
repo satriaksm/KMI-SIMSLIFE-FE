@@ -120,7 +120,7 @@ defineExpose({
       <div
         v-if="isOpen"
         @click="closeSidebar"
-        class="fixed inset-0 bg-black/50 z-40 sm:hidden"
+        class="fixed inset-0 bg-black/50 z-40 lg:hidden"
       ></div>
     </transition>
 
@@ -129,8 +129,8 @@ defineExpose({
       :class="[
         'fixed top-0 left-0 h-full bg-white shadow-sm z-40 transition-all duration-300 flex flex-col',
         isOpen ? 'translate-x-0' : '-translate-x-full',
-        'sm:translate-x-0',
-        isOpen ? 'w-64' : 'w-64 sm:w-16',
+        'lg:translate-x-0',
+        isOpen ? 'w-64' : 'w-64 lg:w-16',
       ]"
     >
       <!-- Header -->
@@ -139,7 +139,7 @@ defineExpose({
           'flex items-center transition-all duration-300 h-20 shadow-sm',
           isOpen
             ? 'justify-between px-4'
-            : 'justify-between px-4 sm:justify-center sm:px-4',
+            : 'justify-between px-4 lg:justify-center lg:px-4',
         ]"
       >
         <router-link to="/admin/dashboard">
@@ -176,7 +176,7 @@ defineExpose({
                 'w-full flex items-center rounded-lg text-sm font-medium transition-all',
                 isOpen
                   ? 'px-4 py-3 gap-3'
-                  : 'px-4 py-3 gap-3 sm:px-3 sm:justify-center sm:gap-0',
+                  : 'px-4 py-3 gap-3 lg:px-3 lg:justify-center lg:gap-0',
                 isActive(item.route)
                   ? 'bg-merchant-primary/10 text-merchant-primary'
                   : 'text-gray-700 hover:bg-gray-50',
@@ -197,7 +197,7 @@ defineExpose({
                   'transition-all duration-300',
                   isOpen
                     ? 'opacity-100 w-auto'
-                    : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
+                    : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden',
                 ]"
               >
                 {{ item.label }}
@@ -215,14 +215,14 @@ defineExpose({
             'w-full flex items-center rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition',
             isOpen
               ? 'justify-between px-4 py-3'
-              : 'justify-between px-4 py-3 sm:justify-center sm:px-3 sm:relative',
+              : 'justify-between px-4 py-3 lg:justify-center lg:px-3 lg:relative',
           ]"
           :title="!isOpen ? 'Notifikasi' : ''"
         >
           <div
             :class="[
               'flex items-center',
-              isOpen ? 'gap-3' : 'gap-3 sm:gap-0 sm:relative',
+              isOpen ? 'gap-3' : 'gap-3 lg:gap-0 lg:relative',
             ]"
           >
             <i class="pi pi-bell text-lg text-gray-600 shrink-0"></i>
@@ -231,7 +231,7 @@ defineExpose({
                 'transition-all duration-300',
                 isOpen
                   ? 'opacity-100 w-auto'
-                  : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
+                  : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden',
               ]"
             >
               Notifikasi
@@ -243,7 +243,7 @@ defineExpose({
               'bg-merchant-primary text-white text-xs font-bold rounded-full text-center transition-all duration-300',
               isOpen
                 ? 'px-2 py-0.5 min-w-6'
-                : 'px-2 py-0.5 min-w-6 sm:absolute sm:-top-1 sm:-right-1 sm:w-5 sm:h-5 sm:p-0 sm:flex sm:items-center sm:justify-center',
+                : 'px-2 py-0.5 min-w-6 lg:absolute lg:-top-1 lg:-right-1 lg:w-5 lg:h-5 lg:p-0 lg:flex lg:items-center lg:justify-center',
             ]"
           >
             {{ notificationCount }}
@@ -257,7 +257,7 @@ defineExpose({
             'w-full flex items-center rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition',
             isOpen
               ? 'px-4 py-3 gap-3'
-              : 'px-4 py-3 gap-3 sm:justify-center sm:px-3 sm:gap-0',
+              : 'px-4 py-3 gap-3 lg:justify-center lg:px-3 lg:gap-0',
           ]"
           :title="!isOpen ? 'Log Out' : ''"
         >
@@ -267,7 +267,7 @@ defineExpose({
               'transition-all duration-300',
               isOpen
                 ? 'opacity-100 w-auto'
-                : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
+                : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden',
             ]"
           >
             Log Out
@@ -277,7 +277,7 @@ defineExpose({
         <!-- Profile Card - Admin Info -->
         <div
           v-if="isOpen"
-          class="bg-linear-to-r from-merchant-primary to-merchant-primary/80 text-white rounded-xl p-4 mt-2 sm:block"
+          class="bg-linear-to-r from-merchant-primary to-merchant-primary/80 text-white rounded-xl p-4 mt-2 lg:block"
         >
           <div class="flex items-center gap-3">
             <div
@@ -313,7 +313,7 @@ defineExpose({
         <!-- Collapsed State -->
         <button
           v-else
-          class="hidden sm:flex w-full justify-center items-center p-3 bg-primary/10 rounded-lg hover:bg-primary transition"
+          class="hidden lg:flex w-full justify-center items-center p-3 bg-primary/10 rounded-lg hover:bg-primary transition"
           :title="`${adminName} - Administrator`"
         >
           <span class="text-lg font-bold text-primary">
@@ -327,7 +327,7 @@ defineExpose({
     <div
       :class="[
         'flex-1 w-full min-h-screen overflow-x-hidden transition-all duration-300',
-        !isOpen ? 'sm:ml-16' : 'sm:ml-64',
+        !isOpen ? 'lg:ml-16' : 'lg:ml-64',
       ]"
     >
       <router-view v-slot="{ Component }">
