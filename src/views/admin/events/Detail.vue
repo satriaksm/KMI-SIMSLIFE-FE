@@ -420,6 +420,33 @@ const exportDetailPDF = async () => {
   }
 };
 
+// ✅ Export Excel method
+const exportExcelLoading = ref(false);
+const exportDetailExcel = async () => {
+  exportExcelLoading.value = true;
+  try {
+    const response = await api.get(`/api/admin/events/${event.value.id}/export-excel`, {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `event-analytics-${event.value.id}-${new Date().toISOString().split('T')[0]}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    toast.success("Laporan analitik event (Excel) berhasil diunduh");
+    showExportModal.value = false;
+  } catch (error) {
+    console.error("Export Excel failed:", error);
+    toast.error(error.response?.data?.message || "Gagal mengunduh laporan Excel");
+  } finally {
+    exportExcelLoading.value = false;
+  }
+};
+
 // ✅ Open export modal method
 const openExportModal = () => {
   console.log('openExportModal called in Detail.vue');
@@ -1115,24 +1142,55 @@ onMounted(async () => {
             </div>
           </div>
           
-          <ul class="space-y-3">
+          <ul class="space-y-3 mb-6">
             <li v-for="(item, i) in ['Informasi fundamental event', 'Daftar merchant yang terdaftar', 'Rincian voucher dan periode', 'Status dan statistik partisipasi']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
               <i class="pi pi-check-circle text-merchant-primary text-xs shrink-0"></i>
               {{ item }}
             </li>
           </ul>
+
+          <Button
+            @click="exportDetailPDF"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportLoading"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Laporan PDF
+          </Button>
         </div>
 
-        <Button
-          @click="exportDetailPDF"
-          variant="merchant"
-          size="lg"
-          block
-          :loading="exportLoading"
-        >
-          <i class="pi pi-download mr-2"></i>
-          Download Laporan PDF
-        </Button>
+        <div class="bg-gradient-to-br from-green-50 to-green-100/50 border border-green-100 rounded-2xl p-6 mt-4">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <i class="pi pi-file-excel text-2xl text-green-600"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-900">Format Laporan Excel</h4>
+              <p class="text-xs text-gray-500">Data analitik komprehensif KMI Simslife</p>
+            </div>
+          </div>
+          
+          <ul class="space-y-3 mb-6">
+            <li v-for="(item, i) in ['Statistik lengkap (rating, performa)', 'Ranking UMKM & Kategori Terlaris', 'Performa produk & metode pembayaran', 'Data multi-sheet yang mudah diolah']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
+              <i class="pi pi-check-circle text-green-600 text-xs shrink-0"></i>
+              {{ item }}
+            </li>
+          </ul>
+
+          <Button
+            @click="exportDetailExcel"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportExcelLoading"
+            class="!bg-green-600 hover:!bg-green-700 !border-green-600"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Excel
+          </Button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>

@@ -47,12 +47,12 @@ const overviewCards = computed(() => [
     route: { name: "Admin - Users" },
   },
   {
-    id: "paguyubans",
-    icon: "pi-sitemap",
-    label: "Paguyuban",
-    current: stats.value?.overview?.paguyubans?.current || 0,
-    previous: stats.value?.overview?.paguyubans?.previous,
-    route: { name: "Admin - Paguyubans" },
+    id: "transactions",
+    icon: "pi-shopping-cart",
+    label: "Transaksi",
+    current: stats.value?.overview?.transactions?.current || 0,
+    previous: stats.value?.overview?.transactions?.previous,
+    route: null,
   },
   {
     id: "products",

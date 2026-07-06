@@ -21,7 +21,7 @@ const DONUT_CREATE_SPEED = 1000;
 
 // Options
 const donutModeOptions = [
-  { value: "merchants", label: "Segmentasi Merchant" },
+  { value: "merchants", label: "Segmentasi UMKM" },
   { value: "products", label: "Kategori Produk" },
 ];
 
@@ -140,7 +140,7 @@ const applyDonutChart = async (labels, series, colors, total, mode) => {
             },
             total: {
               show: true,
-              label: mode === "merchants" ? "Total Merchant" : "Total Produk",
+              label: mode === "merchants" ? "Total UMKM" : "Total Produk",
               fontSize: "16px",
               fontWeight: 600,
               color: "#64748b",
@@ -258,7 +258,7 @@ onUnmounted(async () => {
       <div class="w-full">
         <h3 class="text-base sm:text-lg font-semibold text-gray-800">Analisis Distribusi</h3>
         <p class="mt-1 text-gray-500 text-xs sm:text-sm">
-          {{ donutChartMode === "merchants" ? "Distribusi segmentasi merchant" : "Distribusi kategori produk (Top 5)" }}
+          {{ donutChartMode === "merchants" ? "Distribusi segmentasi UMKM" : "Distribusi kategori produk (Top 5)" }}
         </p>
       </div>
 
