@@ -13,10 +13,12 @@ import { useEventMerchants } from "@/composables/useEventMerchants";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 import api from "@/libs/axios";
 import LogoText from "@/assets/icons/LogoWithText.png";
+import AnalyticsTab from "./Analytics.vue";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const activeTab = ref("info"); // "info" | "analytics"
 
 const { fetchEventDetail, deleteEvent, inviteMerchants, loading } = useEvents();
 const { 
@@ -475,8 +477,31 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event">
+    <!-- Tab Switcher -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-6" v-if="event">
+      <div class="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+        <button
+          @click="activeTab = 'info'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'info' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-info-circle mr-2"></i>Informasi Event
+        </button>
+        <button
+          @click="activeTab = 'analytics'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'analytics' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-chart-bar mr-2"></i>Analisis Event
+        </button>
+      </div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div v-if="event && activeTab === 'analytics'" class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <AnalyticsTab :event-id="event.id" />
+    </div>
+
+    <!-- Main Content (Info Tab) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event && activeTab === 'info'">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Left Column: Banner & Info -->
         <div class="lg:col-span-2 space-y-8">
