@@ -61,6 +61,7 @@ const breadcrumbItems = computed(() => [
   { label: event.value?.event_name || "Detail Event" },
 ]);
 
+const postingToCommunity = ref(false);
 const showAllVouchers = ref(false);
 const displayedVouchers = computed(() => {
   if (!event.value?.vouchers) return [];
@@ -240,6 +241,26 @@ function formatCurrency(value) {
 }
 
 const goBack = () => router.push({ name: "Admin - Events" });
+
+const handlePostToCommunity = async () => {
+  if (postingToCommunity.value) return;
+  postingToCommunity.value = true;
+  try {
+    const response = await api.post(`/api/admin/events/${event.value.id}/post-to-community`);
+    if (response.data.success) {
+      toast.success(response.data.message);
+      // Optional: open the post in a new tab or navigate there
+      // window.open(`/community/post/${response.data.post_id}`, '_blank');
+    } else {
+      toast.error(response.data.message || 'Gagal memposting ke komunitas');
+    }
+  } catch (error) {
+    console.error('Post to community error:', error);
+    toast.error(error.response?.data?.message || 'Gagal memposting ke komunitas');
+  } finally {
+    postingToCommunity.value = false;
+  }
+};
 
 // Open modal and reset
 const openAddVoucherModal = async () => {
@@ -492,6 +513,10 @@ onMounted(async () => {
             Kembali
           </button>
           <div class="w-px h-6 bg-gray-200 mx-1"></div>
+          <Button @click="handlePostToCommunity" variant="primary-outline" size="sm" :disabled="postingToCommunity">
+            <i class="pi" :class="postingToCommunity ? 'pi-spinner pi-spin' : 'pi-share-alt'"></i>
+            <span class="ml-2">{{ postingToCommunity ? 'Memposting...' : 'Post Komunitas' }}</span>
+          </Button>
           <Button @click="goToEdit" variant="merchant-outline" size="sm">
             <i class="pi pi-pencil mr-2 text-xs"></i>
             Edit Event
