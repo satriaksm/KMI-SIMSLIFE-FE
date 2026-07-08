@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import CommunityView from "@/views/CommunityView.vue";
 import CommunityDetailView from "@/views/CommunityDetailView.vue";
-import MyOrderLayout from "@/views/CustomerOrder/MyOrderLayout.vue";
 
 const adminGuard = (to, from, next) => {
   const authStore = useAuthStore();
@@ -269,14 +268,6 @@ const routes = [
           title: "Pembayaran | SUMILIR",
         },
       },
-      {
-        path: "booking-confirmation",
-        name: "Booking Confirmation",
-        component: () => import("@/views/customer/BookingConfirmation.vue"),
-        meta: {
-          title: "Konfirmasi Pemesanan | SUMILIR",
-        },
-      },
       // Redirect lama /jasa-history ke /orders
       {
         path: "jasa-history",
@@ -347,16 +338,6 @@ const routes = [
         },
       },
 
-      // Edit Review Route - universal for all types
-      {
-        path: "reviews/:ratingId/edit",
-        name: "Edit Review",
-        component: () => import("@/views/CustomerOrder/EditReviewView.vue"),
-        meta: {
-          title: "Perbarui Penilaian | SUMILIR",
-          requiresAuth: true,
-        },
-      },
 
       // ===========================
       // Profil User
@@ -393,26 +374,6 @@ const routes = [
             meta: { title: "Ubah Kata Sandi | SUMILIR" }, // ← dari kodemu
           },
         ],
-      },
-      {
-        path: "reports",
-        name: "MyReports",
-        component: () => import("@/views/reports/MyReports.vue"),
-        meta: {
-          requiresAuth: true,
-          denyRoles: ["admin"],
-          title: "Laporan Saya | SUMILIR",
-        },
-      },
-      {
-        path: "reports/:id",
-        name: "Report Detail",
-        component: () => import("@/views/reports/UserReportDetail.vue"),
-        meta: {
-          requiresAuth: true,
-          denyRoles: ["admin"],
-          title: "Detail Laporan | SUMILIR",
-        },
       },
     ],
   },
@@ -641,6 +602,14 @@ const routes = [
         name: "Admin - Settings",
         component: () => import("@/views/admin/settings/Index.vue"),
         meta: { title: "Platform Settings | Admin SUMILIR" },
+      },
+
+      // REFUNDS
+      {
+        path: "refunds",
+        name: "Admin - Refunds",
+        component: () => import("@/views/admin/refunds/Index.vue"),
+        meta: { title: "Refund Management | Admin SUMILIR" },
       },
     ],
   },
@@ -947,24 +916,6 @@ const routes = [
             },
           },
         ],
-      },
-    ],
-  },
-
-  // My Order History (dari kodemu)
-  {
-    path: "/my-order",
-    component: MyOrderLayout, // ← dari kodemu
-    meta: {
-      requiresAuth: true,
-      roles: ["customer"], // ← dari kodemu
-    },
-    children: [
-      {
-        path: "",
-        name: "MyOrder",
-        component: () => import("@/views/CustomerOrder/MyOrderView.vue"),
-        meta: { title: "My Order | SUMILIR" }, // ← dari kodemu
       },
     ],
   },

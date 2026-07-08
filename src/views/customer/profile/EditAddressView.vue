@@ -20,6 +20,7 @@ import {
   getVillages,
 } from "@/services/api/location";
 import { getMyAddress, upsertMyAddress } from "@/services/api/address";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 // =========================
 // STATE
@@ -32,6 +33,9 @@ const userStore = useUserStore();
 const loading = ref(true);
 const saving = ref(false);
 const prefilling = ref(false);
+
+const { syncMapToAddress, syncAddressToMap, isSyncing } = useAddressMapSync();
+const mapRef = ref(null);
 
 const loadingProvinces = ref(false);
 const loadingCities = ref(false);
@@ -160,6 +164,24 @@ async function loadVillages(districtId) {
   }
 }
 
+const handleManualLocationChange = async ({ lat, lng }) => {
+  prefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => setFieldValue("province_id", id),
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => setFieldValue("city_id", id),
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => setFieldValue("district_id", id),
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => setFieldValue("village_id", id)
+    });
+  } finally {
+    prefilling.value = false;
+  }
+};
+
 async function prefillFromApi() {
   const res = await getMyAddress();
   const address = res?.data ?? null;
@@ -260,6 +282,21 @@ watch(
     setFieldValue("village_id", "");
     await loadVillages(districtId);
   },
+);
+
+watch(
+  () => values.village_id,
+  (val) => {
+    if (prefilling.value) return;
+    if (val) {
+      const provName = provinceOptions.value.find((p) => p.value == values.province_id)?.label;
+      const cityName = cityOptions.value.find((c) => c.value == values.city_id)?.label;
+      const distName = districtOptions.value.find((d) => d.value == values.district_id)?.label;
+      const villName = villageOptions.value.find((v) => v.value == val)?.label;
+      
+      syncAddressToMap([villName, distName, cityName, provName], mapRef);
+    }
+  }
 );
 
 // =========================
@@ -387,13 +424,18 @@ onMounted(async () => {
           />
 
           <div>
-            <label class="block mb-2 text-sm font-semibold text-gray-700">
-              Lokasi di Peta
-              <span class="text-red-500">*</span>
-            </label>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-semibold text-gray-700">
+                Lokasi di Peta
+                <span class="text-red-500">*</span>
+              </label>
+              <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+            </div>
             <MapPicker
+              ref="mapRef"
               v-model:lat="lat"
               v-model:lng="lng"
+              @manual-change="handleManualLocationChange"
               height="320px"
               variant="user"
             />

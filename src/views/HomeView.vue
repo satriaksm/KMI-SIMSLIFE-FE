@@ -22,10 +22,11 @@ import MapPreviewSection from "@/components/home/MapPreviewSection.vue";
 import AnimatedCounter from "@/components/common/AnimatedCounter.vue";
 import Button from "@/components/common/Button.vue";
 
-import jasaIconUrl from "@/assets/icons/Jasa.svg?url";
-import kulinerIconUrl from "@/assets/icons/Kuliner.svg?url";
-import tokoIconUrl from "@/assets/icons/Toko.svg?url";
-import komunitasIconUrl from "@/assets/icons/Komunitas.svg?url";
+import jasaIcon from "@/assets/icons/Jasa.svg";
+import kulinerIcon from "@/assets/icons/Kuliner.svg";
+import tokoIcon from "@/assets/icons/Toko.svg";
+import umkmIcon from "@/assets/icons/merchant.svg";
+import komunitasIcon from "@/assets/icons/Komunitas.svg";
 import WhiteWithText from "@/assets/icons/White-with-Text.png";
 
 import api from "@/libs/axios.js";
@@ -132,23 +133,28 @@ const carouselConfig = {
 
 const navigates = ref([
   {
+    label: "UMKM",
+    icon: umkmIcon,
+    to: { path: "/explore", query: { mode: "umkm" } },
+  },
+  {
     label: "Kuliner",
-    icon: kulinerIconUrl,
+    icon: kulinerIcon,
     to: { path: "/explore", query: { mode: "kuliner" } },
   },
   {
     label: "Toko",
-    icon: tokoIconUrl,
+    icon: tokoIcon,
     to: { path: "/explore", query: { mode: "toko" } },
   },
   {
     label: "Jasa",
-    icon: jasaIconUrl,
+    icon: jasaIcon,
     to: { path: "/explore", query: { mode: "jasa" } },
   },
   {
     label: "Komunitas",
-    icon: komunitasIconUrl,
+    icon: komunitasIcon,
     to: { name: "community" },
   },
 ]);
@@ -313,11 +319,11 @@ onBeforeUnmount(() => {
 
       <!-- Search Bar Container -->
       <div
-        class="relative z-10 flex justify-center px-4 mx-auto mt-2 sm:-mt-10 max-w-7xl"
+        class="relative z-20 flex justify-center px-4 mx-auto -mt-6 sm:-mt-10 max-w-7xl"
       >
         <div class="w-full sm:w-[906px]">
           <div
-            class="overflow-hidden bg-white border border-gray-100 shadow-xl rounded-2xl"
+            class="overflow-hidden bg-white border border-gray-200 shadow-lg sm:rounded-2xl rounded-xl"
           >
             <!-- Search -->
             <div class="p-4 border-b border-gray-100 sm:p-5">
@@ -345,7 +351,7 @@ onBeforeUnmount(() => {
             </div>
 
             <!-- Categories -->
-            <div class="p-4 sm:p-5">
+            <div class="p-4 sm:p-5 bg-gray-50/50">
               <div class="grid grid-cols-4 gap-3 sm:gap-4">
                 <CategoryCard
                   v-for="cat in navigates"
@@ -367,15 +373,16 @@ onBeforeUnmount(() => {
         <!-- Section Header -->
         <div class="flex items-center justify-between mb-6 sm:mb-10">
           <div>
-            <h2
-              class="mb-1 text-xl font-bold text-gray-900 sm:text-2xl lg:text-3xl"
-            >
+            <h2 class="text-xl font-bold text-gray-900 sm:text-3xl">
               Temukan UMKM yang Kamu Butuhkan
             </h2>
-            <p class="text-sm text-gray-600 sm:text-base">
-              UMKM lokal terpilih untuk Anda
+            <p class="mt-1 text-sm text-gray-500 sm:text-base">
+              Pilihan UMKM terbaik di Banyuanyar
             </p>
           </div>
+          <router-link to="/explore?mode=umkm" class="hidden text-sm font-semibold sm:block text-primary hover:text-primary/80">
+            Lihat Semua
+          </router-link>
         </div>
 
         <!-- Skeleton Loading -->

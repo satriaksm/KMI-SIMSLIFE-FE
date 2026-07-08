@@ -220,7 +220,7 @@ defineExpose({
       <div
         v-if="isOpen"
         @click="closeSidebar"
-        class="fixed inset-0 z-40 bg-black/50 sm:hidden"
+        class="fixed inset-0 z-40 bg-black/50 lg:hidden"
       ></div>
     </transition>
 
@@ -229,8 +229,8 @@ defineExpose({
       :class="[
         'fixed top-0 left-0 h-full bg-white shadow-sm z-40 transition-all duration-300 flex flex-col',
         isOpen ? 'translate-x-0' : '-translate-x-full',
-        'sm:translate-x-0',
-        isOpen ? 'w-64' : 'w-64 sm:w-16',
+        'lg:translate-x-0',
+        isOpen ? 'w-64' : 'w-64 lg:w-16',
       ]"
     >
       <!-- Header -->
@@ -239,7 +239,7 @@ defineExpose({
           'flex items-center h-16',
           isOpen
             ? 'justify-between px-4'
-            : 'justify-between px-4 sm:justify-center',
+            : 'justify-between px-4 lg:justify-center',
         ]"
       >
         <router-link to="/">
@@ -250,7 +250,7 @@ defineExpose({
               'h-8 transition-all duration-300',
               isOpen
                 ? 'ms-3 opacity-100'
-                : 'sm:opacity-0 sm:h-0 sm:ms-0 ms-3',
+                : 'lg:opacity-0 lg:h-0 lg:ms-0 ms-3',
             ]"
           />
         </router-link>
@@ -279,7 +279,7 @@ defineExpose({
                 'w-full flex items-center rounded-lg text-sm font-medium transition-all',
                 isOpen
                   ? 'px-4 py-3 gap-3'
-                  : 'px-4 py-3 gap-3 sm:px-3 sm:justify-center sm:gap-0',
+                  : 'px-4 py-3 gap-3 lg:px-3 lg:justify-center lg:gap-0',
                 isActive(item.route)
                   ? 'bg-merchant-primary/10 text-merchant-primary'
                   : 'text-gray-700 hover:bg-gray-50',
@@ -300,7 +300,7 @@ defineExpose({
                   'transition-all duration-300',
                   isOpen
                     ? 'opacity-100 w-auto'
-                    : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden sm:hidden',
+                    : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden lg:hidden',
                 ]"
               >
                 {{ item.label }}
@@ -319,7 +319,7 @@ defineExpose({
             'w-full flex items-center rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition',
             isOpen
               ? 'px-4 py-3 gap-3'
-              : 'px-4 py-3 gap-3 sm:justify-center sm:px-3 sm:gap-0',
+              : 'px-4 py-3 gap-3 lg:justify-center lg:px-3 lg:gap-0',
           ]"
           :title="!isOpen ? 'Log Out' : ''"
         >
@@ -329,7 +329,7 @@ defineExpose({
               'transition-all duration-300',
               isOpen
                 ? 'opacity-100 w-auto'
-                : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
+                : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden',
             ]"
           >
             Log Out
@@ -494,7 +494,7 @@ defineExpose({
     <div
       :class="[
         'flex-1 min-w-0 min-h-screen transition-all duration-300',
-        !isOpen ? 'sm:ml-16' : 'sm:ml-64',
+        !isOpen ? 'lg:ml-16' : 'lg:ml-64',
       ]"
     >
       <router-view :key="$route.fullPath" v-slot="{ Component }">

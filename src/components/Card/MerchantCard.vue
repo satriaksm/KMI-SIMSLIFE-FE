@@ -11,11 +11,12 @@
     >
       <!-- Logo/Image -->
       <div class="relative bg-muted-background aspect-square">
-        <img
+        <ResponsiveImage
           v-if="merchant.logo_url"
-          :src="merchant.logo_url"
+          :src="merchantLogoUrl"
+          :urls="merchantLogoUrls"
           :alt="merchant.name"
-          class="object-cover w-full h-full"
+          customClass="object-cover w-full h-full"
         />
         <div
           v-else
@@ -71,6 +72,7 @@
 	          <span class="line-clamp-1" :title="primaryAddressString">{{ primaryAddressString }}</span>
 	        </div>
 
+
       </div>
     </router-link>
 
@@ -88,12 +90,55 @@
 <script setup>
 import { computed } from "vue";
 import ReportButton from "@/components/ReportButton.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
+import { getMerchantLogoUrl, getImageUrl } from "@/libs/getImageUrl";
 
 const props = defineProps({
   merchant: {
     type: Object,
     required: true,
   },
+});
+
+const merchantLogoUrl = computed(() => {
+  if (props.merchant?.logo_urls) {
+    return props.merchant.logo_urls.medium || props.merchant.logo_url;
+  }
+  if (typeof props.merchant?.logo_url === 'string') {
+    const url = props.merchant.logo_url;
+    if (url.includes('/api/')) {
+      const baseUrl = url.split('?')[0];
+      return `${baseUrl}?size=medium`;
+    }
+    return url;
+  }
+  if (props.merchant?.id && props.merchant?.logo_path) {
+    return getMerchantLogoUrl(props.merchant);
+  }
+  if (props.merchant?.logo_path) {
+    return getImageUrl(props.merchant.logo_path);
+  }
+  return props.merchant?.logo_url || null;
+});
+
+const merchantLogoUrls = computed(() => {
+  if (props.merchant?.logo_urls) {
+    return {
+      medium: props.merchant.logo_urls.medium,
+      thumb: props.merchant.logo_urls.thumb
+    };
+  }
+  if (typeof props.merchant?.logo_url === 'string') {
+    const url = props.merchant.logo_url;
+    if (url.includes('/api/')) {
+      const baseUrl = url.split('?')[0];
+      return {
+        medium: `${baseUrl}?size=medium`,
+        thumb: `${baseUrl}?size=thumb`
+      };
+    }
+  }
+  return null;
 });
 
 const distanceKm = computed(() => {
@@ -136,25 +181,7 @@ const primaryAddressString = computed(() => {
   return parts.join(", ");
 });
 
-const merchantLogoUrl = computed(() => {
-  const merchant = props.merchant;
 
-  if (!merchant) return "";
-
-  if (merchant.logo_url) {
-    return merchant.logo_url;
-  }
-
-  if (merchant.id && merchant.logo_path) {
-    return getMerchantLogoUrl(merchant);
-  }
-
-  if (merchant.logo_path) {
-    return getImageUrl(merchant.logo_path);
-  }
-
-  return "";
-});
 
 // Tentukan apakah merchant ini tipe Jasa berdasarkan segmentation atau category
 const isMerchantJasa = computed(() => {

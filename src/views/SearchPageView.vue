@@ -259,6 +259,18 @@ const combinedResults = computed(() => {
   // always appear after products.
   const list = [...(products.value ?? []), ...(jasas.value ?? [])];
 
+  if (activeInstantSorts.value.length === 0) {
+    return list.sort((a, b) => {
+      const aRel = a?.relevance_score ?? 0;
+      const bRel = b?.relevance_score ?? 0;
+      if (aRel !== bRel) return bRel - aRel;
+      // Fallback to latest if relevance is the same
+      const aTime = toTimeOrNull(a?.created_at ?? a?.createdAt);
+      const bTime = toTimeOrNull(b?.created_at ?? b?.createdAt);
+      return compareTimeDesc(aTime, bTime);
+    });
+  }
+
   const hasNearest = activeInstantSorts.value.includes("nearest");
   const primarySort = hasNearest
     ? "nearest"
@@ -267,7 +279,11 @@ const combinedResults = computed(() => {
         "oldest",
         "cheapest",
         "expensive",
-      ]) || "latest";
+      ]);
+
+  if (!primarySort) {
+    return list;
+  }
 
   if (primarySort !== "nearest") {
     return list.sort((a, b) => compareBySortKey(a, b, primarySort));
@@ -294,6 +310,7 @@ const combinedResults = computed(() => {
     return compareBySortKey(a, b, "latest");
   });
 });
+
 
 function handleResultClick(item) {
   const isJasa =
@@ -1092,7 +1109,7 @@ onBeforeUnmount(() => {
           <span class="text-primary">"{{ route.query.q }}"</span>
         </h1>
         <p class="mt-1 text-sm text-muted-foreground">
-          Menampilkan produk dan UMKM terkait
+          Menampilkan produk/jasa dan UMKM terkait
         </p>
       </div>
 

@@ -12,6 +12,7 @@ import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import AppButton from "@/components/common/Button.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 // =========================
 // STATE & REFS
@@ -35,9 +36,9 @@ const schema = yup.object({
   email: yup.string().required("Email wajib diisi").email("Format email tidak valid"),
   nik: yup
     .string()
-    .required("NIK wajib diisi")
-    .length(16, "NIK harus 16 digit")
-    .matches(/^[0-9]+$/, "NIK harus berupa angka"),
+    .nullable()
+    .test("len", "NIK harus 16 digit", (val) => !val || val.length === 16)
+    .test("num", "NIK harus berupa angka", (val) => !val || /^[0-9]+$/.test(val)),
 });
 
 // Form data
@@ -238,14 +239,15 @@ onMounted(() => {
                   "
                   class="w-40 h-40 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
                 />
-                <img
+                <ResponsiveImage
                   v-if="
                     !isInitialProfileLoading && hasProfilePicture && !imgError
                   "
                   :src="formData.profile_picture"
+                  :urls="formData.profile_picture === userStore.user?.profile_picture ? userStore.user?.profile_picture_urls : null"
                   :alt="formData.name"
                   loading="lazy"
-                  class="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
+                  customClass="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
                   :class="imgLoaded ? '' : 'opacity-0'"
                   @load="onImgLoad"
                   @error="onImgError"
@@ -352,12 +354,11 @@ onMounted(() => {
                 <div class="lg:col-span-2">
                   <TextField
                     name="nik"
-                    label="NIK(Nomor Induk Kependudukan)"
+                    label="NIK (Opsional)"
                     v-model="formData.nik"
                     type="text"
                     :maxlength="16"
-                    required
-                    placeholder="16 digit NIK"
+                    placeholder="16 digit NIK (opsional)"
                   />
                 </div>
               </div>
@@ -398,12 +399,13 @@ onMounted(() => {
               "
               class="w-32 h-32 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
             />
-            <img
+            <ResponsiveImage
               v-if="!isInitialProfileLoading && hasProfilePicture && !imgError"
               :src="formData.profile_picture"
+              :urls="formData.profile_picture === userStore.user?.profile_picture ? userStore.user?.profile_picture_urls : null"
               :alt="formData.name"
               loading="lazy"
-              class="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
+              customClass="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
               :class="imgLoaded ? '' : 'opacity-0'"
               @load="onImgLoad"
               @error="onImgError"

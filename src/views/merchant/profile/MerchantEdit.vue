@@ -84,11 +84,12 @@
       >
         <!-- Cover Image -->
         <div class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1">
-          <img
+          <ResponsiveImage
             v-if="hasFormCover"
             :src="form.coverImage"
+            :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
             @error="onCoverImgError"
           />
           <div
@@ -118,11 +119,12 @@
         <div class="relative px-4 pb-4 pt-14">
           <div class="absolute -top-12 left-4">
             <div class="relative">
-              <img
+              <ResponsiveImage
                 v-if="hasFormLogo"
                 :src="form.logo"
+                :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
                 alt="Logo"
-                class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
+                customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
                 @error="onLogoImgError"
               />
               <span
@@ -159,11 +161,12 @@
           <div
             class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1"
           >
-            <img
+            <ResponsiveImage
               v-if="hasFormCover"
               :src="form.coverImage"
+              :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
               alt="Cover"
-              class="absolute inset-0 object-cover w-full h-full"
+              customClass="absolute inset-0 object-cover w-full h-full"
               @error="onCoverImgError"
             />
             <div
@@ -210,11 +213,12 @@
 
         <div class="absolute -bottom-12 left-8">
           <div class="relative">
-            <img
+            <ResponsiveImage
               v-if="hasFormLogo"
               :src="form.logo"
+              :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
               alt="Logo"
-              class="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
+              customClass="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
               @error="onLogoImgError"
             />
             <span
@@ -292,6 +296,7 @@
               label="Kontak"
               placeholder="Masukkan nomor kontak"
               variant="merchant"
+              required
             />
           </div>
 
@@ -323,7 +328,7 @@
                   label="NPWP"
                   placeholder="Contoh: 12.345.678.9-012.345"
                   variant="merchant"
-                                required
+                                
 
                 />
               </div>
@@ -374,9 +379,14 @@
 
             <!-- Map Picker -->
             <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+              </div>
               <MapPicker
+                ref="mapRefMobile"
                 v-model:lat="latitude"
                 v-model:lng="longitude"
+                @manual-change="handleManualLocationChange"
                 :zoom="15"
                 height="192px"
                 variant="merchant"
@@ -394,6 +404,7 @@
                     provinces.map((p) => ({ value: p.id, label: p.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="city_id"
@@ -403,6 +414,7 @@
                   :disabled="!form.province_id"
                   :options="cities.map((c) => ({ value: c.id, label: c.name }))"
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="district_id"
@@ -414,6 +426,7 @@
                     districts.map((d) => ({ value: d.id, label: d.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
                   name="village_id"
@@ -425,6 +438,7 @@
                     villages.map((v) => ({ value: v.id, label: v.name }))
                   "
                   variant="merchant"
+                  required
                 />
               </div>
               <!-- Detail alamat -->
@@ -606,7 +620,7 @@
                     label="NPWP"
                     placeholder="Contoh: 12.345.678.9-012.345"
                     variant="merchant"
-                                  required
+                                  
 
                   />
                 </div>
@@ -658,9 +672,14 @@
 
               <!-- Map Picker (Langsung di halaman, bukan modal) -->
               <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+                </div>
                 <MapPicker
+                  ref="mapRefDesktop"
                   v-model:lat="latitude"
                   v-model:lng="longitude"
+                  @manual-change="handleManualLocationChange"
                   :zoom="15"
                   height="320px"
                   variant="merchant"
@@ -840,17 +859,23 @@
             Simpan
           </AppButton>
         </div>
+        
+        <!-- Hidden submit for mobile fallback -->
+        <button ref="hiddenSubmitBtn" type="submit" class="hidden"></button>
 
         <!-- Mobile Action Button - Fixed at Bottom -->
         <div
-          class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
+          class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <button
-            type="submit"
-            class="w-full py-3 text-sm font-semibold text-center text-white transition-opacity bg-merchant-primary rounded-xl hover:opacity-90"
+          <AppButton 
+            type="button" 
+            @click="triggerSubmit"
+            :loading="isSaving" 
+            variant="merchant"
+            block
           >
             Simpan
-          </button>
+          </AppButton>
         </div>
       </Form>
     </div>
@@ -874,7 +899,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
@@ -891,10 +916,12 @@ import { fetchBanks } from "@/services/api/bank";
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
 import * as yup from "yup";
 import { Form } from "vee-validate";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -926,6 +953,13 @@ const breadcrumbItems = computed(() => [
     label: "Edit Profil UMKM",
   },
 ]);
+
+const initialData = ref({
+  logo_url: null,
+  logo_urls: null,
+  banner_url: null,
+  banner_urls: null,
+});
 
 const form = ref({
   name: "",
@@ -1008,6 +1042,36 @@ const latitude = ref(null);
 const longitude = ref(null);
 const coverInput = ref(null);
 const logoInput = ref(null);
+const hiddenSubmitBtn = ref(null);
+
+const triggerSubmit = () => {
+  if (hiddenSubmitBtn.value) {
+    hiddenSubmitBtn.value.click();
+  }
+};
+
+const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
+const mapRefMobile = ref(null);
+const mapRefDesktop = ref(null);
+const isPrefilling = ref(false);
+
+const handleManualLocationChange = async ({ lat, lng }) => {
+  isPrefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => { form.value.province_id = id; },
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => { form.value.city_id = id; },
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => { form.value.district_id = id; },
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => { form.value.village_id = id; },
+    });
+  } finally {
+    isPrefilling.value = false;
+  }
+};
 
 const hasFormLogo = computed(() => {
   const val = form.value?.logo;
@@ -1056,6 +1120,7 @@ async function loadBanks() {
 watch(
   () => form.value.province_id,
   async (pid) => {
+    if (isPrefilling.value) return;
     form.value.city_id = null;
     form.value.district_id = null;
     form.value.village_id = null;
@@ -1073,6 +1138,7 @@ watch(
 watch(
   () => form.value.city_id,
   async (cid) => {
+    if (isPrefilling.value) return;
     form.value.district_id = null;
     form.value.village_id = null;
 
@@ -1088,6 +1154,7 @@ watch(
 watch(
   () => form.value.district_id,
   async (did) => {
+    if (isPrefilling.value) return;
     form.value.village_id = null;
     villages.value = [];
 
@@ -1095,6 +1162,28 @@ watch(
       await loadVillages(did);
     }
   },
+);
+
+watch(
+  () => form.value.village_id,
+  (val) => {
+    if (isPrefilling.value) return;
+    if (val) {
+      const provName = provinces.value.find((p) => p.id == form.value.province_id)?.name;
+      const cityName = cities.value.find((c) => c.id == form.value.city_id)?.name;
+      const distName = districts.value.find((d) => d.id == form.value.district_id)?.name;
+      const villName = villages.value.find((v) => v.id == val)?.name;
+
+      const combinedRef = {
+        panTo: (lat, lng, zoom) => {
+          if (mapRefMobile.value) mapRefMobile.value.panTo(lat, lng, zoom);
+          if (mapRefDesktop.value) mapRefDesktop.value.panTo(lat, lng, zoom);
+        }
+      };
+
+      syncAddressToMap([villName, distName, cityName, provName], combinedRef);
+    }
+  }
 );
 
 // Ambil data wilayah dari service
@@ -1191,6 +1280,7 @@ onMounted(async () => {
   // Kalau edit data lama (prefill)
 
   try {
+    isPrefilling.value = true;
     if (!merchantSlug.value) {
       toast.error("Merchant tidak valid");
       router.push("/merchant-register");
@@ -1199,8 +1289,11 @@ onMounted(async () => {
 
     const data = await fetchMerchantProfile(merchantSlug.value);
 
-    latitude.value = data?.primary_address?.latitude ?? null;
-    longitude.value = data?.primary_address?.longitude ?? null;
+    const latRaw = data?.primary_address?.latitude ?? data?.latitude ?? null;
+    const lngRaw = data?.primary_address?.longitude ?? data?.longitude ?? null;
+
+    latitude.value = latRaw !== null && latRaw !== undefined ? Number(latRaw) : null;
+    longitude.value = lngRaw !== null && lngRaw !== undefined ? Number(lngRaw) : null;
 
     form.value.name = data?.name ?? "";
     form.value.contact = data?.phone ?? "";
@@ -1238,6 +1331,13 @@ onMounted(async () => {
         ? data.banner_url
         : "";
 
+    initialData.value = {
+      logo_url: form.value.logo,
+      logo_urls: data?.logo_urls || null,
+      banner_url: form.value.coverImage,
+      banner_urls: data?.banner_urls || null,
+    };
+
     const hours = data?.operational_hours ?? {};
 
     form.value.operationalHours = DAYS.map((day) => {
@@ -1266,6 +1366,10 @@ onMounted(async () => {
     isLoading.value = false;
   } catch (error) {
     isLoading.value = false;
+  } finally {
+    nextTick(() => {
+      isPrefilling.value = false;
+    });
   }
 });
 
@@ -1362,7 +1466,7 @@ const buildOperationalHoursPayload = () => {
 const editProfileSchema = yup.object().shape({
   name: yup.string().required("Nama UMKM wajib diisi"),
   contact: yup.string().required("Kontak wajib diisi"),
-  NPWP: yup.string().required("NPWP wajib diisi"),
+  NPWP: yup.string().nullable(),
   bank_code: yup.string().required("Bank wajib dipilih"),
   bank_account_number: yup.string().required("Nomor rekening wajib diisi"),
   bank_account_name: yup.string().required("Nama pemilik rekening wajib diisi"),

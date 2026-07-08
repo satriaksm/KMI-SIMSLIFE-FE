@@ -66,11 +66,11 @@
         <div
           class="relative w-full overflow-hidden bg-linear-to-b from-gray-200 to-gray-100 aspect-24/9 lg:aspect-4/1"
         >
-          <img
+          <ResponsiveImage
             v-if="merchant.banner_url"
-            :src="merchant.banner_url"
+            :src="merchant.banner_urls?.original || merchant.banner_url"
             alt="Background"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
           />
           <div
             v-else
@@ -117,11 +117,11 @@
               <div
                 class="flex items-center justify-center w-20 h-20 overflow-hidden border shadow-inner rounded-2xl bg-white/20 backdrop-blur-sm shrink-0 border-white/30"
               >
-                <img
+                <ResponsiveImage
                   v-if="merchant.logo_url"
-                  :src="merchant.logo_url"
+                  :src="merchant.logo_urls?.thumb || merchant.logo_url"
                   alt="Logo Toko"
-                  class="object-cover w-full h-full"
+                  customClass="object-cover w-full h-full"
                 />
                 <span v-else>
                   <svg
@@ -233,9 +233,35 @@
 
       <!-- Tab Content: Menu -->
       <div v-show="activeTab === 'menu'" class="px-4 py-4 mx-auto max-w-7xl">
+        <!-- Sort Filters -->
+        <div class="flex gap-2 pb-4 overflow-x-auto no-scrollbar">
+          <button
+            v-for="opt in sortOptions"
+            :key="opt.key"
+            type="button"
+            class="px-3 py-1.5 text-sm border rounded-full whitespace-nowrap transition"
+            :class="
+              activeSort === opt.key
+                ? 'bg-secondary text-white border-secondary'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-secondary/40'
+            "
+            @click="toggleSort(opt.key)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <!-- Initial Loading Skeleton -->
+        <div
+          v-if="isLoadingMenu"
+          class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+        >
+          <ProductCardSkeleton v-for="i in 12" :key="'menu-skeleton-' + i" />
+        </div>
+
         <!-- Empty State -->
         <div
-          v-if="
+          v-else-if="
             (menuKind === 'jasa' && jasaList.length === 0) ||
             (menuKind === 'product' && productList.length === 0)
           "
@@ -370,7 +396,7 @@
           <h3 class="mb-3 text-base font-bold text-gray-900">
             Jam Operasional
           </h3>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-4 sm:grid-flow-col">
             <div
               v-for="day in operationalHours"
               :key="day.name"
@@ -513,6 +539,7 @@ import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import AppButton from "@/components/common/Button.vue";
 import ReviewSection from "@/components/common/ReviewSection.vue";
 import JasaRatingBadge from "@/components/common/JasaRatingBadge.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 
@@ -536,6 +563,25 @@ const productList = ref([]);
 const loading = ref(true);
 const activeTab = ref("menu");
 const menuKind = ref("jasa"); // 'product' | 'jasa'
+const isLoadingMenu = ref(false);
+
+// Sorting state
+const sortOptions = [
+  { key: "newest", label: "Terbaru" },
+  { key: "price_asc", label: "Termurah" },
+  { key: "price_desc", label: "Termahal" },
+];
+const activeSort = ref("newest");
+
+function toggleSort(key) {
+  if (activeSort.value !== key) {
+    activeSort.value = key;
+    // Reload items
+    if (merchant.value) {
+      fetchMerchantMenu(merchant.value, route.params.slug, { append: false });
+    }
+  }
+}
 
 // Infinite scroll state (mirip SearchPage/ProductLayananHome)
 const loadMoreRef = ref(null);
@@ -1080,6 +1126,7 @@ async function fetchMerchantMenu(
 
   // Reset lists to avoid stale UI when navigating between merchants
   if (!append) {
+    isLoadingMenu.value = true;
     jasaList.value = [];
     productList.value = [];
     currentPage.value = 1;
@@ -1098,7 +1145,7 @@ async function fetchMerchantMenu(
       const { data } = await api.get(
         `/api/public/merchants/${merchantSlug}/products`,
         {
-          params: { per_page: perPage, page: currentPage.value },
+          params: { per_page: perPage, page: currentPage.value, sort: activeSort.value },
         },
       );
 
@@ -1114,7 +1161,11 @@ async function fetchMerchantMenu(
       hasMore.value = parsed.current < parsed.last;
       await ensureSentinelObserved();
     } finally {
-      if (append) isLoadingMore.value = false;
+      if (append) {
+        isLoadingMore.value = false;
+      } else {
+        isLoadingMenu.value = false;
+      }
     }
     return;
   }
@@ -1131,7 +1182,7 @@ async function fetchMerchantMenu(
       const { data } = await api.get(
         `/api/public/merchants/${merchantSlug}/jasas`,
         {
-          params: { per_page: perPage, page: currentPage.value },
+          params: { per_page: perPage, page: currentPage.value, sort: activeSort.value },
         },
       );
 
@@ -1152,7 +1203,11 @@ async function fetchMerchantMenu(
       hasMore.value = parsed.current < parsed.last;
       await ensureSentinelObserved();
     } finally {
-      if (append) isLoadingMore.value = false;
+      if (append) {
+        isLoadingMore.value = false;
+      } else {
+        isLoadingMenu.value = false;
+      }
     }
     return;
   }

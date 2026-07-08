@@ -378,7 +378,7 @@ onMounted(fetchDashboard);
             <div class="flex items-center justify-center w-10 h-10 mb-2 rounded-xl bg-blue-100 text-blue-600">
               <i class="pi pi-shopping-bag"></i>
             </div>
-            <p class="text-xs text-muted-foreground">Pesanan Hari Ini</p>
+            <p class="text-xs text-muted-foreground">Pesanan Masuk Hari Ini</p>
             <p class="text-xl font-bold text-gray-900">{{ orderStats.today }}</p>
           </div>
           <div class="flex flex-col justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">

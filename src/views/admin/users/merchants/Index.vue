@@ -448,7 +448,7 @@ onMounted(() => {
               class="w-10 h-10 rounded-full overflow-hidden"
             >
               <img
-                :src="getMerchantLogoUrl(item)"
+                :src="getMerchantLogoUrl(item, 'thumb')"
                 :alt="item.name"
                 class="w-full h-full object-cover"
                 @error="
@@ -572,7 +572,7 @@ onMounted(() => {
               class="w-12 h-12 rounded-full overflow-hidden shrink-0"
             >
               <img
-                :src="getMerchantLogoUrl(m)"
+                :src="getMerchantLogoUrl(m, 'thumb')"
                 :alt="m.name"
                 class="w-full h-full object-cover"
                 @error="

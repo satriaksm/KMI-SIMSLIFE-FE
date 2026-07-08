@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import ReportButton from "@/components/ReportButton.vue";
-import { getImageUrl } from "@/libs/getImageUrl.js";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 const imageError = ref(false);
 
@@ -61,21 +61,43 @@ const formattedPrice = computed(() => {
   return `Rp ${minFormatted} - Rp ${maxFormatted}`;
 });
 
-// Get image URL
 const productImageUrl = computed(() => {
   if (imageError.value) return null;
 
-  const img = props.product.cover_image;
-  if (!img) return null;
-
-  if (typeof img === "string") {
-    return getImageUrl(img);
+  if (props.product.cover_image) {
+    if (typeof props.product.cover_image === 'string') {
+      const url = props.product.cover_image;
+      if (url.includes('/api/images/')) {
+        const baseUrl = url.split('?')[0];
+        return `${baseUrl}?size=medium`;
+      }
+      return url;
+    }
+    return props.product.cover_image.medium_url || props.product.cover_image.src_url || props.product.cover_image;
   }
+  return null;
+});
 
-  if (typeof img === "object") {
-    return getImageUrl(img.src_url || img.url || img.id || img.image_path);
+const productImageUrls = computed(() => {
+  if (imageError.value) return null;
+
+  if (props.product.cover_image) {
+    if (typeof props.product.cover_image === 'string') {
+      const url = props.product.cover_image;
+      if (url.includes('/api/images/')) {
+        const baseUrl = url.split('?')[0];
+        return {
+          medium: `${baseUrl}?size=medium`,
+          thumb: `${baseUrl}?size=thumb`
+        };
+      }
+      return null;
+    }
+    return props.product.cover_image.src_urls || props.product.cover_image.image_urls || {
+      medium: props.product.cover_image.medium_url || props.product.cover_image.src_url,
+      thumb: props.product.cover_image.thumb_url || props.product.cover_image.src_url
+    };
   }
-
   return null;
 });
 
@@ -119,12 +141,13 @@ watch(
   >
     <!-- Product Image (1:1 aspect ratio) -->
     <!-- Image Container -->
-      <div class="relative aspect-[1/1] overflow-hidden bg-gray-100">
-        <img
+      <div class="relative aspect-[1/1] overflow-hidden bg-gray-100 rounded-t-2xl">
+        <ResponsiveImage
           v-if="productImageUrl"
           :src="productImageUrl"
+          :urls="productImageUrls"
           :alt="product.name"
-          class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+          customClass="h-full w-full object-cover transition-transform duration-500 "
           @error="imageError = true"
         />
         <div
@@ -162,7 +185,7 @@ watch(
     </div>
 
     <!-- Product Info -->
-    <div class="flex flex-col flex-1 px-3 py-3 bg-white sm:px-4 sm:py-3">
+    <div class="flex flex-col flex-1 px-3 py-3 bg-white sm:px-4 sm:py-3 rounded-2xl">
       <!-- Product Name -->
       <h3
         class="mb-1 text-xs font-semibold text-gray-900 line-clamp-2"

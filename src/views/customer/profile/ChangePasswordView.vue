@@ -99,8 +99,12 @@ const goBack = () => {
     <MobileHeader title="Ubah Kata Sandi" @back="goBack" />
 
     <!-- Content -->
-    <div class="max-w-4xl px-4 py-4 pb-24 mx-auto">
-      <form @submit.prevent="onSubmit" class="space-y-6">
+    <div class="max-w-3xl px-4 py-6 mx-auto sm:px-6 lg:px-8">
+      <div class="sm:p-8 sm:bg-white sm:border sm:border-gray-100 sm:shadow-sm rounded-2xl">
+        <h3 class="mb-6 text-xl font-bold text-gray-900 hidden sm:block">
+          Ubah Kata Sandi
+        </h3>
+        <form @submit.prevent="onSubmit" class="space-y-6">
         <!-- Current Password -->
         <PasswordField
           name="current_password"
@@ -315,6 +319,7 @@ const goBack = () => {
           </AppButton>
         </div>
       </form>
+      </div>
     </div>
   </div>
 </template>

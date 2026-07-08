@@ -75,9 +75,17 @@ const getMarkerColorBySegmentation = (merchant) => {
   }
 };
 
+const getThumbLogoUrl = (merchant) => {
+  let logo = merchant?.logo_url ? String(merchant.logo_url) : "";
+  if (logo && logo.includes('/api/')) {
+    return `${logo.split('?')[0]}?size=thumb`;
+  }
+  return logo;
+};
+
 const renderMarkerIcon = (merchant, isActive = false) => {
   const color = getMarkerColorBySegmentation(merchant);
-  const logo = merchant?.logo_url ? String(merchant.logo_url) : "";
+  const logo = getThumbLogoUrl(merchant);
 
   const innerHtml = logo
     ? `<span class="umkm-marker__logo-wrap">
@@ -298,7 +306,7 @@ onBeforeUnmount(() => {
                               class="relative z-20 w-12 h-12 -mt-6 overflow-hidden bg-white border-2 border-white rounded-lg shadow-md"
                             >
                               <img
-                                :src="merchant.logo_url"
+                                :src="getThumbLogoUrl(merchant)"
                                 :alt="merchant.name"
                                 class="object-cover w-full h-full"
                               />
@@ -494,7 +502,7 @@ onBeforeUnmount(() => {
                               class="relative z-20 w-10 h-10 -mt-5 overflow-hidden bg-white border-2 border-white rounded-lg shadow-md sm:w-12 sm:h-12 sm:-mt-6"
                             >
                               <img
-                                :src="merchant.logo_url"
+                                :src="getThumbLogoUrl(merchant)"
                                 :alt="merchant.name"
                                 class="object-cover w-full h-full"
                               />

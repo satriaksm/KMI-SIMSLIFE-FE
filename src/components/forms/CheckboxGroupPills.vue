@@ -1,26 +1,4 @@
 <script setup>
-/*
-RadioGroupPills — Kumpulan radio bergaya "pil"
-
-Contoh pakai:
-<Form :validation-schema="schema">
-  <RadioGroupPills
-    name="gender"
-    label="Jenis Kelamin"
-    :options="[
-      { value: 'male', label: 'Laki-laki' },
-      { value: 'female', label: 'Perempuan' },
-    ]"
-    variant="merchant"
-  />
-</Form>
-
-Props:
-- name: string (wajib) => nama field vee-validate
-- label: string => label grup
-- options: Array<{ value:any, label:string }> (wajib)
-- variant: string (default "primary") => "primary" | "merchant"
-*/
 import { Field, ErrorMessage } from "vee-validate";
 import { computed } from "vue";
 
@@ -30,7 +8,7 @@ const props = defineProps({
   options: { type: Array, required: true },
   variant: { type: String, default: "primary" },
   required: { type: Boolean, default: false },
-  modelValue: { type: [String, Number, Boolean], default: undefined },
+  modelValue: { type: [Array, String, Number, Boolean], default: () => [] },
   layout: { type: String, default: "flex" },
 });
 
@@ -55,6 +33,7 @@ const bgColorClass = computed(() => {
 });
 
 const dotColorClass = computed(() => {
+  // we keep the same naming convention for consistency with RadioGroupPills
   return props.variant === "merchant"
     ? "group-peer-checked:bg-merchant-primary"
     : "group-peer-checked:bg-primary";
@@ -78,13 +57,13 @@ const ringColorClass = computed(() => {
         v-for="opt in options"
         :key="opt.value"
         :class="[
-          'select-none transition-all duration-300',
+          'select-none',
           opt.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           layout === 'grid' ? 'w-full' : ''
         ]"
       >
         <Field
-          type="radio"
+          type="checkbox"
           :name="name"
           :value="opt.value"
           :disabled="opt.disabled"
@@ -105,11 +84,17 @@ const ringColorClass = computed(() => {
         >
           <span
             :class="[
-              'rounded-full bg-muted-foreground transition shrink-0',
-              layout === 'grid' ? 'mt-1 w-3 h-3' : 'w-2.5 h-2.5',
+              'rounded bg-muted-foreground transition shrink-0 flex items-center justify-center',
+              layout === 'grid' ? 'mt-1 w-4 h-4' : 'w-3.5 h-3.5',
               !opt.disabled ? dotColorClass : ''
             ]"
-          ></span>
+          >
+            <!-- Here we add the check icon, we rely on peer mechanics or we could conditionally render it, but we can't easily do it in pure CSS without a plugin if group-peer-checked is fake. -->
+            <!-- Actually we can use peer-checked on a parent by changing the CSS, or we can use vue bindings if we know if it's selected. -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-white transition-opacity duration-200" :class="(Array.isArray(modelValue) ? modelValue.includes(opt.value) : modelValue === opt.value) ? 'opacity-100' : 'opacity-0'" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+          </span>
           <div class="flex flex-1 items-start justify-between min-w-0 gap-2">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 text-sm font-semibold" :class="{ 'line-through text-gray-400': opt.disabled }">

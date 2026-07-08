@@ -402,7 +402,7 @@ watch(
                 >
                   <img
                     v-if="user?.profile_picture || user?.avatar"
-                    :src="user?.profile_picture || user?.avatar"
+                    :src="user?.profile_picture_urls?.thumb || user?.profile_picture || user?.avatar"
                     alt="Foto Profil"
                     class="object-cover w-8 h-8 transition-transform rounded-full group-hover:scale-105"
                   />
@@ -563,7 +563,7 @@ watch(
             >
               <img
                 v-if="isAuthenticated && (user?.profile_picture || user?.avatar)"
-                :src="user?.profile_picture || user?.avatar"
+                :src="user?.profile_picture_urls?.thumb || user?.profile_picture || user?.avatar"
                 alt="Foto Profil"
                 class="object-cover w-6 h-6 transition-colors rounded-full"
                 :class="
