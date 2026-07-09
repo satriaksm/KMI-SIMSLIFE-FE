@@ -268,6 +268,34 @@ const routes = [
           title: "Pembayaran | SUMILIR",
         },
       },
+      // Redirect lama /jasa-history ke /orders
+      {
+        path: "jasa-history",
+        redirect: "/orders",
+      },
+      {
+        path: "service-history",
+        redirect: "/orders",
+      },
+      {
+        path: "service-orders",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/service-history",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/orders",
+        redirect: "/orders",
+      },
+      {
+        path: "customer/orders/:orderId",
+        redirect: (to) => ({
+          name: "Detail Pesanan",
+          params: { orderId: to.params.orderId },
+        }),
+      },
       // ===========================
       // KONSULTASI CUSTOMER (UMKM JASA)
       // ===========================
@@ -305,10 +333,11 @@ const routes = [
         name: "Universal Review",
         component: () => import("@/views/customer/UniversalReviewView.vue"),
         meta: {
-          title: "Beri Review | SUMILIR",
+          title: "Nilai Produk/Layanan | SUMILIR",
           requiresAuth: true,
         },
       },
+
 
       // ===========================
       // Profil User
@@ -696,11 +725,13 @@ const routes = [
       // ===========================
       // BOOKING MANAGEMENT
       // ===========================
+      // Redirect lama /bookings ke /orders (Pesanan Masuk)
       {
         path: "bookings",
-        name: "Merchant - Booking Management",
-        component: () => import("@/views/merchant/service/MerchantServiceHistory.vue"),
-        meta: { title: "History Layanan Jasa | SUMILIR" },
+        redirect: (to) => ({
+          name: "Merchant - Orders",
+          params: { merchantSlug: to.params.merchantSlug },
+        }),
       },
 
       // ===========================
@@ -828,6 +859,14 @@ const routes = [
         component: () => import("@/views/merchant/reports/Index.vue"),
         meta: {
           title: "Laporan UMKM | SUMILIR",
+        },
+      },
+      {
+        path: "reviews",
+        name: "Merchant - Reviews",
+        component: () => import("@/views/merchant/reviews/Index.vue"),
+        meta: {
+          title: "Ulasan UMKM | SUMILIR",
         },
       },
 

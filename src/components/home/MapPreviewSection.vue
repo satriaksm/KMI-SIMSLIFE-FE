@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { Carousel, Slide, Navigation } from "vue3-carousel";
 import "vue3-carousel/dist/carousel.css";
 import L from "leaflet";
@@ -195,6 +195,13 @@ const slideTo = (index) => {
 onMounted(async () => {
   await loadMerchants();
 });
+
+onBeforeUnmount(() => {
+  if (map.value) {
+    map.value.remove();
+    map.value = null;
+  }
+});
 </script>
 
 <template>
@@ -224,6 +231,7 @@ onMounted(async () => {
           <div
             id="home-map-preview"
             class="w-full h-60 sm:h-[360px] lg:h-[400px]"
+            v-once
           ></div>
 
           <!-- View Full Map Button - -->

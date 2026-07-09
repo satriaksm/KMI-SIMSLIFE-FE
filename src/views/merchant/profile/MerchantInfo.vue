@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useToast } from "vue-toastification";
@@ -17,7 +17,7 @@ const route = useRoute();
 const authStore = useAuthStore();
 const toast = useToast();
 
-const { fetchMerchantProfile, deleteMerchant } = useMerchants();
+const { fetchMerchantProfile, deleteMerchant, merchant } = useMerchants();
 
 // Emit untuk toggle sidebar dari parent layout
 const emit = defineEmits(["toggle-sidebar"]);
@@ -86,6 +86,66 @@ const merchantInfo = ref({
 });
 const operationalHours = ref([]);
 
+// Reviews state - use merchant ref directly
+const reviewsLoading = ref(false);
+const expandedReviewIds = ref([]);
+
+// Rating summary computed
+const ratingSummary = computed(() => {
+  return merchant.value?.rating_summary || { average_rating: 0, total_reviews: 0 };
+});
+
+// Computed merchant reviews
+const merchantReviews = computed(() => {
+  return merchant.value?.ratings || [];
+});
+
+// Review helper functions
+const getReviewerName = (review) => {
+  if (review?.reviewer_name) return review.reviewer_name;
+  if (review?.is_anonymous) return 'Anonim';
+  return review?.user?.name || 'Pelanggan';
+};
+
+const getReviewerInitial = (review) => {
+  const name = getReviewerName(review);
+  return name?.charAt(0).toUpperCase() || '?';
+};
+
+const hasReviewHistory = (review) => {
+  const histories = review?.histories || review?.review_histories || [];
+  return histories.length > 0;
+};
+
+const getReviewHistories = (review) => {
+  return review?.histories || review?.review_histories || [];
+};
+
+const toggleReviewHistory = (reviewId) => {
+  const index = expandedReviewIds.value.indexOf(reviewId);
+  if (index === -1) {
+    expandedReviewIds.value.push(reviewId);
+  } else {
+    expandedReviewIds.value.splice(index, 1);
+  }
+};
+
+const formatDate = (date) => {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
+
+// Debug: Log profile review data when merchant changes
+watch(merchant, (newMerchant) => {
+  if (newMerchant?.ratings?.length > 0) {
+    console.log('PROFILE REVIEW DATA:', newMerchant.ratings[0]);
+  }
+}, { immediate: true });
+
 // Delete merchant UI state
 const showDeleteMerchantModal = ref(false);
 const deleteMerchantConfirmText = ref("");
@@ -98,6 +158,10 @@ const merchantDisplayName = computed(() => {
     authStore.activeMerchant?.name ||
     ""
   );
+});
+
+const showReviews = computed(() => {
+  return !route.path.includes('/merchant-center/');
 });
 
 const canDeleteMerchant = computed(() => {
@@ -618,6 +682,157 @@ const goToEdit = () => {
                   class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
                 >
                   {{ merchantInfo.bank_account_name || "-" }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daftar Ulasan -->
+          <div v-if="showReviews" class="pt-6">
+            <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
+              Daftar Ulasan
+            </h3>
+
+            <!-- Rating Summary -->
+            <div class="flex items-center gap-4 p-4 mb-4 bg-gray-50 rounded-xl">
+              <div class="flex items-center gap-2">
+                <i class="pi pi-star-fill text-2xl text-orange-400"></i>
+                <span class="text-2xl font-bold text-gray-900">{{ ratingSummary.average_rating || 0 }}</span>
+                <span class="text-sm text-gray-500">/ 5</span>
+              </div>
+              <div class="text-sm text-gray-600">
+                {{ ratingSummary.total_reviews || 0 }} ulasan
+              </div>
+            </div>
+
+            <!-- Loading State -->
+            <div v-if="reviewsLoading" class="text-center py-8">
+              <i class="pi pi-spin pi-spinner text-2xl text-gray-400"></i>
+            </div>
+
+            <!-- Empty State -->
+            <div v-else-if="merchantReviews.length === 0" class="text-center py-8 bg-gray-50 rounded-xl">
+              <i class="pi pi-star text-3xl text-gray-300 mb-2"></i>
+              <p class="text-gray-500">Belum ada ulasan</p>
+            </div>
+
+            <!-- Reviews List -->
+            <div v-else class="space-y-4">
+              <div
+                v-for="review in merchantReviews"
+                :key="review.id"
+                class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm"
+              >
+                <div class="flex items-start gap-3">
+                  <!-- Avatar -->
+                  <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-semibold shrink-0">
+                    {{ getReviewerInitial(review) }}
+                  </div>
+
+                  <div class="flex-1">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between mb-1">
+                      <p class="font-medium text-gray-800">
+                        {{ getReviewerName(review) }}
+                        <span v-if="review.is_anonymous" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600 ml-1">
+                          <i class="pi pi-eye-slash text-[8px] mr-0.5"></i>Anonim
+                        </span>
+                      </p>
+                      <span class="text-xs text-gray-400">{{ formatDate(review.created_at) }}</span>
+                    </div>
+
+                    <!-- Stars -->
+                    <div class="flex items-center gap-0.5 mb-2">
+                      <i
+                        v-for="i in 5"
+                        :key="i"
+                        :class="['pi pi-star-fill text-sm', i <= Number(review.rating) ? 'text-orange-400' : 'text-gray-300']"
+                      ></i>
+                    </div>
+
+                    <!-- Comment -->
+                    <p v-if="review.comment" class="text-sm text-gray-600 mb-3">
+                      {{ review.comment }}
+                    </p>
+
+                    <!-- Updated Badge -->
+                    <div v-if="hasReviewHistory(review)" class="mb-3">
+                      <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full">
+                        <i class="pi pi-history"></i>
+                        Ulasan diperbarui
+                      </span>
+                    </div>
+
+                    <!-- Merchant Reply -->
+                    <div v-if="review.merchant_reply" class="mt-3 p-3 bg-green-50 border border-green-100 rounded-xl">
+                      <div class="flex items-center gap-2 mb-1">
+                        <i class="pi pi-check-circle text-green-500"></i>
+                        <p class="text-xs font-semibold text-green-700">Tanggapan Merchant</p>
+                      </div>
+                      <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ review.merchant_reply }}</p>
+                      <p v-if="review.merchant_reply_at" class="text-xs text-gray-400 mt-2">
+                        {{ formatDate(review.merchant_reply_at) }}
+                      </p>
+                    </div>
+
+                    <!-- Review History Toggle -->
+                    <div v-if="hasReviewHistory(review)">
+                      <button
+                        @click="toggleReviewHistory(review.id)"
+                        class="mt-3 text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <i :class="['pi', expandedReviewIds.includes(review.id) ? 'pi-chevron-up' : 'pi-chevron-down']"></i>
+                        {{ expandedReviewIds.includes(review.id) ? 'Sembunyikan' : 'Lihat' }} Riwayat Ulasan
+                      </button>
+
+                      <!-- Expanded History -->
+                      <div v-if="expandedReviewIds.includes(review.id)" class="mt-3 space-y-3">
+                        <div
+                          v-for="(history, index) in getReviewHistories(review)"
+                          :key="history.id || index"
+                          class="p-3 bg-gray-50 border border-gray-200 rounded-lg"
+                        >
+                          <!-- Before -->
+                          <div class="mb-3">
+                            <p class="text-xs font-semibold text-gray-500 uppercase mb-1">Sebelum</p>
+                            <div class="flex items-center gap-1 mb-1">
+                              <i
+                                v-for="star in 5"
+                                :key="'old-' + star"
+                                class="pi text-xs"
+                                :class="star <= Number(history.old_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                              ></i>
+                            </div>
+                            <p v-if="history.old_comment" class="text-sm text-gray-600">{{ history.old_comment }}</p>
+                          </div>
+
+                          <!-- Arrow -->
+                          <div class="flex justify-center my-2">
+                            <i class="pi pi-arrow-down text-gray-400 text-xs"></i>
+                          </div>
+
+                          <!-- After -->
+                          <div>
+                            <p class="text-xs font-semibold text-green-600 uppercase mb-1">Sesudah</p>
+                            <div class="flex items-center gap-1 mb-1">
+                              <i
+                                v-for="star in 5"
+                                :key="'new-' + star"
+                                class="pi text-xs"
+                                :class="star <= Number(history.new_rating || 0) ? 'pi-star-fill text-orange-400' : 'pi-star text-gray-300'"
+                              ></i>
+                            </div>
+                            <p v-if="history.new_comment" class="text-sm text-gray-600">{{ history.new_comment }}</p>
+                          </div>
+
+                          <!-- Date -->
+                          <p class="text-xs text-gray-400 mt-2">
+                            Diperbarui: {{ formatDate(history.created_at) }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

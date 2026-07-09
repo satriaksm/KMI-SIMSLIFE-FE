@@ -501,11 +501,22 @@ import { fetchCart as fetchCartApi, addToCart as addToCartApi } from "@/services
 import api from "@/libs/axios";
 
 const getThumbImageUrl = (url) => {
-  const imgUrl = url ? String(url) : "";
-  if (imgUrl && imgUrl.includes('/api/')) {
-    return `${imgUrl.split('?')[0]}?size=thumb`;
+  // handle object { src, urls } dari normalizeProductImages
+  if (url && typeof url === "object") {
+    url = url.urls?.thumb || url.urls?.medium || url.src || "";
   }
-  return imgUrl;
+  const imgUrl = url ? String(url) : "";
+  if (!imgUrl) return "";
+  // already absolute URL
+  if (imgUrl.startsWith("http")) {
+    if (imgUrl.includes('/api/')) {
+      return `${imgUrl.split('?')[0]}?size=thumb`;
+    }
+    return imgUrl;
+  }
+  // relative path dari storage (e.g. "products/2/xxx.webp")
+  const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  return `${base}/storage/${imgUrl}`;
 };
 
 const {
@@ -1009,9 +1020,18 @@ async function fetchShippingCost() {
       note: result?.note ?? null,
     };
   } catch (e) {
-    console.error("Gagal menghitung ongkir:", e);
-    amounts.value.ongkir = 0;
-    shippingInfo.value = null;
+    // Shipping API failed - use safe fallback with default flat rate
+    // DO NOT block checkout, just use default fee
+    console.warn("[Checkout] Shipping API failed, using default flat rate:", e?.message || e);
+    const DEFAULT_SHIPPING_FEE = 15000; // Default Rp 15.000
+    amounts.value.ongkir = DEFAULT_SHIPPING_FEE;
+    shippingInfo.value = {
+      distanceKm: 0,
+      baseCost: DEFAULT_SHIPPING_FEE,
+      costPerKm: 0,
+      note: 'Biaya pengiriman standar',
+    };
+    // Note: Checkout will still work - backend will recalculate the actual fee
   } finally {
     shippingLoading.value = false;
   }

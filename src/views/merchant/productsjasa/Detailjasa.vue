@@ -138,6 +138,26 @@ const addOnPriceRange = computed(() => {
   return `+${formatPrice(min)} - ${formatPrice(max)}`;
 });
 
+// Helper: map service_type enum ke label ramah-pengguna
+const serviceTypeLabel = computed(() => {
+  const t = jasa.value?.service_type;
+  if (!t) return "-";
+  switch (String(t).toLowerCase()) {
+    case 'di_tempat_umkm':
+    case 'at_location':
+    case 'ditempat_saya':
+      return "Di Tempat UMKM";
+    case 'ke_rumah_pelanggan':
+    case 'on_site':
+    case 'kerumah_pelanggan':
+      return "Ke Rumah Pelanggan";
+    case 'online':
+      return "Online";
+    default:
+      return t;
+  }
+});
+
 const resolveJasaImageSrc = (image) => {
   // Prioritas: API URL terlebih dahulu (sama seperti produk)
   if (image?.url) return getImageUrl(image.url);
@@ -146,22 +166,24 @@ const resolveJasaImageSrc = (image) => {
   return "";
 };
 
-// Main image src: pakai relasi images dengan API URL
+// Main image src: pakai index aktif, fallback ke cover_img
 const mainImageSrc = computed(() => {
   if (!jasa.value) return "";
 
-  // Prioritas 1: cover_img.src_url dari backend (sama seperti produk)
+  const images = jasa.value.images || [];
+
+  // Prioritas 1: gambar yang dipilih via thumbnail / next/prev
+  if (currentImageIndex.value >= 0 && images.length) {
+    const img = images[currentImageIndex.value];
+    if (img) return resolveJasaImageSrc(img);
+  }
+
+  // Prioritas 2: cover_img dari API
   if (jasa.value.cover_img?.src_url) {
     return getImageUrl(jasa.value.cover_img.src_url);
   }
 
-  const images = jasa.value.images || [];
-
-  if (images.length && currentImageIndex.value >= 0) {
-    const img = images[currentImageIndex.value] || images[0];
-    return resolveJasaImageSrc(img);
-  }
-
+  // Prioritas 3: cover atau gambar pertama
   if (images.length) {
     const coverImage = images.find((img) => img?.is_cover) || images[0];
     return resolveJasaImageSrc(coverImage);
@@ -290,7 +312,7 @@ const getSelectionTypeLabel = (group) => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <MerchantMobileHeader title="Detail Jasa" />
+    <MerchantMobileHeader title="Detail Jasa" :backRoute="`/merchant-center/${currentMerchantSlug}/jasas`" />
 
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 sm:block">
@@ -414,9 +436,9 @@ const getSelectionTypeLabel = (group) => {
                 @click="selectImage(index)"
                 :class="{
                   'border-merchant-primary ring-2 ring-merchant-primary/20 scale-105':
-                    currentImageIndex === index,
+                    currentImageIndex.value === index,
                   'border-gray-200 hover:border-merchant-primary/50 hover:scale-105':
-                    currentImageIndex !== index,
+                    currentImageIndex.value !== index,
                 }"
                 class="relative flex items-center justify-center overflow-hidden transition border rounded-lg aspect-square bg-gray-50"
               >
@@ -637,18 +659,7 @@ const getSelectionTypeLabel = (group) => {
             <!-- Service Type -->
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">Tipe Layanan</span>
-              <span class="text-sm font-medium text-gray-900">
-                <template v-if="jasa.service_type === 'at_location'"
-                  >Di Tempat Saya</template
-                >
-                <template v-else-if="jasa.service_type === 'on_site'"
-                  >Ke Rumah/Lokasi Pelanggan</template
-                >
-                <template v-else-if="jasa.service_type === 'online'"
-                  >Online</template
-                >
-                <template v-else>{{ jasa.service_type || "-" }}</template>
-              </span>
+              <span class="text-sm font-medium text-gray-900">{{ serviceTypeLabel }}</span>
             </div>
 
             <!-- Location Address (ambil dari jasa atau profil UMKM) -->
@@ -675,16 +686,6 @@ const getSelectionTypeLabel = (group) => {
               </div>
             </div>
 
-            <!-- Service Area -->
-            <div v-if="jasa.service_area">
-              <div class="mb-3 border-t border-gray-100"></div>
-              <div class="flex items-start justify-between gap-3">
-                <span class="shrink-0 text-sm text-gray-600">Area Layanan</span>
-                <span class="text-sm font-medium text-right text-gray-900">
-                  {{ jasa.service_area }}
-                </span>
-              </div>
-            </div>
           </div>
 
           <!-- Payment Methods Card -->

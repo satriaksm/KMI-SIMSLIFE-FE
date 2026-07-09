@@ -1,5 +1,6 @@
 <script setup>
 import { computed, watch } from "vue";
+import Button from "./Button.vue";
 
 const props = defineProps({
   // Data

@@ -26,6 +26,7 @@ import jasaIcon from "@/assets/icons/Jasa.svg";
 import kulinerIcon from "@/assets/icons/Kuliner.svg";
 import tokoIcon from "@/assets/icons/Toko.svg";
 import umkmIcon from "@/assets/icons/merchant.svg";
+import komunitasIcon from "@/assets/icons/Komunitas.svg";
 import WhiteWithText from "@/assets/icons/White-with-Text.png";
 
 import api from "@/libs/axios.js";
@@ -150,6 +151,11 @@ const navigates = ref([
     label: "Jasa",
     icon: jasaIcon,
     to: { path: "/explore", query: { mode: "jasa" } },
+  },
+  {
+    label: "Komunitas",
+    icon: komunitasIcon,
+    to: { name: "community" },
   },
 ]);
 

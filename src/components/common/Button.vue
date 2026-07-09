@@ -116,7 +116,7 @@ const variantClasses = {
 
   // Outline Danger
   "danger-outline":
-    "border border-danger-foreground text-danger-foreground hover:bg-danger-background disabled:opacity-60 focus:ring-red-500 duration-200 active:scale-95",
+    "border border-danger-foreground bg-white text-danger-foreground hover:bg-danger-foreground hover:text-white active:bg-red-700 active:text-white disabled:opacity-60 focus:ring-red-500 duration-200 active:scale-95",
 
   muted:
     "bg-muted-background text-muted-foreground hover:bg-gray-300 disabled:bg-muted-background disabled:opacity-60 focus:ring-gray-400 duration-200 active:scale-95",

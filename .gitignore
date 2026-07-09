@@ -41,3 +41,5 @@ dev-dist/sw.js
 # PNPM Store
 .pnpm-store
 .pnpm-store/
+
+ngrok.exe

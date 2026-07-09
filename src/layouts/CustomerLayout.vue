@@ -92,9 +92,6 @@ const menus = computed(() => {
     if (m.key === "pesanan" && (!isAuthenticated.value || isAdmin.value)) {
       return false;
     }
-    if (m.key === "service-history" && !isAuthenticated.value) {
-      return false;
-    }
     return true;
   });
 });
@@ -148,6 +145,11 @@ async function goToOrdersFromModal() {
   await router.push("/orders").catch(() => router.push("/orders"));
 }
 
+async function goToConsultationsFromModal() {
+  closeAccountModal();
+  await router.push("/customer/consultations").catch(() => router.push("/customer/consultations"));
+}
+
 async function logoutFromModal() {
   closeAccountModal();
   await authStore.logout();
@@ -161,7 +163,6 @@ function isMenuActive(m) {
     return (
       route.path.startsWith("/profile") ||
       route.path.startsWith("/my-order") ||
-      route.path.startsWith("/service-history") ||
       (!isAuthenticated.value && route.path === "/login")
     );
   }
@@ -209,16 +210,8 @@ function getMobileProfileTarget() {
   return isAuthenticated.value ? "/profile" : "/login";
 }
 
-function getMobileHistoryTarget() {
-  return isAuthenticated.value ? "/service-history" : "/login";
-}
-
 function isMobileProfileActive() {
   return route.path.startsWith("/profile") || (!isAuthenticated.value && route.path === "/login");
-}
-
-function isMobileHistoryActive() {
-  return route.path.startsWith("/service-history");
 }
 
 async function handleLogout() {
@@ -459,6 +452,14 @@ watch(
                     class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100"
                   >
                     Pesanan Saya
+                  </button>
+                  <button
+                    v-if="!isAdmin"
+                    type="button"
+                    @click="goToConsultationsFromModal"
+                    class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100"
+                  >
+                    Konsultasi Saya
                   </button>
                   <button
                     type="button"

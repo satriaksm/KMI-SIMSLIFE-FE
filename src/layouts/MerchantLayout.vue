@@ -96,18 +96,26 @@ const menuItems = computed(() => {
       route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
     },
 
-    // 🛒 Pesanan Masuk — hanya untuk Toko/Kuliner
-    ...(isJasaMerchant ? [] : [{
+    // 🛒 Pesanan Masuk — SEMUA merchant (Produk, Kuliner, dan Jasa)
+    // Jasa menggunakan tab "Jasa" di dalam halaman Pesanan Masuk
+    {
       label: "Pesanan Masuk",
       icon: "pi-shopping-bag",
       route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    }]),
+    },
 
     // 📊 Laporan — semua merchant
     {
       label: "Laporan",
       icon: "pi-file",
       route: `/merchant-center/${currentMerchantSlug.value}/reports`,
+    },
+
+    // ⭐️ Ulasan — semua merchant
+    {
+      label: "Ulasan",
+      icon: "pi-star",
+      route: `/merchant-center/${currentMerchantSlug.value}/reviews`,
     },
 
     // 📦 Produk / Jasa
@@ -122,13 +130,6 @@ const menuItems = computed(() => {
           icon: "pi-box",
           route: `/merchant-center/${currentMerchantSlug.value}/products`,
         },
-
-    // 🔧 History Layanan Jasa — hanya untuk Jasa
-    ...(isJasaMerchant ? [{
-      label: "History Layanan Jasa",
-      icon: "pi-history",
-      route: `/merchant-center/${currentMerchantSlug.value}/bookings`,
-    }] : []),
 
     // 💬 Konsultasi — hanya untuk Jasa
     ...(isJasaMerchant ? [{

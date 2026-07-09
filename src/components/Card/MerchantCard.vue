@@ -64,22 +64,15 @@
             </span>
           </div>
         </div>
+	        <div
+	          v-if="primaryAddressString"
+	          class="flex items-center gap-1 mb-1 text-[11px] text-gray-500"
+	        >
+	          <i class="pi pi-map-marker text-gray-400 me-1"></i>
+	          <span class="line-clamp-1" :title="primaryAddressString">{{ primaryAddressString }}</span>
+	        </div>
 
-        <div
-          v-if="merchant.primary_address"
-          class="flex items-center gap-1 mb-1 text-[11px] text-gray-500"
-        >
-          <span
-            class="line-clamp-1 capitalize"
-            :title="`${merchant.primary_address?.detail}, ${merchant.primary_address.village?.name}, ${merchant.primary_address.district?.name}, ${merchant.primary_address.city?.name}, ${merchant.primary_address.province?.name}`"
-          >
-            {{ merchant.primary_address?.detail }}
-            {{ merchant.primary_address.village?.name }}
-            {{ merchant.primary_address.district?.name }}
-            {{ merchant.primary_address.city?.name }}
-            {{ merchant.primary_address.province?.name }}
-          </span>
-        </div>
+
       </div>
     </router-link>
 
@@ -163,8 +156,19 @@ const formattedDistanceKm = computed(() => {
 });
 
 const primaryAddressString = computed(() => {
-  const addr = props.merchant?.primary_address;
-  if (!addr) return "";
+  const m = props.merchant;
+  // Try multiple key formats: snake_case, camelCase, array fallback, direct fields
+  const addr =
+    m?.primary_address ??
+    m?.primaryAddress ??
+    (Array.isArray(m?.addresses) ? m.addresses[0] : null) ??
+    null;
+
+  if (!addr) {
+    // Last resort: direct address fields
+    const direct = m?.address ?? m?.alamat ?? null;
+    return direct ? String(direct).trim() : "";
+  }
 
   const parts = [];
   const detail = addr.detail ? String(addr.detail).trim() : "";

@@ -109,6 +109,7 @@ const titleClass = computed(() => {
 // Handle back navigation
 const handleBack = () => {
   if (props.onBack) {
+    // Custom handler provided by parent — use it exclusively, skip default navigation
     props.onBack();
   } else {
     emit("back");

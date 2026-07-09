@@ -23,10 +23,12 @@ const reviewForm = ref({
 });
 const selectedFiles = ref([]);
 const previewFiles = ref([]);
-const loading = ref(false);
+const loadingItem = ref(false);
+const itemInfo = ref(null);
 const submitting = ref(false);
 const alreadyReviewed = ref(false);
 const existingReview = ref(null);
+const removedMediaIds = ref([]);
 
 // Allowed file types
 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
@@ -144,11 +146,19 @@ const handleFileSelect = (event) => {
 
 // Remove file from selection
 const removeFile = (index) => {
-  // Revoke object URL to free memory
-  if (previewFiles.value[index]?.url) {
-    URL.revokeObjectURL(previewFiles.value[index].url);
+  const item = previewFiles.value[index];
+  if (item.isExisting) {
+    removedMediaIds.value.push(item.id);
+  } else {
+    // Revoke object URL to free memory
+    if (item.url) {
+      URL.revokeObjectURL(item.url);
+    }
+    const fileIndex = selectedFiles.value.indexOf(item.file);
+    if (fileIndex > -1) {
+      selectedFiles.value.splice(fileIndex, 1);
+    }
   }
-  selectedFiles.value.splice(index, 1);
   previewFiles.value.splice(index, 1);
 };
 
@@ -191,57 +201,89 @@ const submitReview = async () => {
     };
     console.log('[UniversalReview] Review Payload:', payload);
 
-    // Add media files — key must be 'media' not 'media[]' to match backend validation
+    // Add media files — key must be 'media[]' to match backend validation
     // Backend: 'media' => 'nullable|array|max:5'
     for (const file of selectedFiles.value) {
-      formData.append('media', file);
+      formData.append('media[]', file);
     }
 
     // Determine endpoint based on type
     let endpoint = "";
     let config = { headers: { 'Content-Type': 'multipart/form-data' } };
 
-    if (reviewableType.value === "service") {
-      endpoint = `/api/service-orders/${orderId.value}/review`;
-    } else {
-      // For product, food, or general review
-      endpoint = `/api/ratings`;
-      formData.append('rateable_id', reviewableId.value);
-      
-      const typeMapping = {
-        'product': 'App\\Models\\Product',
-        'jasa': 'App\\Models\\Jasa'
-      };
-      formData.append('rateable_type', typeMapping[reviewableType.value] || reviewableType.value);
-      if (route.query.merchantId) {
-        formData.append('merchant_id', route.query.merchantId);
+    if (existingReview.value && existingReview.value.id) {
+      endpoint = `/api/ratings/${existingReview.value.id}`;
+      formData.append('_method', 'PUT');
+      if (removedMediaIds.value.length > 0) {
+        formData.append('removed_media_ids', JSON.stringify(removedMediaIds.value));
       }
-      if (orderId.value) {
-        formData.append('order_id', orderId.value);
+    } else {
+      if (reviewableType.value === "service") {
+        endpoint = `/api/jasa-orders/${orderId.value}/review`;
+      } else {
+        endpoint = `/api/ratings`;
+        formData.append('rateable_id', reviewableId.value);
+        
+        const typeMapping = {
+          'product': 'App\\Models\\Product',
+          'jasa': 'App\\Models\\Jasa'
+        };
+        formData.append('rateable_type', typeMapping[reviewableType.value] || reviewableType.value);
+        
+        if (route.query.merchantId) {
+          formData.append('merchant_id', route.query.merchantId);
+        }
+        if (orderId.value) {
+          formData.append('order_id', orderId.value);
+        }
+        if (route.query.orderItemId) {
+          formData.append('order_item_id', route.query.orderItemId);
+        }
       }
     }
 
-    console.log("[UniversalReview] Submitting review with media:", selectedFiles.value.length, "files");
+    console.log("[UniversalReview] Submitting review with selectedFiles:", selectedFiles.value.map(f => ({ name: f.name, size: f.size })));
+    
+    // Log FormData entries for review submission
+    const entries = {};
+    for (const [key, val] of formData.entries()) {
+      if (val instanceof File) {
+        entries[key] = `File: name=${val.name}, size=${val.size}`;
+      } else {
+        entries[key] = val;
+      }
+    }
+    console.log("[UniversalReview] FormData Entries:", entries);
 
     const { data } = await api.post(endpoint, formData, config);
 
-    console.log("[UniversalReview] Response received:", data);
+    console.log("[UniversalReview] Response received from submit:", data);
 
     // ApiResponse::success returns { message, data } — NOT { success }
     // data = axios response.data = { message: "...", data: { review, order } }
     toast.success(data?.message || 'Review berhasil dikirim!');
     alreadyReviewed.value = true;
     existingReview.value = data?.data?.review || data?.data || {};
-    // Redirect back to service history
-    router.push("/service-history");
+    // Redirect back to order detail
+    if (orderId.value) {
+      const typeQuery = reviewableType.value === "service" ? "?type=jasa" : "";
+      router.push(`/orders/${orderId.value}${typeQuery}`);
+    } else {
+      router.push("/orders");
+    }
   } catch (error) {
     console.log("[UniversalReview] Response received:", error.response?.data || error);
 
     // Check for 409 Conflict (already reviewed)
     if (error.response?.status === 409 || (error.response?.data?.message || '').includes('sudah') && (error.response?.data?.message || '').includes('review')) {
-      toast.info('Pesanan ini sudah diberi review sebelumnya');
+      toast.info('Pesanan ini sudah diberi penilaian sebelumnya');
       alreadyReviewed.value = true;
-      setTimeout(() => router.push('/service-history'), 1500);
+      if (orderId.value) {
+        const typeQuery = reviewableType.value === "service" ? "?type=jasa" : "";
+        setTimeout(() => router.push(`/orders/${orderId.value}${typeQuery}`), 1500);
+      } else {
+        setTimeout(() => router.push('/orders'), 1500);
+      }
       return;
     }
 
@@ -261,27 +303,104 @@ const goBack = () => {
   router.back();
 };
 
-// Check if service order already has a review
+// Check if service/product order already has a review
 const checkExistingReview = async () => {
-  if (reviewableType.value === "service" && orderId.value) {
+  if (!orderId.value) return;
+
+  if (reviewableType.value === "service") {
     try {
-      const { data } = await api.get(`/api/service-orders/${orderId.value}`);
+      const { data } = await api.get(`/api/jasa-orders/${orderId.value}`);
       const order = data.data || data;
+
+      const jasaItem = order.jasa_items?.[0] || order.jasa_item || {};
+      const title = jasaItem.jasa_title_snapshot || jasaItem.jasa?.title || "Layanan Jasa";
+      const image = jasaItem.jasa_image_snapshot || jasaItem.jasa?.image_url || null;
+      itemInfo.value = {
+        name: title,
+        image: image,
+        icon: "pi-wrench",
+        typeLabel: "Layanan"
+      };
+
       if (order.review) {
-        alreadyReviewed.value = true;
         existingReview.value = order.review;
-        toast.info('Pesanan ini sudah diberi review');
+        
+        if (order.can_update_review) {
+          reviewForm.value.rating = order.review.rating || 5;
+          reviewForm.value.comment = order.review.comment || "";
+          reviewForm.value.is_anonymous = !!order.review.is_anonymous;
+          
+          if (Array.isArray(order.review.media)) {
+            previewFiles.value = order.review.media.map(m => ({
+              id: m.id,
+              url: m.media_url || m.file_url,
+              type: m.file_type || 'image',
+              name: m.original_name || 'image',
+              isExisting: true
+            }));
+          }
+          alreadyReviewed.value = false;
+        } else {
+          alreadyReviewed.value = true;
+          toast.info('Pesanan ini sudah diberi penilaian dan tidak dapat diubah lagi');
+        }
       }
     } catch (err) {
       console.log("[UniversalReview] Could not check existing review:", err);
+    }
+  } else {
+    // For product or general review
+    try {
+      const { data: od } = await api.get(`/api/orders/${orderId.value}`);
+      const o = od?.data ?? od ?? {};
+      const orderItemIdVal = route.query.orderItemId ? Number(route.query.orderItemId) : null;
+      
+      // Find the specific item being reviewed
+      const item = (o.items || []).find(it => it.id === orderItemIdVal || it.product_id === reviewableId.value);
+      if (item) {
+        itemInfo.value = {
+          name: item.name || "Produk",
+          image: item.image || item.product?.image_url || null,
+          icon: "pi-shopping-bag",
+          typeLabel: "Produk"
+        };
+      }
+
+      if (item && item.review) {
+        existingReview.value = item.review;
+        
+        // If they can still update the review, prefill the form and set edit mode!
+        if (item.can_update_review) {
+          reviewForm.value.rating = item.review.rating || 5;
+          reviewForm.value.comment = item.review.comment || "";
+          reviewForm.value.title = item.review.title || "";
+          reviewForm.value.is_anonymous = !!item.review.is_anonymous;
+          
+          if (Array.isArray(item.review.media)) {
+            previewFiles.value = item.review.media.map(m => ({
+              id: m.id,
+              url: m.media_url || m.file_url,
+              type: m.file_type || 'image',
+              name: m.original_name || 'image',
+              isExisting: true
+            }));
+          }
+          // Set alreadyReviewed to false so they can submit update
+          alreadyReviewed.value = false;
+        } else {
+          // If they cannot update anymore, show already reviewed screen
+          alreadyReviewed.value = true;
+          toast.info('Pesanan ini sudah diberi penilaian dan tidak dapat diubah lagi');
+        }
+      }
+    } catch (err) {
+      console.log("[UniversalReview] Could not check existing review for product:", err);
     }
   }
 };
 
 // Initialize
 onMounted(async () => {
-  console.log("[UniversalReview] Route params:", route.params);
-  console.log("[UniversalReview] User:", authStore.user);
   await checkExistingReview();
 });
 
@@ -311,7 +430,7 @@ watch(
             <i class="pi pi-arrow-left"></i>
           </button>
           <div>
-            <h1 class="text-lg font-bold text-gray-900">Beri Review</h1>
+            <h1 class="text-lg font-bold text-gray-900">Beri Rating dan Ulasan</h1>
             <p class="text-xs text-gray-500">Berikan penilaian Anda</p>
           </div>
         </div>
@@ -324,9 +443,9 @@ watch(
         <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <i class="pi pi-check-circle text-3xl text-green-600"></i>
         </div>
-        <h2 class="text-lg font-bold text-green-800 mb-2">Review Sudah Terkirim</h2>
+        <h2 class="text-lg font-bold text-green-800 mb-2">Rating dan Ulasan Sudah Terkirim</h2>
         <p class="text-sm text-green-700 mb-4">
-          Anda sudah memberikan review untuk pesanan ini.
+          Anda sudah memberikan rating dan ulasan untuk pesanan ini.
         </p>
         <div v-if="existingReview" class="bg-white rounded-xl p-4 mb-4 text-left">
           <div class="flex items-center gap-1 mb-2">
@@ -338,7 +457,7 @@ watch(
           <p class="text-sm text-gray-600">{{ existingReview.comment || 'Tidak ada komentar' }}</p>
         </div>
         <button
-          @click="router.push('/service-history')"
+          @click="router.push('/orders')"
           class="px-6 py-2.5 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition"
         >
           Kembali ke Riwayat Pesanan
@@ -522,6 +641,22 @@ watch(
               <strong>Tips:</strong> Review yang detail dan jujur membantu
               pengguna lain dalam memilih layanan yang tepat.
             </p>
+          </div>
+        </div>
+
+        <!-- Warning: review can only be updated once -->
+        <div class="px-5 pb-3">
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <div class="flex items-start gap-2.5">
+              <i class="pi pi-exclamation-triangle text-amber-500 mt-0.5 text-sm"></i>
+              <div>
+                <p class="text-xs font-semibold text-amber-700">Informasi Ulasan</p>
+                <p class="text-xs text-amber-600 mt-0.5 leading-relaxed">
+                  Ulasan hanya dapat diperbarui 1 kali setelah dikirim.<br/>
+                  Setelah pembaruan dilakukan, ulasan tidak dapat diubah kembali.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

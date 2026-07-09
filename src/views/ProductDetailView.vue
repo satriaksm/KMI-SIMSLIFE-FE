@@ -1131,11 +1131,11 @@
   </ResponsiveModal>
 
   <!-- Penilaian Produk -->
-  <div class="px-4 py-6 bg-gray-50">
+  <div class="px-4 pt-6 pb-24 bg-gray-50 sm:pb-32">
     <div class="max-w-2xl mx-auto">
       <!-- Rating Summary Header -->
       <div class="mb-4">
-        <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Produk</h3>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Rating dan Ulasan</h3>
         <div v-if="product?.rating_summary && product.rating_summary.total_reviews > 0" class="flex items-center gap-3">
           <div class="flex items-center gap-1">
             <i
@@ -1148,7 +1148,7 @@
             ></i>
           </div>
           <span class="font-semibold text-gray-700">{{ product.rating_summary.average_rating?.toFixed(1) || '0.0' }}</span>
-          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} keseluruhan)</span>
+          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} ulasan)</span>
         </div>
         <p v-else class="text-sm text-gray-500">Belum ada ulasan</p>
       </div>
@@ -2122,7 +2122,7 @@ function buyNow() {
     productId: product.value?.id ?? null,
     slug: product.value?.slug,
     title: product.value?.name,
-    image: selectedImage.value || productImages.value?.[0] || "",
+    image: selectedImage.value?.src || (typeof selectedImage.value === 'string' ? selectedImage.value : '') || productImages.value?.[0]?.src || productImages.value?.[0] || "",
     store: {
       id: store.id ?? null,
       merchantId: store.id ?? null,

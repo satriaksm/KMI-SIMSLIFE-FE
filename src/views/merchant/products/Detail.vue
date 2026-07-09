@@ -382,7 +382,7 @@ onMounted(() => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <MerchantMobileHeader title="Detail Produk" />
+    <MerchantMobileHeader title="Detail Produk" :backRoute="`/merchant-center/${currentMerchantSlug}/products`" />
 
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
