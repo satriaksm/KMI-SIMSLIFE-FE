@@ -501,11 +501,22 @@ import { fetchCart as fetchCartApi, addToCart as addToCartApi } from "@/services
 import api from "@/libs/axios";
 
 const getThumbImageUrl = (url) => {
-  const imgUrl = url ? String(url) : "";
-  if (imgUrl && imgUrl.includes('/api/')) {
-    return `${imgUrl.split('?')[0]}?size=thumb`;
+  // handle object { src, urls } dari normalizeProductImages
+  if (url && typeof url === "object") {
+    url = url.urls?.thumb || url.urls?.medium || url.src || "";
   }
-  return imgUrl;
+  const imgUrl = url ? String(url) : "";
+  if (!imgUrl) return "";
+  // already absolute URL
+  if (imgUrl.startsWith("http")) {
+    if (imgUrl.includes('/api/')) {
+      return `${imgUrl.split('?')[0]}?size=thumb`;
+    }
+    return imgUrl;
+  }
+  // relative path dari storage (e.g. "products/2/xxx.webp")
+  const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+  return `${base}/storage/${imgUrl}`;
 };
 
 const {

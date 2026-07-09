@@ -585,7 +585,8 @@
             <Button
               block
               @click="$router.push('/orders')"
-              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold"
+              variant="primary"
+              customClass="mt-2 font-semibold"
             >
               Kembali ke Pesanan Saya
             </Button>
@@ -623,7 +624,8 @@
               v-if="order?.can_review"
               block
               @click="goToReview"
-              customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              variant=""
+              customClass="mt-2 bg-white hover:bg-primary text-primary hover:text-white border border-primary font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
             >
               <i class="pi pi-star mr-1"></i>
               Beri Ulasan
@@ -633,7 +635,8 @@
               v-if="order?.is_reviewed && order?.can_update_review"
               block
               @click="goToReview"
-              customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
+              variant=""
+              customClass="mt-2 bg-white hover:bg-primary text-primary hover:text-white border border-primary font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
             >
               <i class="pi pi-pencil mr-1"></i>
               Perbarui Rating dan Ulasan
@@ -1277,7 +1280,8 @@
                     },
                   })
                 "
-                customClass="mt-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold"
+                variant=""
+                customClass="mt-2 bg-white hover:bg-primary text-primary hover:text-white border border-primary font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
               >
                 <i class="pi pi-pencil mr-1"></i>
                 Perbarui Rating dan Ulasan
@@ -1306,7 +1310,8 @@
                     },
                   })
                 "
-                customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                variant=""
+                customClass="mt-2 bg-white hover:bg-primary text-primary hover:text-white border border-primary font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
               >
                 <i class="pi pi-star mr-1"></i>
                 Beri Ulasan
@@ -1315,7 +1320,8 @@
             <Button
               block
               @click="$router.push('/orders')"
-              customClass="mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700"
+              variant="primary"
+              customClass="mt-2 font-semibold"
             >
               Kembali ke Pesanan Saya
             </Button>
@@ -1351,11 +1357,11 @@ const toast = useToast();
 
 const orderId = computed(() => String(route.params.orderId || ""));
 
-// Order type from query parameter - determines which API endpoint to use
-// Set by Index.vue when navigating to detail page
-const orderType = computed(() => "jasa");
+// Order type determined by order data
+const orderType = computed(() => isJasaOrder.value ? "jasa" : "product");
 
 async function ensureJasaDetailUrl() {
+  if (!isJasaOrder.value) return;
   const type = String(route.query?.type || "").toLowerCase();
 
   if (type !== "jasa") {
@@ -2539,20 +2545,34 @@ async function fetchOrder() {
   if (confirmTimer) clearInterval(confirmTimer);
 
   try {
-    await ensureJasaDetailUrl();
-
-    const { data: res } = await getCustomerOrderDetail(id);
-    rawOrder.value = res?.data ?? res ?? null;
-    isJasaOrder.value = true;
+    try {
+      const { data: res } = await api.get(`/api/orders/${id}`);
+      const orderData = res?.data ?? res ?? null;
+      if (orderData && (orderData.order_type === 'jasa' || orderData.type === 'jasa')) {
+        const { data: resJasa } = await getCustomerOrderDetail(id);
+        rawOrder.value = resJasa?.data ?? resJasa ?? null;
+        isJasaOrder.value = true;
+        await ensureJasaDetailUrl();
+      } else {
+        rawOrder.value = orderData;
+        isJasaOrder.value = false;
+        if (route.query?.type === "jasa") {
+          const newQuery = { ...route.query };
+          delete newQuery.type;
+          await router.replace({ path: route.path, query: newQuery });
+        }
+      }
+    } catch (productErr) {
+      console.warn("[Detail] Product fetch failed, trying Jasa endpoint...", productErr.message);
+      const { data: resJasa } = await getCustomerOrderDetail(id);
+      rawOrder.value = resJasa?.data ?? resJasa ?? null;
+      isJasaOrder.value = true;
+      await ensureJasaDetailUrl();
+    }
   } catch (err) {
-    console.error("[Detail] Failed to fetch jasa order:", {
-      error: err?.response?.data || err.message,
-      status: err?.response?.status,
-    });
-
-    toast.error("Gagal memuat detail pesanan jasa");
+    console.error("[Detail] Failed to fetch order:", err);
+    toast.error("Gagal memuat detail pesanan");
     rawOrder.value = null;
-    isJasaOrder.value = true;
   } finally {
     loading.value = false;
   }
@@ -2583,13 +2603,16 @@ async function verifyPaymentFromXendit(retryCount = 0) {
       // Remove query parameters from URL to avoid loop on refresh, but preserve type and other non-payment params
       const newQuery = {
         ...route.query,
-        type: "jasa",
       };
+      if (isJasaOrder.value) {
+        newQuery.type = "jasa";
+      } else {
+        delete newQuery.type;
+      }
       delete newQuery.payment;
       delete newQuery.order_id;
       delete newQuery.external_id;
       delete newQuery.payment_status;
-      newQuery.type = "jasa";
       await router.replace({ path: route.path, query: newQuery });
 
       await fetchOrder();
@@ -2669,11 +2692,19 @@ onMounted(async () => {
   } else if (paymentStatus === "failed") {
     toast.error("Pembayaran gagal. Silakan coba lagi.");
 
+    const newQuery = { ...route.query };
+    delete newQuery.payment;
+    delete newQuery.order_id;
+    delete newQuery.external_id;
+    delete newQuery.payment_status;
+    if (isJasaOrder.value) {
+      newQuery.type = "jasa";
+    } else {
+      delete newQuery.type;
+    }
     await router.replace({
       path: route.path,
-      query: {
-        type: "jasa",
-      },
+      query: newQuery,
     });
   }
 });

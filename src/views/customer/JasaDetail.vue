@@ -646,7 +646,7 @@
     />
 
     <!-- Penilaian Layanan -->
-    <div class="px-4 py-6 bg-gray-50">
+    <div class="px-4 pt-6 pb-24 bg-gray-50 sm:pb-32">
       <div class="max-w-2xl mx-auto">
         <!-- Rating Summary Header -->
         <div class="mb-4">

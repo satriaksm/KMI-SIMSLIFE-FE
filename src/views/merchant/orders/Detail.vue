@@ -1009,6 +1009,7 @@ const failedReason = ref("");
 
 function getNextStatus() {
   const rawStatus = rawOrder.value?.status;
+  const isPickup = rawOrder.value?.delivery_type === "pickup";
   switch (rawStatus) {
     case "paid":
       return "accepted"; // UMKM terima pesanan yang sudah dibayar
@@ -1018,9 +1019,11 @@ function getNextStatus() {
       return null; // Transfer pending = belum bayar
     case "responsed":
     case "accepted":
-      return "delivered";
+      // pickup → ready_to_pickup, delivery → delivered
+      return isPickup ? "ready_to_pickup" : "delivered";
     case "delivered":
-      // UMKM (penjual) bisa menekan "completed" (Pesanan Tiba) untuk semua jenis pesanan
+      return "completed";
+    case "ready_to_pickup":
       return "completed";
     default:
       return null;
@@ -1033,8 +1036,10 @@ const nextActionLabel = computed(() => {
   switch (next) {
     case "accepted":
       return "Terima & Proses Pesanan";
+    case "ready_to_pickup":
+      return "Tandai Siap Diambil";
     case "delivered":
-      return isPickup ? "Tandai Siap Diambil" : "Tandai Dikirim";
+      return "Tandai Dikirim";
     case "completed":
       return isPickup
         ? "Tandai Selesai / Sudah Diambil"
