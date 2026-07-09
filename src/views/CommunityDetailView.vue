@@ -7,126 +7,170 @@
 
     <div v-else-if="post">
       <!-- Post card -->
-      <div class="p-3 mb-5 bg-white rounded-lg shadow sm:p-5 md:p-6 sm:mb-6 relative">
-        <div class="flex items-start gap-3 sm:gap-4">
-          <!-- avatar -->
-          <UserAvatar 
-            :user="post.author" 
-            size="lg"
+      <div class="mb-5 sm:mb-6 overflow-hidden rounded-2xl shadow-md border"
+        :class="[
+          post.author?.is_super_admin ? 'border-secondary' :
+          post.author?.is_admin ? 'border-secondary/40' :
+          'border-gray-100'
+        ]"
+      >
+        <!-- Role Striking Header -->
+        <div v-if="post.author?.is_super_admin" class="bg-gradient-to-r from-secondary to-[#058895] px-4 py-2.5 flex items-center justify-between text-white border-b border-secondary/20">
+          <div class="flex items-center gap-1.5 font-bold text-[11px] uppercase tracking-widest drop-shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+            PENGUMUMAN RESMI
+          </div>
+          <img :src="LogoWithText" alt="Sumilir" class="h-4 w-auto object-contain brightness-0 invert pointer-events-none drop-shadow-sm" />
+        </div>
+        <div v-else-if="post.author?.is_admin" class="bg-gradient-to-r from-secondary/15 to-transparent px-4 py-2.5 flex items-center justify-between border-b border-secondary/10">
+          <div class="flex items-center gap-1.5 font-bold text-[11px] text-secondary uppercase tracking-widest">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+            INFO ADMIN
+          </div>
+          <img :src="LogoWithText" alt="Sumilir" class="h-3.5 w-auto object-contain opacity-50 pointer-events-none grayscale contrast-200" />
+        </div>
+
+        <!-- Event Banner Hero (only for event posts) -->
+        <div v-if="post.post_type === 'event' && (post.event?.banner_url || post.event?.banner_img_path || post.event?.event_name)"
+          class="relative w-full h-48 sm:h-64 overflow-hidden"
+          :style="!(post.event?.banner_url || post.event?.banner_img_path) ? 'background: linear-gradient(135deg, #ffa30e 0%, #0894eb 100%)' : ''">
+          <img
+            v-if="post.event?.banner_url || post.event?.banner_img_path"
+            :src="post.event.banner_url || `/storage/${post.event.banner_img_path}`"
+            :alt="post.event?.event_name"
+            class="w-full h-full object-cover"
+            @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
           />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
 
-          <div class="flex-1">
-            <div class="flex justify-between items-start w-full">
-              <!-- author + date -->
-              <div class="flex flex-col gap-0.5">
-                <div class="text-[10px] sm:text-xs text-gray-500">
-                  oleh
-                  <span class="ml-1 font-medium text-gray-800">
-                    {{ post.author?.name }}
-                  </span>
-                </div>
-                <div class="mt-1 text-xs text-gray-500">
-                  {{ formatDateTime(post.created_at) }}
-                </div>
-              </div>
+          <!-- EVENT badge + views -->
+          <div class="absolute top-3 left-3 right-3 flex items-start justify-between pointer-events-none">
+            <span class="inline-flex items-center gap-2 bg-white/95 backdrop-blur-sm text-secondary text-[11px] font-bold px-3 py-1.5 rounded-full shadow-md">
+              Event
+              <img :src="LogoWithText" alt="Sumilir" class="h-3.5 object-contain" />
+            </span>
+            <span class="flex items-center gap-1 bg-black/40 backdrop-blur-sm text-white/90 text-[10px] px-2.5 py-1 rounded-full shadow-sm">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              {{ post.views_count ?? 0 }}
+            </span>
+          </div>
 
-              <!-- Action icons (Report & Back) -->
-              <div class="flex items-center gap-3">
-                <ReportButton
-                  reportable-type="post"
-                  :reportable-id="post.id"
-                  :reportable-name="post.post_title || 'Postingan Komunitas'"
-                />
-                
-                <!-- NEW Back Button aligned with user photo -->
-                <router-link
-                  to="/community"
-                  class="text-secondary hover:text-secondary/80 transition-colors"
-                  title="Kembali ke Komunitas"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 sm:w-7 sm:h-7">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-                  </svg>
-                </router-link>
-              </div>
-            </div>
-
-            <!-- title -->
-            <h1
-              class="mt-2 text-base font-semibold leading-snug text-gray-900 sm:mt-3 sm:text-xl md:text-2xl"
-            >
-              {{ post.post_title }}
-            </h1>
-
-            <!-- content -->
-            <div
-              class="mt-2 sm:mt-3 text-[11px] sm:text-sm md:text-base text-gray-800 whitespace-pre-line"
-            >
-              {{ post.post_content }}
+          <!-- Event name + dates at bottom of banner -->
+          <div class="absolute bottom-0 left-0 right-0 px-4 pb-4">
+            <p v-if="post.event?.event_name" class="text-white font-bold text-lg sm:text-xl leading-snug drop-shadow mb-2">
+              {{ post.event.event_name }}
+            </p>
+            <div v-if="post.event" class="flex flex-wrap gap-2">
+              <span class="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[11px] font-medium px-3 py-1 rounded-full">
+                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {{ post.event.event_start_date ? new Date(post.event.event_start_date).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'}) : '-' }}
+              </span>
+              <span v-if="post.event.event_end_date && post.event.event_end_date !== post.event.event_start_date"
+                class="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[11px] font-medium px-3 py-1 rounded-full">
+                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                s/d {{ new Date(post.event.event_end_date).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'}) }}
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- gallery -->
-        <div class="mt-4 sm:mt-5">
-          <div v-if="post.images && post.images.length">
-            <!-- Single image -->
-            <div v-if="post.images.length === 1">
-              <ResponsiveImage
-                :src="post.images[0].src"
-                :urls="post.images[0].urls"
-                customClass="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
-                @click="openLightbox(post.images, 0)"
-                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
-              />
+        <!-- Card body -->
+        <div class="p-4 sm:p-5 md:p-6 bg-white">
+          <div class="flex items-start gap-3 sm:gap-4">
+            <!-- Avatar -->
+            <div :class="['shrink-0', post.author?.is_super_admin || post.author?.is_admin ? 'rounded-full ring-2 ring-secondary/25 ring-offset-1' : 'rounded-full p-0.5 bg-secondary/20']">
+              <UserAvatar :user="post.author" size="lg" />
             </div>
 
-            <!-- Two images -->
-            <div v-else-if="post.images.length === 2" class="grid grid-cols-2 gap-2">
-              <ResponsiveImage
-                v-for="(imgObj, i) in post.images.slice(0, 2)"
-                :key="i"
-                :src="imgObj.src"
-                :urls="imgObj.urls"
-                customClass="object-cover w-full h-32 rounded-lg cursor-pointer sm:h-40 md:h-56"
-                @click="openLightbox(post.images, i)"
-                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
-              />
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start w-full">
+                <!-- author + badges + date -->
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <router-link :to="`/profile/${post.author?.id}`" class="text-sm font-semibold text-gray-900 hover:text-secondary transition-colors">
+                      {{ post.author?.name }}
+                    </router-link>
+                    <span v-if="post.author?.is_super_admin"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-white">
+                      <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                      Superadmin
+                    </span>
+                    <span v-else-if="post.author?.is_admin"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary/10 text-secondary">
+                      <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                      Admin
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-gray-400">{{ formatDateTime(post.created_at) }}</p>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2 shrink-0">
+                  <ReportButton reportable-type="post" :reportable-id="post.id" :reportable-name="post.post_title || 'Postingan Komunitas'" />
+                  <router-link to="/community" class="text-secondary hover:opacity-80 transition" title="Kembali ke Komunitas">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 sm:w-7 sm:h-7">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                    </svg>
+                  </router-link>
+                </div>
+              </div>
+
+              <!-- Title -->
+              <h1 class="mt-3 text-base font-bold leading-snug text-gray-900 sm:text-xl md:text-2xl">
+                {{ post.post_title }}
+              </h1>
+
+              <!-- Content -->
+              <div class="mt-2 sm:mt-3 text-[12px] sm:text-sm md:text-base text-gray-700 whitespace-pre-line leading-relaxed">
+                {{ post.post_content }}
+              </div>
             </div>
+          </div>
 
-            <!-- 3+ images: hero + thumbnails -->
-            <div v-else>
-              <ResponsiveImage
-                :src="post.images[0].src"
-                :urls="post.images[0].urls"
-                customClass="object-cover w-full h-40 mb-2 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
-                @click="openLightbox(post.images, 0)"
-                @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
-              />
-
-              <div class="grid grid-cols-3 gap-2">
-                <div
-                  v-for="(imgObj, i) in post.images.slice(1, 4)"
-                  :key="i"
-                  class="relative"
-                >
-                  <ResponsiveImage
-                    :src="imgObj.src"
-                    :urls="imgObj.urls"
-                    customClass="object-cover w-full rounded-md cursor-pointer h-18 sm:h-24 md:h-32"
-                    @click="openLightbox(post.images, i + 1)"
-                    @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
-                  />
-                  <div
-                    v-if="i === 2 && post.images.length > 4"
-                    class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white rounded-md cursor-pointer bg-black/45 sm:text-sm md:text-base"
-                    @click.stop="openLightbox(post.images, i + 1)"
-                  >
-                    +{{ post.images.length - 4 }}
+          <!-- Gallery -->
+          <div class="mt-4 sm:mt-5">
+            <div v-if="post.images && post.images.length">
+              <div v-if="post.images.length === 1">
+                <ResponsiveImage :src="post.images[0].src" :urls="post.images[0].urls"
+                  customClass="object-cover w-full h-40 rounded-xl cursor-pointer sm:h-52 md:h-72 lg:h-96"
+                  @click="openLightbox(post.images, 0)"
+                  @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }" />
+              </div>
+              <div v-else-if="post.images.length === 2" class="grid grid-cols-2 gap-2">
+                <ResponsiveImage v-for="(imgObj, i) in post.images.slice(0, 2)" :key="i"
+                  :src="imgObj.src" :urls="imgObj.urls"
+                  customClass="object-cover w-full h-32 rounded-xl cursor-pointer sm:h-40 md:h-56"
+                  @click="openLightbox(post.images, i)"
+                  @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }" />
+              </div>
+              <div v-else>
+                <ResponsiveImage :src="post.images[0].src" :urls="post.images[0].urls"
+                  customClass="object-cover w-full h-40 mb-2 rounded-xl cursor-pointer sm:h-52 md:h-72 lg:h-96"
+                  @click="openLightbox(post.images, 0)"
+                  @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }" />
+                <div class="grid grid-cols-3 gap-2">
+                  <div v-for="(imgObj, i) in post.images.slice(1, 4)" :key="i" class="relative">
+                    <ResponsiveImage :src="imgObj.src" :urls="imgObj.urls"
+                      customClass="object-cover w-full rounded-lg cursor-pointer h-18 sm:h-24 md:h-32"
+                      @click="openLightbox(post.images, i + 1)"
+                      @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }" />
+                    <div v-if="i === 2 && post.images.length > 4"
+                      class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-white rounded-lg cursor-pointer bg-black/50 sm:text-sm"
+                      @click.stop="openLightbox(post.images, i + 1)">
+                      +{{ post.images.length - 4 }}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- Views footer -->
+          <div class="mt-4 pt-3 border-t border-gray-100 flex items-center gap-1.5 text-xs text-gray-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            {{ post.views_count ?? 0 }} kali dilihat
           </div>
         </div>
       </div>
@@ -350,6 +394,8 @@ import { getCommunityImageUrl } from '@/libs/getImageUrl';
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ReportButton from "@/components/ReportButton.vue";
+import LogoWithText from "@/assets/icons/LogoWithText.png";
+import LogoNoText from "@/assets/icons/LogoNoText.png";
 
 const route = useRoute();
 const post = ref(null);
