@@ -359,8 +359,9 @@ function getNextStatus() {
       return null; // Transfer pending = belum bayar
     case "responsed":
     case "accepted":
-      return "delivered";
+      return rawOrder.value?.delivery_type === "pickup" ? "ready_to_pickup" : "delivered";
     case "delivered":
+    case "ready_to_pickup":
       // UMKM (penjual) bisa menekan "completed" (Pesanan Tiba) untuk semua jenis pesanan
       return "completed";
     default:

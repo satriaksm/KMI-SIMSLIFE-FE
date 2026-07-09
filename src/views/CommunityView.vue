@@ -56,7 +56,7 @@
         ref="menubarRef"
       >
         <button
-          @click="showCreatePost = true"
+          @click="openCreatePost"
           class="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white transition rounded-full shadow bg-secondary hover:bg-secondary/90"
         >
           <svg
@@ -508,7 +508,7 @@
         >
           <!-- Buat Post Button -->
           <button
-            @click="showCreatePost = true"
+            @click="openCreatePost"
             class="flex items-center justify-center gap-2 rounded-full bg-secondary text-white hover:bg-secondary/90 px-3 xl:px-4 2xl:px-6 py-2 xl:py-2.5 2xl:py-3 font-semibold transition text-xs xl:text-sm 2xl:text-base w-full"
           >
             <svg
@@ -682,6 +682,9 @@ import { getCommunityImageUrl } from '@/libs/getImageUrl'; // ✅ ADD
 import UserAvatar from "@/components/common/UserAvatar.vue";
 import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ReportButton from "@/components/ReportButton.vue";
+import { useAuthStore } from "@/stores/auth";
+import { useToast } from "vue-toastification";
+import { useRouter } from "vue-router";
 
 /* STATE */
 const posts = ref([]);
@@ -690,6 +693,19 @@ const showCreatePost = ref(false);
 const searchQuery = ref("");
 const showSortPopup = ref(false);
 const sortActive = ref("created_at_desc");
+
+const authStore = useAuthStore();
+const toast = useToast();
+const router = useRouter();
+
+function openCreatePost() {
+  if (!authStore.isAuthenticated) {
+    toast.info("Silakan login terlebih dahulu untuk melanjutkan.");
+    router.push("/login");
+    return;
+  }
+  showCreatePost.value = true;
+}
 
 /* LIGHTBOX */
 const lightbox = ref({ open: false, images: [], index: 0 });

@@ -134,10 +134,10 @@ async function submit() {
   serverMessage.value = ''
 
   if (!title.value.trim()) {
-    errors.value.post_title = ['The post title field is required.']
+    errors.value.post_title = ['Judul postingan wajib diisi.']
   }
   if (!content.value.trim()) {
-    errors.value.post_content = ['The post content field is required.']
+    errors.value.post_content = ['Konten postingan wajib diisi.']
   }
   if (imageFiles.value.length > maxFiles) {
     clientErrors.value.push(`Maksimal ${maxFiles} gambar.`)
