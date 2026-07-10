@@ -387,7 +387,7 @@ onMounted(() => {
     <!-- Desktop Header -->
     <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
       <div
-        class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 lg:px-8 gap-y-2 gap-x-4"
+        class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
       >
         <div>
           <!-- ✅ Use Breadcrumb Component -->

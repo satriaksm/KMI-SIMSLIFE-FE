@@ -394,7 +394,7 @@ function leaveOrdersChannel(id) {
       <div class="flex items-center gap-3">
         <button
           @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>

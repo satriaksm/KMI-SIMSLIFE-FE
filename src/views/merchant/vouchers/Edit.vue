@@ -360,8 +360,10 @@ const onSubmit = veeHandleSubmit(
             </h4>
             <ul class="pl-4 space-y-1 text-xs list-disc text-merchant-primary">
               <li>
-                Kode voucher tidak boleh sama dengan voucher lain di toko Anda.
+                Kode voucher tidak boleh sama dengan voucher lain di UMKM Anda.
               </li>
+                            <li>Secret Voucher: Voucher disembunyikan agar tidak muncul di daftar voucher (Pengguna harus memasukkan kode voucher secara manual)</li>
+
               <li>Pilih tipe voucher: Persentase (%) atau Nilai Tetap (Rp).</li>
               <li>
                 Jika tipe Persentase (%), wajib mengisi nilai maksimal diskon
@@ -412,7 +414,7 @@ const onSubmit = veeHandleSubmit(
           <CheckboxField
             name="is_secret"
             v-model="is_secret"
-            label="Jadikan Secret Voucher (tidak muncul di daftar voucher publik)"
+            label="Tersembunyi (Secret Voucher)"
             variant="primary"
           />
 

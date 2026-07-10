@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto pb-28 max-w-7xl">
+  <div class="mx-auto pb-12 sm:pb-28 max-w-7xl">
     <!-- Mobile Header -->
     <MobileHeader title="Checkout Pesanan" variant="primary" />
 
@@ -348,7 +348,7 @@
 
     <!-- Bottom bar -->
     <footer
-      class="fixed left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-lg bottom-16 sm:bottom-0"
+      class="fixed left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-lg bottom-0"
     >
       <div class="px-4 py-3 mx-auto space-y-2 max-w-7xl">
         <div

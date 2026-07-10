@@ -319,10 +319,10 @@ onMounted(async () => {
 
 <template>
   <div class="">
-    <MobileHeader title="Alamat Utama" @back="goBack" />
+    <MobileHeader title="Alamat Utama" @back="goBack" variant="primary"/>
 
-    <div class="px-4 py-4 mx-auto max-w-7xl">
-      <div class="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+    <div class="px-0 py-0 mx-auto max-w-7xl sm:px-4 sm:py-4">
+      <div class="p-4 sm:bg-white sm:p-6 sm:border sm:border-gray-100 sm:shadow-sm sm:rounded-2xl">
         <div v-if="loading" class="space-y-6 animate-pulse">
           <!-- Select Fields Skeleton -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -413,15 +413,6 @@ onMounted(async () => {
             />
           </div>
 
-          <TextField
-            name="detail"
-            label="Detail Alamat"
-            textarea
-            :rows="3"
-            placeholder="Contoh: Jl. Mawar No. 12, RT 01/RW 02"
-            :modelValue="values.detail"
-            @update:modelValue="(v) => setFieldValue('detail', v)"
-          />
 
           <div>
             <div class="flex items-center justify-between mb-2">
@@ -448,8 +439,20 @@ onMounted(async () => {
             </p>
           </div>
 
+
+          <TextField
+            name="detail"
+            label="Detail Alamat"
+            textarea
+            :rows="3"
+            placeholder="Contoh: Jl. Mawar No. 12, RT 01/RW 02"
+            :modelValue="values.detail"
+            @update:modelValue="(v) => setFieldValue('detail', v)"
+          />
+
           <div class="flex gap-4">
-            <div class="hidden w-full sm:inline">
+            <!-- Desktop Buttons -->
+            <div class="hidden sm:flex w-full gap-4">
               <AppButton
                 type="button"
                 variant="muted-outline"
@@ -458,17 +461,29 @@ onMounted(async () => {
               >
                 Batal
               </AppButton>
+              <AppButton
+                type="submit"
+                variant="primary"
+                class="w-full"
+                :loading="saving"
+                :disabled="saving"
+              >
+                {{ saving ? "Menyimpan..." : "Simpan" }}
+              </AppButton>
             </div>
 
-            <AppButton
-              type="submit"
-              variant="primary"
-              class="w-full"
-              :loading="saving"
-              :disabled="saving"
-            >
-              {{ saving ? "Menyimpan..." : "Simpan" }}
-            </AppButton>
+            <!-- Mobile Sticky Button -->
+            <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+              <AppButton
+                type="submit"
+                variant="primary"
+                class="w-full"
+                :loading="saving"
+                :disabled="saving"
+              >
+                {{ saving ? "Menyimpan..." : "Simpan" }}
+              </AppButton>
+            </div>
           </div>
         </Form>
       </div>

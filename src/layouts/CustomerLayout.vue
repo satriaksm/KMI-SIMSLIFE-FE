@@ -37,6 +37,16 @@ const cartItemsCount = computed(() => {
 });
 const showProfileMenu = ref(false);
 
+const isAuthPage = computed(() =>
+  ["Login", "Register", "Forgot Password", "Reset Password", "Email Verification"].includes(route.name)
+);
+
+const showMobileDock = computed(() => {
+  const allowedPaths = ['/', '/explore', '/map', '/community', '/orders', '/profile', '/login'];
+  const currentPath = route.path.replace(/\/$/, '') || '/';
+  return allowedPaths.includes(currentPath);
+});
+
 const baseMenus = [
   {
     key: "home",
@@ -318,8 +328,9 @@ watch(
 
 <template>
   <div class="flex flex-col min-h-screen pb-16 sm:pb-0">
-    <!-- Navbar Desktop (hidden on mobile) -->
+    <!-- Navbar Desktop (hidden on mobile, hidden on auth pages) -->
     <div
+      v-if="!isAuthPage"
       class="hidden sm:block sticky top-0 z-50 w-full h-[68px] bg-white border-b border-gray-200 shadow-sm"
     >
       <div class="max-w-[1440px] mx-auto h-full px-4">
@@ -532,6 +543,7 @@ watch(
 
     <!-- Bottom Dock Navigation (Mobile only) -->
     <nav
+      v-if="showMobileDock"
       class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg sm:hidden"
     >
       <div class="flex items-center justify-around h-16 px-1">

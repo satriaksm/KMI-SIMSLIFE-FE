@@ -235,7 +235,7 @@ defineExpose({
       <!-- Header -->
       <div
         :class="[
-          'flex items-center h-16',
+          'flex items-center h-24',
           isOpen
             ? 'justify-between px-4'
             : 'justify-between px-4 lg:justify-center',

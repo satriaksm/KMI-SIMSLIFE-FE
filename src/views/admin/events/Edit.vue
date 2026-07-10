@@ -10,6 +10,7 @@ import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import api from "@/libs/axios";
 import { useEvents } from "@/composables/useEvents";
+import { compressImage } from "@/utils/imageCompressor";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 import LogoText from "@/assets/icons/LogoWithText.png";
 
@@ -206,14 +207,26 @@ const loadEvent = async () => {
   }
 };
 
-const handleBannerChange = (event) => {
+const handleBannerChange = async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-  bannerFile.value = file;
+
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error("Ukuran banner maksimal 5MB");
+    event.target.value = "";
+    return;
+  }
+
   hasNewBanner.value = true;
-  const reader = new FileReader();
-  reader.onload = (e) => { bannerPreview.value = e.target?.result; };
-  reader.readAsDataURL(file);
+
+  try {
+    const compressedFile = await compressImage(file, 1920);
+    bannerFile.value = compressedFile;
+    bannerPreview.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    bannerFile.value = file;
+    bannerPreview.value = URL.createObjectURL(file);
+  }
 };
 
 const removeBanner = () => {

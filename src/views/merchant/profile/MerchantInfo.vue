@@ -263,7 +263,7 @@ const goToEdit = () => {
         <!-- Hamburger Button (Mobile) -->
         <button
           @click="$emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>
@@ -397,7 +397,7 @@ const goToEdit = () => {
           </div>
         </div>
 
-        <div class="absolute -bottom-10 sm:-bottom-12 left-10 sm:left-8">
+        <div class="absolute -bottom-10 sm:-bottom-12 left-4 sm:left-8">
           <ResponsiveImage
             v-if="hasLogo"
             :src="merchantInfo.logo"

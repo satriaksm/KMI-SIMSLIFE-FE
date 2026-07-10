@@ -1,4 +1,5 @@
 import { ref, computed } from "vue";
+import { compressImage } from "@/utils/imageCompressor";
 
 export function useProductVariants({ maxVariants, maxOptions, toast }) {
   const useVariants = ref(false);
@@ -104,7 +105,7 @@ export function useProductVariants({ maxVariants, maxOptions, toast }) {
     return total <= maxOptions;
   };
 
-  const handleOptionImageUpload = (variantIndex, optionIndex, event) => {
+  const handleOptionImageUpload = async (variantIndex, optionIndex, event) => {
     const files = Array.from(event.target.files);
     const option = variants.value[variantIndex].options[optionIndex];
 
@@ -116,17 +117,25 @@ export function useProductVariants({ maxVariants, maxOptions, toast }) {
 
     const file = files[0];
     if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+      try {
+        const compressedFile = await compressImage(file, 1920);
         option.images = [
           {
             id: Date.now(),
-            file,
-            preview: e.target.result,
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile),
           },
         ];
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        // Fallback
+        option.images = [
+          {
+            id: Date.now(),
+            file: file,
+            preview: URL.createObjectURL(file),
+          },
+        ];
+      }
     }
     event.target.value = "";
   };

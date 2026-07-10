@@ -616,7 +616,7 @@ function leaveOrderChannel(id) {
     <MerchantMobileHeader title="Detail Pesanan" />
 
     <div
-      class="top-0 left-0 right-0 z-10 items-center justify-between hidden px-4 py-4 bg-white border-b border-gray-100 sm:flex sm:fixed sm:static sm:px-6"
+      class="top-0 left-0 right-0 z-10 items-center justify-between hidden px-4 py-4 sm:py-6 bg-white border-b border-gray-100 sm:flex sm:fixed sm:static sm:px-6"
     >
       <div class="flex items-center gap-3">
         <button

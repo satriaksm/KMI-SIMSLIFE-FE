@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex items-center justify-center p-4 bg-white sm:bg-gray-50 min-h-svh sm:min-h-0 sm:items-stretch sm:p-8"
+    class="flex items-center justify-center p-4 bg-white sm:bg-gray-50 min-h-[calc(100vh-64px)] sm:min-h-screen sm:p-8"
   >
     <div
       class="w-full max-w-5xl overflow-hidden bg-white shadow-none rounded-2xl sm:shadow-lg"
@@ -10,22 +10,26 @@
         <div
           class="hidden sm:flex items-center justify-center bg-gradient-to-br from-primary to-[#FFA30E] p-12"
         >
-          <img
-            :src="WhiteWithText"
-            alt="Ilustration Login"
-            class="w-full max-w-md"
-          />
+          <router-link to="/">
+            <img
+              :src="WhiteWithText"
+              alt="Ilustration Login"
+              class="w-full max-w-md transition-transform hover:scale-105"
+            />
+          </router-link>
         </div>
 
         <!-- Right Side - Form -->
         <div class="flex flex-col justify-center p-4 sm:p-12">
           <!-- Mobile Illustration -->
-          <div class="items-center justify-center py-4 sm:hidden">
-            <img
-              :src="LogoWithText"
-              alt="Ilustration Login"
-              class="w-full mx-auto max-w-52"
-            />
+          <div class="items-center justify-center py-4 sm:hidden flex">
+            <router-link to="/">
+              <img
+                :src="LogoWithText"
+                alt="Ilustration Login"
+                class="w-full mx-auto max-w-52 transition-transform active:scale-95"
+              />
+            </router-link>
           </div>
 
           <h2
@@ -101,13 +105,13 @@
           </Form>
 
           <!-- Debug Info (Development Only) -->
-          <div
+          <!-- <div
             v-if="isDev"
             class="p-4 mt-6 text-xs border border-gray-200 bg-gray-50 rounded-xl"
           >
             <p class="mb-2 font-semibold text-gray-700">Debug Info:</p>
             <p class="text-gray-600"><strong>API URL:</strong> {{ apiUrl }}</p>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>

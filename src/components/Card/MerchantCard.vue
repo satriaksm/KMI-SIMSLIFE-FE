@@ -44,22 +44,23 @@
           {{ merchant.name }}
         </h3>
 
-        <!-- Products/Jasa Count - Dynamic label based on merchant type -->
-        <div class="flex items-center gap-1 mb-1 text-[11px] text-gray-500 mt-2">
-          <i class="text-base me-1 pi pi-shopping-bag text-primary"></i>
-          <span class="line-clamp-1">
-            {{ displayCount }} {{ displayLabel }}
-          </span>
-        </div>
+        <!-- Meta Info Row (Products & Distance) -->
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1 text-[11px] text-gray-500 mt-2">
+          <!-- Products/Jasa Count -->
+          <div class="flex items-center gap-1">
+            <i class="text-xs pi pi-shopping-bag text-primary"></i>
+            <span class="line-clamp-1">
+              {{ displayCount }} {{ displayLabel }}
+            </span>
+          </div>
 
-        <!-- Location -->
-        <div
-          v-if="formattedDistanceKm"
-          class="flex items-center gap-1 mb-1 text-[11px] text-gray-500"
-        >
-          <i class="text-base pi pi-map-marker me-1 text-danger-foreground"></i>
-          <div>
-            <span v-if="formattedDistanceKm">
+          <!-- Location Distance -->
+          <div
+            v-if="formattedDistanceKm"
+            class="flex items-center gap-1"
+          >
+            <i class="text-xs pi pi-map-marker text-danger-foreground"></i>
+            <span>
               {{ formattedDistanceKm }}
             </span>
           </div>

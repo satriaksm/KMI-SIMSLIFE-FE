@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-100">
     <MobileHeader title="Rincian Pesananmu" @back="goBack" variant="primary" />
 
-    <div class="px-4 py-2 mx-auto space-y-2 max-w-7xl sm:py-4 sm:space-y-4">
+    <div class="px-4 py-2 pb-4 mx-auto space-y-2 max-w-7xl sm:py-4 sm:space-y-4">
       <!-- Verifying payment banner -->
       <div
         v-if="verifying"
@@ -165,7 +165,7 @@
             <template v-if="order.meta.delivery_type === 'pickup'">
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" :urls="order.pickup.logoUrls" customClass="object-cover w-full h-full" alt="Store logo" />
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" customClass="object-cover w-full h-full" alt="Store logo" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -195,7 +195,7 @@
             <template v-else>
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" :urls="order.pickup.logoUrls" customClass="object-cover w-full h-full" alt="Store logo" />
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" customClass="object-cover w-full h-full" alt="Store logo" />
                   <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                   </svg>
@@ -401,50 +401,92 @@
           </div>
         </div>
 
-        <div v-if="order.status !== 'cancelled'" class="py-3 mx-auto max-w-7xl">
+        <div v-if="order.status !== 'cancelled'" class=" mx-auto max-w-7xl">
           <div v-if="order?.status === 'pending' && isPaymentExpired" class="mb-3 text-center text-sm font-semibold text-red-600 bg-red-50 py-2 rounded-xl">
             Waktu pembayaran telah habis.
           </div>
           <div v-else-if="order?.status === 'pending' && countdownText" class="mb-3 text-center text-sm font-medium text-amber-700 bg-amber-50 py-2 rounded-xl">
             Sisa waktu pembayaran: <span class="font-bold">{{ countdownText }}</span>
           </div>
-          <Button
-            v-if="order?.status === 'pending' && order?.meta?.payment_method !== 'COD'"
-            variant="primary"
-            block
-            :loading="paying"
-            :disabled="isPaymentExpired"
-            @click="handlePayNow"
-          >
-            Bayar Sekarang
-          </Button>
-          <Button
-            v-if="order?.status === 'pending'"
-            variant="danger-outline"
-            block
-            :loading="cancelling"
-            @click="handleCancel"
-            customClass="mt-2"
-          >
-            Batalkan Pesanan
-          </Button>
-          <Button
-            v-if="order?.status === 'delivered' && order?.meta?.payment_method?.toUpperCase() !== 'COD'"
-            block
-            :loading="completing"
-            @click="handleComplete"
-            customClass="mt-2 bg-green-600 hover:bg-green-700 text-white"
-          >
-            Pesanan Diterima (Selesai)
-          </Button>
-          <Button
-            v-if="order?.status === 'completed'"
-            block
-            @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
-            customClass="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Beri Ulasan
-          </Button>
+          <!-- Desktop Buttons -->
+          <div class="hidden sm:block space-y-2 mt-2">
+            <Button
+              v-if="order?.status === 'pending' && order?.meta?.payment_method !== 'COD'"
+              variant="primary"
+              block
+              :loading="paying"
+              :disabled="isPaymentExpired"
+              @click="handlePayNow"
+            >
+              Bayar Sekarang
+            </Button>
+            <Button
+              v-if="order?.status === 'pending'"
+              variant="danger-outline"
+              block
+              :loading="cancelling"
+              @click="handleCancel"
+            >
+              Batalkan Pesanan
+            </Button>
+            <Button
+              v-if="order?.status === 'delivered' && order?.meta?.payment_method?.toUpperCase() !== 'COD'"
+              block
+              :loading="completing"
+              @click="handleComplete"
+              customClass="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Pesanan Diterima (Selesai)
+            </Button>
+            <Button
+              v-if="order?.status === 'completed'"
+              block
+              @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
+              customClass="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Beri Ulasan
+            </Button>
+          </div>
+
+          <!-- Mobile Sticky Buttons -->
+          <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe flex flex-col gap-2">
+            <Button
+              v-if="order?.status === 'pending' && order?.meta?.payment_method !== 'COD'"
+              variant="primary"
+              block
+              :loading="paying"
+              :disabled="isPaymentExpired"
+              @click="handlePayNow"
+            >
+              Bayar Sekarang
+            </Button>
+            <Button
+              v-if="order?.status === 'pending'"
+              variant="danger-outline"
+              block
+              :loading="cancelling"
+              @click="handleCancel"
+            >
+              Batalkan Pesanan
+            </Button>
+            <Button
+              v-if="order?.status === 'delivered' && order?.meta?.payment_method?.toUpperCase() !== 'COD'"
+              block
+              :loading="completing"
+              @click="handleComplete"
+              customClass="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Pesanan Diterima (Selesai)
+            </Button>
+            <Button
+              v-if="order?.status === 'completed'"
+              block
+              @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
+              customClass="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Beri Ulasan
+            </Button>
+          </div>
         </div>
       </template>
     </div>
@@ -573,8 +615,8 @@ const order = computed(() => {
           ].filter(Boolean).join(", ")
         : "Alamat toko belum diatur",
       phone: o.merchant?.phone || null,
-      logoUrl: o.merchant?.logo_url || o.merchant?.logoUrl || null,
-      logoUrls: o.merchant?.logo_urls || o.merchant?.logoUrls || null,
+      logoUrl: (o.merchant?.logo_url || o.merchant?.logoUrl) ? `${(o.merchant?.logo_url || o.merchant?.logoUrl).split('?')[0]}?size=thumb` : null,
+      logoUrls: null,
     },
 
     dropoff: {
@@ -643,7 +685,8 @@ function formatDateTime(dateStr) {
 
 function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
+  if (path.startsWith('http') && !path.includes('/api/order-snapshots') && !path.includes('/storage')) return path;
+  
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
   return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }

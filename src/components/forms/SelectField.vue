@@ -209,7 +209,7 @@ onUnmounted(() => {
           class="absolute z-50 flex flex-col w-full mt-1 overflow-hidden bg-white border border-gray-200 shadow-lg rounded-xl max-h-60"
         >
           <!-- Search Input -->
-          <div class="sticky top-0 p-2 border-b border-gray-100 bg-gray-50/50">
+          <div v-if="options.length > 5" class="sticky top-0 p-2 border-b border-gray-100 bg-gray-50/50">
             <div class="relative">
               <i
                 class="absolute text-xs text-gray-400 -translate-y-1/2 pi pi-search left-3 top-1/2"

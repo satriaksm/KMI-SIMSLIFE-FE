@@ -43,6 +43,16 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
+const searchInput = ref(route.query.q || "");
+watch(
+  () => route.query.q,
+  (newQ) => {
+    if (newQ !== searchInput.value) {
+      searchInput.value = newQ || "";
+    }
+  },
+);
+
 const myLatitude = ref(null);
 const myLongitude = ref(null);
 
@@ -713,12 +723,11 @@ function buildProductQuery() {
 }
 
 function submitSearch() {
-  const q = route.query.q;
-  if (!q) return;
+  if (!searchInput.value.trim()) return;
 
-  router.push({
+  router.replace({
     name: "Search Page",
-    query: { q },
+    query: { q: searchInput.value },
   });
 }
 const goToCart = () => {
@@ -1078,8 +1087,7 @@ onBeforeUnmount(() => {
         <form @submit.prevent="submitSearch" class="flex-1">
           <div class="relative">
             <TextField
-              :modelValue="route.query.q || ''"
-              @update:modelValue="(v) => router.replace({ query: { q: v } })"
+              v-model="searchInput"
               name="search"
               placeholder="Cari produk atau UMKM…"
               variant="primary"

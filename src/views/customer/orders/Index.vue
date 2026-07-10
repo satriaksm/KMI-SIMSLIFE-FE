@@ -1,6 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-100">
-    <MobileHeader title="Pesanan Saya" @back="goBack" variant="primary" />
+    <!-- <MobileHeader title="Pesanan Saya" @back="goBack" variant="primary" /> -->
 
     <div class="px-4 py-4 mx-auto space-y-2 sm:space-y-4 max-w-7xl">
       <!-- Search + Filter Button -->
@@ -445,7 +445,9 @@ function formatDateLabel(dateStr) {
 
 function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
+  // Jika path adalah full URL (dari backend), kita paksa arahkan ke endpoint order-snapshots agar bisa di-resize
+  if (path.startsWith('http') && !path.includes('/api/order-snapshots') && !path.includes('/storage')) return path;
+  
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
   return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }

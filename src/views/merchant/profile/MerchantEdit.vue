@@ -2,7 +2,7 @@
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
     <MerchantMobileHeader
-      title="Edit Informasi Toko"
+      title="Edit Informasi UMKM"
       :backRoute="
         merchantSlug
           ? `/merchant-center/${merchantSlug}/profile`
@@ -78,12 +78,9 @@
           </div>
         </div>
       </div>
-      <!-- Mobile: Card with Cover & Logo -->
-      <div
-        class="mx-4 mb-4 overflow-hidden bg-white shadow-sm sm:hidden rounded-2xl"
-      >
-        <!-- Cover Image -->
-        <div class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1">
+      <!-- Cover & Logo -->
+      <div class="relative mx-4 mb-2 overflow-visible bg-white sm:mx-0 sm:mb-4 sm:shadow-sm">
+        <div class="relative w-full overflow-hidden rounded-2xl aspect-24/9 lg:aspect-4/1">
           <ResponsiveImage
             v-if="hasFormCover"
             :src="form.coverImage"
@@ -98,7 +95,7 @@
             aria-hidden="true"
           >
             <svg
-              class="w-10 h-10 text-white"
+              class="w-12 h-12 text-white sm:w-16 sm:h-16"
               fill="currentColor"
               viewBox="0 0 24 24"
             >
@@ -109,125 +106,29 @@
           </div>
           <button
             @click="handleUploadCover"
-            class="absolute flex items-center justify-center w-10 h-10 text-white transition-opacity rounded-full shadow-lg top-3 right-3 bg-merchant-primary hover:opacity-90"
+            class="absolute flex items-center justify-center w-10 h-10 p-0 text-white transition-opacity rounded-full shadow-lg sm:p-3 sm:w-12 sm:h-12 top-3 right-3 sm:top-6 sm:right-6 bg-merchant-primary hover:opacity-90"
           >
-            <i class="text-base pi pi-camera"></i>
+            <i class="text-base pi pi-camera sm:text-xl"></i>
           </button>
         </div>
 
-        <!-- Logo - Overlapping -->
-        <div class="relative px-4 pb-4 pt-14">
-          <div class="absolute -top-12 left-4">
-            <div class="relative">
-              <ResponsiveImage
-                v-if="hasFormLogo"
-                :src="form.logo"
-                :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
-                alt="Logo"
-                customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
-                @error="onLogoImgError"
-              />
-              <span
-                v-else
-                class="flex items-center justify-center w-24 h-24 bg-gray-100 border-4 border-white shadow-lg rounded-2xl"
-                aria-hidden="true"
-              >
-                <svg
-                  class="w-10 h-10 text-gray-300"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z"
-                  />
-                </svg>
-              </span>
-              <button
-                @click="handleUploadLogo"
-                class="absolute bottom-0 right-0 flex items-center justify-center w-8 h-8 text-white transition-opacity rounded-full shadow-lg bg-merchant-primary hover:opacity-90"
-              >
-                <i class="text-xs pi pi-camera"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Desktop: Cover & Logo -->
-      <div
-        class="relative hidden mb-4 overflow-visible bg-white shadow-sm sm:block rounded-xl"
-      >
-        <div class="overflow-hidden rounded-xl">
-          <div
-            class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1"
-          >
-            <ResponsiveImage
-              v-if="hasFormCover"
-              :src="form.coverImage"
-              :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
-              alt="Cover"
-              customClass="absolute inset-0 object-cover w-full h-full"
-              @error="onCoverImgError"
-            />
-            <div
-              v-else
-              class="absolute inset-0 flex items-center justify-center bg-linear-to-br from-muted-background to-muted-foreground"
-              aria-hidden="true"
-            >
-              <svg
-                class="w-12 h-12 text-white lg:w-16 lg:h-16"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM5 19V5h14v14H5zm8-7a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-6 7l3-4 2.5 3 3.5-5 4 6H7z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <button
-          @click="handleUploadCover"
-          class="absolute p-3 text-white transition-opacity rounded-full shadow-lg top-6 right-6 bg-merchant-primary hover:opacity-90"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-        </button>
-
-        <div class="absolute -bottom-12 left-8">
+        <div class="absolute -bottom-10 sm:-bottom-12 left-4 sm:left-8">
           <div class="relative">
             <ResponsiveImage
               v-if="hasFormLogo"
               :src="form.logo"
               :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
               alt="Logo"
-              customClass="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
+              customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
               @error="onLogoImgError"
             />
             <span
               v-else
-              class="flex items-center justify-center w-32 h-32 bg-gray-100 border-4 border-white shadow-lg rounded-2xl"
+              class="flex items-center justify-center w-24 h-24 bg-gray-100 border-4 border-white shadow-lg sm:w-32 sm:h-32 rounded-2xl"
               aria-hidden="true"
             >
               <svg
-                class="w-12 h-12 text-gray-300"
+                class="w-12 h-12 text-gray-300 sm:w-16 sm:h-16"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -238,34 +139,16 @@
             </span>
             <button
               @click="handleUploadLogo"
-              class="absolute bottom-0 right-0 p-2 text-white transition-opacity rounded-full shadow-lg bg-merchant-primary hover:opacity-90"
+              class="absolute bottom-0 right-0 flex items-center justify-center w-8 h-8 p-0 text-white transition-opacity rounded-full shadow-lg sm:w-10 sm:h-10 sm:p-2 bg-merchant-primary hover:opacity-90"
             >
-              <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+              <i class="text-xs pi pi-camera sm:text-sm"></i>
             </button>
           </div>
         </div>
       </div>
 
       <!-- Form Content -->
-      <Form :validation-schema="editProfileSchema" @submit="handleSave" class="sm:pt-16">
+      <Form :validation-schema="editProfileSchema" @submit="handleSave" class="pt-16">
         <!-- Mobile: Single Card -->
         <div
           class="p-4 mx-4 mb-2 space-y-5 bg-white shadow-sm sm:hidden rounded-2xl"
@@ -280,10 +163,9 @@
               name="name"
               v-model="form.name"
               label="Nama UMKM"
-              placeholder="Masukkan nama toko"
+              placeholder="Masukkan nama UMKM"
               variant="merchant"
-                            required
-
+              required
             />
           </div>
 
@@ -308,7 +190,7 @@
               :textarea="true"
               :rows="4"
               label="Tentang"
-              placeholder="Ceritakan tentang toko Anda..."
+              placeholder="Ceritakan tentang UMKM Anda..."
               variant="merchant"
             />
           </div>
@@ -555,7 +437,7 @@
 
         <!-- Desktop: Original Layout -->
         <div
-          class="hidden p-6 mb-4 space-y-8 bg-white shadow-sm sm:block rounded-xl"
+          class="hidden p-6  mb-4 space-y-8 bg-white shadow-sm sm:block rounded-xl"
         >
           <h2 class="text-2xl font-bold text-merchant-primary">
             Informasi UMKM
@@ -895,11 +777,21 @@
       class="hidden"
       @change="onLogoSelected"
     />
+    
+    <ImageCropperModal
+      :show="showCropper"
+      :image-url="cropperImageUrl"
+      :aspect-ratio="cropperAspectRatio"
+      :title="cropperTitle"
+      @close="showCropper = false"
+      @crop="handleCrop"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, nextTick } from "vue";
+import { compressImage } from "@/utils/imageCompressor";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
@@ -922,8 +814,15 @@ import AppButton from "@/components/common/Button.vue";
 import * as yup from "yup";
 import { Form } from "vee-validate";
 import { useAddressMapSync } from "@/composables/useAddressMapSync";
+import ImageCropperModal from "@/components/common/ImageCropperModal.vue";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+const showCropper = ref(false);
+const cropperImageUrl = ref("");
+const cropperType = ref(""); // 'cover' or 'logo'
+const cropperAspectRatio = ref(1);
+const cropperTitle = ref("");
 
 const isDev = import.meta.env.DEV;
 const router = useRouter();
@@ -1383,12 +1282,16 @@ const onCoverSelected = (e) => {
     return;
   }
 
-  form.value.coverFile = file;
-  form.value.coverImage = URL.createObjectURL(file);
-
-  if (isDev) {
-    console.log("Cover file:", file);
-  }
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    cropperImageUrl.value = event.target.result;
+    cropperType.value = "cover";
+    cropperAspectRatio.value = 4 / 1;
+    cropperTitle.value = "Sesuaikan Cover UMKM";
+    showCropper.value = true;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
 };
 
 const onLogoSelected = (e) => {
@@ -1401,11 +1304,37 @@ const onLogoSelected = (e) => {
     return;
   }
 
-  form.value.logoFile = file;
-  form.value.logo = URL.createObjectURL(file);
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    cropperImageUrl.value = event.target.result;
+    cropperType.value = "logo";
+    cropperAspectRatio.value = 1;
+    cropperTitle.value = "Sesuaikan Logo UMKM";
+    showCropper.value = true;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+};
 
-  if (isDev) {
-    console.log("Logo file:", file);
+const handleCrop = async (croppedFile) => {
+  showCropper.value = false;
+  try {
+    const compressedFile = await compressImage(croppedFile, 1920);
+    if (cropperType.value === "cover") {
+      form.value.coverFile = compressedFile;
+      form.value.coverImage = URL.createObjectURL(compressedFile);
+    } else if (cropperType.value === "logo") {
+      form.value.logoFile = compressedFile;
+      form.value.logo = URL.createObjectURL(compressedFile);
+    }
+  } catch (err) {
+    if (cropperType.value === "cover") {
+      form.value.coverFile = croppedFile;
+      form.value.coverImage = URL.createObjectURL(croppedFile);
+    } else if (cropperType.value === "logo") {
+      form.value.logoFile = croppedFile;
+      form.value.logo = URL.createObjectURL(croppedFile);
+    }
   }
 };
 

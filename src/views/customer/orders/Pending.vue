@@ -111,7 +111,8 @@ function formatDateLabel(dateStr) {
 
 function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
-  if (path.startsWith('http')) return path;
+  if (path.startsWith('http') && !path.includes('/api/order-snapshots') && !path.includes('/storage')) return path;
+  
   const baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
   return `${baseUrl}/api/order-snapshots/${orderItemId}?size=thumb`;
 }

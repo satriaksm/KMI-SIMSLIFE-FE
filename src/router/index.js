@@ -49,7 +49,7 @@ const routes = [
       {
         path: "explore",
         name: "UMKM & Produk-Layanan Jasa",
-        component: () => import("@/views/ExploreView.vue"),
+        component: () => import("@/views/HomeView.vue"),
         meta: {
           title: "Semua Produk & Layanan | SUMILIR",
           description:
@@ -350,11 +350,11 @@ const routes = [
   },
 
   // ===========================
-  // Grup halaman Auth pakai AuthLayout
+  // Grup halaman Auth pakai CustomerLayout
   // ===========================
   {
     path: "/",
-    component: () => import("@/layouts/AuthLayout.vue"),
+    component: () => import("@/layouts/CustomerLayout.vue"),
     meta: { guest: true },
     children: [
       {
