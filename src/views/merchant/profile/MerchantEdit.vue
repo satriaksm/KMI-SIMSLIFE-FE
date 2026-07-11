@@ -399,11 +399,7 @@
                       >
                       <input
                         type="time"
-                        :value="day.open || '06:00'"
-                        @input="
-                          day.open = $event.target.value;
-                          updateDayHours(index);
-                        "
+                        v-model="day.open"
                         class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
                         :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
@@ -416,11 +412,7 @@
                       >
                       <input
                         type="time"
-                        :value="day.close || '18:00'"
-                        @input="
-                          day.close = $event.target.value;
-                          updateDayHours(index);
-                        "
+                        v-model="day.close"
                         class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
                         :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
@@ -699,11 +691,7 @@
                       >
                       <input
                         type="time"
-                        :value="day.open || '06:00'"
-                        @input="
-                          day.open = $event.target.value;
-                          updateDayHours(index);
-                        "
+                        v-model="day.open"
                         class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
                         :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
@@ -716,11 +704,7 @@
                       >
                       <input
                         type="time"
-                        :value="day.close || '18:00'"
-                        @input="
-                          day.close = $event.target.value;
-                          updateDayHours(index);
-                        "
+                        v-model="day.close"
                         class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
                         :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
