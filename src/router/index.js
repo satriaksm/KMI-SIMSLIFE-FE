@@ -694,16 +694,6 @@ const routes = [
       },
 
       // ===========================
-      // BOOKING MANAGEMENT
-      // ===========================
-      {
-        path: "bookings",
-        name: "Merchant - Booking Management",
-        component: () => import("@/views/merchant/service/MerchantServiceHistory.vue"),
-        meta: { title: "History Layanan Jasa | SUMILIR" },
-      },
-
-      // ===========================
       // 🆕 KONSULTASI (UMKM JASA)
       // ===========================
       {
@@ -828,6 +818,15 @@ const routes = [
         component: () => import("@/views/merchant/reports/Index.vue"),
         meta: {
           title: "Laporan UMKM | SUMILIR",
+        },
+      },
+
+            {
+        path: "reviews",
+        name: "Merchant - Reviews",
+        component: () => import("@/views/merchant/reviews/Index.vue"),
+        meta: {
+          title: "Ulasan UMKM | SUMILIR",
         },
       },
 

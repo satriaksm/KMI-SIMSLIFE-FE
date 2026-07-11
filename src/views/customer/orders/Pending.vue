@@ -124,17 +124,19 @@ function mapOrder(o) {
     dateLabel: formatDateLabel(o.created_at),
     status: "pending_payment",
     total: o.gross_amount,
-    items: (o.items || []).map((it) => ({
+    order_type: o.order_type,
+    delivery_type: o.delivery_type || "delivery",
+    items: (o.order_type === 'jasa' ? (o.jasa_items || []) : (o.items || [])).map((it) => ({
       id: it.id,
-      title: it.product_name_snapshot || "Produk",
+      title: it.jasa_title_snapshot || it.product_name_snapshot || "Item/Layanan",
       qty: it.quantity,
-      variant: it.product_variant_snapshot || "",
+      variant: o.order_type === 'jasa' ? (it.order_method === 'langsung_pesan' || it.order_method === 'keranjang' ? 'Langsung Pesan' : (it.order_method === 'konsultasi' || it.order_method === 'memerlukan_konsultasi' ? 'Konsultasi' : 'Booking')) : (it.product_variant_snapshot || ""),
       addons: (it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.unit_price_snapshot,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      price: it.unit_price_snapshot || it.subtotal || it.price || it.jasa_price_snapshot || 0,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
     })),
     _raw: o,
   };

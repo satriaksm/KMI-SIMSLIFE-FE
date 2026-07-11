@@ -55,8 +55,10 @@ function mapApiStatus(beStatus, o) {
     case "responsed":
     case "accepted":
       return "processing";
+    case "on-progress":
+      return "on_progress";
     case "ready_to_pickup":
-      return "ready";
+      return o.order_type === 'jasa' ? (o.delivery_type === 'online' ? 'shipped' : 'ready') : (o.delivery_type === "pickup" ? "ready" : "shipped");
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
     case "completed":
@@ -79,6 +81,7 @@ const order = computed(() => {
   if (!o) return null;
   return {
     id: o.id,
+    order_type: o.order_type,
     invoice: o.order_code || "-",
     customer: {
       name: o.user_name_snapshot || "Pelanggan",
@@ -91,18 +94,18 @@ const order = computed(() => {
     _rawStatus: o.status,
     payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
     created_at: o.created_at,
-    items: (o.items || []).map((it) => ({
+    items: (o.order_type === 'jasa' ? (o.jasa_items || []) : (o.items || [])).map((it) => ({
       id: it.id,
-      name: it.product_name_snapshot || "Produk",
-      variant: it.product_variant_snapshot || "",
+      name: it.jasa_title_snapshot || it.product_name_snapshot || "Item/Layanan",
+      variant: o.order_type === 'jasa' ? (it.order_method === 'langsung_pesan' || it.order_method === 'keranjang' ? 'Langsung Pesan' : (it.order_method === 'konsultasi' || it.order_method === 'memerlukan_konsultasi' ? 'Konsultasi' : 'Booking')) : (it.product_variant_snapshot || ""),
       addons: (it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
       qty: it.quantity,
-      price: it.unit_price_snapshot,
-      subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      price: it.unit_price_snapshot || it.price || it.jasa_price_snapshot,
+      subtotal: it.subtotal_snapshot || it.subtotal || ((it.unit_price_snapshot || it.price || it.jasa_price_snapshot || 0) * it.quantity),
+      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
     })),
     amounts: {
       subtotal: Number(o.subtotal || 0),
@@ -279,46 +282,48 @@ const currentStatusConfig = computed(() => {
 const timeline = computed(() => {
   if (!order.value) return [];
   const status = order.value.status;
-  const isPickup = order.value.delivery_type === "pickup";
+  const isJasa = rawOrder.value?.order_type === 'jasa';
+  const isPickup = rawOrder.value?.delivery_type === "pickup";
+  const isOnline = rawOrder.value?.delivery_type === "online";
+  
+  const step3Label = isJasa ? (isOnline ? "Pelaksanaan Selesai" : "Pelaksanaan Selesai") : (isPickup ? "Siap Diambil" : "Sedang Diantar");
+  const step3Desc = isJasa ? "Layanan telah dikerjakan" : (isPickup ? "Siap diambil di toko" : "Pesanan dikirim");
+  const step3Icon = isJasa ? "pi-check-circle" : (isPickup ? "pi-map-marker" : "pi-truck");
+  const step3Key = isJasa ? "shipped" : (isPickup ? "ready" : "shipped");
+  
+  const step4Label = isJasa ? "Selesai" : "Selesai";
+  const step4Desc = isJasa ? "Layanan berhasil" : (isPickup ? "Pesanan diambil" : "Pesanan diterima");
 
   const steps = [
-    {
-      key: "waiting_review",
-      label: "Menunggu Konfirmasi",
-      desc: "Pembayaran diterima",
-      icon: "pi-credit-card",
-    },
-    {
-      key: "processing",
-      label: "Sedang Diproses",
-      desc: "Pesanan disiapkan",
-      icon: "pi-sync",
-    },
-    {
-      key: isPickup ? "ready" : "shipped",
-      label: isPickup ? "Siap Diambil" : "Sedang Diantar",
-      desc: isPickup ? "Siap diambil di toko" : "Pesanan dikirim",
-      icon: isPickup ? "pi-map-marker" : "pi-truck",
-    },
-    {
-      key: "completed",
-      label: "Pesanan Selesai",
-      desc: isPickup ? "Pesanan diambil" : "Pesanan diterima",
-      icon: "pi-check-circle",
-    },
+    { key: "placed", label: "Dibuat", desc: "Pesanan masuk", icon: "pi-receipt" },
+    { key: "accepted", label: isJasa ? "Pesanan Diterima" : "Diproses", desc: isJasa ? "Telah dikonfirmasi" : "Sedang disiapkan", icon: isJasa ? "pi-cog" : "pi-box" },
   ];
 
-  const statusOrder = [
-    "waiting_review",
-    "processing",
-    isPickup ? "ready" : "shipped",
-    "completed",
-  ];
-  const order_idx = statusOrder.indexOf(status);
+  if (isJasa) {
+    steps.push({ key: "on_progress", label: "Sedang Dikerjakan", desc: "Layanan diproses", icon: isOnline ? "pi-globe" : "pi-users" });
+  }
+
+  steps.push(
+    { key: step3Key, label: step3Label, desc: step3Desc, icon: step3Icon },
+    { key: "completed", label: step4Label, desc: step4Desc, icon: "pi-home" }
+  );
+
+  const statuses = ["placed", "accepted"];
+  if (isJasa) statuses.push("on_progress");
+  statuses.push(step3Key, "completed");
+
+  let currentStatus = order.value.status;
+  if (["pending", "waiting_review", "paid", "responsed"].includes(currentStatus)) currentStatus = "placed";
+  if (currentStatus === "processing") currentStatus = "accepted";
+  if (currentStatus === "on-progress") currentStatus = "on_progress";
+  if (currentStatus === "delivered") currentStatus = "shipped";
+  if (currentStatus === "ready_to_pickup") currentStatus = "ready";
+
+  const order_idx = statuses.indexOf(currentStatus);
   return steps.map((s, i) => ({
     ...s,
-    done: i <= order_idx && status !== "cancelled",
-    active: statusOrder.indexOf(s.key) === order_idx,
+    done: i <= order_idx && currentStatus !== "cancelled",
+    active: i === order_idx,
   }));
 });
 
@@ -373,7 +378,9 @@ function getNextStatus() {
       return null; // Transfer pending = belum bayar
     case "responsed":
     case "accepted":
-      return rawOrder.value?.delivery_type === 'pickup' ? 'ready_to_pickup' : 'delivered';
+      return rawOrder.value?.order_type === 'jasa' ? 'on-progress' : (rawOrder.value?.delivery_type === 'pickup' ? 'ready_to_pickup' : 'delivered');
+    case "on-progress":
+      return rawOrder.value?.order_type === 'jasa' ? 'completed' : null; // or delivered? actually completed
     case "delivered":
     case "ready_to_pickup":
       // UMKM (penjual) bisa menekan "completed" (Pesanan Tiba) untuk semua jenis pesanan
@@ -385,7 +392,21 @@ function getNextStatus() {
 
 const nextActionLabel = computed(() => {
   const next = getNextStatus();
+  const isJasa = order.value?.order_type === 'jasa';
   const isPickup = order.value?.delivery_type === "pickup";
+  
+  if (isJasa) {
+    switch (next) {
+      case "accepted":
+        return "Terima & Proses Pesanan";
+      case "on-progress":
+        return "Tandai Sedang Dikerjakan";
+      case "completed":
+        return "Tandai Selesai";
+      default:
+        return null;
+    }
+  }
   switch (next) {
     case "accepted":
       return "Terima & Proses Pesanan";
@@ -844,9 +865,9 @@ function leaveOrderChannel(id) {
             <p class="font-medium text-gray-800">{{ order.payment_method }}</p>
           </div>
           <div>
-            <p class="text-xs text-gray-400">Metode Pengiriman</p>
+            <p class="text-xs text-gray-400">{{ order.order_type === 'jasa' ? 'Metode Pengerjaan' : 'Metode Pengiriman' }}</p>
             <p class="font-medium text-gray-800">
-              {{ order.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)' }}
+              {{ order.order_type === 'jasa' ? (order.delivery_type === 'in-store' ? 'Pelaksanaan di Tempat (In-Store)' : (order.delivery_type === 'on-site' ? 'Panggilan (On-Site)' : 'Online / Daring')) : (order.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)') }}
             </p>
           </div>
         </div>
@@ -881,8 +902,8 @@ function leaveOrderChannel(id) {
           </div>
         </div>
 
-        <div v-if="order.shipping_address && order.delivery_type === 'delivery'" class="pt-1">
-          <p class="mb-1 text-xs text-gray-400">Alamat Pengiriman</p>
+        <div v-if="order.shipping_address && (order.delivery_type === 'delivery' || order.delivery_type === 'on-site')" class="pt-1">
+          <p class="mb-1 text-xs text-gray-400">{{ order.order_type === 'jasa' ? 'Alamat Pengerjaan' : 'Alamat Pengiriman' }}</p>
           <div class="flex items-start gap-2">
             <i
               class="pi pi-map-marker text-xs text-gray-400 mt-0.5 shrink-0"
@@ -927,7 +948,7 @@ function leaveOrderChannel(id) {
         <h2
           class="pb-2 mb-3 text-sm font-semibold text-gray-700 border-b border-gray-100"
         >
-          Produk ({{ order.items.length }} item)
+          {{ rawOrder?.order_type === 'jasa' ? 'Layanan Jasa' : 'Produk' }} ({{ order.items.length }} item)
         </h2>
         <div class="space-y-3">
           <div
@@ -980,8 +1001,8 @@ function leaveOrderChannel(id) {
             <span>Diskon</span>
             <span>-Rp {{ formatIDR(order.amounts.discount) }}</span>
           </div>
-          <div class="flex justify-between text-sm text-gray-600">
-            <span>Ongkos Kirim</span>
+          <div v-if="order.amounts.shipping > 0" class="flex justify-between text-sm text-gray-600">
+            <span>{{ order.order_type === 'jasa' ? 'Biaya Transportasi' : 'Ongkos Kirim' }}</span>
             <span>Rp {{ formatIDR(order.amounts.shipping) }}</span>
           </div>
           <div

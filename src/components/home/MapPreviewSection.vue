@@ -110,7 +110,32 @@ const renderMarkerIcon = (merchant, isActive = false) => {
     ? `<span class="umkm-marker__logo-wrap">
         <img class="umkm-marker__logo" src="${logo}" loading="lazy" referrerpolicy="no-referrer" />
       </span>`
-    : `...svg...`;
+    : `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M4 10.5V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9.5"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M3 10.5l2-7h14l2 7"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M9 21v-7h6v7"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>`;
 
   return L.divIcon({
     className: "umkm-marker-icon",
@@ -786,13 +811,13 @@ onMounted(async () => {
   display: block;
 }
 
-.umkm-marker svg {
+:deep(.umkm-marker svg) {
   width: 18px;
   height: 18px;
   display: block;
 }
 
-.umkm-marker.active {
+:deep(.umkm-marker.active) {
   animation: pulse-marker 2s infinite;
 }
 

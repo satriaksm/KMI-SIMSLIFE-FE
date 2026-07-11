@@ -16,7 +16,7 @@
           <span>{{ order.dateLabel }}</span>
           <span class="inline-block w-1 h-1 rounded-full bg-gray-300"></span>
           <span class="font-medium text-primary">
-            {{ order.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}
+            {{ order.order_type === 'jasa' ? (order.delivery_type === 'in-store' ? 'Di Tempat' : (order.delivery_type === 'on-site' ? 'Panggilan' : 'Online')) : (order.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim') }}
           </span>
         </div>
       </div>
@@ -56,7 +56,7 @@
             <div class="text-xs text-muted-foreground">{{ it.qty }}x</div>
           </div>
           <div class="flex items-center text-xs text-muted-foreground">
-            Rp {{ formatIDR(it.price) }}
+            Rp {{ formatIDR(it.price || it.subtotal || 0) }}
           </div>
         </div>
       </div>

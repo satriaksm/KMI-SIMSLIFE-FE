@@ -85,7 +85,7 @@
             <i class="text-xl pi shrink-0" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'pi-exclamation-triangle text-orange-500' : 'pi-times-circle text-red-500'"></i>
             <div>
               <p class="text-sm font-semibold" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'text-orange-700' : 'text-red-700'">
-                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : (order.status === 'undelivered' || order.status === 'unpicked') ? (order.meta.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : 'Pesanan Gagal Kirim') : 'Pesanan Dibatalkan' }}
+                {{ order.status === 'rejected' ? 'Pesanan Ditolak Penjual' : (order.status === 'undelivered' || order.status === 'unpicked') ? (order.meta.delivery_type === 'pickup' ? 'Pesanan Tidak Diambil' : (order.order_type === 'jasa' ? 'Pelaksanaan Gagal' : 'Pesanan Gagal Kirim')) : 'Pesanan Dibatalkan' }}
               </p>
               <p v-if="order.meta.failed_reason" class="text-xs mt-0.5" :class="order.status === 'undelivered' || order.status === 'unpicked' ? 'text-orange-600' : 'text-red-500'">
                 {{ order.meta.failed_reason }}
@@ -162,7 +162,105 @@
         <!-- Pickup & delivery -->
         <div class="p-4 bg-white border border-gray-200 rounded-2xl">
           <div class="space-y-4">
-            <template v-if="order.meta.delivery_type === 'pickup'">
+            <!-- JASA: in-store (pelaksanaan di tempat UMKM) -->
+            <template v-if="order.order_type === 'jasa' && order.meta.delivery_type === 'in-store'">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" customClass="object-cover w-full h-full" alt="Store logo" />
+                  <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0 mt-1">
+                  <div class="text-xs text-muted-foreground">Pelaksanaan di Tempat Jasa</div>
+                  <div class="text-sm font-extrabold text-black truncate">
+                    {{ order.pickup.place }}
+                  </div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ order.pickup.address }}
+                  </div>
+                  <div class="mt-2" v-if="order.pickup.phone">
+                    <a
+                      :href="`https://wa.me/${order.pickup.phone.replace(/^0/, '62')}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                    >
+                      <i class="pi pi-whatsapp" />
+                      Hubungi UMKM
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- JASA: on-site (pekerja datang ke pelanggan) -->
+            <template v-else-if="order.order_type === 'jasa' && order.meta.delivery_type === 'on-site'">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+                  <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" customClass="object-cover w-full h-full" alt="Store logo" />
+                  <svg v-else class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0 mt-1">
+                  <div class="text-xs text-muted-foreground">Penyedia Jasa</div>
+                  <div class="text-sm font-extrabold text-black truncate">
+                    {{ order.pickup.place }}
+                  </div>
+                  <div class="mt-2" v-if="order.pickup.phone">
+                    <a
+                      :href="`https://wa.me/${order.pickup.phone.replace(/^0/, '62')}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                    >
+                      <i class="pi pi-whatsapp" />
+                      Hubungi UMKM
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-3 mt-4">
+                <div class="w-2 h-2 mt-1 rounded-full bg-success-foreground shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <div class="text-xs text-muted-foreground">Dikerjakan di alamat</div>
+                  <div class="text-sm text-muted-foreground">
+                    {{ order.dropoff.address }}
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- JASA: online -->
+            <template v-else-if="order.order_type === 'jasa' && order.meta.delivery_type === 'online'">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 mt-1 overflow-hidden bg-blue-50 rounded-full shrink-0 flex items-center justify-center">
+                  <i class="pi pi-globe text-lg text-blue-500"></i>
+                </div>
+                <div class="flex-1 min-w-0 mt-1">
+                  <div class="text-xs text-muted-foreground">Layanan Online / Daring</div>
+                  <div class="text-sm font-extrabold text-black truncate">
+                    {{ order.pickup.place }}
+                  </div>
+                  <div class="mt-2" v-if="order.pickup.phone">
+                    <a
+                      :href="`https://wa.me/${order.pickup.phone.replace(/^0/, '62')}`"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center gap-1.5 text-xs font-bold text-green-600 hover:text-green-700"
+                    >
+                      <i class="pi pi-whatsapp" />
+                      Hubungi UMKM
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- PRODUK: pickup -->
+            <template v-else-if="order.meta.delivery_type === 'pickup'">
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
                   <ResponsiveImage v-if="order.pickup.logoUrl" :src="order.pickup.logoUrl" customClass="object-cover w-full h-full" alt="Store logo" />
@@ -192,6 +290,8 @@
                 </div>
               </div>
             </template>
+
+            <!-- PRODUK: delivery -->
             <template v-else>
               <div class="flex items-start gap-3">
                 <div class="w-10 h-10 mt-1 overflow-hidden bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
@@ -289,7 +389,7 @@
             <div class="pt-3 space-y-2 border-t border-gray-200">
               <div class="flex items-center justify-between text-xs">
                 <div class="text-muted-foreground">
-                  Subtotal Pesanan ({{ order.items.length }} menu)
+                  Subtotal Pesanan ({{ order.items.length }} item)
                 </div>
                 <div class="text-muted-foreground">
                   Rp {{ formatIDR(order.amounts.subtotal) }}
@@ -303,8 +403,8 @@
                 </div>
               </div>
 
-              <div class="flex items-center justify-between text-xs">
-                <div class="text-muted-foreground">Biaya Pengiriman</div>
+              <div v-if="order.amounts.delivery_fee > 0" class="flex items-center justify-between text-xs">
+                <div class="text-muted-foreground">{{ order.order_type === 'jasa' ? 'Biaya Transportasi' : 'Biaya Pengiriman' }}</div>
                 <div class="text-muted-foreground">
                   Rp {{ formatIDR(order.amounts.delivery_fee) }}
                 </div>
@@ -335,7 +435,7 @@
         <div v-if="order.meta.proof_image_url" class="overflow-hidden bg-white border border-gray-200 rounded-2xl mb-4">
           <div class="px-4 py-3 border-b border-gray-200">
             <div class="text-base font-extrabold text-black">
-              Bukti Foto Pengiriman
+              Bukti Foto {{ order.order_type === 'jasa' ? 'Pelaksanaan' : 'Pengiriman' }}
             </div>
           </div>
           <div class="p-4 flex justify-center">
@@ -393,9 +493,9 @@
             </div>
 
             <div class="flex items-center justify-between gap-3">
-              <div class="text-xs text-muted-foreground">Metode Pengiriman</div>
+              <div class="text-xs text-muted-foreground">{{ order.order_type === 'jasa' ? 'Metode Pengerjaan' : 'Metode Pengiriman' }}</div>
               <div class="text-xs font-semibold text-black">
-                {{ order.meta.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)' }}
+                {{ order.order_type === 'jasa' ? (order.meta.delivery_type === 'in-store' ? 'Pelaksanaan di Tempat (In-Store)' : (order.meta.delivery_type === 'on-site' ? 'Panggilan (On-Site)' : 'Online / Daring')) : (order.meta.delivery_type === 'pickup' ? 'Ambil Sendiri (Pickup)' : 'Kirim ke Alamat (Delivery)') }}
               </div>
             </div>
           </div>
@@ -441,7 +541,7 @@
             <Button
               v-if="order?.status === 'completed'"
               block
-              @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
+              @click="$router.push({ path: `/review/${order.order_type === 'jasa' ? 'service' : 'product'}/${order.id}/${order.order_type === 'jasa' ? order.items[0]?.jasaId : order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
               customClass="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Beri Ulasan
@@ -481,7 +581,7 @@
             <Button
               v-if="order?.status === 'completed'"
               block
-              @click="$router.push({ path: `/review/product/${order.id}/${order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
+              @click="$router.push({ path: `/review/${order.order_type === 'jasa' ? 'service' : 'product'}/${order.id}/${order.order_type === 'jasa' ? order.items[0]?.jasaId : order.items[0]?.productId}`, query: { merchantId: order.merchantId } })"
               customClass="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Beri Ulasan
@@ -559,6 +659,7 @@ const order = computed(() => {
     paid: [true, true, false, false, false],
     responsed: [true, true, true, false, false],
     accepted: [true, true, true, false, false],
+    'on-progress': [true, true, true, true, false],
     ready_to_pickup: [true, true, true, true, false],
     delivered: [true, true, true, true, false],
     completed: [true, true, true, true, true],
@@ -572,6 +673,7 @@ const order = computed(() => {
 
   return {
     id: o.id,
+    order_type: o.order_type,
     merchantId: o.merchant_id,
     status,
 
@@ -590,15 +692,15 @@ const order = computed(() => {
       },
       {
         key: "prepared",
-        icon: "pi-box",
+        icon: o.order_type === 'jasa' ? "pi-cog" : "pi-box",
         done: dones[2],
-        label: "Sedang\nDisiapkan",
+        label: o.order_type === 'jasa' ? "Pesanan\nDiterima" : "Sedang\nDisiapkan",
       },
       {
         key: "shipped",
-        icon: o.delivery_type === "pickup" ? "pi-map-marker" : "pi-truck",
+        icon: o.order_type === 'jasa' ? (o.delivery_type === 'online' ? 'pi-globe' : 'pi-map-marker') : (o.delivery_type === "pickup" ? "pi-map-marker" : "pi-truck"),
         done: dones[3],
-        label: o.delivery_type === "pickup" ? "Siap\nDiambil" : "Sedang\nDiantar",
+        label: o.order_type === 'jasa' ? "Sedang\nDikerjakan" : (o.delivery_type === "pickup" ? "Siap\nDiambil" : "Sedang\nDiantar"),
       },
       { key: "home", icon: "pi-home", done: dones[4], label: "Selesai" },
     ],
@@ -620,7 +722,7 @@ const order = computed(() => {
     },
 
     dropoff: {
-      place: "Alamat Pengiriman",
+      place: o.order_type === 'jasa' ? "Alamat Pengerjaan" : "Alamat Pengiriman",
       address:
         [
           o.address_detail_snapshot,
@@ -633,19 +735,20 @@ const order = computed(() => {
           .join(", ") || "-",
     },
 
-    items: (o.items || []).map((it) => ({
+    items: (o.order_type === 'jasa' ? (o.jasa_items || []) : (o.items || [])).map((it) => ({
       id: it.id,
       productId: it.product_id,
-      title: it.product_name_snapshot || "Produk",
+      jasaId: it.jasa_id,
+      title: it.jasa_title_snapshot || it.product_name_snapshot || "Item",
       qty: it.quantity,
-      variant: it.product_variant_snapshot || "",
+      variant: o.order_type === 'jasa' ? (it.order_method === 'langsung_pesan' || it.order_method === 'keranjang' ? 'Langsung Pesan' : (it.order_method === 'konsultasi' || it.order_method === 'memerlukan_konsultasi' ? 'Konsultasi' : 'Booking')) : (it.product_variant_snapshot || ""),
       addons: (it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
+      price: it.subtotal_snapshot || it.subtotal || ((it.unit_price_snapshot || it.price || it.jasa_price_snapshot || 0) * it.quantity),
       originalPrice: null,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
       imageUrls: null,
     })),
 

@@ -31,7 +31,7 @@
             type="button"
             class="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border text-[10px] bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#FFA30E] focus:ring-offset-1"
             :class="[
-              (resolveJasaAssetSrc(img) === selectedImagePath) || (!selectedImagePath && img.is_cover)
+              jasa.images.indexOf(img) === selectedImageIndex.value
                 ? 'border-[#FFA30E]'
                 : 'border-gray-200'
             ]"
@@ -64,6 +64,20 @@
               @error="onImgError($event, 'header')"
               class="object-cover w-full h-full"
             />
+            <button
+              v-if="jasa?.images && jasa.images.length > 1"
+              @click="prevGalleryImage"
+              class="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center text-gray-700 transition active:scale-95"
+            >
+              <i class="pi pi-chevron-left text-sm"></i>
+            </button>
+            <button
+              v-if="jasa?.images && jasa.images.length > 1"
+              @click="nextGalleryImage"
+              class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center text-gray-700 transition active:scale-95"
+            >
+              <i class="pi pi-chevron-right text-sm"></i>
+            </button>
             <div class="absolute inset-0 bg-gradient-to-t from-black/25 via-black/5 to-transparent"></div>
           </div>
           <div
@@ -76,7 +90,7 @@
               type="button"
               class="relative flex-shrink-0 w-14 h-14 rounded-md overflow-hidden border text-[10px] bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#FFA30E] focus:ring-offset-1"
               :class="[
-                (resolveJasaAssetSrc(img) === selectedImagePath) || (!selectedImagePath && img.is_cover)
+                jasa.images.indexOf(img) === selectedImageIndex.value
                   ? 'border-[#FFA30E]'
                   : 'border-gray-200'
               ]"
@@ -132,7 +146,7 @@
             :to="{ name: 'Merchant Detail', params: { slug: jasa.merchant.slug }, hash: '#reviews' }"
             class="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold shrink-0 hover:bg-gray-100 transition"
           >
-            Ulasan
+            Rating dan Ulasan
           </router-link>
           <button
             v-else
@@ -141,6 +155,15 @@
             Kunjungi
           </button>
         </div>
+      </div>
+
+      <!-- Banner: Merchant sedang tutup -->
+      <div
+        v-if="showMerchantClosedBanner"
+        class="mt-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2"
+      >
+        <i class="pi pi-info-circle"></i>
+        UMKM sedang tutup. Anda tidak dapat membuat pesanan saat ini.
       </div>
 
       <!-- Info Jasa -->
@@ -187,7 +210,7 @@
 
     <!-- Lokasi & Tipe Layanan -->
     <section
-      v-if="jasa?.service_type || jasa?.location_address || merchantAddress"
+      v-if="jasa?.delivery_type || jasa?.location_address || merchantAddress"
       class="px-4 py-4 mt-3 bg-white/95"
     >
       <div class="max-w-3xl mx-auto lg:max-w-5xl">
@@ -199,17 +222,17 @@
         </h2>
 
         <div class="space-y-2 text-sm">
-          <div v-if="jasa?.service_type" class="flex items-center justify-between">
+          <div v-if="jasa?.delivery_type" class="flex items-center justify-between">
             <span class="text-gray-600 flex items-center gap-1.5">
               <i class="text-gray-500 pi pi-briefcase"></i>
               Tipe Layanan
             </span>
             <span class="font-medium text-gray-900">
-              {{ serviceTypeLabel }}
+              {{ deliveryTypeLabel }}
             </span>
           </div>
 
-          <div v-if="jasa?.service_type_booking" class="flex items-center justify-between">
+          <div v-if="jasa?.cara_pemesanan" class="flex items-center justify-between">
             <span class="text-gray-600 flex items-center gap-1.5">
               <i class="text-gray-500 pi pi-list"></i>
               Mekanisme Pemesanan
@@ -226,7 +249,7 @@
               Jam Layanan
             </span>
             <span class="font-medium text-gray-900 text-right text-sm">
-              {{ parsedOperatingTimes.join(', ') }}
+              {{ availableTimes.join(', ') }}
             </span>
           </div>
 
@@ -235,9 +258,9 @@
             Gunakan tombol <strong>Minta Konsultasi</strong> di bawah untuk langsung menghubungi penjual.
           </div>
 
-          <!-- Lokasi UMKM (untuk service_type di_tempat_umkm) -->
+          <!-- Lokasi UMKM (untuk delivery_type in-store) -->
           <div
-            v-if="(jasa?.service_type === 'di_tempat_umkm' || jasa?.service_type === 'at_location') && merchantAddress"
+            v-if="jasa?.delivery_type === 'in-store' && merchantAddress"
             class="flex items-start gap-2"
           >
             <span class="mt-0.5">
@@ -251,29 +274,10 @@
             </div>
           </div>
 
-          <!-- Area Layanan untuk ke_rumah_pelanggan -->
+          <!-- Area Layanan untuk on-site -->
+          <!-- Fallback address (jika delivery_type tidak dikenal tapi ada alamat) -->
           <div
-            v-if="jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site'"
-            class="flex items-start gap-2"
-          >
-            <span class="mt-0.5">
-              <i class="text-gray-500 pi pi-map-marker"></i>
-            </span>
-            <div class="flex-1">
-              <p class="text-xs text-gray-500 mb-0.5">Area Layanan</p>
-              <p class="text-sm leading-snug text-gray-700">
-                {{ jasa.service_area || '-' }}
-              </p>
-              <p class="text-xs text-gray-400 mt-0.5">
-                <i class="pi pi-info-circle mr-1"></i>
-                Anda akan diminta mengisi alamat lengkap saat checkout
-              </p>
-            </div>
-          </div>
-
-          <!-- Fallback address (jika service_type tidak dikenal tapi ada alamat) -->
-          <div
-            v-if="jasa?.service_type !== 'di_tempat_umkm' && jasa?.service_type !== 'at_location' && jasa?.service_type !== 'ke_rumah_pelanggan' && jasa?.service_type !== 'on_site' && jasa?.service_type !== 'online' && jasa?.location_address"
+            v-if="jasa?.delivery_type !== 'in-store' && jasa?.delivery_type !== 'on-site' && jasa?.delivery_type !== 'online' && jasa?.location_address"
             class="flex items-start gap-2"
           >
             <span class="mt-0.5">
@@ -384,6 +388,17 @@
           <i class="pi pi-clock text-merchant-primary"></i>
           Pilih Waktu
         </h3>
+        <div class="flex flex-wrap items-center gap-4 mb-3 text-xs text-gray-500">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+            <span>Menunggu konfirmasi UMKM</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+            <span>Sudah disetujui UMKM</span>
+          </div>
+        </div>
         <div class="p-4 border border-gray-200 rounded-2xl bg-gray-50/60">
         <!-- Pagi -->
         <div v-if="times.morning && times.morning.length > 0" class="mb-3">
@@ -392,19 +407,32 @@
             <button
               v-for="(t, i) in times.morning"
               :key="'m' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
         </div>
-        
+
         <!-- Siang -->
         <div v-if="times.afternoon && times.afternoon.length > 0" class="mb-3">
           <div class="mb-2 text-sm text-gray-700">Siang</div>
@@ -412,37 +440,78 @@
             <button
               v-for="(t, i) in times.afternoon"
               :key="'a' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
         </div>
-        
+
         <!-- Malam -->
-        <div v-if="times.evening && times.evening.length > 0">
+        <div v-if="times.evening && times.evening.length > 0" class="mb-3">
           <div class="mb-2 text-sm text-gray-700">Malam</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="(t, i) in times.evening"
               :key="'e' + i"
-              @click="activeTime = t"
-              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg"
+              @click="handleTimeClick(t)"
+              :disabled="isSlotBooked(t)"
+              class="px-4 py-2 text-sm transition-all duration-200 border rounded-lg relative"
               :class="
-                t === activeTime
-                  ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
-                  : 'bg-gray-100 text-gray-700 border-gray-200'
+                isSlotBooked(t)
+                  ? (
+                    isSlotPending(t)
+                      ? 'bg-orange-50 text-orange-500 border-orange-200 cursor-not-allowed'
+                      : 'bg-red-50 text-red-500 border-red-200 cursor-not-allowed'
+                  )
+                  : (t === activeTime
+                    ? 'bg-[#FFA30E] text-white border-[#FFA30E] scale-[1.03]'
+                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-[#FFA30E]')
               "
             >
               {{ t }}
+              <span
+                v-if="isSlotBooked(t)"
+                class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full"
+                :class="isSlotPending(t) ? 'bg-orange-400' : 'bg-red-500'"
+                :title="getSlotStatusLabel(t)"
+              ></span>
             </button>
           </div>
+        </div>
+
+        <!-- Fallback: jika operating_times ada tapi tidak ada tombol yang muncul -->
+        <div
+          v-if="availableTimes.length > 0 && !times.morning.length && !times.afternoon.length && !times.evening.length"
+          class="text-sm text-gray-500 text-center py-2"
+        >
+          <i class="pi pi-info-circle mr-1"></i>
+          Format jam tidak valid
+        </div>
+
+        <!-- Loading indicator saat fetch booked slots -->
+        <div v-if="loadingBookedSlots" class="mt-2 text-xs text-gray-400 flex items-center gap-1">
+          <i class="pi pi-spin pi-spinner text-[10px]"></i>
+          Memuat ketersediaan jadwal...
         </div>
         </div>
       </div>
@@ -454,8 +523,30 @@
       class="fixed left-0 right-0 bottom-16 sm:bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] px-4 py-3"
     >
       <div class="flex items-center max-w-3xl gap-4 mx-auto lg:max-w-5xl">
-        <template v-if="isBookingMode">
+        <!-- Jika merchant sedang tutup, tampilkan tombol nonaktif -->
+        <div v-if="!merchantIsOpen" class="flex-1 py-3 text-center text-sm text-gray-400 bg-gray-100 rounded-full">
+          <i class="pi pi-clock mr-1"></i>
+          UMKM sedang tutup — pesanan tidak tersedia
+        </div>
+
+        <template v-else-if="isBookingMode">
+          <!-- Jika jam layanan belum diatur merchant -->
+          <div v-if="!hasOperatingTimes" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
+            <i class="pi pi-clock mr-1"></i>
+            Jam layanan belum diatur oleh merchant
+          </div>
+          <div v-else-if="isActiveTimeBooked" class="flex-1 py-3 text-center text-sm text-red-500 bg-red-50 rounded-full">
+            <i class="pi pi-ban mr-1"></i>
+            Jadwal pada jam ini sudah terisi
+          </div>
+          <!-- Jika jam sudah ada tapi belum dipilih -->
+          <div v-else-if="!canBook" class="flex-1 py-3 text-center text-sm text-gray-500 bg-gray-100 rounded-full">
+            <i class="pi pi-calendar mr-1"></i>
+            Pilih waktu terlebih dahulu
+          </div>
+          <!-- Tombol booking aktif -->
           <router-link
+            v-else
             :to="{
               name: 'Pembayaran Jasa',
               query: {
@@ -465,21 +556,21 @@
                 tgl: hasOperatingDays ? selectedDate.toISOString() : '',
                 waktu: hasOperatingTimes ? activeTime : '',
                 payment_methods: jasa?.payment_methods || '',
-                service_type: jasa?.service_type || '',
+                delivery_type: jasa?.delivery_type || '',
                 merchant_slug: jasa?.merchant?.slug || '',
                 jasa_slug: jasa?.slug || route.params.slug || '',
-                // Alamat tidak diisi untuk: online, di_tempat_umkm (dari profil merchant), ke_rumah_pelanggan (dari customer)
+                // Alamat tidak diisi untuk: online, in-store (dari profil merchant), on-site (dari customer)
                 alamat:
-                  (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
+                  (jasa?.delivery_type === 'on-site' || jasa?.delivery_type === 'online')
                     ? ''
-                    : jasa?.location_address || merchantAddress || '',
+                    : merchantAddress || jasa?.location_address || '',
                 price_type:
                   jasa?.fixed_price && jasa.fixed_price > 0
                     ? 'fixed'
                     : jasa?.base_price && jasa.base_price > 0
                       ? 'base'
                       : '',
-                service_type_booking: 'booking',
+                order_method: 'scheduled',
               },
             }"
             class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
@@ -512,21 +603,21 @@
                 tgl: '',
                 waktu: '',
                 payment_methods: jasa?.payment_methods || '',
-                service_type: jasa?.service_type || '',
+                delivery_type: jasa?.delivery_type || '',
                 merchant_slug: jasa?.merchant?.slug || '',
                 jasa_slug: jasa?.slug || route.params.slug || '',
-                // Alamat tidak diisi untuk: online, di_tempat_umkm (dari profil merchant), ke_rumah_pelanggan (dari customer)
+                // Alamat tidak diisi untuk: online, in-store (dari profil merchant), on-site (dari customer)
                 alamat:
-                  (jasa?.service_type === 'ke_rumah_pelanggan' || jasa?.service_type === 'on_site' || jasa?.service_type === 'online')
+                  (jasa?.delivery_type === 'on-site' || jasa?.delivery_type === 'online')
                     ? ''
-                    : jasa?.location_address || merchantAddress || '',
+                    : merchantAddress || jasa?.location_address || '',
                 price_type:
                   jasa?.fixed_price && jasa.fixed_price > 0
                     ? 'fixed'
                     : jasa?.base_price && jasa.base_price > 0
                       ? 'base'
                       : 'cart',
-                service_type_booking: 'keranjang',
+                order_method: 'direct',
               },
             }"
             class="flex-1 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
@@ -551,23 +642,15 @@
       v-model="selectedDate"
       :open="calendarOpen"
       :operating-days="jasa?.operating_days || ''"
-      @close="calendarOpen = false"
-    />
-
-    <!-- Kalender -->
-    <CalendarModal
-      v-model="selectedDate"
-      :open="calendarOpen"
-      :operating-days="jasa?.operating_days || ''"
-      @close="calendarOpen = false"
+      @close="calendarOpen = false; fetchBookedSlots(selectedDate)"
     />
 
     <!-- Penilaian Layanan -->
-    <div class="px-4 py-6 bg-gray-50">
+    <div class="px-4 pt-6 pb-24 bg-gray-50 sm:pb-32">
       <div class="max-w-2xl mx-auto">
         <!-- Rating Summary Header -->
         <div class="mb-4">
-          <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Layanan</h3>
+          <h3 class="text-lg font-bold text-gray-900 mb-2">Rating dan Ulasan</h3>
           <div v-if="jasa?.rating_summary && jasa.rating_summary.total_reviews > 0" class="flex items-center gap-3">
             <div class="flex items-center gap-1">
               <i
@@ -620,6 +703,7 @@ const authStore = useAuthStore();
 
 const jasa = ref(null);
 const selectedImagePath = ref(null);
+const selectedImageIndex = ref(-1);
 
 // Fallback images for error handling
 const fallbackHeader = 'data:image/svg+xml,%3Csvg width="400" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect fill="%23E5E7EB" width="400" height="300"/%3E%3C/svg%3E';
@@ -629,23 +713,44 @@ const goBack = () => {
   router.back();
 };
 
+// Helper normalisasi jam layanan
+function normalizeOperatingTimes(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.map(t => String(t).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    // Coba parse sebagai JSON
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.map(t => String(t).trim()).filter(Boolean);
+      }
+    } catch (e) {
+      // Bukan JSON, split dengan koma
+    }
+    // Split dengan koma
+    return value
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+// Computed property untuk jam layanan yang sudah dinormalisasi
+const availableTimes = computed(() => {
+  return normalizeOperatingTimes(jasa.value?.operating_times);
+});
+
 const hasOperatingDays = computed(() =>
   Boolean(String(jasa.value?.operating_days || "").trim())
 );
 
-const parsedOperatingTimes = computed(() => {
-  const raw = jasa.value?.operating_times;
-  // Handle both array (from DB cast) and string (old data)
-  if (Array.isArray(raw)) {
-    return raw.map(t => String(t).trim()).filter(Boolean);
-  }
-  if (typeof raw === 'string') {
-    return raw.split(",").map(t => t.trim()).filter(Boolean);
-  }
-  return [];
-});
-
-const hasOperatingTimes = computed(() => parsedOperatingTimes.value.length > 0);
+const hasOperatingTimes = computed(() => availableTimes.value.length > 0);
 
 // Helper untuk mendapatkan URL logo merchant
 const getMerchantLogo = (logo) => {
@@ -659,6 +764,131 @@ const getMerchantLogo = (logo) => {
 // ----- jadwal -----
 const selectedDate = ref(new Date());
 const calendarOpen = ref(false);
+const bookedSlots = ref([]);
+const bookedSlotStatuses = ref({});
+const loadingBookedSlots = ref(false);
+
+// Format tanggal ke YYYY-MM-DD untuk API
+const formatDateForApi = (date) => {
+  if (!date) return null;
+  const d = new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+// Normalize time format: API returns "08:00", frontend operating_times uses "08.00"
+// Both formats should normalize to same value for comparison
+const normalizeTime = (t) => String(t || '').trim().replace(':', '.');
+
+// Ambil slot yang sudah terisi saat tanggal berubah
+const fetchBookedSlots = async (date) => {
+  if (!jasa.value?.id) return;
+
+  const dateStr = formatDateForApi(date);
+  if (!dateStr) return;
+
+  loadingBookedSlots.value = true;
+
+  try {
+    const { data } = await api.get(`/api/public/jasas/${jasa.value.id}/available-slots`, {
+      params: { date: dateStr },
+    });
+
+    const rawBookedSlots = Array.isArray(data?.booked_slots)
+      ? data.booked_slots
+      : [];
+
+    const rawSlotStatuses = Array.isArray(data?.slot_statuses)
+      ? data.slot_statuses
+      : [];
+
+    bookedSlots.value = rawBookedSlots;
+
+    const nextStatuses = {};
+
+    rawSlotStatuses.forEach((slot) => {
+      const normalizedTime = normalizeTime(slot?.time || slot?.booking_time || "");
+
+      if (!normalizedTime) return;
+
+      nextStatuses[normalizedTime] = {
+        type: slot?.type || "pending",
+        label: slot?.label || "Jadwal sudah terisi",
+        status: slot?.status || null,
+        payment_status: slot?.payment_status || null,
+      };
+    });
+
+    // Fallback jika backend lama hanya mengirim booked_slots
+    rawBookedSlots.forEach((slotTime) => {
+      const normalizedTime = normalizeTime(slotTime);
+
+      if (!normalizedTime || nextStatuses[normalizedTime]) return;
+
+      nextStatuses[normalizedTime] = {
+        type: "approved",
+        label: "Jadwal sudah terisi",
+        status: null,
+        payment_status: null,
+      };
+    });
+
+    bookedSlotStatuses.value = nextStatuses;
+
+    ensureActiveTimeAvailable();
+  } catch (e) {
+    console.warn("[JasaDetail] Gagal mengambil slot terisi:", e?.message || e);
+    bookedSlots.value = [];
+    bookedSlotStatuses.value = {};
+  } finally {
+    loadingBookedSlots.value = false;
+  }
+};
+
+// Cek apakah sebuah slot jam sudah terisi
+const getSlotStatus = (time) => {
+  const normalized = normalizeTime(time);
+  return bookedSlotStatuses.value[normalized] || null;
+};
+
+const isSlotBooked = (time) => {
+  return Boolean(getSlotStatus(time));
+};
+
+const isSlotPending = (time) => {
+  return getSlotStatus(time)?.type === "pending";
+};
+
+const isSlotApproved = (time) => {
+  return getSlotStatus(time)?.type === "approved";
+};
+
+const getSlotStatusLabel = (time) => {
+  return getSlotStatus(time)?.label || "";
+};
+
+const ensureActiveTimeAvailable = () => {
+  const allTimes = [
+    ...times.value.morning,
+    ...times.value.afternoon,
+    ...(times.value.evening || []),
+  ];
+
+  if (allTimes.length === 0) {
+    activeTime.value = "";
+    return;
+  }
+
+  if (!activeTime.value || isSlotBooked(activeTime.value)) {
+    activeTime.value = allTimes.find((time) => !isSlotBooked(time)) || "";
+  }
+};
+
+const isActiveTimeBooked = computed(() => {
+  return activeTime.value ? isSlotBooked(activeTime.value) : false;
+});
 
 const atMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const addDays = (d, n) =>
@@ -699,15 +929,18 @@ const quickDays = computed(() => {
 const monthShort = computed(() =>
   selectedDate.value.toLocaleString("id-ID", { month: "short" })
 );
-const selectQuick = (d, available) => {
-  if (!available) return; // Tidak bisa pilih hari yang tidak tersedia
+const selectQuick = async (d, available) => {
+  if (!available) return;
+
   selectedDate.value = new Date(d);
+  await fetchBookedSlots(d);
+  ensureActiveTimeAvailable();
 };
 
 // ----- waktu -----
 // Parse operating_times dari jasa. Jika tidak diatur saat create, waktu tidak ditampilkan di customer.
 const times = computed(() => {
-  const operatingTimes = parsedOperatingTimes.value;
+  const operatingTimes = availableTimes.value;
 
   if (operatingTimes.length === 0) {
     return { morning: [], afternoon: [], evening: [] };
@@ -718,34 +951,48 @@ const times = computed(() => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 6 && hour < 12;
   });
-  
+
   const afternoon = operatingTimes.filter(t => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 12 && hour < 18;
   });
-  
+
   const evening = operatingTimes.filter(t => {
     const hour = parseInt(t.split('.')[0]);
     return hour >= 18;
   });
-  
+
   return { morning, afternoon, evening };
 });
 
 // Active time - pilih pertama yang tersedia
 const activeTime = ref("");
 
-// Set active time ketika times berubah
-const initActiveTime = () => {
-  const allTimes = [...times.value.morning, ...times.value.afternoon, ...(times.value.evening || [])];
-  if (allTimes.length > 0 && !activeTime.value) {
-    activeTime.value = allTimes[0];
-    return;
+// Cek apakah booking sudah lengkap (tanggal dan jam dipilih)
+const canBook = computed(() => {
+  if (isBookingMode.value) {
+    return (
+      hasOperatingTimes.value &&
+      Boolean(activeTime.value.trim()) &&
+      !isActiveTimeBooked.value
+    );
   }
 
-  if (allTimes.length === 0) {
-    activeTime.value = "";
+  return true;
+});
+
+// Set active time ketika times berubah
+const initActiveTime = () => {
+  ensureActiveTimeAvailable();
+};
+
+// Handle klik pada slot waktu
+const handleTimeClick = (t) => {
+  if (isSlotBooked(t)) {
+    toast.warning("Jadwal pada jam ini sudah terisi, silakan pilih jam lain.");
+    return;
   }
+  activeTime.value = t;
 };
 
 // ----- gambar jasa -----
@@ -762,19 +1009,27 @@ const resolveJasaAssetSrc = (img) => {
 };
 
 const jasaImage = computed(() => {
-  if (selectedImagePath.value) return selectedImagePath.value;
-
   if (!jasa.value) return "";
 
-  // Prioritaskan cover URL dari API agar aman di environment deploy
-  if (jasa.value.cover_img?.id) {
-    return getImageUrl(jasa.value.cover_img.id);
+  // Prioritas 1: gambar yang dipilih via thumbnail / next/prev
+  if (selectedImageIndex.value >= 0) {
+    const images = jasa.value.images || [];
+    const img = images[selectedImageIndex.value];
+    if (img) {
+      const src = resolveJasaAssetSrc(img);
+      if (src) return src;
+    }
   }
+
+  // Prioritas 2: cover_img dari API
   if (jasa.value.cover_img?.src_url) {
     return getImageUrl(jasa.value.cover_img.src_url);
   }
   if (jasa.value.cover_img?.url) {
     return getImageUrl(jasa.value.cover_img.url);
+  }
+  if (jasa.value.cover_img?.id) {
+    return getImageUrl(jasa.value.cover_img.id);
   }
   if (jasa.value.image_url) {
     return jasa.value.image_url;
@@ -793,10 +1048,31 @@ const jasaImage = computed(() => {
 
 const onSelectGalleryImage = (img) => {
   if (!img) return;
-  const src = resolveJasaAssetSrc(img);
-  if (src) {
-    selectedImagePath.value = src;
+  const images = jasa.value?.images || [];
+  const index = images.findIndex(
+    (i) => i.id === img.id || i.path === img.path || i.image === img.image
+  );
+  if (index >= 0) {
+    selectedImageIndex.value = index;
+    selectedImagePath.value = resolveJasaAssetSrc(img);
   }
+};
+
+const nextGalleryImage = () => {
+  const images = jasa.value?.images || [];
+  if (!images.length) return;
+  const next = (selectedImageIndex.value + 1) % images.length;
+  selectedImageIndex.value = next;
+  selectedImagePath.value = resolveJasaAssetSrc(images[next]);
+};
+
+const prevGalleryImage = () => {
+  const images = jasa.value?.images || [];
+  if (!images.length) return;
+  const prev =
+    (selectedImageIndex.value - 1 + images.length) % images.length;
+  selectedImageIndex.value = prev;
+  selectedImagePath.value = resolveJasaAssetSrc(images[prev]);
 };
 
 // ----- deskripsi -----
@@ -805,46 +1081,56 @@ const jasaDesc = computed(
 );
 
 // ----- mekanisme pemesanan (keranjang / booking / konsultasi) -----
+// Primary: cara_pemesanan (DB format: langsung_pesan | booking | memerlukan_konsultasi)
+// Fallback: order_method (for old records)
 const serviceBookingLabel = computed(() => {
-  // Check both FE field (service_type_booking) and DB field (cara_pemesanan)
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   if (!raw) return "Tidak tersedia";
 
   const t = String(raw).toLowerCase();
 
-  // Support both old values (cart/consultation) and new values (keranjang/konsultasi)
-  if (t === 'keranjang' || t === 'cart' || t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
+  // DB cara_pemesanan values → FE display
+  if (t === 'langsung_pesan') return "Keranjang (Tanpa Jadwal)";
   if (t === 'booking') return "Booking (Pilih Tanggal & Jam)";
-  if (t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
+  if (t === 'memerlukan_konsultasi') return "Konsultasi (Hubungi Penjual)";
+
+  // order_method FE format (for old records)
+  if (t === 'keranjang') return "Keranjang (Tanpa Jadwal)";
+  if (t === 'konsultasi') return "Konsultasi (Hubungi Penjual)";
+
   return String(raw);
 });
 
 const isBookingMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
-  return String(raw || '').toLowerCase() === 'booking';
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
+  const t = String(raw || '').toLowerCase();
+  return t === 'booking';
 });
 
 const isConsultationMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   const t = String(raw || '').toLowerCase();
-  return t === 'konsultasi' || t === 'consultation' || t === 'memerlukan_konsultasi';
+  return t === 'memerlukan_konsultasi' || t === 'konsultasi';
 });
 
 const isCartMode = computed(() => {
-  const raw = jasa.value?.service_type_booking || jasa.value?.cara_pemesanan;
+  const raw = jasa.value?.cara_pemesanan || jasa.value?.order_method;
   const t = String(raw || '').toLowerCase();
-  return t === 'keranjang' || t === 'cart' || t === 'langsung_pesan' || (!raw);
+  // langsung_pesan = cart mode (langsung checkout tanpa jadwal)
+  // keranjang = cart mode (FE format)
+  // empty/null = default to cart mode
+  return t === 'langsung_pesan' || t === 'keranjang' || (!raw);
 });
 
 function buildConsultationMessage() {
   const jasaTitle = jasa.value?.title || "Layanan Jasa";
-  const serviceType = serviceTypeLabel.value || "-";
+  const deliveryType = deliveryTypeLabel.value || "-";
   const lines = [
     "Halo, saya ingin konsultasi layanan Sumilir.",
     "",
     "Layanan yang ingin dikonsultasikan:",
     `- ${jasaTitle}`,
-    `- Tipe layanan: ${serviceType}`,
+    `- Tipe layanan: ${deliveryType}`,
     `- Mekanisme: ${serviceBookingLabel.value}`,
     "",
     "Mohon bantuannya untuk menjelaskan detail, harga, dan jadwal layanan.",
@@ -911,42 +1197,68 @@ async function openConsultationChat() {
 }
 
 // ----- tipe layanan (online / di tempat / ke alamat pelanggan) -----
-const serviceTypeLabel = computed(() => {
-  const t = jasa.value?.service_type;
+const deliveryTypeLabel = computed(() => {
+  const t = jasa.value?.delivery_type;
   if (!t) return "-";
   // Normalize from old values
   if (t === 'at_location' || t === 'ditempat_saya') return "Di Tempat UMKM";
   if (t === 'on_site' || t === 'kerumah_pelanggan') return "Ke Rumah Pelanggan";
   if (t === 'online') return "Online";
-  if (t === 'di_tempat_umkm') return "Di Tempat UMKM";
-  if (t === 'ke_rumah_pelanggan') return "Ke Rumah Pelanggan";
+  if (t === 'in-store') return "Di Tempat UMKM";
+  if (t === 'on-site') return "Ke Rumah Pelanggan";
   return t;
 });
 
-// ----- alamat merchant untuk service_type at_location -----
+// ----- alamat merchant untuk delivery_type in-store -----
+const getAddressPart = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    return value.name || value.nama || value.label || value.value || '';
+  }
+  return '';
+};
+
+const formatAddress = (address) => {
+  if (!address) return '';
+
+  const parts = [
+    getAddressPart(address.detail),
+    getAddressPart(address.village),
+    getAddressPart(address.district),
+    getAddressPart(address.city),
+    getAddressPart(address.province),
+  ].filter(Boolean);
+
+  return parts.join(', ');
+};
+
 const merchantAddress = computed(() => {
   const merchant = jasa.value?.merchant;
   if (!merchant) return '';
 
-  const primaryAddress = merchant.primary_address;
-  if (!primaryAddress) {
-    // Fallback ke field address atau alamat lama
-    return merchant.address || merchant.alamat || '';
+  // Try primary_address (snake_case from API) or primaryAddress (camelCase)
+  const primaryAddress = merchant.primary_address || merchant.primaryAddress || null;
+  if (primaryAddress) {
+    const formatted = formatAddress(primaryAddress);
+    if (formatted) return formatted;
+    if (primaryAddress.full_address) return primaryAddress.full_address;
   }
 
-  // Format alamat lengkap dari primary_address
-  const parts = [
-    primaryAddress.detail,
-    primaryAddress.village,
-    primaryAddress.district,
-    primaryAddress.city,
-    primaryAddress.province,
-  ].filter(Boolean);
-
-  return parts.join(', ') || '';
+  // Fallback ke field address atau alamat lama
+  return merchant.full_address || merchant.address || merchant.alamat || '';
 });
 
 // ----- harga display -----
+// ----- merchant open status (is_open_now dari API) -----
+// Mengikuti pola produk: backend adalah sumber kebenaran utama
+const merchantIsOpen = computed(() => {
+  return jasa.value?.merchant?.is_open_now === true;
+});
+
+const showMerchantClosedBanner = computed(() => {
+  return jasa.value?.merchant?.is_open_now === false;
+});
 const priceTypeLabel = computed(() => {
   if (!jasa.value) return "";
   if (jasa.value.fixed_price && jasa.value.fixed_price > 0) return "Harga Tetap";
@@ -1113,9 +1425,12 @@ onMounted(async () => {
         const dbDay = jsToDbDay(checkDate.getDay());
         if (operatingDays.includes(dbDay)) {
           selectedDate.value = checkDate;
+          await fetchBookedSlots(checkDate);
           break;
         }
       }
+    } else {
+      await fetchBookedSlots(selectedDate.value);
     }
 
     // Set active time ke waktu pertama yang tersedia

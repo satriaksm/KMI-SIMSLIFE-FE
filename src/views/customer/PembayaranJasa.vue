@@ -1,18 +1,29 @@
 <template>
-  <div class="min-h-screen pb-32 bg-gradient-to-b from-gray-50 via-white to-gray-100 sm:pb-28">
-
+  <div
+    class="min-h-screen pb-32 bg-gradient-to-b from-gray-50 via-white to-gray-100 sm:pb-28"
+  >
     <!-- Mobile Layout (default) -->
     <div class="lg:hidden">
-
       <!-- AppBar — full width header -->
-      <header class="sticky top-0 z-20 w-full px-4 py-3 text-white shadow-md bg-gradient-to-r from-merchant-primary to-merchant-primary/90">
+      <header
+        class="sticky top-0 z-20 w-full px-4 py-3 text-white shadow-md bg-gradient-to-r from-merchant-primary to-merchant-primary/90"
+      >
         <div class="flex items-center gap-3">
-          <button type="button" class="flex items-center justify-center text-white transition rounded-full shadow-sm w-9 h-9 bg-white/15 hover:bg-white/25 backdrop-blur-sm" @click="goBack" aria-label="Kembali">
+          <button
+            type="button"
+            class="flex items-center justify-center text-white transition rounded-full shadow-sm w-9 h-9 bg-white/15 hover:bg-white/25 backdrop-blur-sm"
+            @click="goBack"
+            aria-label="Kembali"
+          >
             <i class="text-sm pi pi-arrow-left"></i>
           </button>
           <div class="flex flex-col">
-            <h1 class="text-sm font-semibold sm:text-base">Ringkasan Pesanan</h1>
-            <p class="text-[11px] sm:text-xs text-white/80">Cek kembali data sebelum mengirim ke chat penjual</p>
+            <h1 class="text-sm font-semibold sm:text-base">
+              Ringkasan Pesanan
+            </h1>
+            <p class="text-[11px] sm:text-xs text-white/80">
+              Cek kembali data sebelum mengirim ke chat penjual
+            </p>
           </div>
         </div>
       </header>
@@ -20,305 +31,388 @@
       <!-- Content area — max-w container di dalam -->
       <main class="px-4 mt-4">
         <div class="max-w-screen-sm mx-auto space-y-4">
-        <!-- Data Pemesan -->
-        <section
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h2
-                class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
-              >
-                <i class="pi pi-user text-merchant-primary"></i>
-                Data Pemesan
-              </h2>
-              <p class="text-[11px] sm:text-xs text-gray-500 mt-0.5">
-                Pastikan nama dan nomor dapat dihubungi oleh penjual.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="px-2 py-1 text-xs border rounded-full border-amber-300 text-amber-700 bg-amber-50"
-              @click="useProfileContact"
-            >
-              Gunakan data profil
-            </button>
-          </div>
-          <div class="space-y-3">
-            <input
-              v-model="form.nama"
-              type="text"
-              placeholder="Nama Lengkap"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
-            />
-            <input
-              v-model="form.tel"
-              type="tel"
-              placeholder="Nomor Telp"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              @input="onPhoneInput"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
-            />
-          </div>
-        </section>
-
-        <!-- Detail Pesanan -->
-        <section
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <h2
-            class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900 sm:text-base"
+          <!-- Data Pemesan -->
+          <section
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
           >
-            <i class="pi pi-clipboard text-merchant-primary"></i>
-            Detail Pesanan
-          </h2>
-          <div class="flex items-center gap-3">
-            <div
-              class="w-24 h-16 overflow-hidden bg-gray-100 shadow-sm rounded-xl"
-            >
-              <img :src="order.image" class="object-cover w-full h-full" />
-            </div>
-            <div class="flex-1">
-              <div class="text-sm font-semibold text-gray-900 line-clamp-2">
-                {{ order.title }}
-              </div>
-              <div class="mt-1 flex items-baseline gap-1.5">
-                <span class="text-sm font-semibold text-merchant-primary">
-                  Rp {{ formatIDR(order.price) }}
-                </span>
-                <span
-                  v-if="orderPriceTypeLabel"
-                  class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700"
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2
+                  class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
                 >
-                  {{ orderPriceTypeLabel }}
-                </span>
-                <!-- Hapus label status seperti 'Available' jika ada -->
+                  <i class="pi pi-user text-merchant-primary"></i>
+                  Data Pemesan
+                </h2>
+                <p class="text-[11px] sm:text-xs text-gray-500 mt-0.5">
+                  Pastikan nama dan nomor dapat dihubungi oleh penjual.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="px-2 py-1 text-xs border rounded-full border-amber-300 text-amber-700 bg-amber-50"
+                @click="useProfileContact"
+              >
+                Gunakan data profil
+              </button>
+            </div>
+            <div class="space-y-3">
+              <input
+                v-model="form.nama"
+                type="text"
+                placeholder="Nama Lengkap"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
+              />
+              <input
+                v-model="form.tel"
+                type="tel"
+                placeholder="Nomor Telp"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                @input="onPhoneInput"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
+              />
+            </div>
+          </section>
+
+          <!-- Detail Pesanan -->
+          <section
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+          >
+            <h2
+              class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900 sm:text-base"
+            >
+              <i class="pi pi-clipboard text-merchant-primary"></i>
+              Detail Pesanan
+            </h2>
+            <div class="flex items-center gap-3">
+              <div
+                class="w-24 h-16 overflow-hidden bg-gray-100 shadow-sm rounded-xl"
+              >
+                <img :src="order.image" class="object-cover w-full h-full" />
+              </div>
+              <div class="flex-1">
+                <div class="text-sm font-semibold text-gray-900 line-clamp-2">
+                  {{ order.title }}
+                </div>
+                <div class="mt-1 flex items-baseline gap-1.5">
+                  <span class="text-sm font-semibold text-merchant-primary">
+                    Rp {{ formatIDR(order.price) }}
+                  </span>
+                  <span
+                    v-if="orderPriceTypeLabel"
+                    class="text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700"
+                  >
+                    {{ orderPriceTypeLabel }}
+                  </span>
+                  <!-- Hapus label status seperti 'Available' jika ada -->
+                </div>
               </div>
             </div>
-          </div>
-          <textarea
-            v-model="form.catatan"
-            rows="3"
-            placeholder="Catatan tambahan"
-            class="w-full px-3 py-2 mt-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
-          ></textarea>
-        </section>
+            <textarea
+              v-model="form.catatan"
+              rows="3"
+              placeholder="Catatan tambahan"
+              class="w-full px-3 py-2 mt-3 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary"
+            ></textarea>
+          </section>
 
-        <!-- Detail Alamat — hanya tampil untuk layanan yang butuh alamat (on_site / ke_rumah_pelanggan) -->
-        <section
-          v-if="isHomeService"
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <div class="flex items-center justify-between mb-3">
-            <div>
+          <!-- Detail Alamat — hanya tampil untuk layanan yang butuh alamat (on_site / on-site) -->
+          <section
+            v-if="isHomeService"
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2
+                  class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
+                >
+                  <i class="pi pi-map-marker text-merchant-primary"></i>
+                  Alamat Layanan
+                </h2>
+                <p class="mt-0.5 text-[11px] text-gray-500">
+                  Wajib diisi — layanan dikerjakan di lokasi Anda.
+                </p>
+              </div>
+            </div>
+
+            <!-- Textarea alamat -->
+            <textarea
+              v-model="form.alamat"
+              rows="3"
+              placeholder="Ketik alamat lengkap layanan di sini..."
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary resize-none"
+            ></textarea>
+
+            <!-- Tombol ambil lokasi + koordinat -->
+            <div class="flex flex-wrap items-center gap-2 mt-2">
+              <button
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-sky-300 text-sky-700 bg-sky-50 hover:bg-sky-100 transition"
+                @click="useProfileAddress"
+              >
+                <i class="pi pi-home text-[10px]"></i>
+                Ambil Alamat dari Profil
+              </button>
+
+              <button
+                type="button"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="locatingDevice"
+                @click="requestDeviceLocation"
+              >
+                <i
+                  :class="
+                    locatingDevice
+                      ? 'pi pi-spin pi-spinner'
+                      : 'pi pi-map-marker'
+                  "
+                  class="text-[10px]"
+                ></i>
+                {{
+                  locatingDevice
+                    ? "Mengambil lokasi..."
+                    : "Ambil Lokasi Saat Ini"
+                }}
+              </button>
+              <span v-if="locatingError" class="text-[11px] text-red-500">{{
+                locatingError
+              }}</span>
+            </div>
+            <p
+              v-if="deviceCoordinates"
+              class="mt-1.5 text-[11px] text-gray-500"
+            >
+              <i class="pi pi-globe mr-0.5"></i>
+              Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }},
+              {{ deviceCoordinates.longitude.toFixed(6) }}
+            </p>
+          </section>
+
+          <!-- Alamat read-only untuk layanan online -->
+          <section
+            v-else-if="isOnlineService"
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+          >
+            <div class="flex items-center justify-between mb-2">
               <h2
                 class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
               >
                 <i class="pi pi-map-marker text-merchant-primary"></i>
                 Alamat Layanan
               </h2>
-              <p class="mt-0.5 text-[11px] text-gray-500">
-                Wajib diisi — layanan dikerjakan di lokasi Anda.
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600"
+                >Online</span
+              >
+            </div>
+            <div class="flex items-start gap-2 text-sm text-gray-800">
+              <span class="mt-0.5 text-gray-500"
+                ><i class="pi pi-globe"></i
+              ></span>
+              <p class="leading-snug break-words">
+                Layanan dilakukan secara online
               </p>
             </div>
-          </div>
+          </section>
 
-          <!-- Textarea alamat -->
-          <textarea
-            v-model="form.alamat"
-            rows="3"
-            placeholder="Ketik alamat lengkap layanan di sini..."
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary/70 focus:border-merchant-primary resize-none"
-          ></textarea>
-
-          <!-- Tombol ambil lokasi + koordinat -->
-          <div class="flex items-center gap-2 mt-2">
-            <button
-              type="button"
-              class="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="locatingDevice"
-              @click="requestDeviceLocation"
-            >
-              <i :class="locatingDevice ? 'pi pi-spin pi-spinner' : 'pi pi-map-marker'" class="text-[10px]"></i>
-              {{ locatingDevice ? 'Mengambil lokasi...' : 'Ambil Lokasi Saat Ini' }}
-            </button>
-            <span v-if="locatingError" class="text-[11px] text-red-500">{{ locatingError }}</span>
-          </div>
-          <p v-if="deviceCoordinates" class="mt-1.5 text-[11px] text-gray-500">
-            <i class="pi pi-globe mr-0.5"></i>
-            Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}
-          </p>
-        </section>
-
-        <!-- Alamat read-only untuk layanan online -->
-        <section
-          v-else-if="isOnlineService"
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <div class="flex items-center justify-between mb-2">
-            <h2
-              class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
-            >
-              <i class="pi pi-map-marker text-merchant-primary"></i>
-              Alamat Layanan
-            </h2>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Online</span>
-          </div>
-          <div class="flex items-start gap-2 text-sm text-gray-800">
-            <span class="mt-0.5 text-gray-500"><i class="pi pi-globe"></i></span>
-            <p class="leading-snug break-words">Layanan dilakukan secara online</p>
-          </div>
-        </section>
-
-        <!-- Alamat read-only untuk layanan di tempat UMKM -->
-        <section
-          v-else-if="isAtMerchantLocation"
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <div class="flex items-center justify-between mb-2">
-            <h2
-              class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
-            >
-              <i class="pi pi-map-marker text-merchant-primary"></i>
-              Alamat Layanan
-            </h2>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Di Tempat UMKM</span>
-          </div>
-          <div class="flex items-start gap-2 text-sm text-gray-800">
-            <span class="mt-0.5 text-gray-500"><i class="pi pi-map-marker"></i></span>
-            <p class="leading-snug break-words">{{ form.alamat || 'Tidak ada alamat' }}</p>
-          </div>
-        </section>
-
-        <!-- Promo -->
-        <section
-          class="overflow-hidden border border-gray-100 shadow-sm bg-white/95 rounded-2xl"
-        >
-          <div
-            class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-lime-100 to-emerald-50"
+          <!-- Alamat read-only untuk layanan di tempat UMKM -->
+          <section
+            v-else-if="isAtMerchantLocation"
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
           >
-            <div class="text-sm font-semibold text-gray-800">
-              {{
-                selectedPromo
-                  ? selectedPromo.title
-                  : promos.length
-                    ? "Pilih voucher diskon"
-                    : "Tidak ada voucher tersedia"
-              }}
+            <div class="flex items-center justify-between mb-2">
+              <h2
+                class="flex items-center gap-2 text-sm font-semibold text-gray-900 sm:text-base"
+              >
+                <i class="pi pi-map-marker text-merchant-primary"></i>
+                Alamat Layanan
+              </h2>
+              <span
+                class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600"
+                >Di Tempat UMKM</span
+              >
             </div>
-            <button
-              class="px-3 py-1 text-xs font-semibold rounded-full"
-              style="background: #ffa30e; color: #fff"
-              @click="selectedPromo ? clearPromo() : usePromo(promos[0])"
+            <div class="flex items-start gap-2 text-sm text-gray-800">
+              <span class="mt-0.5 text-gray-500"
+                ><i class="pi pi-map-marker"></i
+              ></span>
+              <p class="leading-snug break-words">
+                {{ form.alamat || "Tidak ada alamat" }}
+              </p>
+            </div>
+          </section>
+
+          <!-- Promo -->
+          <section
+            class="overflow-hidden border border-gray-100 shadow-sm bg-white/95 rounded-2xl"
+          >
+            <div
+              class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-lime-100 to-emerald-50"
             >
-              {{ selectedPromo ? "Batalkan" : "Pakai" }}
-            </button>
-          </div>
-
-          <button
-            class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700"
-            @click="openPromo = true"
-          >
-            Lihat promo lainnya
-            <span>➜</span>
-          </button>
-        </section>
-
-        <!-- Ringkasan Pembayaran -->
-        <section
-          class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
-        >
-          <h2
-            class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900 sm:text-base"
-          >
-            <i class="pi pi-wallet text-merchant-primary"></i>
-            Ringkasan Pembayaran
-          </h2>
-
-          <div class="space-y-3">
-            <div class="text-sm text-gray-600">Metode Pembayaran</div>
-
-            <!-- Loading State -->
-            <div v-if="paymentFeesLoading" class="space-y-2">
-              <div v-for="n in 2" :key="n" class="h-10 bg-gray-100 rounded-lg animate-pulse"></div>
+              <div class="text-sm font-semibold text-gray-800">
+                {{
+                  selectedPromo
+                    ? selectedPromo.title
+                    : promos.length
+                      ? "Pilih voucher diskon"
+                      : "Tidak ada voucher tersedia"
+                }}
+              </div>
+              <button
+                class="px-3 py-1 text-xs font-semibold rounded-full"
+                style="background: #ffa30e; color: #fff"
+                @click="selectedPromo ? clearPromo() : usePromo(promos[0])"
+              >
+                {{ selectedPromo ? "Batalkan" : "Pakai" }}
+              </button>
             </div>
 
-            <!-- Payment Methods Grid -->
-            <div v-else class="space-y-3">
-              <div v-for="group in groupedPaymentMethods" :key="group.type">
-                <div class="mb-1.5 text-xs font-semibold text-gray-500 uppercase">{{ group.title }}</div>
-                <div class="grid grid-cols-2 gap-2">
-                  <label
-                    v-for="method in group.items"
-                    :key="method.id"
-                    class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition text-xs"
-                    :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300'"
-                    @click="pay.method = method.id"
+            <button
+              class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700"
+              @click="openPromo = true"
+            >
+              Lihat promo lainnya
+              <span>➜</span>
+            </button>
+          </section>
+
+          <!-- Ringkasan Pembayaran -->
+          <section
+            class="p-4 border border-gray-100 shadow-sm bg-white/95 rounded-2xl sm:p-5"
+          >
+            <h2
+              class="flex items-center gap-2 mb-3 text-sm font-semibold text-gray-900 sm:text-base"
+            >
+              <i class="pi pi-wallet text-merchant-primary"></i>
+              Ringkasan Pembayaran
+            </h2>
+
+            <div class="space-y-3">
+              <div class="text-sm text-gray-600">Metode Pembayaran</div>
+
+              <!-- Loading State -->
+              <div v-if="paymentFeesLoading" class="space-y-2">
+                <div
+                  v-for="n in 2"
+                  :key="n"
+                  class="h-10 bg-gray-100 rounded-lg animate-pulse"
+                ></div>
+              </div>
+
+              <!-- Payment Methods Grid -->
+              <div v-else class="space-y-3">
+                <div v-for="group in groupedPaymentMethods" :key="group.type">
+                  <div
+                    class="mb-1.5 text-xs font-semibold text-gray-500 uppercase"
                   >
-                    <div
-                      class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition"
-                      :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                    {{ group.title }}
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label
+                      v-for="method in group.items"
+                      :key="method.id"
+                      class="flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition text-xs"
+                      :class="
+                        selectedPayment === method.id
+                          ? 'border-merchant-primary bg-merchant-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      "
+                      @click="selectedPayment = method.id"
                     >
-                      <svg v-if="pay.method === method.id" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="font-medium text-gray-800 truncate">{{ method.name }}</div>
-                      <div class="text-[10px] text-gray-500 truncate">{{ method.description }}</div>
-                    </div>
-                  </label>
+                      <div
+                        class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition"
+                        :class="
+                          selectedPayment === method.id
+                            ? 'border-merchant-primary bg-merchant-primary'
+                            : 'border-gray-300'
+                        "
+                      >
+                        <svg
+                          v-if="selectedPayment === method.id"
+                          class="w-2.5 h-2.5 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="3"
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="font-medium text-gray-800 truncate">
+                          {{ method.name }}
+                        </div>
+                        <div class="text-[10px] text-gray-500 truncate">
+                          {{ method.description }}
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="pt-2 space-y-1 text-sm text-gray-700">
+                <div class="flex justify-between">
+                  <span>Harga Jasa</span>
+                  <span>Rp {{ formatIDR(amounts.jasa) }}</span>
+                </div>
+                <div v-if="amounts.ongkir > 0" class="flex justify-between">
+                  <span>Biaya Pengantaran</span>
+                  <span>Rp {{ formatIDR(amounts.ongkir) }}</span>
+                </div>
+                <div
+                  v-if="amounts.platformFee > 0"
+                  class="flex justify-between text-xs text-gray-500"
+                >
+                  <span>Biaya Admin</span>
+                  <span>Rp {{ formatIDR(amounts.platformFee) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>
+                    Diskon
+                    <span
+                      v-if="selectedPromo"
+                      class="font-semibold text-amber-600"
+                      >({{ selectedPromo.code }})</span
+                    >
+                  </span>
+                  <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
+                </div>
+                <div class="my-1 border-t border-gray-300"></div>
+                <div
+                  class="flex items-center justify-between px-3 py-2 mt-1 text-sm font-semibold bg-amber-50 rounded-xl"
+                >
+                  <span>Total Pembayaran</span>
+                  <span>Rp {{ formatIDR(total) }}</span>
                 </div>
               </div>
             </div>
-
-            <div class="pt-2 space-y-1 text-sm text-gray-700">
-              <div class="flex justify-between">
-                <span>Harga Jasa</span>
-                <span>Rp {{ formatIDR(amounts.jasa) }}</span>
-              </div>
-              <div v-if="amounts.ongkir > 0" class="flex justify-between">
-                <span>Biaya Pengantaran</span>
-                <span>Rp {{ formatIDR(amounts.ongkir) }}</span>
-              </div>
-              <div v-if="amounts.platformFee > 0" class="flex justify-between text-xs text-gray-500">
-                <span>Biaya Admin</span>
-                <span>Rp {{ formatIDR(amounts.platformFee) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span>
-                  Diskon
-                  <span
-                    v-if="selectedPromo"
-                    class="font-semibold text-amber-600"
-                    >({{ selectedPromo.code }})</span
-                  >
-                </span>
-                <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
-              </div>
-              <div class="my-1 border-t border-gray-300"></div>
-              <div
-                class="flex items-center justify-between px-3 py-2 mt-1 text-sm font-semibold bg-amber-50 rounded-xl"
-              >
-                <span>Total Pembayaran</span>
-                <span>Rp {{ formatIDR(total) }}</span>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
         </div>
       </main>
 
       <!-- Bottom bar (Total + Chat button) - Mobile Only -->
-      <div class="fixed left-0 right-0 bottom-16 sm:bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] px-4 py-3">
+      <div
+        class="fixed left-0 right-0 bottom-16 sm:bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] px-4 py-3"
+      >
         <div class="max-w-screen-sm mx-auto space-y-1.5">
-          <div class="flex items-center justify-between text-xs font-semibold text-gray-900 sm:text-sm">
+          <div
+            class="flex items-center justify-between text-xs font-semibold text-gray-900 sm:text-sm"
+          >
             <span>Total Pembayaran</span>
             <span>Rp {{ formatIDR(total) }}</span>
           </div>
-          <p class="text-[11px] text-gray-500">Pesanan akan dikirim ke chat penjual.</p>
-          <button class="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md" @click="sendToChat">
+          <p class="text-[11px] text-gray-500">
+            Pesanan akan dikirim ke chat penjual.
+          </p>
+          <button
+            class="w-full flex items-center justify-center gap-2 py-3 rounded-full bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-semibold text-center transition shadow-md"
+            @click="sendToChat"
+          >
             <i class="text-sm pi pi-send"></i>
             <span>Pesan Sekarang</span>
           </button>
@@ -333,12 +427,20 @@
         <div class="max-w-7xl mx-auto px-6 py-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
-              <button type="button" class="w-10 h-10 rounded-xl bg-merchant-primary/10 flex items-center justify-center text-merchant-primary hover:bg-merchant-primary/20 transition" @click="goBack">
+              <button
+                type="button"
+                class="w-10 h-10 rounded-xl bg-merchant-primary/10 flex items-center justify-center text-merchant-primary hover:bg-merchant-primary/20 transition"
+                @click="goBack"
+              >
                 <i class="pi pi-arrow-left"></i>
               </button>
               <div>
-                <h1 class="text-lg font-bold text-gray-900">Ringkasan Pesanan</h1>
-                <p class="text-sm text-gray-500">Lengkapi data untuk memesan layanan</p>
+                <h1 class="text-lg font-bold text-gray-900">
+                  Ringkasan Pesanan
+                </h1>
+                <p class="text-sm text-gray-500">
+                  Lengkapi data untuk memesan layanan
+                </p>
               </div>
             </div>
           </div>
@@ -347,156 +449,352 @@
 
       <!-- Main Content -->
       <div class="max-w-7xl mx-auto px-6 py-6">
-        <div class="grid grid-cols-12 gap-6" style="height: calc(100vh - 180px);">
+        <div
+          class="grid grid-cols-12 gap-6"
+          style="height: calc(100vh - 180px)"
+        >
           <!-- Left Panel - Form -->
           <div class="col-span-8 overflow-y-auto pr-2">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div
+              class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
+            >
               <div class="grid grid-cols-2 gap-6">
                 <!-- Data Pemesan -->
                 <div>
                   <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                      <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">1</span>
+                    <h3
+                      class="text-sm font-semibold text-gray-900 flex items-center gap-2"
+                    >
+                      <span
+                        class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                        >1</span
+                      >
                       Data Pemesan
                     </h3>
-                    <button type="button" class="text-xs px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition" @click="useProfileContact">
+                    <button
+                      type="button"
+                      class="text-xs px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition"
+                      @click="useProfileContact"
+                    >
                       <i class="pi pi-user mr-1"></i> Gunakan profil
                     </button>
                   </div>
                   <div class="space-y-3">
                     <div>
-                      <label class="block text-xs font-medium text-gray-600 mb-1.5">Nama Lengkap</label>
-                      <input v-model="form.nama" type="text" placeholder="Nama pemesan" class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50" />
+                      <label
+                        class="block text-xs font-medium text-gray-600 mb-1.5"
+                        >Nama Lengkap</label
+                      >
+                      <input
+                        v-model="form.nama"
+                        type="text"
+                        placeholder="Nama pemesan"
+                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50"
+                      />
                     </div>
                     <div>
-                      <label class="block text-xs font-medium text-gray-600 mb-1.5">Nomor Telepon</label>
-                      <input v-model="form.tel" type="tel" placeholder="08xxxxxxxxxx" inputmode="numeric" pattern="[0-9]*" @input="onPhoneInput" class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50" />
+                      <label
+                        class="block text-xs font-medium text-gray-600 mb-1.5"
+                        >Nomor Telepon</label
+                      >
+                      <input
+                        v-model="form.tel"
+                        type="tel"
+                        placeholder="08xxxxxxxxxx"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        @input="onPhoneInput"
+                        class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50"
+                      />
                     </div>
                   </div>
                 </div>
 
                 <!-- Detail Pesanan -->
                 <div>
-                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">2</span>
+                  <h3
+                    class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4"
+                  >
+                    <span
+                      class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                      >2</span
+                    >
                     Detail Pesanan
                   </h3>
                   <div class="flex items-center gap-3 mb-3">
-                    <div class="w-16 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                      <img :src="order.image" class="object-cover w-full h-full" />
+                    <div
+                      class="w-16 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0"
+                    >
+                      <img
+                        :src="order.image"
+                        class="object-cover w-full h-full"
+                      />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm font-semibold text-gray-900 line-clamp-2">{{ order.title }}</p>
+                      <p
+                        class="text-sm font-semibold text-gray-900 line-clamp-2"
+                      >
+                        {{ order.title }}
+                      </p>
                       <div class="flex items-center gap-2 mt-0.5">
-                        <span class="text-sm font-bold text-merchant-primary">Rp {{ formatIDR(order.price) }}</span>
-                        <span v-if="orderPriceTypeLabel" class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{{ orderPriceTypeLabel }}</span>
+                        <span class="text-sm font-bold text-merchant-primary"
+                          >Rp {{ formatIDR(order.price) }}</span
+                        >
+                        <span
+                          v-if="orderPriceTypeLabel"
+                          class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600"
+                          >{{ orderPriceTypeLabel }}</span
+                        >
                       </div>
                     </div>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1.5">Catatan</label>
-                    <textarea v-model="form.catatan" rows="2" placeholder="Catatan tambahan..." class="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"></textarea>
+                    <label
+                      class="block text-xs font-medium text-gray-600 mb-1.5"
+                      >Catatan</label
+                    >
+                    <textarea
+                      v-model="form.catatan"
+                      rows="2"
+                      placeholder="Catatan tambahan..."
+                      class="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"
+                    ></textarea>
                   </div>
                 </div>
 
-                <!-- Alamat Layanan — hanya untuk on_site / ke_rumah_pelanggan -->
+                <!-- Alamat Layanan — hanya untuk on_site / on-site -->
                 <div v-if="isHomeService" class="col-span-2">
-                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
+                  <h3
+                    class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4"
+                  >
+                    <span
+                      class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                      >3</span
+                    >
                     Alamat Layanan
-                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Wajib Diisi</span>
+                    <span
+                      class="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600"
+                      >Wajib Diisi</span
+                    >
                   </h3>
                   <div class="mb-2">
-                    <label class="block text-xs font-medium text-gray-600 mb-1.5">Alamat Lengkap</label>
-                    <textarea v-model="form.alamat" rows="3" placeholder="Ketik alamat lengkap layanan di sini..." class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"></textarea>
+                    <label
+                      class="block text-xs font-medium text-gray-600 mb-1.5"
+                      >Alamat Lengkap</label
+                    >
+                    <textarea
+                      v-model="form.alamat"
+                      rows="3"
+                      placeholder="Ketik alamat lengkap layanan di sini..."
+                      class="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary/50 focus:border-merchant-primary bg-gray-50 resize-none"
+                    ></textarea>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <button type="button" class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50" :disabled="locatingDevice" @click="requestDeviceLocation">
-                      <i :class="locatingDevice ? 'pi pi-spin pi-spinner' : 'pi pi-map-marker'" class="text-[10px]"></i>
-                      {{ locatingDevice ? 'Mengambil lokasi...' : 'Ambil Lokasi Saat Ini' }}
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-sky-300 text-sky-700 bg-sky-50 hover:bg-sky-100 transition"
+                      @click="useProfileAddress"
+                    >
+                      <i class="pi pi-home text-[10px]"></i>
+                      Ambil Alamat dari Profil
                     </button>
-                    <span v-if="locatingError" class="text-xs text-red-500">{{ locatingError }}</span>
+
+                    <button
+                      type="button"
+                      class="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50"
+                      :disabled="locatingDevice"
+                      @click="requestDeviceLocation"
+                    >
+                      <i
+                        :class="
+                          locatingDevice
+                            ? 'pi pi-spin pi-spinner'
+                            : 'pi pi-map-marker'
+                        "
+                        class="text-[10px]"
+                      ></i>
+                      {{
+                        locatingDevice
+                          ? "Mengambil lokasi..."
+                          : "Ambil Lokasi Saat Ini"
+                      }}
+                    </button>
+                    <span v-if="locatingError" class="text-xs text-red-500">{{
+                      locatingError
+                    }}</span>
                   </div>
-                  <p v-if="deviceCoordinates" class="text-xs text-gray-500 mt-1.5">Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }}, {{ deviceCoordinates.longitude.toFixed(6) }}</p>
+                  <p
+                    v-if="deviceCoordinates"
+                    class="text-xs text-gray-500 mt-1.5"
+                  >
+                    Koordinat: {{ deviceCoordinates.latitude.toFixed(6) }},
+                    {{ deviceCoordinates.longitude.toFixed(6) }}
+                  </p>
                 </div>
 
                 <!-- Alamat read-only untuk layanan online -->
                 <div v-else-if="isOnlineService" class="col-span-2">
-                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
+                  <h3
+                    class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4"
+                  >
+                    <span
+                      class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                      >3</span
+                    >
                     Alamat Layanan
-                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Online</span>
+                    <span
+                      class="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600"
+                      >Online</span
+                    >
                   </h3>
-                  <div class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100">
-                    <span class="text-purple-400"><i class="pi pi-globe"></i></span>
-                    <p class="flex-1 text-sm text-purple-700">Layanan dilakukan secara online</p>
+                  <div
+                    class="flex items-center gap-3 p-3 bg-purple-50 rounded-xl border border-purple-100"
+                  >
+                    <span class="text-purple-400"
+                      ><i class="pi pi-globe"></i
+                    ></span>
+                    <p class="flex-1 text-sm text-purple-700">
+                      Layanan dilakukan secara online
+                    </p>
                   </div>
                 </div>
 
                 <!-- Alamat read-only untuk di tempat UMKM -->
                 <div v-else-if="isAtMerchantLocation" class="col-span-2">
-                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">3</span>
+                  <h3
+                    class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4"
+                  >
+                    <span
+                      class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                      >3</span
+                    >
                     Alamat Layanan
-                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Di Tempat UMKM</span>
+                    <span
+                      class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600"
+                      >Di Tempat UMKM</span
+                    >
                   </h3>
-                  <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                    <span class="text-gray-400"><i class="pi pi-map-marker"></i></span>
-                    <p class="flex-1 text-sm text-gray-700">{{ form.alamat || 'Tidak ada alamat' }}</p>
+                  <div
+                    class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl"
+                  >
+                    <span class="text-gray-400"
+                      ><i class="pi pi-map-marker"></i
+                    ></span>
+                    <p class="flex-1 text-sm text-gray-700">
+                      {{ form.alamat || "Tidak ada alamat" }}
+                    </p>
                   </div>
                 </div>
 
                 <!-- Promo & Pembayaran -->
                 <div class="col-span-2">
-                  <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4">
-                    <span class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold">4</span>
+                  <h3
+                    class="text-sm font-semibold text-gray-900 flex items-center gap-2 mb-4"
+                  >
+                    <span
+                      class="w-7 h-7 rounded-lg bg-merchant-primary text-white flex items-center justify-center text-xs font-bold"
+                      >4</span
+                    >
                     Promo & Pembayaran
                   </h3>
                   <div class="grid grid-cols-2 gap-4">
                     <!-- Promo -->
-                    <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                    <div
+                      class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100"
+                    >
                       <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-gray-700">{{ selectedPromo ? selectedPromo.title : promos.length ? 'Pilih voucher' : 'Tidak ada voucher' }}</span>
-                        <button class="text-xs px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition" @click="openPromo = true">
-                          {{ selectedPromo ? 'Batalkan' : 'Pakai' }}
+                        <span class="text-xs font-semibold text-gray-700">{{
+                          selectedPromo
+                            ? selectedPromo.title
+                            : promos.length
+                              ? "Pilih voucher"
+                              : "Tidak ada voucher"
+                        }}</span>
+                        <button
+                          class="text-xs px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition"
+                          @click="selectedPromo ? clearPromo() : (openPromo = true)"
+                        >
+                          {{ selectedPromo ? "Batalkan" : "Pakai" }}
                         </button>
                       </div>
-                      <button class="text-xs text-merchant-primary hover:underline" @click="openPromo = true">Lihat promo lainnya →</button>
+                      <button
+                        class="text-xs text-merchant-primary hover:underline"
+                        @click="openPromo = true"
+                      >
+                        Lihat promo lainnya →
+                      </button>
                     </div>
 
                     <!-- Metode Bayar -->
                     <div class="p-3 bg-gray-50 rounded-xl">
-                      <label class="block text-xs font-medium text-gray-600 mb-2">Metode Pembayaran</label>
+                      <label
+                        class="block text-xs font-medium text-gray-600 mb-2"
+                        >Metode Pembayaran</label
+                      >
 
                       <!-- Loading State -->
                       <div v-if="paymentFeesLoading" class="space-y-2">
-                        <div class="h-8 bg-gray-200 rounded-lg animate-pulse"></div>
-                        <div class="h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                        <div
+                          class="h-8 bg-gray-200 rounded-lg animate-pulse"
+                        ></div>
+                        <div
+                          class="h-8 bg-gray-200 rounded-lg animate-pulse"
+                        ></div>
                       </div>
 
                       <!-- Payment Methods (same as mobile) -->
                       <div v-else class="space-y-2">
-                        <div v-for="group in groupedPaymentMethods" :key="group.type">
-                          <div class="mb-1 text-[10px] font-semibold text-gray-400 uppercase">{{ group.title }}</div>
+                        <div
+                          v-for="group in groupedPaymentMethods"
+                          :key="group.type"
+                        >
+                          <div
+                            class="mb-1 text-[10px] font-semibold text-gray-400 uppercase"
+                          >
+                            {{ group.title }}
+                          </div>
                           <div class="grid grid-cols-2 gap-1.5">
                             <label
                               v-for="method in group.items"
                               :key="method.id"
                               class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition text-xs"
-                              :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary/5' : 'border-gray-200 hover:border-gray-300 bg-white'"
-                              @click="pay.method = method.id"
+                              :class="
+                                selectedPayment === method.id
+                                  ? 'border-merchant-primary bg-merchant-primary/5'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              "
+                              @click="selectedPayment = method.id"
                             >
                               <div
                                 class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition flex-shrink-0"
-                                :class="pay.method === method.id ? 'border-merchant-primary bg-merchant-primary' : 'border-gray-300'"
+                                :class="
+                                  selectedPayment === method.id
+                                    ? 'border-merchant-primary bg-merchant-primary'
+                                    : 'border-gray-300'
+                                "
                               >
-                                <svg v-if="pay.method === method.id" class="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                                <svg
+                                  v-if="selectedPayment === method.id"
+                                  class="w-2 h-2 text-white"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="3"
+                                    d="M5 13l4 4L19 7"
+                                  />
                                 </svg>
                               </div>
                               <div class="flex-1 min-w-0">
-                                <div class="font-medium text-gray-700 truncate">{{ method.name }}</div>
-                                <div class="text-[9px] text-gray-400 truncate">{{ method.description }}</div>
+                                <div class="font-medium text-gray-700 truncate">
+                                  {{ method.name }}
+                                </div>
+                                <div class="text-[9px] text-gray-400 truncate">
+                                  {{ method.description }}
+                                </div>
                               </div>
                             </label>
                           </div>
@@ -511,10 +809,14 @@
 
           <!-- Right Panel - Summary -->
           <div class="col-span-4">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-6 h-fit">
+            <div
+              class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-6 h-fit"
+            >
               <!-- Header -->
               <div class="bg-white border-b border-gray-100 px-5 py-4">
-                <h3 class="font-bold text-gray-900 text-base">Ringkasan Pesanan</h3>
+                <h3 class="font-bold text-gray-900 text-base">
+                  Ringkasan Pesanan
+                </h3>
                 <p class="text-gray-500 text-xs mt-0.5">Periksa pesanan Anda</p>
               </div>
 
@@ -522,21 +824,41 @@
               <div class="p-5">
                 <!-- Product Info -->
                 <div class="mb-4">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Detail Layanan</p>
+                  <p
+                    class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3"
+                  >
+                    Detail Layanan
+                  </p>
                   <div class="bg-gray-50 rounded-xl p-3">
                     <div class="flex items-start gap-3 mb-3">
-                      <div class="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
-                        <img :src="order.image" class="object-cover w-full h-full" />
+                      <div
+                        class="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm"
+                      >
+                        <img
+                          :src="order.image"
+                          class="object-cover w-full h-full"
+                        />
                       </div>
                       <div class="flex-1 min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{{ order.title }}</p>
+                        <p
+                          class="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight"
+                        >
+                          {{ order.title }}
+                        </p>
                         <div class="flex items-baseline gap-1.5 mt-1">
-                          <span class="text-sm font-bold text-merchant-primary">Rp {{ formatIDR(order.price) }}</span>
-                          <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{{ orderPriceTypeLabel || 'Harga Tetap' }}</span>
+                          <span class="text-sm font-bold text-merchant-primary"
+                            >Rp {{ formatIDR(order.price) }}</span
+                          >
+                          <span
+                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium"
+                            >{{ orderPriceTypeLabel || "Harga Tetap" }}</span
+                          >
                         </div>
                       </div>
                     </div>
-                    <div class="flex justify-between text-sm pt-2 border-t border-gray-200">
+                    <div
+                      class="flex justify-between text-sm pt-2 border-t border-gray-200"
+                    >
                       <span class="text-gray-500">Kategori</span>
                       <span class="text-gray-700 font-medium">Jasa</span>
                     </div>
@@ -545,31 +867,50 @@
 
                 <!-- Order Info -->
                 <div class="mb-4">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Info Pemesanan</p>
+                  <p
+                    class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3"
+                  >
+                    Info Pemesanan
+                  </p>
                   <div class="space-y-2">
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Pemesan</span>
-                      <span class="text-gray-800 font-medium">{{ form.nama || '-' }}</span>
+                      <span class="text-gray-800 font-medium">{{
+                        form.nama || "-"
+                      }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Tanggal</span>
-                      <span class="text-gray-800">{{ form.tanggalLabel || '—' }}</span>
+                      <span class="text-gray-800">{{
+                        form.tanggalLabel || "—"
+                      }}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Waktu</span>
-                      <span class="text-gray-800">{{ form.waktu || '—' }}</span>
+                      <span class="text-gray-800">{{ form.waktu || "—" }}</span>
                     </div>
-                    <div v-if="isOnlineService" class="flex justify-between text-sm">
+                    <div
+                      v-if="isOnlineService"
+                      class="flex justify-between text-sm"
+                    >
                       <span class="text-gray-500">Alamat</span>
                       <span class="text-purple-600 font-medium">Online</span>
                     </div>
-                    <div v-else-if="isHomeService" class="flex justify-between text-sm">
+                    <div
+                      v-else-if="isHomeService"
+                      class="flex justify-between text-sm"
+                    >
                       <span class="text-gray-500">Alamat</span>
-                      <span class="text-gray-800 text-right max-w-[55%] line-clamp-2">{{ form.alamat || '-' }}</span>
+                      <span
+                        class="text-gray-800 text-right max-w-[55%] line-clamp-2"
+                        >{{ form.alamat || "-" }}</span
+                      >
                     </div>
                     <div class="flex justify-between text-sm">
                       <span class="text-gray-500">Pembayaran</span>
-                      <span class="px-2 py-0.5 rounded-full bg-merchant-primary/10 text-merchant-primary text-xs font-semibold">
+                      <span
+                        class="px-2 py-0.5 rounded-full bg-merchant-primary/10 text-merchant-primary text-xs font-semibold"
+                      >
                         {{ selectedPaymentMethodName }}
                       </span>
                     </div>
@@ -577,15 +918,29 @@
                 </div>
 
                 <!-- Diskon info -->
-                <div v-if="selectedPromo" class="flex justify-between text-sm mb-3 p-2 bg-amber-50 rounded-lg">
-                  <span class="text-gray-500">Diskon <span class="text-amber-600 font-medium">({{ selectedPromo.code }})</span></span>
-                  <span class="text-amber-600 font-semibold">-Rp {{ formatIDR(amounts.diskon) }}</span>
+                <div
+                  v-if="selectedPromo"
+                  class="flex justify-between text-sm mb-3 p-2 bg-amber-50 rounded-lg"
+                >
+                  <span class="text-gray-500"
+                    >Diskon
+                    <span class="text-amber-600 font-medium"
+                      >({{ selectedPromo.code }})</span
+                    ></span
+                  >
+                  <span class="text-amber-600 font-semibold"
+                    >-Rp {{ formatIDR(amounts.diskon) }}</span
+                  >
                 </div>
 
                 <!-- Total -->
-                <div class="flex items-center justify-between py-3 border-t border-gray-100 mb-4">
+                <div
+                  class="flex items-center justify-between py-3 border-t border-gray-100 mb-4"
+                >
                   <span class="text-base font-bold text-gray-900">Total</span>
-                  <span class="text-xl font-bold text-merchant-primary">Rp {{ formatIDR(total) }}</span>
+                  <span class="text-xl font-bold text-merchant-primary"
+                    >Rp {{ formatIDR(total) }}</span
+                  >
                 </div>
 
                 <!-- Button -->
@@ -594,10 +949,15 @@
                   class="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-[#FFA30E] to-[#ffba3d] hover:from-[#e5920d] hover:to-[#ffb024] text-white font-bold text-sm transition shadow-lg shadow-amber-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
                   @click="sendToChat"
                 >
-                  <i :class="submitting ? 'pi pi-spin pi-spinner' : 'pi pi-send'" class="text-sm"></i>
-                  {{ submitting ? 'Memproses...' : 'Booking Sekarang' }}
+                  <i
+                    :class="submitting ? 'pi pi-spin pi-spinner' : 'pi pi-send'"
+                    class="text-sm"
+                  ></i>
+                  {{ submitting ? "Memproses..." : "Booking Sekarang" }}
                 </button>
-                <p class="text-xs text-gray-400 text-center mt-2">Pesanan akan dikirim via WhatsApp</p>
+                <p class="text-xs text-gray-400 text-center mt-2">
+                  Pesanan akan dikirim via WhatsApp
+                </p>
               </div>
             </div>
           </div>
@@ -607,11 +967,30 @@
 
     <!-- Bubble Notifikasi dengan tombol OK -->
     <transition name="fade">
-      <div v-if="errorMessage || successMessage" class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm sm:backdrop-blur">
+      <div
+        v-if="errorMessage || successMessage"
+        class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm sm:backdrop-blur"
+      >
         <div class="absolute inset-0"></div>
-        <div class="relative max-w-sm w-[90%] sm:w-auto rounded-2xl shadow-lg px-4 py-3 flex flex-col gap-2 text-xs sm:text-sm border bg-opacity-95" :class="errorMessage ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'">
+        <div
+          class="relative max-w-sm w-[90%] sm:w-auto rounded-2xl shadow-lg px-4 py-3 flex flex-col gap-2 text-xs sm:text-sm border bg-opacity-95"
+          :class="
+            errorMessage
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          "
+        >
           <p class="leading-snug">{{ errorMessage || successMessage }}</p>
-          <button type="button" class="self-end mt-1 px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold" :class="errorMessage ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'" @click="clearNotification">
+          <button
+            type="button"
+            class="self-end mt-1 px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold"
+            :class="
+              errorMessage
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            "
+            @click="clearNotification"
+          >
             Oke
           </button>
         </div>
@@ -621,22 +1000,47 @@
     <!-- Bottom Sheet Promo List -->
     <transition name="fade">
       <div v-if="openPromo" class="fixed inset-0 z-40">
-        <div class="absolute inset-0 bg-black/40" @click="openPromo = false"></div>
-        <div class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[70vh] overflow-y-auto">
+        <div
+          class="absolute inset-0 bg-black/40"
+          @click="openPromo = false"
+        ></div>
+        <div
+          class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[70vh] overflow-y-auto"
+        >
           <div class="w-12 h-1 mx-auto mb-3 bg-gray-300 rounded-full"></div>
           <div class="flex items-center justify-between mb-2">
             <h3 class="text-base font-semibold text-gray-900">Pilih Promo</h3>
             <button class="text-gray-500" @click="openPromo = false">✕</button>
           </div>
           <div class="space-y-3">
-            <div v-for="p in promos" :key="p.code" class="overflow-hidden border border-gray-200 rounded-xl">
-              <div class="flex items-center justify-between px-4 py-3 bg-gray-50">
+            <div
+              v-for="p in promos"
+              :key="p.code"
+              class="overflow-hidden border border-gray-200 rounded-xl"
+            >
+              <div
+                class="flex items-center justify-between px-4 py-3 bg-gray-50"
+              >
                 <div>
-                  <div class="text-sm font-semibold text-gray-800">{{ p.title }}</div>
+                  <div class="text-sm font-semibold text-gray-800">
+                    {{ p.title }}
+                  </div>
                   <div class="text-xs text-gray-600">{{ p.desc }}</div>
                 </div>
-                <button class="px-3 py-1 text-xs font-semibold rounded-full" :class="selectedPromo && selectedPromo.code === p.code ? 'bg-amber-500 text-white' : 'bg-amber-100 text-amber-900'" @click="usePromo(p)">
-                  {{ selectedPromo && selectedPromo.code === p.code ? "Dipakai" : "Gunakan" }}
+                <button
+                  class="px-3 py-1 text-xs font-semibold rounded-full"
+                  :class="
+                    selectedPromo && selectedPromo.code === p.code
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-amber-100 text-amber-900'
+                  "
+                  @click="usePromo(p)"
+                >
+                  {{
+                    selectedPromo && selectedPromo.code === p.code
+                      ? "Dipakai"
+                      : "Gunakan"
+                  }}
                 </button>
               </div>
               <div class="px-4 py-3 text-xs text-gray-600">
@@ -645,7 +1049,12 @@
             </div>
           </div>
           <div class="flex justify-end mt-4">
-            <button class="px-4 py-2 border border-gray-200 rounded-lg" @click="openPromo = false">Tutup</button>
+            <button
+              class="px-4 py-2 border border-gray-200 rounded-lg"
+              @click="openPromo = false"
+            >
+              Tutup
+            </button>
           </div>
         </div>
       </div>
@@ -654,24 +1063,47 @@
     <!-- Bottom Sheet Pilih Alamat -->
     <transition name="fade">
       <div v-if="openAlamatOptions" class="fixed inset-0 z-40">
-        <div class="absolute inset-0 bg-black/40" @click="openAlamatOptions = false"></div>
-        <div class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[60vh] overflow-y-auto">
+        <div
+          class="absolute inset-0 bg-black/40"
+          @click="openAlamatOptions = false"
+        ></div>
+        <div
+          class="absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[60vh] overflow-y-auto"
+        >
           <div class="w-12 h-1 mx-auto mb-3 bg-gray-300 rounded-full"></div>
           <div class="mb-3">
-            <h3 class="text-base font-semibold text-gray-900">Pilih Sumber Alamat</h3>
-            <p class="text-xs text-gray-500 mt-0.5">Kamu bisa gunakan alamat profil atau lokasi perangkat.</p>
+            <h3 class="text-base font-semibold text-gray-900">
+              Pilih Sumber Alamat
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Kamu bisa gunakan alamat profil atau lokasi perangkat.
+            </p>
           </div>
           <div class="space-y-3 text-sm">
-            <button type="button" class="flex items-center w-full gap-3 px-3 py-2 border border-gray-200 rounded-xl hover:bg-gray-50" @click="useProfileAddress">
-              <span class="flex items-center justify-center w-8 h-8 text-lg rounded-full bg-emerald-100 text-emerald-600"><i class="pi pi-user"></i></span>
+            <button
+              type="button"
+              class="flex items-center w-full gap-3 px-3 py-2 border border-gray-200 rounded-xl hover:bg-gray-50"
+              @click="useProfileAddress"
+            >
+              <span
+                class="flex items-center justify-center w-8 h-8 text-lg rounded-full bg-emerald-100 text-emerald-600"
+                ><i class="pi pi-user"></i
+              ></span>
               <div class="flex-1 text-left">
                 <p class="font-semibold text-gray-800">Alamat Profil</p>
-                <p class="text-xs text-gray-500">Gunakan alamat yang tersimpan di profil kamu jika tersedia.</p>
+                <p class="text-xs text-gray-500">
+                  Gunakan alamat yang tersimpan di profil kamu jika tersedia.
+                </p>
               </div>
             </button>
           </div>
           <div class="flex justify-end mt-4">
-            <button class="px-4 py-2 text-sm border border-gray-200 rounded-lg" @click="openAlamatOptions = false">Tutup</button>
+            <button
+              class="px-4 py-2 text-sm border border-gray-200 rounded-lg"
+              @click="openAlamatOptions = false"
+            >
+              Tutup
+            </button>
           </div>
         </div>
       </div>
@@ -679,30 +1111,55 @@
 
     <!-- Overlay Ringkasan Pemesanan (Card) -->
     <transition name="fade">
-      <div v-if="showChat" class="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm sm:backdrop-blur-md">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[80vh] sm:max-h-[85vh]">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <h2 class="text-sm font-semibold text-gray-900">Ringkasan Pemesanan</h2>
-            <button class="text-sm text-gray-500 hover:text-gray-700" @click="showChat = false">✕</button>
+      <div
+        v-if="showChat"
+        class="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm sm:backdrop-blur-md"
+      >
+        <div
+          class="w-full max-w-md bg-white rounded-2xl shadow-xl flex flex-col max-h-[80vh] sm:max-h-[85vh]"
+        >
+          <div
+            class="flex items-center justify-between px-4 py-3 border-b border-gray-200"
+          >
+            <h2 class="text-sm font-semibold text-gray-900">
+              Ringkasan Pemesanan
+            </h2>
+            <button
+              class="text-sm text-gray-500 hover:text-gray-700"
+              @click="showChat = false"
+            >
+              ✕
+            </button>
           </div>
           <div class="flex flex-col flex-1 gap-4 p-4 bg-gray-50">
-            <div class="px-4 py-3 text-white transition cursor-pointer rounded-2xl bg-merchant-primary hover:bg-merchant-primary/90" @click="showDetails = !showDetails">
+            <div
+              class="px-4 py-3 text-white transition cursor-pointer rounded-2xl bg-merchant-primary hover:bg-merchant-primary/90"
+              @click="showDetails = !showDetails"
+            >
               <p class="mb-1 text-xs opacity-90">Layanan Jasa</p>
               <p class="text-sm font-semibold truncate">{{ order.title }}</p>
-              <p class="mt-1 text-sm font-medium">Rp {{ formatIDR(order.price) }}</p>
-              <p class="text-[11px] mt-2 opacity-90 flex items-center justify-between">
+              <p class="mt-1 text-sm font-medium">
+                Rp {{ formatIDR(order.price) }}
+              </p>
+              <p
+                class="text-[11px] mt-2 opacity-90 flex items-center justify-between"
+              >
                 <span>{{ form.tanggalLabel }} • {{ form.waktu }}</span>
-                <span class="underline">{{ showDetails ? "Sembunyikan detail" : "Lihat detail" }}</span>
+                <span class="underline">{{
+                  showDetails ? "Sembunyikan detail" : "Lihat detail"
+                }}</span>
               </p>
             </div>
-            <div v-if="showDetails" class="px-4 py-3 text-xs text-gray-700 whitespace-pre-line bg-white border border-gray-200 rounded-2xl sm:text-sm">
+            <div
+              v-if="showDetails"
+              class="px-4 py-3 text-xs text-gray-700 whitespace-pre-line bg-white border border-gray-200 rounded-2xl sm:text-sm"
+            >
               {{ summaryText }}
             </div>
           </div>
         </div>
       </div>
     </transition>
-
   </div>
 </template>
 
@@ -711,11 +1168,13 @@ import { computed, ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUserStore } from "@/stores/user";
+import { useToast } from "vue-toastification";
 import api from "@/libs/axios.js";
 import { usePaymentMethods } from "@/composables/usePaymentMethods";
 
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 
 // ===== Payment Methods =====
 const {
@@ -725,9 +1184,71 @@ const {
   getFilteredPaymentMethods,
   calculatePlatformFee,
   isCodMethod,
-  isXenditEnabled,
   isCodEnabled,
 } = usePaymentMethods();
+
+const XENDIT_CHANNELS = [
+  "QRIS",
+  "BCA",
+  "BNI",
+  "BRI",
+  "MANDIRI",
+  "PERMATA",
+  "CIMB",
+  "OVO",
+  "DANA",
+  "SHOPEEPAY",
+  "LINKAJA",
+  "ALFAMART",
+  "INDOMARET",
+];
+
+// selectedPayment: variabel utama yang berubah saat user klik metode
+const selectedPayment = ref(null);
+
+// paymentMethod: abstrak untuk backend (COD vs XENDIT)
+const paymentMethod = computed(() => {
+  const val = selectedPayment.value;
+  if (!val) return "COD";
+  const upper = String(val).toUpperCase();
+  return upper === "COD" ? "COD" : "XENDIT";
+});
+
+// paymentChannel: channel aktual yang dikirim ke backend
+const paymentChannel = computed(() => {
+  const val = selectedPayment.value;
+  if (!val) return null;
+  const upper = String(val).toUpperCase();
+  if (upper === "COD") return null;
+  return XENDIT_CHANNELS.includes(upper) ? upper : null;
+});
+
+// isXendit / isCod
+const isXenditPayment = computed(() => paymentMethod.value === "XENDIT");
+const isCodPayment = computed(() => paymentMethod.value === "COD");
+
+// Inisialisasi: pilih metode pertama yang tersedia (COD didahulukan jika enabled)
+onMounted(() => {
+  if (selectedPayment.value !== null) return; // sudah diset oleh user
+  if (isCodEnabled(order.paymentMethods)) {
+    selectedPayment.value = "cod";
+  } else {
+    const first = availablePaymentMethods.value[0];
+    selectedPayment.value = first ? first.id : "cod";
+  }
+});
+
+// Watch: hanya set default jika user belum memilih apa pun
+watch(selectedPayment, (val) => {
+  console.log("[PembayaranJasa] selectedPayment changed to:", val);
+  console.log("[PembayaranJasa] paymentMethod:", paymentMethod.value);
+  console.log("[PembayaranJasa] paymentChannel:", paymentChannel.value);
+});
+
+// Platform fee
+watch(selectedPayment, () => {
+  refreshPlatformFee();
+});
 
 // Get filtered payment methods based on jasa's enabled methods
 const availablePaymentMethods = computed(() => {
@@ -740,19 +1261,19 @@ const groupedPaymentMethods = computed(() => {
   if (!enabledMethods.length) return [];
 
   const groups = [
-    { title: 'Bayar Tunai', type: 'cod', items: [] },
-    { title: 'QRIS', type: 'qris', items: [] },
-    { title: 'Transfer Bank', type: 'va', items: [] },
-    { title: 'E-Wallet', type: 'ewallet', items: [] },
-    { title: 'Gerai Retail', type: 'retail', items: [] },
+    { title: "Bayar Tunai", type: "cod", items: [] },
+    { title: "QRIS", type: "qris", items: [] },
+    { title: "Transfer Bank", type: "va", items: [] },
+    { title: "E-Wallet", type: "ewallet", items: [] },
+    { title: "Gerai Retail", type: "retail", items: [] },
   ];
 
-  enabledMethods.forEach(m => {
-    const group = groups.find(g => g.type === m.type);
+  enabledMethods.forEach((m) => {
+    const group = groups.find((g) => g.type === m.type);
     if (group) group.items.push(m);
   });
 
-  return groups.filter(g => g.items.length > 0);
+  return groups.filter((g) => g.items.length > 0);
 });
 
 // ===== Data dari query =====
@@ -766,7 +1287,7 @@ const order = {
   tglISO: route.query.tgl || "",
   waktu: route.query.waktu || "",
   priceType: route.query.price_type || "",
-  serviceType: route.query.service_type || "",
+  deliveryType: route.query.delivery_type || "",
   paymentMethods: (route.query.payment_methods || "")
     .split(",")
     .map((m) => m.trim())
@@ -784,9 +1305,14 @@ function saveLocalBooking(booking) {
   try {
     const raw = localStorage.getItem(LOCAL_BOOKINGS_KEY);
     const existing = raw ? JSON.parse(raw) : [];
-    const filtered = existing.filter((b) => String(b.id) !== String(booking.id));
+    const filtered = existing.filter(
+      (b) => String(b.id) !== String(booking.id),
+    );
     filtered.unshift(booking);
-    localStorage.setItem(LOCAL_BOOKINGS_KEY, JSON.stringify(filtered.slice(0, 50)));
+    localStorage.setItem(
+      LOCAL_BOOKINGS_KEY,
+      JSON.stringify(filtered.slice(0, 50)),
+    );
   } catch (e) {
     console.error("[PembayaranJasa] saveLocalBooking error:", e);
   }
@@ -802,40 +1328,59 @@ function getLocalBookings() {
 }
 
 // Jenis layanan jasa (online / di lokasi penyedia / ke lokasi pelanggan)
-const serviceType = ref(route.query.service_type || null);
+const deliveryType = ref(route.query.delivery_type || null);
 
 // Mekanisme pemesanan: booking (dengan jadwal) atau keranjang (tanpa jadwal)
 // Default kosong agar isBookingMechanism aman (false) kecuali route override
 // Helper: ekstrak mekanisme dari data jasa API
-// Priority: service_type_booking > mekanisme_pemesanan > cara_pemesanan > booking_type > order_type
-// API returns: keranjang | booking | konsultasi (via service_type_booking)
-// DB column: cara_pemesanan (langsung_pesan | booking | memerlukan_konsultasi)
+// Primary: cara_pemesanan (DB: langsung_pesan | booking | memerlukan_konsultasi)
+// Maps to FE format: keranjang | booking | konsultasi
 const getMekanismeFromJasa = (jasaData) => {
   if (!jasaData) return null;
 
-  // 1. service_type_booking — normalized dari API (keranjang | booking | konsultasi)
-  const stb = jasaData?.service_type_booking;
-  if (stb !== null && stb !== undefined && stb !== '' && String(stb).trim() !== '') {
-    const v = String(stb).trim();
-    console.log(`[PembayaranJasa] service_type_booking dari API: "${v}"`);
+  // 1. order_method — FE format dari API (keranjang | booking | konsultasi)
+  const om = jasaData?.order_method;
+  if (
+    om !== null &&
+    om !== undefined &&
+    om !== "" &&
+    String(om).trim() !== ""
+  ) {
+    const v = String(om).trim();
+    console.log(`[PembayaranJasa] order_method dari API: "${v}"`);
     return v;
   }
 
-  // 2. Legacy DB column: cara_pemesanan
+  // 2. cara_pemesanan — DB format (langsung_pesan | booking | memerlukan_konsultasi)
   const cp = jasaData?.cara_pemesanan;
-  if (cp !== null && cp !== undefined && cp !== '' && String(cp).trim() !== '') {
+  if (
+    cp !== null &&
+    cp !== undefined &&
+    cp !== "" &&
+    String(cp).trim() !== ""
+  ) {
     const raw = String(cp).trim();
-    const mapped = raw === 'langsung_pesan' ? 'keranjang' : (raw === 'memerlukan_konsultasi' ? 'konsultasi' : raw);
-    console.log(`[PembayaranJasa] cara_pemesanan dari API: "${raw}" → "${mapped}"`);
+    // Map DB format to FE format
+    const mapped =
+      raw === "langsung_pesan"
+        ? "keranjang"
+        : raw === "memerlukan_konsultasi"
+          ? "konsultasi"
+          : raw;
+    console.log(
+      `[PembayaranJasa] cara_pemesanan dari API: "${raw}" → "${mapped}"`,
+    );
     return mapped;
   }
 
-  // 3. Fallback: mekanisme_pemesanan / booking_type / order_type
-  const fallbackFields = ['mekanisme_pemesanan', 'booking_type', 'order_type', 'mechanism'];
+  // 3. Fallback: mekanisme_pemesanan / booking_type
+  const fallbackFields = ["mekanisme_pemesanan", "booking_type", "mechanism"];
   for (const f of fallbackFields) {
     const v = jasaData?.[f];
-    if (v !== null && v !== undefined && v !== '' && String(v).trim() !== '') {
-      console.log(`[PembayaranJasa] fallback field "${f}" dari API: "${String(v).trim()}"`);
+    if (v !== null && v !== undefined && v !== "" && String(v).trim() !== "") {
+      console.log(
+        `[PembayaranJasa] fallback field "${f}" dari API: "${String(v).trim()}"`,
+      );
       return String(v).trim();
     }
   }
@@ -844,25 +1389,30 @@ const getMekanismeFromJasa = (jasaData) => {
 };
 
 const mekanismePemesanan = ref(
-  route.query.mekanisme_pemesanan ||
-  route.query.order_type ||
-  ''
+  route.query.mekanisme_pemesanan || route.query.order_type || "",
 );
 
 // Helper: apakah ini checkout tanpa jadwal (keranjang)?
 const isKeranjangCheckout = computed(() => {
-  const m = String(mekanismePemesanan.value || '').toLowerCase();
-  return ['keranjang', 'checkout', 'tanpa_jadwal', 'cart', 'walk_in'].some((kw) => m.includes(kw));
+  const m = String(mekanismePemesanan.value || "").toLowerCase();
+  return [
+    "keranjang",
+    "langsung_pesan",
+    "direct",
+    "checkout",
+    "tanpa_jadwal",
+    "cart",
+    "walk_in",
+  ].some((kw) => m.includes(kw));
 });
 
 // Helper: apakah ini booking dengan jadwal?
-// Kembalikan false secara default — hanya booking jika jelas mengandung keyword tersebut
 const isBookingMechanism = computed(() => {
-  const m = String(mekanismePemesanan.value || '').toLowerCase().trim();
-  // Jika tidak ada nilai, anggap keranjang (aman: tidak perlu jadwal)
+  const m = String(mekanismePemesanan.value || "")
+    .toLowerCase()
+    .trim();
   if (!m) return false;
-  // Hanya true jika JELAS mengandung keyword booking/jadwal/scheduled
-  return ['booking', 'jadwal', 'scheduled'].some((kw) => m.includes(kw));
+  return ["booking", "scheduled", "jadwal"].some((kw) => m.includes(kw));
 });
 
 // Format booking_time ke H:i yang valid
@@ -877,7 +1427,7 @@ const formatTimeForApi = (time) => {
   // Validasi format: HH:MM
   const match = cleaned.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;
-  const hour = String(match[1]).padStart(2, '0');
+  const hour = String(match[1]).padStart(2, "0");
   const minute = match[2];
   return `${hour}:${minute}`;
 };
@@ -889,8 +1439,8 @@ const formatDateForApi = (iso) => {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return null;
     const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   } catch {
     return null;
@@ -901,7 +1451,11 @@ const formatDateForApi = (iso) => {
 const form = ref({
   nama: "",
   tel: "",
-  alamat: String(serviceType.value || "").toLowerCase().includes("online") ? "Online" : (route.query.alamat || ""),
+  alamat: String(deliveryType.value || "")
+    .toLowerCase()
+    .includes("online")
+    ? "Online"
+    : route.query.alamat || "",
   catatan: route.query.catatan || "",
   tanggalISO: order.tglISO,
   tanggalLabel: fmtTanggal(order.tglISO),
@@ -925,8 +1479,12 @@ const amounts = ref({
 });
 
 const total = computed(() => {
-  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
-  return gross + amounts.value.platformFee;
+  const jasa = toNumber(amounts.value.jasa);
+  const ongkir = toNumber(amounts.value.ongkir);
+  const diskon = toNumber(amounts.value.diskon);
+  const platformFee = toNumber(amounts.value.platformFee);
+  const gross = Math.max(0, jasa + ongkir - diskon);
+  return gross + platformFee;
 });
 
 // Label tipe harga untuk menandai harga tetap vs harga mulai
@@ -940,39 +1498,9 @@ const orderPriceTypeLabel = computed(() => {
 // Get human-readable name for selected payment method
 const selectedPaymentMethodName = computed(() => {
   const allMethods = paymentMethodsList.value;
-  const method = allMethods.find(m => m.id === pay.method);
-  return method?.name || pay.method || '-';
+  const method = allMethods.find((m) => m.id === selectedPayment);
+  return method?.name || selectedPayment || "-";
 });
-
-// Default metode: COD if enabled, else first available
-const defaultPaymentMethod = computed(() => {
-  if (isCodEnabled(order.paymentMethods)) return "cod";
-  const methods = availablePaymentMethods.value;
-  return methods.length > 0 ? methods[0].id : "cod";
-});
-
-// pay - declare first with default value, update later
-const pay = ref({ method: "cod" });
-
-// Watch for defaultPaymentMethod changes to update pay
-watch(defaultPaymentMethod, (newMethod) => {
-  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
-    pay.method = newMethod;
-  }
-}, { immediate: true });
-
-// Watch for order.paymentMethods changes to update default
-watch(() => order.paymentMethods, () => {
-  if (!pay.method || !availablePaymentMethods.value.find(m => m.id === pay.method)) {
-    pay.method = defaultPaymentMethod.value;
-  }
-});
-
-// Platform fee based on selected payment method - declare AFTER pay
-watch(() => pay.method, (methodId) => {
-  const gross = Math.max(0, amounts.value.jasa + amounts.value.ongkir - amounts.value.diskon);
-  amounts.value.platformFee = calculatePlatformFee(methodId, gross);
-}, { immediate: true });
 
 // Pesan error / sukses untuk ditampilkan di layar (bukan alert browser)
 const errorMessage = ref("");
@@ -983,40 +1511,91 @@ const clearNotification = () => {
   successMessage.value = "";
 };
 
-const isOnlineService = computed(() => serviceType.value === "online");
-const isAtMerchantLocation = computed(() => serviceType.value === "di_tempat_umkm" || serviceType.value === "at_location");
+const isOnlineService = computed(() => deliveryType.value === "online");
+const isAtMerchantLocation = computed(
+  () =>
+    deliveryType.value === "in-store" ||
+    deliveryType.value === "at_location",
+);
 const isHomeService = computed(() => {
-  const type = String(serviceType.value || '').toLowerCase();
-  return ['ke_rumah_pelanggan', 'on_site', 'rumah_pelanggan', 'home_service', 'customer_location', 'tempat_pelanggan'].some((kw) => type.includes(kw));
+  const type = String(deliveryType.value || "").toLowerCase();
+  return [
+    "on-site",
+    "on_site",
+    "rumah_pelanggan",
+    "home_service",
+    "customer_location",
+    "tempat_pelanggan",
+  ].some((kw) => type.includes(kw));
 });
 
 // Alamat wajib untuk layanan ke lokasi pelanggan
 const isCustomerAddressRequired = computed(() => isHomeService.value);
 
 // Alamat tidak wajib untuk layanan online dan di tempat UMKM
-const addressRequired = computed(() => !isOnlineService.value && !isAtMerchantLocation.value);
+const addressRequired = computed(
+  () => !isOnlineService.value && !isAtMerchantLocation.value,
+);
+
+function getAddressPart(value) {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (typeof value === "object") {
+    return String(
+      value.name ||
+      value.nama ||
+      value.label ||
+      value.value ||
+      ""
+    ).trim();
+  }
+
+  return String(value).trim();
+}
 
 function resolveMerchantAddress(merchant, jasaLocationAddress = "") {
-  const locationCandidate = String(jasaLocationAddress || "").trim();
-  if (locationCandidate) return locationCandidate;
+  if (!merchant) {
+    return String(jasaLocationAddress || "").trim();
+  }
 
-  if (!merchant) return "";
+  if (merchant.full_address) {
+    return String(merchant.full_address).trim();
+  }
 
   const primaryAddress = merchant.primary_address || merchant.primaryAddress;
+
   if (primaryAddress) {
+    if (primaryAddress.full_address) {
+      return String(primaryAddress.full_address).trim();
+    }
+
     const parts = [
       primaryAddress.detail,
       primaryAddress.village,
       primaryAddress.district,
       primaryAddress.city,
       primaryAddress.province,
-    ].filter(Boolean);
+    ]
+      .map(getAddressPart)
+      .filter(Boolean);
 
     const formatted = parts.join(", ").trim();
-    if (formatted) return formatted;
+
+    if (formatted) {
+      return formatted;
+    }
   }
 
-  return String(merchant.address || merchant.alamat || "").trim();
+  return String(
+    merchant.address ||
+    merchant.alamat ||
+    jasaLocationAddress ||
+    ""
+  ).trim();
 }
 
 // Validasi sederhana form sebelum lanjut pembayaran
@@ -1053,6 +1632,18 @@ function onPhoneInput(event) {
   form.value.tel = digits;
 }
 
+// ===== Helpers =====
+
+// Convert formatted currency string to number
+// Handles formats like "Rp 1.500.000", "1.500.000", "Rp 150.000" -> 150000
+function toNumber(value) {
+  if (typeof value === "number" && !isNaN(value)) return value;
+  if (!value) return 0;
+  const cleaned = String(value).replace(/[^\d.-]/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 const formatIDR = (v) => Number(v || 0).toLocaleString("id-ID");
 function fmtTanggal(iso) {
   if (!iso) return "—";
@@ -1075,12 +1666,9 @@ async function loadVouchersForJasa(merchantSlug) {
   if (!merchantSlug) return;
   promosLoading.value = true;
   try {
-    const { data } = await api.get(
-      `/api/checkout/${merchantSlug}/vouchers`,
-      {
-        params: { amount: order.price || 0 },
-      },
-    );
+    const { data } = await api.get(`/api/checkout/${merchantSlug}/vouchers`, {
+      params: { amount: toNumber(order.price) || 0 },
+    });
 
     const list = Array.isArray(data?.data)
       ? data.data
@@ -1103,19 +1691,54 @@ async function loadVouchersForJasa(merchantSlug) {
   }
 }
 
+const normalizeVoucherType = (type) => {
+  const value = String(type || "").toLowerCase().trim();
+
+  if (["percent", "percentage", "persen", "diskon_persen"].includes(value)) {
+    return "percent";
+  }
+
+  if (["fixed", "flat", "nominal", "amount"].includes(value)) {
+    return "fixed";
+  }
+
+  return "fixed";
+};
+
+const refreshPlatformFee = () => {
+  const jasa = toNumber(amounts.value.jasa);
+  const ongkir = toNumber(amounts.value.ongkir);
+  const diskon = toNumber(amounts.value.diskon);
+  const gross = Math.max(0, jasa + ongkir - diskon);
+
+  amounts.value.platformFee = calculatePlatformFee(selectedPayment.value, gross);
+};
+
 function computeDiscount(promo) {
   if (!promo) return 0;
 
-  const base = Number(order.price || 0);
+  const base = toNumber(amounts.value.jasa || order.price || 0);
   const raw = promo.raw || {};
-  const type = raw.voucher_type || promo.type;
-  const value = Number(raw.value ?? promo.value ?? 0);
+
+  const type = normalizeVoucherType(raw.voucher_type || promo.type);
+  const value = toNumber(raw.value ?? promo.value ?? 0);
+  const minPurchase = toNumber(raw.min_purchase_amount || 0);
+  const maxDiscount = toNumber(raw.max_discount_amount || 0);
+
+  if (base <= 0) return 0;
+
+  if (minPurchase > 0 && base < minPurchase) {
+    errorMessage.value = `Minimal transaksi untuk voucher ini Rp ${formatIDR(minPurchase)}.`;
+    return 0;
+  }
 
   let discount = 0;
+
   if (type === "percent") {
     discount = Math.round((value / 100) * base);
-    if (raw.max_discount_amount) {
-      discount = Math.min(discount, Number(raw.max_discount_amount));
+
+    if (maxDiscount > 0) {
+      discount = Math.min(discount, maxDiscount);
     }
   } else {
     discount = value;
@@ -1127,22 +1750,34 @@ function computeDiscount(promo) {
 function usePromo(p) {
   if (!p) return;
 
+  errorMessage.value = "";
+
   const discount = computeDiscount(p);
+
   if (discount <= 0) {
     selectedPromo.value = null;
     amounts.value.diskon = 0;
+    refreshPlatformFee();
+
+    if (!errorMessage.value) {
+      errorMessage.value = "Voucher tidak dapat digunakan untuk pesanan ini.";
+    }
+
     return;
   }
 
   selectedPromo.value = p;
   amounts.value.diskon = discount;
+  refreshPlatformFee();
   openPromo.value = false;
 }
 
 function clearPromo() {
   selectedPromo.value = null;
   amounts.value.diskon = 0;
+  refreshPlatformFee();
 }
+
 // ===== Chat / WhatsApp integration =====
 const showChat = ref(false);
 const summaryText = ref("");
@@ -1161,28 +1796,136 @@ const submitting = ref(false);
 const openAlamatOptions = ref(false);
 
 // Coba gunakan alamat dari profil user (jika ada)
-function useProfileAddress() {
-  const user = authStore.user;
-  const profileUser = userStore.user;
-  // Prioritas: alamat lengkap dari profil user (full_address), lalu address/alamat biasa
-  const candidate =
-    profileUser?.full_address ||
-    profileUser?.address ||
-    profileUser?.alamat ||
-    user?.address ||
-    user?.alamat ||
-    user?.profile?.address ||
-    user?.profile?.alamat ||
-    "";
+function getProfileAddressPart(value) {
+  if (!value) return "";
 
-  if (candidate) {
-    form.value.alamat = candidate;
-    openAlamatOptions.value = false;
-    successMessage.value = "Alamat berhasil diisi dari profil.";
-  } else {
-    errorMessage.value =
-      "Alamat profil belum tersedia. Silakan lengkapi profil terlebih dahulu.";
+  if (typeof value === "string") {
+    return value.trim();
   }
+
+  if (typeof value === "object") {
+    return String(
+      value.name ||
+      value.nama ||
+      value.label ||
+      value.value ||
+      ""
+    ).trim();
+  }
+
+  return String(value).trim();
+}
+
+function buildProfileAddress() {
+  const user = authStore.user || {};
+  const profileUser = userStore.user || {};
+  const profile = user.profile || profileUser.profile || {};
+
+  const directCandidates = [
+    profileUser.full_address,
+    profileUser.fullAddress,
+    profileUser.address,
+    profileUser.alamat,
+    user.full_address,
+    user.fullAddress,
+    user.address,
+    user.alamat,
+    profile.full_address,
+    profile.fullAddress,
+    profile.address,
+    profile.alamat,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  const addressObject =
+    profileUser.primary_address ||
+    profileUser.primaryAddress ||
+    profileUser.address_detail ||
+    profileUser.addressDetail ||
+    user.primary_address ||
+    user.primaryAddress ||
+    user.address_detail ||
+    user.addressDetail ||
+    profile.primary_address ||
+    profile.primaryAddress ||
+    profile.address_detail ||
+    profile.addressDetail ||
+    null;
+
+  if (addressObject && typeof addressObject === "object") {
+    const objectParts = [
+      addressObject.detail,
+      addressObject.address_detail,
+      addressObject.detail_alamat,
+      addressObject.alamat,
+      addressObject.village,
+      addressObject.village_name,
+      addressObject.district,
+      addressObject.district_name,
+      addressObject.city,
+      addressObject.city_name,
+      addressObject.regency,
+      addressObject.regency_name,
+      addressObject.province,
+      addressObject.province_name,
+    ]
+      .map(getProfileAddressPart)
+      .filter(Boolean);
+
+    if (objectParts.length) {
+      return objectParts.join(", ");
+    }
+  }
+
+  const parts = [
+    profileUser.detail_address || profileUser.address_detail || profileUser.detail_alamat || profileUser.detail,
+    profileUser.village || profileUser.village_name,
+    profileUser.district || profileUser.district_name,
+    profileUser.city || profileUser.city_name || profileUser.regency || profileUser.regency_name,
+    profileUser.province || profileUser.province_name,
+
+    user.detail_address || user.address_detail || user.detail_alamat || user.detail,
+    user.village || user.village_name,
+    user.district || user.district_name,
+    user.city || user.city_name || user.regency || user.regency_name,
+    user.province || user.province_name,
+
+    profile.detail_address || profile.address_detail || profile.detail_alamat || profile.detail,
+    profile.village || profile.village_name,
+    profile.district || profile.district_name,
+    profile.city || profile.city_name || profile.regency || profile.regency_name,
+    profile.province || profile.province_name,
+  ]
+    .map(getProfileAddressPart)
+    .filter(Boolean);
+
+  return [...new Set(parts)].join(", ");
+}
+
+function useProfileAddress() {
+  const address = buildProfileAddress();
+
+  if (address) {
+    form.value.alamat = address;
+    openAlamatOptions.value = false;
+
+    // Jangan pakai successMessage karena itu memunculkan popup tengah
+    clearNotification();
+    toast.success("Alamat profil berhasil digunakan");
+
+    return;
+  }
+
+  openAlamatOptions.value = false;
+
+  // Jangan pakai errorMessage agar tidak muncul popup tengah
+  clearNotification();
+  toast.error("Alamat profil belum tersedia. Silakan lengkapi alamat profil terlebih dahulu.");
 }
 
 // Helper: reverse geocode lat,lng menjadi alamat teks (best effort)
@@ -1223,7 +1966,8 @@ async function reverseGeocode(lat, lng) {
 
 async function requestDeviceLocation() {
   if (!navigator.geolocation) {
-    locatingError.value = "Perangkat tidak mendukung pengambilan lokasi otomatis. Silakan isi alamat secara manual.";
+    locatingError.value =
+      "Perangkat tidak mendukung pengambilan lokasi otomatis. Silakan isi alamat secara manual.";
     return;
   }
 
@@ -1252,10 +1996,10 @@ async function requestDeviceLocation() {
     const address = await reverseGeocode(latitude, longitude);
     if (address) {
       form.value.alamat = address;
-      successMessage.value = "Lokasi berhasil terdeteksi dan alamat terisi otomatis.";
+      toast.success("Lokasi berhasil terdeteksi dan alamat terisi otomatis");
     } else {
       form.value.alamat = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-      successMessage.value = "Koordinat ditemukan. Silakan lengkapi alamat secara manual.";
+      toast.success("Lokasi berhasil diambil");
     }
   } catch (error) {
     console.error("[PembayaranJasa] Gagal mengambil lokasi device", error);
@@ -1264,10 +2008,12 @@ async function requestDeviceLocation() {
     } else if (error.code === 2) {
       locatingError.value = "Lokasi tidak tersedia. Silakan isi alamat secara manual.";
     } else if (error.code === 3) {
-      locatingError.value = " Waktu habis. Silakan coba lagi atau isi alamat manual.";
+      locatingError.value = "Waktu habis. Silakan coba lagi atau isi alamat manual.";
     } else {
       locatingError.value = "Gagal mengambil lokasi. Silakan isi alamat secara manual.";
     }
+
+    toast.error(locatingError.value);
   } finally {
     locatingDevice.value = false;
   }
@@ -1318,7 +2064,9 @@ onMounted(async () => {
   if (!order.jasaSlug) return;
 
   try {
-    const { data } = await api.get(`/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`);
+    const { data } = await api.get(
+      `/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`,
+    );
     const payload = data?.data ?? data;
 
     // Prioritas sumber nomor WhatsApp penjual
@@ -1343,19 +2091,28 @@ onMounted(async () => {
       order.merchantName = payload.merchant.name;
     }
 
-    // Otomatis isi alamat berdasarkan service_type
-    if (payload?.service_type === 'at_location') {
+    // Otomatis isi alamat berdasarkan delivery_type
+    const fetcheddeliveryType = String(payload?.delivery_type || "").toLowerCase();
+
+    if (
+      fetcheddeliveryType === "at_location" ||
+      fetcheddeliveryType === "in-store" ||
+      fetcheddeliveryType === "ditempat_umkm"
+    ) {
       form.value.alamat = fetchedMerchantAddr;
-    } else if (payload?.service_type === 'on_site') {
-      form.value.alamat = '';
+    } else if (
+      fetcheddeliveryType === "on_site" ||
+      fetcheddeliveryType === "on-site"
+    ) {
+      form.value.alamat = "";
     }
 
     if (!order.merchantSlug && payload?.merchant?.slug) {
       await loadVouchersForJasa(payload.merchant.slug);
     }
 
-    if (!serviceType.value && payload?.service_type) {
-      serviceType.value = payload.service_type;
+    if (!deliveryType.value && payload?.delivery_type) {
+      deliveryType.value = payload.delivery_type;
     }
   } catch (e) {
     console.error("[PembayaranJasa] Gagal mengambil data jasa", e);
@@ -1400,7 +2157,7 @@ function buildWhatsappMessage() {
   }
   if (deviceCoordinates.value) {
     lines.push(
-      `Koordinat : ${deviceCoordinates.value.latitude.toFixed(6)}, ${deviceCoordinates.value.longitude.toFixed(6)}`
+      `Koordinat : ${deviceCoordinates.value.latitude.toFixed(6)}, ${deviceCoordinates.value.longitude.toFixed(6)}`,
     );
   }
   if (form.value.catatan) {
@@ -1410,18 +2167,26 @@ function buildWhatsappMessage() {
 
   // Ringkasan pembayaran
   lines.push("=== Ringkasan Pembayaran ===");
-  lines.push(`Harga Jasa       : Rp ${formatIDR(amounts.value.jasa)}`);
-  lines.push(`Biaya Pengantaran: Rp ${formatIDR(amounts.value.ongkir)}`);
+  lines.push(
+    `Harga Jasa       : Rp ${formatIDR(toNumber(amounts.value.jasa))}`,
+  );
+  lines.push(
+    `Biaya Pengantaran: Rp ${formatIDR(toNumber(amounts.value.ongkir))}`,
+  );
   if (selectedPromo.value) {
     lines.push(
       `Diskon (${selectedPromo.value.code}) : Rp ${formatIDR(
-        amounts.value.diskon,
+        toNumber(amounts.value.diskon),
       )}`,
     );
   } else {
-    lines.push(`Diskon            : Rp ${formatIDR(amounts.value.diskon)}`);
+    lines.push(
+      `Diskon            : Rp ${formatIDR(toNumber(amounts.value.diskon))}`,
+    );
   }
-  lines.push(`Total Pembayaran  : Rp ${formatIDR(total.value || order.price)}`);
+  lines.push(
+    `Total Pembayaran  : Rp ${formatIDR(toNumber(total.value) || order.price)}`,
+  );
 
   return lines.join("\n");
 }
@@ -1443,27 +2208,38 @@ const sendToChat = async () => {
     }
 
     if (!form.value.tel || !isValidPhone(form.value.tel)) {
-      errorMessage.value = "Nomor telepon wajib diisi dan hanya boleh berisi angka (min. 8 digit).";
+      errorMessage.value =
+        "Nomor telepon wajib diisi dan hanya boleh berisi angka (min. 8 digit).";
       return;
     }
 
-    if (isCustomerAddressRequired.value && !String(form.value.alamat || '').trim()) {
+    if (
+      isCustomerAddressRequired.value &&
+      !String(form.value.alamat || "").trim()
+    ) {
       errorMessage.value = "Alamat layanan wajib diisi terlebih dahulu.";
       return;
     }
 
     // Validasi jadwal: hanya untuk mekanisme Booking
     // Keranjang/tanpa jadwal langsung skip validasi jadwal
-    console.log("[PembayaranJasa] Mekanisme:", mekanismePemesanan.value, "| isBookingMechanism:", isBookingMechanism.value);
+    console.log(
+      "[PembayaranJasa] Mekanisme:",
+      mekanismePemesanan.value,
+      "| isBookingMechanism:",
+      isBookingMechanism.value,
+    );
     if (isBookingMechanism.value) {
       if (!isFormValid.value) {
-        errorMessage.value = "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
+        errorMessage.value =
+          "Mohon lengkapi data pemesan dan jadwal terlebih dahulu.";
         return;
       }
 
       const parsedTime = formatTimeForApi(form.value.waktu);
       if (!parsedTime) {
-        errorMessage.value = "Format waktu booking tidak valid. Gunakan format HH:MM, contoh: 14:00.";
+        errorMessage.value =
+          "Format waktu booking tidak valid. Gunakan format HH:MM, contoh: 14:00.";
         return;
       }
     }
@@ -1472,7 +2248,8 @@ const sendToChat = async () => {
     // ===== Helpers =====
     const cleanValue = (val) => {
       if (val === null || val === undefined || val === "") return null;
-      if (val === "—" || val === "-" || val === "null" || val === "undefined") return null;
+      if (val === "—" || val === "-" || val === "null" || val === "undefined")
+        return null;
       return val;
     };
 
@@ -1481,7 +2258,9 @@ const sendToChat = async () => {
     let jasaDataForLog = null;
     let fetchedJasaData = null;
     try {
-      const { data: jasaData } = await api.get(`/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`);
+      const { data: jasaData } = await api.get(
+        `/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`,
+      );
       jasaId = jasaData?.id || jasaData?.data?.id || null;
       jasaDataForLog = jasaData;
       fetchedJasaData = jasaData?.data || jasaData; // normalize
@@ -1489,7 +2268,10 @@ const sendToChat = async () => {
     } catch (e) {
       // Jika 404 (jasa tidak ditemukan), tetap lanjut dengan fallback
       const isNotFound = e.response?.status === 404;
-      console.warn(`[PembayaranJasa] Gagal fetch jasa (${isNotFound ? '404' : 'other'}):`, e.response?.data);
+      console.warn(
+        `[PembayaranJasa] Gagal fetch jasa (${isNotFound ? "404" : "other"}):`,
+        e.response?.data,
+      );
       if (!isNotFound) {
         errorMessage.value = "Gagal memuat data jasa. Silakan coba lagi.";
         return;
@@ -1502,11 +2284,19 @@ const sendToChat = async () => {
     const apiMekanisme = getMekanismeFromJasa(fetchedJasaData);
     if (apiMekanisme) {
       mekanismePemesanan.value = apiMekanisme;
-      console.log(`[PembayaranJasa] Mekanisme di-override dari API: "${apiMekanisme}"`);
-      console.log(`[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`);
+      console.log(
+        `[PembayaranJasa] Mekanisme di-override dari API: "${apiMekanisme}"`,
+      );
+      console.log(
+        `[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`,
+      );
     } else {
-      console.log(`[PembayaranJasa] Mekanisme dari API kosong — pakai route query / default kosong`);
-      console.log(`[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`);
+      console.log(
+        `[PembayaranJasa] Mekanisme dari API kosong — pakai route query / default kosong`,
+      );
+      console.log(
+        `[PembayaranJasa] isKeranjangCheckout: ${isKeranjangCheckout.value} | isBookingMechanism: ${isBookingMechanism.value}`,
+      );
     }
 
     if (!jasaId) {
@@ -1515,19 +2305,40 @@ const sendToChat = async () => {
     }
 
     // ===== Bangun payload =====
+    // order_method: mekanisme pemesanan (FE format: keranjang | booking | konsultasi)
+    const mappedOrderMethod = isKeranjangCheckout.value
+      ? "keranjang"
+      : isBookingMechanism.value
+        ? "booking"
+        : "keranjang";
+
     const orderPayload = {
       jasa_id: jasaId,
       service_name: order.title,
-      service_type: serviceType.value,
+      delivery_type: deliveryType.value,
       customer_name: form.value.nama,
       customer_phone: form.value.tel,
       customer_address: cleanValue(form.value.alamat),
-      booking_date: isKeranjangCheckout.value ? null : formatDateForApi(form.value.tanggalISO),
-      booking_time: isKeranjangCheckout.value ? null : formatTimeForApi(form.value.waktu),
+      booking_date: isKeranjangCheckout.value
+        ? null
+        : formatDateForApi(form.value.tanggalISO),
+      booking_time: isKeranjangCheckout.value
+        ? null
+        : formatTimeForApi(form.value.waktu),
       booking_note: cleanValue(form.value.catatan),
-      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
-      payment_method: pay.method, // Use actual method ID (cod, QRIS, BCA, etc.)
-      total_price: total.value || order.price || 0,
+      // order_method: mekanisme pemesanan (PRIMARY - keranjang | booking | konsultasi)
+      order_method: mappedOrderMethod,
+      payment_method:
+        selectedPayment.value?.toUpperCase() === "COD" ? "COD" : "xendit", // abstract/consistent value
+      payment_channel: paymentChannel.value, // actual channel e.g. BCA, QRIS, etc.
+      channel_code: paymentChannel.value, // explicit channel code
+      subtotal: toNumber(amounts.value.jasa), // service price before fee
+      total_price: toNumber(total.value) || toNumber(order.price) || 0, // includes fee
+
+      voucher_id: selectedPromo.value?.raw?.id || null,
+      voucher_code: selectedPromo.value?.code || null,
+      discount_amount: toNumber(amounts.value.diskon),
+      
       latitude: deviceCoordinates.value?.latitude ?? null,
       longitude: deviceCoordinates.value?.longitude ?? null,
     };
@@ -1535,146 +2346,92 @@ const sendToChat = async () => {
     console.log("[PembayaranJasa] Service Order Payload:", orderPayload);
     console.log("[PembayaranJasa] Payload fields:", {
       jasa_id: orderPayload.jasa_id,
-      service_type: orderPayload.service_type,
+      delivery_type: orderPayload.delivery_type,
       customer_name: orderPayload.customer_name,
       customer_phone: orderPayload.customer_phone,
       customer_address: orderPayload.customer_address,
       booking_date: orderPayload.booking_date,
       booking_time: orderPayload.booking_time,
-      mekanisme_pemesanan: orderPayload.mekanisme_pemesanan,
+      order_method: orderPayload.order_method,
       payment_method: orderPayload.payment_method,
+      payment_channel: orderPayload.payment_channel,
+      subtotal: orderPayload.subtotal,
       total_price: orderPayload.total_price,
     });
 
+    // ===== Debug: log semua info yang diperlukan =====
+    console.log(
+      "[PembayaranJasa] selectedPayment (channel):",
+      selectedPayment.value,
+    );
+    console.log(
+      "[PembayaranJasa] paymentMethod (abstract):",
+      paymentMethod.value,
+    );
+    console.log(
+      "[PembayaranJasa] paymentChannel (for backend):",
+      paymentChannel.value,
+    );
+    console.log(
+      "[PembayaranJasa] Available methods:",
+      availablePaymentMethods.value.map((m) => m.id),
+    );
+
     // ===== Kirim ke backend — WAJIB SUKSES =====
-    const response = await api.post("/api/service-orders", orderPayload);
-    console.log("[PembayaranJasa] Response service order:", response.data);
+    const response = await api.post("/api/jasa-orders", orderPayload);
+    console.log("[PembayaranJasa] SELECTED PROMO BEFORE POST:", selectedPromo.value);
+    console.log("[PembayaranJasa] DISCOUNT BEFORE POST:", amounts.value.diskon);
+    console.log("[PembayaranJasa] FINAL ORDER PAYLOAD:", orderPayload);
+    console.log("[PembayaranJasa] Full response:", response);
+    console.log("[PembayaranJasa] Response.data:", response.data);
 
-    // ApiResponse::success → { message, data: { id, merchant_id, ... } }
-    const res = response.data;
-    const createdOrder = res?.data;
+    // ApiResponse::success → { message, data: { success, order_id, ... } }
+    const responseData = response.data?.data || response.data;
+    console.log("[PembayaranJasa] Normalized responseData:", responseData);
 
-    // Jika backend tidak mengembalikan id, anggap gagal total
-    if (!createdOrder?.id) {
-      errorMessage.value = res?.message || "Gagal membuat pesanan. Silakan coba lagi.";
-      console.error("Response tanpa id dari backend:", res);
+    // ===== Ambil order_id / jasa_order_item_id =====
+    // Support multiple field names: order_id, jasa_order_item_id, id (fallback)
+    const orderId =
+      responseData?.order_id ||
+      responseData?.jasa_order_item_id ||
+      responseData?.id;
+
+    if (!orderId) {
+      console.error("[PembayaranJasa] Response tanpa order_id:", response.data);
+      errorMessage.value =
+        response.data?.message ||
+        "Gagal membuat pesanan. ID pesanan tidak ditemukan.";
       return;
     }
 
-    const orderId = createdOrder.id;
-    const backendStatus = createdOrder.status || 'menunggu_konfirmasi_merchant';
-
-    // ===== Handle NON-COD: redirect ke invoice Xendit =====
-    if (!isCodMethod(pay.method)) {
-      // Cek apakah backend sudah membuat invoice dan mengembalikan invoice_url
-      const invoiceUrl = res?.data?.invoice_url || createdOrder?.invoice_url;
-      if (invoiceUrl) {
-        // Redirect langsung ke halaman pembayaran Xendit
-        window.location.href = invoiceUrl;
-        return;
-      }
-      // Jika backend belum membuat invoice, tampilkan pesan
-      errorMessage.value = "Metode pembayaran online belum tersedia. Silakan pilih metode lain.";
-      return;
-    }
-
-    // ===== Simpan ke localStorage sebagai backup =====
-    const localBooking = {
-      id: orderId,
-      service_name: createdOrder.service_name || order.title,
-      service_type: createdOrder.service_type || serviceType.value || 'on_site',
-      mekanisme_pemesanan: createdOrder.mekanisme_pemesanan || (isKeranjangCheckout.value ? 'keranjang' : 'booking'),
-      merchant_name: createdOrder.merchant_name || order.merchantName || '',
-      merchant_slug: order.merchantSlug || '',
-      merchant_address: merchantAddress.value || createdOrder.merchant?.primary_address?.detail || '',
-      customer_name: createdOrder.customer_name || form.value.nama,
-      customer_phone: createdOrder.customer_phone || form.value.tel,
-      customer_address: createdOrder.customer_address || form.value.alamat || '',
-      booking_date: createdOrder.booking_date || form.value.tanggalISO || null,
-      booking_time: createdOrder.booking_time || form.value.waktu || null,
-      booking_note: createdOrder.booking_note || form.value.catatan || '',
-      payment_method: createdOrder.payment_method || pay.method || 'cod',
-      total_price: createdOrder.total_price || total.value || order.price || 0,
-      latitude: createdOrder.customer_latitude ?? deviceCoordinates.value?.latitude ?? null,
-      longitude: createdOrder.customer_longitude ?? deviceCoordinates.value?.longitude ?? null,
-      service_image: createdOrder.service_image || order.image || '',
-      status: backendStatus,
-      created_at: createdOrder.created_at || new Date().toISOString(),
-    };
-    saveLocalBooking(localBooking);
-
-    console.log("Data service order (customer):", localBooking);
-
-    // ===== Bangun pesan WhatsApp =====
-    const message = buildWhatsappMessage();
-    if (!message) return;
-
-    // Cek apakah backend punya redirect WhatsApp — jika tidak, tetap buka WhatsApp manual
-    let whatsappRedirectUrl = null;
-    try {
-      const { data: waData } = await api.post(
-        `/api/service-orders/${orderId}/redirect-whatsapp`,
-        { order_id: orderId }
-      ).catch(() => null);
-      // Jika endpoint tidak ada (404), waData akan null — tidak masalah
-      if (waData?.data?.redirect_url) {
-        whatsappRedirectUrl = waData.data.redirect_url;
-      }
-    } catch {
-      // Gagal fetch redirect — abaikan, tetap pakai nomor manual
-    }
-
-    let url = whatsappRedirectUrl || jasaWhatsappLink.value;
-
-    if (!url) {
-      errorMessage.value = "Nomor atau link WhatsApp penjual belum tersedia. Silakan hubungi penjual secara manual.";
-      return;
-    }
-
-    if (!url.startsWith("http") && !url.startsWith("wa.me")) {
-      const phone = url.replace(/[^0-9]/g, "");
-      url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    } else if (url.startsWith("http")) {
-      url += url.includes("?") ? `&text=${encodeURIComponent(message)}` : `?text=${encodeURIComponent(message)}`;
-    }
-
-    window.open(url, "_blank");
-
-    // ===== Redirect ke halaman konfirmasi =====
-    const params = new URLSearchParams({
-      order_id: orderId,
-      jasa_id: route.query.jasa_id || "",
-      merchant_slug: order.merchantSlug || "",
-      merchant_name: order.merchantName || "",
-      merchant_address: merchantAddress.value || "",
-      jasa_title: order.title,
-      service_type: serviceType.value || order.serviceType || "on_site",
-      mekanisme_pemesanan: isKeranjangCheckout.value ? 'keranjang' : 'booking',
-      nama: form.value.nama,
-      tel: form.value.tel,
-      alamat: form.value.alamat || "",
-      tanggal: form.value.tanggalISO || order.tglISO,
-      waktu: form.value.waktu,
-      payment_method: pay.method || "Bayar di Tempat",
-      total: total.value || order.price,
-      catatan: form.value.catatan || "",
-      service_image: order.image || "",
+    // Simpan payment_id, external_id, order_id, jasa_order_item_id jika tersedia
+    const paymentId = responseData?.payment_id || null;
+    const externalId = responseData?.external_id || null;
+    const jasaOrderItemId = responseData?.jasa_order_item_id || null;
+    console.log("[PembayaranJasa] Order IDs:", {
+      orderId,
+      paymentId,
+      externalId,
+      jasaOrderItemId,
     });
 
-    if (order.jasaSlug) {
-      params.set("jasa_slug", order.jasaSlug);
-    }
-
-    router.push({
-      path: "/booking-confirmation",
-      query: Object.fromEntries(params),
-    });
-
+    // ===== Flow jasa baru =====
+    // Setelah pesanan dibuat, customer tidak langsung diarahkan ke Xendit.
+    // Pesanan harus dikonfirmasi merchant terlebih dahulu.
+    // Tombol bayar baru muncul di halaman detail setelah status menjadi `diterima`.
+    console.log(
+      "[PembayaranJasa] Order created. Waiting for merchant confirmation.",
+    );
+    router.push(`/orders/${orderId}?type=jasa`);
+    return;
   } catch (err) {
     console.error("[PembayaranJasa] Error checkout:", err);
     console.error("[PembayaranJasa] Status:", err.response?.status);
     console.error("[PembayaranJasa] Response Data:", err.response?.data);
-    console.error("[PembayaranJasa] Validation Errors:", err.response?.data?.errors);
+    console.error(
+      "[PembayaranJasa] Validation Errors:",
+      err.response?.data?.errors,
+    );
 
     const backendMessage = err.response?.data?.message;
     const validationErrors = err.response?.data?.errors;
@@ -1682,13 +2439,18 @@ const sendToChat = async () => {
     if (validationErrors) {
       // Tampilkan semua error validasi dari backend
       const allErrors = Object.entries(validationErrors)
-        .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-        .join(' | ');
-      errorMessage.value = allErrors || "Validasi gagal. Periksa kembali data Anda.";
+        .map(
+          ([field, msgs]) =>
+            `${field}: ${Array.isArray(msgs) ? msgs.join(", ") : msgs}`,
+        )
+        .join(" | ");
+      errorMessage.value =
+        allErrors || "Validasi gagal. Periksa kembali data Anda.";
     } else if (backendMessage) {
       errorMessage.value = backendMessage;
     } else if (err.request) {
-      errorMessage.value = "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
+      errorMessage.value =
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
     } else {
       errorMessage.value = "Terjadi kesalahan. Silakan coba lagi.";
     }

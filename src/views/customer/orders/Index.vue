@@ -153,7 +153,7 @@
             <template #action="{ order: o }">
               <Button
                 v-if="o.status === 'completed'"
-                @click.stop="$router.push({ path: `/review/product/${o.id}/${o.items[0]?.productId}`, query: { merchantId: o._raw.merchant_id } })"
+                @click.stop="$router.push({ path: `/review/${o.order_type === 'jasa' ? 'service' : 'product'}/${o.id}/${o.order_type === 'jasa' ? o.items[0]?.jasaId : o.items[0]?.productId}`, query: { merchantId: o._raw.merchant_id } })"
                 class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-merchant-primary hover:bg-merchant-primary/90"
               >
                 Beri Ulasan
@@ -419,7 +419,10 @@ function mapApiStatus(beStatus, o) {
     case "accepted":
       return "processing";
     case "delivered":
-      return o.delivery_type === "pickup" ? "ready" : "shipped";
+    case "ready_to_pickup":
+      return o.order_type === 'jasa' ? 'on_progress' : (o.delivery_type === "pickup" ? "ready" : "shipped");
+    case "on-progress":
+      return "on_progress";
     case "completed":
       return "completed";
     case "cancelled":
@@ -459,19 +462,21 @@ function mapOrder(o) {
     dateLabel: formatDateLabel(o.created_at),
     status: mapApiStatus(o.status, o),
     total: o.gross_amount,
+    order_type: o.order_type,
     delivery_type: o.delivery_type || "delivery",
-    items: (o.items || []).map((it) => ({
+    items: (o.order_type === 'jasa' ? (o.jasa_items || []) : (o.items || [])).map((it) => ({
       id: it.id,
       productId: it.product_id,
-      title: it.product_name_snapshot || "Produk",
+      jasaId: it.jasa_id,
+      title: it.jasa_title_snapshot || it.product_name_snapshot || "Item/Layanan",
       qty: it.quantity,
-      variant: it.product_variant_snapshot || "",
+      variant: o.order_type === 'jasa' ? (it.order_method === 'langsung_pesan' || it.order_method === 'keranjang' ? 'Langsung Pesan' : (it.order_method === 'konsultasi' || it.order_method === 'memerlukan_konsultasi' ? 'Konsultasi' : 'Booking')) : (it.product_variant_snapshot || ""),
       addons: (it.addons || []).map((a) => ({
         name: a.addon_name_snapshot || a.addon?.name || "Addon",
         price: Number(a.addon_price_snapshot || 0),
       })),
-      price: it.unit_price_snapshot,
-      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
+      price: it.unit_price_snapshot || it.subtotal || it.price || it.jasa_price_snapshot || 0,
+      imageUrl: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
       productSlug: it.product?.slug, // Get product slug for Buy Again
     })),
     _raw: o,
