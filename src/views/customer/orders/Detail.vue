@@ -614,7 +614,8 @@
               block
               :loading="confirmingSelesai"
               @click="handleKonfirmasiSelesai"
-              customClass="mt-2 bg-green-500 hover:bg-green-600 text-white font-semibold"
+              variant=""
+              customClass="mt-2 bg-green-500 hover:bg-green-600 text-white font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
             >
               <i class="pi pi-check-circle mr-1"></i>
               Konfirmasi Selesai
@@ -1259,7 +1260,8 @@
               block
               :loading="completing"
               @click="handleComplete"
-              customClass="mt-2 bg-green-600 hover:bg-green-700 text-white"
+              variant=""
+              customClass="mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold shadow-sm hover:shadow-lg duration-200 active:scale-95"
             >
               Pesanan Diterima (Selesai)
             </Button>

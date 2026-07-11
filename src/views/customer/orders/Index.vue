@@ -119,15 +119,7 @@
                   <i class="pi pi-clock"></i>
                   Sisa waktu konfirmasi selesai: {{ getCompletionDeadlineRemaining(o) }}
                 </div>
-                <!-- Bayar Kembali (Xendit belum dibayar) -->
-                <Button
-                  v-if="needsPayment(o)"
-                  @click.stop="retryPayment(o)"
-                  class="h-8 px-3 py-1.5 text-xs text-white border-0 bg-blue-500 hover:bg-blue-600"
-                >
-                  <i class="pi pi-credit-card mr-1"></i>
-                  Bayar Sekarang
-                </Button>
+
                 <!-- Konfirmasi Selesai (merchant sudah upload bukti) -->
                 <Button
                   v-if="o.status === 'menunggu_konfirmasi_selesai' || o.status === 'menunggu_selesai'"
