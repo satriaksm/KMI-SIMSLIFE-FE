@@ -13,6 +13,8 @@ import TextField from "@/components/forms/TextField.vue";
 import MobileHeader from "@/components/customer/MobileHeader.vue";
 import AppButton from "@/components/common/Button.vue";
 import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
+import ImageCropperModal from "@/components/common/ImageCropperModal.vue";
+import { compressImage } from "@/utils/imageCompressor.js";
 
 // =========================
 // STATE & REFS
@@ -58,6 +60,9 @@ const imgError = ref(false);
 
 const MAX_PROFILE_IMAGE_MB = 5;
 const MAX_PROFILE_IMAGE_BYTES = MAX_PROFILE_IMAGE_MB * 1024 * 1024;
+
+const showCropper = ref(false);
+const cropperImageUrl = ref("");
 
 // =========================
 // COMPUTED
@@ -164,9 +169,14 @@ const handleSave = async () => {
       const specificMessage = Object.values(errors).flat().join(", ");
       toast.error(specificMessage);
     } else {
-      const message =
-        error.response?.data?.message ||
-        "Gagal memperbarui profil. Silakan coba lagi.";
+      let fallbackMsg = "Gagal memperbarui profil. Silakan coba lagi.";
+      if (error.response) {
+         fallbackMsg = `Gagal (Error ${error.response.status}: ${error.response.statusText || 'Server Error'}). Silakan coba lagi.`;
+      } else if (error.message) {
+         fallbackMsg = `Gagal memperbarui profil (${error.message}).`;
+      }
+      
+      const message = error.response?.data?.message || fallbackMsg;
       toast.error(message);
     }
   }
@@ -179,22 +189,45 @@ const onFileChange = (e) => {
 
   if (!String(file.type || "").startsWith("image/")) {
     toast.error("File harus berupa gambar");
-    profilePictureFile.value = null;
-    formData.value.profile_picture = "";
     if (e?.target) e.target.value = "";
     return;
   }
 
   if (file.size > MAX_PROFILE_IMAGE_BYTES) {
     toast.error(`Ukuran gambar maksimal ${MAX_PROFILE_IMAGE_MB}MB`);
-    profilePictureFile.value = null;
-    formData.value.profile_picture = "";
     if (e?.target) e.target.value = "";
     return;
   }
 
-  profilePictureFile.value = file;
-  formData.value.profile_picture = URL.createObjectURL(file);
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    cropperImageUrl.value = event.target.result;
+    showCropper.value = true;
+  };
+  reader.readAsDataURL(file);
+
+  if (e?.target) e.target.value = "";
+};
+
+const handleCrop = async (croppedFile) => {
+  showCropper.value = false;
+  try {
+    const compressedFile = await compressImage(croppedFile, 1920);
+    profilePictureFile.value = compressedFile;
+    formData.value.profile_picture = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    profilePictureFile.value = croppedFile;
+    formData.value.profile_picture = URL.createObjectURL(croppedFile);
+  }
+};
+
+const onInvalidSubmit = ({ errors }) => {
+  if (errors && Object.keys(errors).length > 0) {
+    const firstError = Object.values(errors)[0];
+    toast.error(firstError);
+  } else {
+    toast.error("Mohon periksa kembali isian Anda");
+  }
 };
 
 // =========================
@@ -219,7 +252,7 @@ onMounted(() => {
     />
 
     <!-- Header -->
-    <MobileHeader title="Edit Profil" @back="goBack" />
+    <MobileHeader title="Edit Profil" @back="goBack" variant="primary"/>
 
     <!-- Content Container -->
     <div class="px-4 py-4 mx-auto max-w-7xl">
@@ -312,7 +345,7 @@ onMounted(() => {
               Edit Informasi Profil
             </h3>
 
-            <Form @submit="handleSave" :validation-schema="schema">
+            <Form @submit="handleSave" @invalid-submit="onInvalidSubmit" :validation-schema="schema">
               <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <!-- Nama -->
                 <div class="lg:col-span-2">
@@ -453,16 +486,20 @@ onMounted(() => {
           >
             Edit Foto Profile
           </button>
+
+          <p class="mt-1 text-xs text-center text-gray-500">
+            Format: JPG, PNG<br />Max size: 5MB
+          </p>
         </div>
 
-        <Form @submit="handleSave" :validation-schema="schema" class="mb-6 space-y-4">
+        <Form @submit="handleSave" @invalid-submit="onInvalidSubmit" :validation-schema="schema" class="mb-6 space-y-4">
           <!-- Nama -->
           <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700"
-              >Nama</label
-            >
+            
+            
             <TextField
               name="name"
+            label="Nama Lengkap"
               v-model="formData.name"
               type="text"
               required
@@ -472,11 +509,10 @@ onMounted(() => {
 
           <!-- Telepon -->
           <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700"
-              >Telepon</label
-            >
+            
             <TextField
               name="phone"
+            label="Nomor Telepon"
               v-model="formData.phone"
               type="tel"
               required
@@ -486,11 +522,10 @@ onMounted(() => {
 
           <!-- Email -->
           <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700"
-              >Email</label
-            >
+            
             <TextField
               name="email"
+            label="Email"
               v-model="formData.email"
               type="email"
               required
@@ -500,33 +535,57 @@ onMounted(() => {
 
           <!-- NIK -->
           <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700"
-              >NIK</label
-            >
+            
             <TextField
               name="nik"
+            label="NIK (Opsional)"
               v-model="formData.nik"
               type="text"
-              required
               :maxlength="16"
               placeholder="Masukkan NIK"
             />
           </div>
 
-          <!-- Save Button -->
-          <AppButton
-            type="submit"
-            variant="primary"
-            size="md"
-            block
-            :loading="userStore.loading"
-            :disabled="userStore.loading"
-            customClass="w-full"
-          >
-            {{ userStore.loading ? "Menyimpan..." : "Simpan" }}
-          </AppButton>
+          <!-- Save Button (Desktop) -->
+          <div class="hidden sm:block">
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="userStore.loading"
+              :disabled="userStore.loading"
+              customClass="w-full"
+            >
+              {{ userStore.loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
+          </div>
+
+          <!-- Save Button (Mobile Sticky) -->
+          <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="userStore.loading"
+              :disabled="userStore.loading"
+              customClass="w-full"
+            >
+              {{ userStore.loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
+          </div>
         </Form>
       </div>
     </div>
+    
+    <ImageCropperModal
+      :show="showCropper"
+      :image-url="cropperImageUrl"
+      :aspect-ratio="1"
+      title="Sesuaikan Foto Profil"
+      @close="showCropper = false"
+      @crop="handleCrop"
+    />
   </div>
 </template>

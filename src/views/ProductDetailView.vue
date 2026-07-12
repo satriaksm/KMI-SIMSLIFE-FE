@@ -761,7 +761,7 @@
 
   <!-- Bottom Action Bar (Mobile) -->
   <div
-    class="fixed left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 sm:hidden bottom-16"
+    class="fixed left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 sm:hidden bottom-0"
   >
     <div v-if="loading" class="flex items-center gap-3">
       <div class="w-12 h-12 bg-gray-200 rounded-xl animate-pulse"></div>

@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import VueDevTools from "vite-plugin-vue-devtools";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -12,6 +13,7 @@ export default defineConfig(({ mode }) => {
     base: "/",
     plugins: [
       vue(),
+      VueDevTools(),
       tailwindcss(),
       VitePWA({
         // Emergency recovery mode: generate a self-destroying SW so clients

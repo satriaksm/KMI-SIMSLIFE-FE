@@ -2,117 +2,128 @@
   <div class="relative z-0">
     <!-- SEARCH + FILTER (DESKTOP) -->
     <div
-      class="fixed z-40 justify-center hidden w-full p-3 -translate-x-1/2 sm:flex sm:top-16 top-24 left-1/2"
+      class="fixed z-40 justify-center hidden w-full p-4 -translate-x-1/2 pointer-events-none sm:flex sm:top-16 top-24 left-1/2"
     >
-      <div class="flex items-center w-full max-w-2xl gap-3">
+      <div class="flex items-start w-full max-w-3xl gap-4 pointer-events-auto">
         <!-- SEARCH BAR -->
-        <div class="relative w-full">
-          <TextField
-            v-model="query"
-            @update:modelValue="search"
-            name="search-desktop"
-            placeholder="Cari UMKM..."
-            hideLabel
-            autocomplete="off"
-          />
+        <div class="relative flex-1">
+          <div class="relative w-full">
+            <span class="absolute z-10 text-gray-400 -translate-y-1/2 pointer-events-none left-4 top-1/2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 10.5 18a7.5 7.5 0 0 0 6.15-3.35Z" />
+              </svg>
+            </span>
+            <TextField
+              v-model="query"
+              @update:modelValue="search"
+              name="search-desktop"
+              placeholder="Cari warung, toko, atau jasa..."
+              hideLabel
+              autocomplete="off"
+              customClass="!pl-11 !h-12 shadow-[0_8px_30px_rgba(0,0,0,0.12)] bg-white rounded-2xl border-none ring-1 ring-black/5"
+            />
+            <button v-if="query" @click="query = ''; results = []" class="absolute z-10 flex items-center justify-center w-6 h-6 text-gray-400 transition -translate-y-1/2 bg-gray-100 rounded-full right-4 top-1/2 hover:text-gray-700">
+              <i class="text-xs pi pi-times"></i>
+            </button>
+          </div>
 
           <!-- HASIL PENCARIAN DESKTOP -->
-          <ul
-            v-if="results.length"
-            class="absolute left-0 right-0 z-50 mt-1 overflow-y-auto bg-white rounded-lg shadow-lg max-h-60 search-results-desktop"
-          >
-            <li
-              v-for="item in results"
-              :key="item.id"
-              @click="goTo(item)"
-              class="flex items-center justify-between gap-3 p-3 transition-colors border-b border-gray-100 cursor-pointer hover:bg-linear-to-r hover:from-primary/5 hover:to-primary/10 last:border-b-0"
+          <transition name="fade">
+            <ul
+              v-if="results.length"
+              class="absolute left-0 right-0 z-50 mt-2 overflow-y-auto bg-white shadow-2xl rounded-2xl max-h-[60vh] border border-gray-100 divide-y divide-gray-50"
             >
-              <div class="flex items-center min-w-0 gap-3">
-                <!-- IMAGE -->
-                <img
-                  loading="lazy"
-                  v-if="item.logo_url"
-                  :src="getThumbLogoUrl(item.logo_url)"
-                  class="object-cover w-12 h-12 bg-gray-200 rounded-lg shrink-0"
-                  alt="Foto UMKM"
-                />
-                <svg
-                  v-else
-                  class="w-12 h-12 p-2 text-gray-300 bg-gray-100 rounded-lg shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z"
+              <li
+                v-for="item in results"
+                :key="item.id"
+                @click="goTo(item)"
+                class="flex items-center justify-between gap-3 p-3 transition-colors cursor-pointer hover:bg-gray-50"
+              >
+                <div class="flex items-center min-w-0 gap-3">
+                  <!-- IMAGE -->
+                  <img
+                    loading="lazy"
+                    v-if="item.logo_url"
+                    :src="getThumbLogoUrl(item.logo_url)"
+                    class="object-cover w-12 h-12 bg-gray-200 rounded-lg shrink-0"
+                    alt="Foto UMKM"
                   />
-                </svg>
+                  <svg
+                    v-else
+                    class="w-12 h-12 p-2 text-gray-300 bg-gray-100 rounded-lg shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+                  </svg>
 
                 <!-- INFO -->
                 <div class="flex-1 min-w-0">
-                  <div class="text-sm font-medium text-gray-900 truncate">
+                  <div class="text-sm font-semibold text-gray-900 truncate">
                     {{ item.name }}
                   </div>
-                  <div
-                    class="flex items-center gap-2 mt-1 text-xs text-gray-600"
-                  >
-                    <span class="font-bold text-merchant-primary">{{
-                      item.segmentation?.name || "UMKM"
-                    }}</span>
-                    <span
-                      v-if="calculateDistance(item)"
-                      class="flex items-center gap-1"
-                    >
-                      <i class="text-red-500 pi pi-map-marker"></i>
+                  <div v-if="item.description" class="mt-0.5 text-[11px] text-gray-500 truncate">
+                    {{ item.description }}
+                  </div>
+                  <div class="flex items-center gap-2 mt-1 text-xs text-gray-600">
+                    <span class="font-bold text-merchant-primary">{{ item.segmentation?.name || "UMKM" }}</span>
+                    <span v-if="calculateDistance(item)" class="flex items-center gap-1">
+                      <i class="text-red-500 pi pi-map-marker text-[10px]"></i>
                       {{ calculateDistance(item) }}
                     </span>
+                    <StatusLabel 
+                      :status="item.is_open_now ? 'success' : 'danger'" 
+                      variant="general" 
+                      :label="item.is_open_now ? 'Buka' : 'Tutup'" 
+                      size="xs" 
+                      :showIcon="false"
+                    />
                   </div>
                 </div>
-              </div>
-            </li>
-          </ul>
+                </div>
+              </li>
+            </ul>
+          </transition>
         </div>
 
         <!-- FILTER BUTTONS DESKTOP -->
-        <div class="flex gap-2">
+        <div class="flex gap-2 shrink-0">
           <button
             @click="setFilter(2)"
-            class="px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500 text-white': activeSeg === 2,
-              'bg-white text-black': activeSeg !== 2,
-            }"
+            class="flex items-center gap-2 px-4 h-12 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 2 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Kuliner
+            <img :src="KulinerIcon" class="w-5 h-5" alt="Kuliner" /> Kuliner
           </button>
           <button
             @click="setFilter(3)"
-            class="px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500 text-white': activeSeg === 3,
-              'bg-white text-black': activeSeg !== 3,
-            }"
+            class="flex items-center gap-2 px-4 h-12 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 3 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Jasa
+            <img :src="JasaIcon" class="w-5 h-5" alt="Jasa" /> Jasa
           </button>
           <button
             @click="setFilter(1)"
-            class="px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500 text-white': activeSeg === 1,
-              'bg-white text-black': activeSeg !== 1,
-            }"
+            class="flex items-center gap-2 px-4 h-12 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 1 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Toko
+            <img :src="TokoIcon" class="w-5 h-5" alt="Toko" /> Toko
           </button>
         </div>
       </div>
     </div>
 
     <!-- SEARCH + FILTER (MOBILE) -->
-    <div class="fixed left-0 z-40 w-full px-3 sm:hidden top-8">
-      <div class="flex flex-col w-full gap-2 mx-auto">
+    <div class="fixed left-0 z-40 w-full px-3 pointer-events-none sm:hidden top-8">
+      <div class="flex flex-col w-full gap-3 mx-auto pointer-events-auto">
+        
         <!-- SEARCH BAR -->
-        <div class="w-full">
+        <div class="relative w-full">
+          <span class="absolute z-10 text-gray-400 -translate-y-1/2 pointer-events-none left-4 top-1/2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m0 0A7.5 7.5 0 1 0 10.5 18a7.5 7.5 0 0 0 6.15-3.35Z" />
+            </svg>
+          </span>
           <TextField
             v-model="query"
             @update:modelValue="search"
@@ -120,93 +131,92 @@
             placeholder="Cari UMKM..."
             hideLabel
             autocomplete="off"
+            customClass="!pl-11 !h-12 shadow-[0_8px_30px_rgba(0,0,0,0.12)] bg-white rounded-2xl border-none ring-1 ring-black/5"
           />
+          <button v-if="query" @click="query = ''; results = []" class="absolute z-10 flex items-center justify-center w-6 h-6 text-gray-400 transition -translate-y-1/2 bg-gray-100 rounded-full right-4 top-1/2 hover:text-gray-700">
+            <i class="text-xs pi pi-times"></i>
+          </button>
         </div>
 
         <!-- FILTER MOBILE (HORIZONTAL SCROLL) -->
-        <div class="flex gap-2 pb-1 overflow-x-auto">
+        <div class="flex gap-2 pb-1 overflow-x-auto hide-scrollbar">
           <button
             @click="setFilter(2)"
-            class="w-full px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500 text-white': activeSeg === 2,
-              'bg-white text-black': activeSeg !== 2,
-            }"
+            class="flex items-center justify-center flex-1 gap-2 px-4 h-10 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 2 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Kuliner
+            <img :src="KulinerIcon" class="w-5 h-5" alt="Kuliner" /> Kuliner
           </button>
           <button
             @click="setFilter(3)"
-            class="w-full px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500  text-white': activeSeg === 3,
-              'bg-white text-black': activeSeg !== 3,
-            }"
+            class="flex items-center justify-center flex-1 gap-2 px-4 h-10 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 3 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Jasa
+            <img :src="JasaIcon" class="w-5 h-5" alt="Jasa" /> Jasa
           </button>
           <button
             @click="setFilter(1)"
-            class="w-full px-4 py-2 text-sm transition rounded-full shadow"
-            :class="{
-              'bg-amber-500 text-white': activeSeg === 1,
-              'bg-white text-black': activeSeg !== 1,
-            }"
+            class="flex items-center justify-center flex-1 gap-2 px-4 h-10 text-sm font-medium transition-all duration-300 rounded-2xl shadow-[0_4px_15px_rgba(0,0,0,0.08)] whitespace-nowrap border-none text-white"
+            :class="activeSeg === 1 ? 'bg-secondary' : 'bg-primary hover:bg-primary/90'"
           >
-            Toko
+            <img :src="TokoIcon" class="w-5 h-5" alt="Toko" /> Toko
           </button>
         </div>
-      </div>
-    </div>
 
-    <!-- HASIL PENCARIAN MOBILE SLIDE-UP -->
-    <transition name="slide-up">
-      <div
-        v-if="results.length"
-        class="sm:hidden fixed bottom-16 left-0 z-40 w-full max-h-[50vh] overflow-y-auto p-3 space-y-1 bg-white rounded-t-2xl shadow-[0_-4px_15px_rgba(0,0,0,0.2)]"
-      >
-        <div
-          v-for="item in results"
-          :key="item.id"
-          @click="goTo(item)"
-          class="flex gap-3 p-3 bg-white shadow rounded-xl active:bg-gray-100"
-        >
-          <img
-            loading="lazy"
-            v-if="item.logo_url"
-            :src="getThumbLogoUrl(item.logo_url)"
-            class="object-cover w-20 h-20 bg-gray-200 rounded-2xl shrink-0"
-            alt="Foto UMKM"
-          />
-          <svg
-            v-else
-            class="w-20 h-20 p-2 text-gray-300 bg-gray-100 rounded-2xl shrink-0"
-            fill="currentColor"
-            viewBox="0 0 24 24"
+        <!-- HASIL PENCARIAN MOBILE DROPDOWN (STATIC - BELOW FILTER) -->
+        <transition name="fade">
+          <div
+            v-if="results.length"
+            class="w-full mt-1 overflow-y-auto p-2 space-y-1 bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] border border-gray-100 max-h-[50vh]"
           >
-            <path
-              d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z"
-            />
-          </svg>
-
-          <div class="flex flex-col justify-center flex-1 gap-2">
-            <h3 class="text-base font-semibold">{{ item.name }}</h3>
-            <div class="flex items-center gap-2 text-xs text-gray-600">
-              <span class="font-bold text-merchant-primary">{{
-                item.segmentation?.name || "UMKM"
-              }}</span>
-              <span
-                v-if="calculateDistance(item)"
-                class="flex items-center gap-1"
+            <div
+              v-for="item in results"
+              :key="item.id"
+              @click="goTo(item)"
+              class="flex gap-3 p-3 transition bg-white border border-gray-50 rounded-xl active:bg-gray-50"
+            >
+              <img
+                loading="lazy"
+                v-if="item.logo_url"
+                :src="getThumbLogoUrl(item.logo_url)"
+                class="object-cover w-16 h-16 bg-gray-200 rounded-lg shrink-0"
+                alt="Foto UMKM"
+              />
+              <svg
+                v-else
+                class="w-16 h-16 p-2 text-gray-300 bg-gray-100 rounded-lg shrink-0"
+                fill="currentColor"
+                viewBox="0 0 24 24"
               >
-                <i class="text-red-500 pi pi-map-marker"></i>
-                {{ calculateDistance(item) }}
-              </span>
+                <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
+              </svg>
+
+              <div class="flex flex-col justify-center flex-1 min-w-0 gap-1">
+                <h3 class="text-sm font-semibold truncate">{{ item.name }}</h3>
+                <p v-if="item.description" class="text-[11px] text-gray-500 line-clamp-2 leading-tight">
+                  {{ item.description }}
+                </p>
+                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-gray-600">
+                  <span class="font-bold text-merchant-primary">{{ item.segmentation?.name || "UMKM" }}</span>
+                  <span v-if="calculateDistance(item)" class="flex items-center gap-1">
+                    <i class="text-red-500 pi pi-map-marker text-[10px]"></i>
+                    {{ calculateDistance(item) }}
+                  </span>
+                  <StatusLabel 
+                    :status="item.is_open_now ? 'success' : 'danger'" 
+                    variant="general" 
+                    :label="item.is_open_now ? 'Buka' : 'Tutup'" 
+                    size="xs" 
+                    :showIcon="false"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </transition>
+
       </div>
-    </transition>
+    </div>
 
     <!-- MAP FULLSCREEN RESPONSIVE -->
     <div id="map" class="relative z-0 w-full h-[95dvh] sm:h-[92dvh]"></div>
@@ -219,14 +229,22 @@ import "leaflet/dist/leaflet.css";
 import api from "@/libs/axios";
 import { useToast } from "vue-toastification";
 import TextField from "@/components/forms/TextField.vue";
+import StatusLabel from "@/components/common/StatusLabel.vue";
+
+import TokoIcon from "@/assets/icons/Toko.svg";
+import KulinerIcon from "@/assets/icons/Kuliner.svg";
+import JasaIcon from "@/assets/icons/Jasa.svg";
 
 const toast = useToast();
 export default {
   name: "MapComponent",
-  components: { TextField },
+  components: { TextField, StatusLabel },
 
   data() {
     return {
+      TokoIcon,
+      KulinerIcon,
+      JasaIcon,
       map: null,
       markers: [],
       merchants: [],
@@ -296,21 +314,18 @@ export default {
         : `${distKm.toFixed(1)}km`;
     },
 
-    getMerchantMarkerIcon(segmentationId) {
-      const key = String(segmentationId ?? "default");
+    getMerchantMarkerIcon(merchant) {
+      const key = String(merchant.id || "default");
       if (this.merchantIconCache[key]) return this.merchantIconCache[key];
 
-      const colorBySeg = {
-        default: "#058895", // fallback
-      };
+      const color = "#058895"; // color merchant-primary
 
-      const color = colorBySeg[Number(segmentationId)] ?? colorBySeg.default;
-
-      const icon = L.divIcon({
-        className: "umkm-marker-icon",
-        html: `
-          <div class="umkm-marker" style="--umkm-marker-color: ${color}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      const logoUrl = merchant.logo_url ? this.getThumbLogoUrl(merchant.logo_url) : "";
+      const innerHtml = logoUrl
+        ? `<span class="umkm-marker__logo-wrap">
+             <img class="umkm-marker__logo" src="${logoUrl}" loading="lazy" referrerpolicy="no-referrer" />
+           </span>`
+        : `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path
                 d="M4 10.5V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9.5"
                 fill="none"
@@ -335,12 +350,18 @@ export default {
                 stroke-linecap="round"
                 stroke-linejoin="round"
               />
-            </svg>
+            </svg>`;
+
+      const icon = L.divIcon({
+        className: "umkm-marker-icon",
+        html: `
+          <div class="umkm-marker" style="--umkm-marker-color: ${color}">
+            ${innerHtml}
           </div>
         `,
-        iconSize: [36, 46],
-        iconAnchor: [18, 46],
-        popupAnchor: [0, -46],
+        iconSize: [36, 48],
+        iconAnchor: [18, 48],
+        popupAnchor: [0, -48],
       });
 
       this.merchantIconCache[key] = icon;
@@ -355,7 +376,7 @@ export default {
 
       const icon = L.divIcon({
         className: "my-location-icon",
-        html: '<div class="w-4 h-4 border-2 border-white rounded-full shadow-md bg-primary"></div>',
+        html: '<div class="w-5 h-5 border-2 border-white rounded-full shadow-md bg-primary"></div>',
         iconSize: [16, 16],
         iconAnchor: [8, 8],
       });
@@ -447,7 +468,7 @@ export default {
         const lng = parseFloat(item.longitude);
         if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
 
-        const icon = this.getMerchantMarkerIcon(item.segmentation?.id);
+        const icon = this.getMerchantMarkerIcon(item);
         const marker = L.marker([lat, lng], { icon }).addTo(this.map);
 
         const logoTag = item.logo_url
@@ -460,19 +481,41 @@ export default {
         const segmentation = item.segmentation?.name || "UMKM";
         const distance = this.calculateDistance(item);
         const distanceInfo = distance
-          ? `<div class="popup-gmaps__distance">
-              <i class="pi pi-map-marker" style="color: #f87171; margin-right: 2px;"></i>
+          ? `<div class="popup-gmaps__distance" style="display:flex; align-items:center; gap: 4px;">
+              <i class="pi pi-map-marker" style="color: #f87171;"></i>
              ${distance}</div>`
           : "";
+
+        const avgRating = item.rating_summary?.average_rating;
+        const ratingInfo = avgRating > 0
+          ? `<div class="popup-gmaps__rating" style="display:flex; align-items:center; gap: 4px; font-size: 12px; color: rgba(0,0,0,0.7);">
+              <i class="pi pi-star-fill" style="color: #fbbf24;"></i>
+             ${avgRating}</div>`
+          : "";
+
+        const openStatus = item.is_open_now
+          ? `<span style="background: #dcfce7; color: #15803d; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600;">Buka</span>`
+          : `<span style="background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600;">Tutup</span>`;
+
+        const descInfo = item.description 
+          ? `<div style="font-size: 11px; color: #6b7280; margin: 4px 0 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; line-height: 1.4;">
+               ${item.description}
+             </div>` 
+          : "";
+
         const popup = `
           <div class="popup-card">
             <div class="popup-card__body">
               ${logoTag}
-              <div class="popup-gmaps__title">${item.name}</div>
-              <div class="popup-gmaps__meta">
+              <div class="popup-gmaps__title" style="margin-bottom: ${item.description ? '2px' : '6px'};">
+                ${item.name}
+              </div>
+              ${descInfo}
+              <div class="popup-gmaps__meta" style="display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap; margin-top: 4px;">
                 <span class="popup-gmaps__badge">${segmentation}</span>
-              ${distanceInfo}
-
+                ${openStatus}
+                ${ratingInfo}
+                ${distanceInfo}
               </div>
             </div>
             <div class="popup-card__footer">
@@ -591,6 +634,15 @@ export default {
 </script>
 
 <style>
+/* Utilities */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .leaflet-popup-content {
   margin: 0 !important;
 }
@@ -613,11 +665,11 @@ export default {
 
 .umkm-marker {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 9999px;
-  background: var(--umkm-marker-color, #10b981);
-  border: 3px solid rgba(255, 255, 255, 0.98);
+  background: var(--umkm-marker-color, #058895);
+  border: 3px solid var(--umkm-marker-color, #058895);
   box-shadow:
     0 10px 18px rgba(0, 0, 0, 0.22),
     0 2px 6px rgba(0, 0, 0, 0.15);
@@ -636,13 +688,31 @@ export default {
   height: 0;
   border-left: 9px solid transparent;
   border-right: 9px solid transparent;
-  border-top: 12px solid var(--umkm-marker-color, #10b981);
+  border-top: 12px solid var(--umkm-marker-color, #058895);
   filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.25));
 }
 
 .umkm-marker svg {
   width: 18px;
   height: 18px;
+  display: block;
+}
+
+.umkm-marker__logo-wrap {
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--umkm-marker-color);
+}
+
+.umkm-marker__logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 

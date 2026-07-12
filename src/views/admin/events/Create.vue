@@ -9,6 +9,7 @@ import InputDateField from "@/components/forms/InputDateField.vue";
 import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import { useEvents } from "@/composables/useEvents";
+import { compressImage } from "@/utils/imageCompressor";
 import api from "@/libs/axios";
 
 const router = useRouter();
@@ -151,13 +152,24 @@ const schema = yup.object({
   event_end_date: yup.date().required("Tanggal selesai wajib diisi").min(yup.ref("event_start_date")),
 });
 
-const handleBannerChange = (event) => {
+const handleBannerChange = async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-  bannerFile.value = file;
-  const reader = new FileReader();
-  reader.onload = (e) => { bannerPreview.value = e.target?.result; };
-  reader.readAsDataURL(file);
+
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error("Ukuran banner maksimal 5MB");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const compressedFile = await compressImage(file, 1920);
+    bannerFile.value = compressedFile;
+    bannerPreview.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    bannerFile.value = file;
+    bannerPreview.value = URL.createObjectURL(file);
+  }
 };
 
 const removeBanner = () => {

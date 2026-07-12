@@ -1,9 +1,10 @@
 <template>
   <div
-    class="flex flex-col items-center justify-end sm:bg-gray-50 bg-primary sm:justify-center sm:pb-8"
+    class="relative flex flex-col items-center justify-start min-h-[calc(100vh-64px)] sm:min-h-screen sm:bg-gray-50 bg-white sm:justify-center sm:pb-8"
   >
+    <div class="absolute top-0 left-0 w-full h-[50vh] bg-primary sm:hidden"></div>
     <div
-      class="flex flex-col justify-end px-4 py-2 pt-8 sm:hidden flex-1/3 sm:px-0 sm:pt-0"
+      class="relative z-10 flex flex-col justify-end w-full px-4 py-2 pt-8 sm:hidden shrink-0 sm:px-0 sm:pt-0"
     >
       <h2
         class="inline mb-2 text-2xl font-bold text-center text-white sm:hidden sm:text-3xl sm:text-left"
@@ -11,14 +12,14 @@
         Daftar
       </h2>
       <p
-        class="sm:hidden inline text-[10px] sm:text-sm text-center sm:text-left mb-6 text-white"
+        class="sm:hidden inline text-[12px] text-sm text-center sm:text-left mb-6 text-white"
       >
         Lengkapi data dirimu untuk membuat akun dan mulai jelajahi layanan
         terbaik
       </p>
     </div>
     <div
-      class="flex flex-col justify-center w-full p-8 bg-white shadow-none sm:flex-0 flex-2/3 sm:p-12 sm:max-w-xl sm:rounded-4xl rounded-t-4xl sm:shadow-lg"
+      class="relative z-10 flex flex-col justify-start w-full p-8 bg-white shadow-none grow sm:flex-0 sm:p-12 sm:max-w-xl sm:rounded-4xl rounded-t-4xl sm:shadow-lg"
     >
       <!-- Right Side - Form -->
       <div class="flex-col sm:flex">
@@ -240,8 +241,8 @@
               <ErrorAlert :message="errorMessage" />
             </div>
 
-            <!-- Submit Button -->
-            <div class="sm:col-span-2">
+            <!-- Submit Button (Desktop) -->
+            <div class="hidden sm:block sm:col-span-2">
               <AppButton
                 type="submit"
                 :loading="isLoading"
@@ -250,6 +251,21 @@
                 size="md"
                 block
                 class="mb-2"
+              >
+                Daftar
+              </AppButton>
+            </div>
+
+            <!-- Submit Button (Mobile Sticky) -->
+            <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+              <AppButton
+                type="submit"
+                :loading="isLoading"
+                :disabled="!meta.valid || isLoading"
+                variant="primary"
+                size="md"
+                block
+                class="w-full"
               >
                 Daftar
               </AppButton>
@@ -270,13 +286,13 @@
           </div>
         </Form>
         <!-- Debug Info (Development Only) -->
-        <div
+        <!-- <div
           v-if="isDev"
           class="p-4 mt-6 text-xs border border-gray-200 bg-gray-50 rounded-xl"
         >
           <p class="mb-2 font-semibold text-gray-700">Debug Info:</p>
           <p class="text-gray-600"><strong>API URL:</strong> {{ apiUrl }}</p>
-        </div>
+        </div> -->
       </div>
     </div>
   </div>

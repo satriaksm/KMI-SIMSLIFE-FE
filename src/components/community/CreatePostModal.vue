@@ -81,6 +81,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import api from '@/libs/axios'
+import { compressImage } from '@/utils/imageCompressor'
 
 const title = ref('')
 const content = ref('')
@@ -97,7 +98,7 @@ const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'imag
 
 const submitDisabled = computed(() => imageFiles.value.length > maxFiles)
 
-function handleFileChange(e) {
+async function handleFileChange(e) {
   clientErrors.value = []
   const files = Array.from(e.target.files || [])
   for (const f of files) {
@@ -113,8 +114,15 @@ function handleFileChange(e) {
       clientErrors.value.push(`${f.name} melebihi ukuran 2 MB.`)
       continue
     }
-    imageFiles.value.push(f)
-    previews.value.push(URL.createObjectURL(f))
+    
+    try {
+      const compressedFile = await compressImage(f, 1920)
+      imageFiles.value.push(compressedFile)
+      previews.value.push(URL.createObjectURL(compressedFile))
+    } catch (err) {
+      imageFiles.value.push(f)
+      previews.value.push(URL.createObjectURL(f))
+    }
   }
   // reset file input so user bisa pilih file yang sama lagi bila perlu
   e.target.value = ''

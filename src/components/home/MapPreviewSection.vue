@@ -37,6 +37,7 @@ const initMap = () => {
     scrollWheelZoom: false,
     dragging: true,
     touchZoom: true,
+    attributionControl: false,
   }).setView([-7.5420536, 110.8082958], 13);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -48,7 +49,6 @@ const initMap = () => {
 // MAP MARKER + POPUP UI
 // =====================
 
-// segmentation name normalizer
 const getSegmentationKey = (merchant) => {
   const raw = (merchant?.segmentation?.name || "").toLowerCase().trim();
 
@@ -59,6 +59,25 @@ const getSegmentationKey = (merchant) => {
 
   // default fallback
   return "jasa";
+};
+
+const isMerchantJasa = (merchant) => {
+  const segmentName = String(merchant?.segmentation?.name || "").toLowerCase();
+  const jasasCount = Number(merchant?.jasas_count || 0);
+  const productsCount = Number(merchant?.products_count || 0);
+  
+  return segmentName.includes("jasa") || (jasasCount > 0 && productsCount === 0);
+};
+
+const getMerchantProductCount = (merchant) => {
+  if (isMerchantJasa(merchant)) {
+    return Number(merchant?.jasas_count || 0);
+  }
+  return Number(merchant?.products_count || 0);
+};
+
+const getMerchantProductLabel = (merchant) => {
+  return isMerchantJasa(merchant) ? "Layanan Jasa" : "Produk";
 };
 
 const getMarkerColorBySegmentation = (merchant) => {
@@ -91,7 +110,32 @@ const renderMarkerIcon = (merchant, isActive = false) => {
     ? `<span class="umkm-marker__logo-wrap">
         <img class="umkm-marker__logo" src="${logo}" loading="lazy" referrerpolicy="no-referrer" />
       </span>`
-    : `...svg...`;
+    : `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M4 10.5V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9.5"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M3 10.5l2-7h14l2 7"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M9 21v-7h6v7"
+            fill="none"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>`;
 
   return L.divIcon({
     className: "umkm-marker-icon",
@@ -157,6 +201,21 @@ const updateMapMarkers = () => {
   setActiveMarker(currentSlide.value);
 };
 
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Radius of earth in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(1);
+};
+
 const loadMerchants = async () => {
   loading.value = true;
 
@@ -169,6 +228,23 @@ const loadMerchants = async () => {
     merchants.value = (response.data.data || []).filter(
       (m) => m.latitude && m.longitude,
     );
+
+    // Calculate distance if geolocation is available
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userLat = position.coords.latitude;
+          const userLng = position.coords.longitude;
+          merchants.value = merchants.value.map(m => {
+            m.distance_km = calculateDistance(userLat, userLng, m.latitude, m.longitude);
+            return m;
+          });
+        },
+        () => {
+          // ignore error
+        }
+      );
+    }
 
     // Initialize map and markers after merchants loaded
     if (merchants.value.length > 0) {
@@ -198,7 +274,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section id="map-preview" class="relative py-8 bg-gray-50 sm:py-16">
+  <section id="map-preview" class="relative py-8 bg-white sm:py-16">
     <div class="px-4 mx-auto max-w-7xl sm:px-6">
       <!-- Section Header -->
       <div class="mb-6 text-center sm:mb-10">
@@ -219,11 +295,11 @@ onMounted(async () => {
       <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:gap-6">
         <!-- Map Preview -->
         <div
-          class="relative overflow-hidden bg-white border border-gray-200 shadow-lg lg:col-span-2 rounded-2xl"
+          class="relative overflow-hidden bg-white shadow-lg lg:col-span-2 rounded-2xl min-h-[300px] sm:min-h-[400px] lg:min-h-0"
         >
           <div
             id="home-map-preview"
-            class="w-full h-60 sm:h-[360px] lg:h-[400px]"
+            class="w-full h-full"
           ></div>
 
           <!-- View Full Map Button - -->
@@ -259,7 +335,7 @@ onMounted(async () => {
                         name: 'Merchant Detail',
                         params: { slug: merchant.slug || merchant.id },
                       }"
-                      class="block w-full bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                      class="block w-full bg-white border border-gray-200 rounded-t-2xl shadow-lg overflow-hidden transition-all duration-300"
                     >
                       <!-- Banner/Cover -->
                       <div
@@ -320,40 +396,34 @@ onMounted(async () => {
                             >
                               {{ merchant.name }}
                             </h3>
-                            <div
-                              class="flex items-center gap-1 text-[10px] text-gray-500"
-                            >
-                              <i
-                                class="text-xs pi pi-shopping-bag text-merchant-primary"
-                              ></i>
-                              <span
-                                >{{ merchant.products_count || 0 }} Produk</span
-                              >
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 mt-0.5">
+                              <div class="flex items-center gap-1">
+                                <i class="text-xs pi pi-shopping-bag text-merchant-primary"></i>
+                                <span>{{ getMerchantProductCount(merchant) }} {{ getMerchantProductLabel(merchant) }}</span>
+                              </div>
+                              <span v-if="merchant.distance_km" class="text-gray-300">&bull;</span>
+                              <div v-if="merchant.distance_km" class="flex items-center gap-1 text-gray-600">
+                                <i class="text-xs pi pi-map-marker text-danger-foreground"></i>
+                                <span class="font-medium">{{ merchant.distance_km }} km</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         <!-- Location Info -->
                         <div v-if="merchant.primary_address" class="space-y-1">
-                          <div
-                            v-if="merchant.distance_km"
-                            class="flex items-center gap-1 text-[10px] text-gray-600"
-                          >
-                            <i
-                              class="text-xs pi pi-map-marker text-danger-foreground"
-                            ></i>
-                            <span class="font-medium"
-                              >{{ merchant.distance_km }} km</span
-                            >
-                          </div>
+                          
 
                           <div
-                            class="flex items-start gap-1 text-[10px] text-gray-500"
+                            class="flex items-center gap-2 text-[10px] text-gray-500"
                           >
-                            <i class="pi pi-home text-xs shrink-0 mt-0.5"></i>
-                            <span class="line-clamp-1">
-                              {{ merchant.primary_address.detail }},
+                            <i class="pi pi-map-marker text-xs shrink-0"></i>
+                            <span class="line-clamp-1 capitalize" :title="`${merchant.primary_address.detail}, ${merchant.primary_address.village?.name}, ${merchant.primary_address.district?.name}, ${merchant.primary_address.city?.name}, ${merchant.primary_address.province?.name}`">
+                              {{ merchant.primary_address.detail }}
                               {{ merchant.primary_address.village?.name }}
+                              {{ merchant.primary_address.district?.name }}
+                              {{ merchant.primary_address.city?.name }}
+                              {{ merchant.primary_address.province?.name }}
                             </span>
                           </div>
                         </div>
@@ -364,11 +434,11 @@ onMounted(async () => {
               </div>
 
               <!-- Thumbnails Desktop  -->
-              <div v-if="merchants.length > 1" class="h-25 shrink-0">
+              <div v-if="merchants.length > 1" class="shrink-0">
                 <Carousel
                   id="merchant-thumbnails-desktop"
-                  :items-to-show="3"
-                  :wrap-around="true"
+                  :items-to-show="Math.min(3, merchants.length)"
+                  :wrap-around="merchants.length > 3"
                   :snap-align="'center'"
                   v-model="currentSlide"
                   class="h-full [&_.carousel__prev]:top-1/2 [&_.carousel__prev]:-translate-y-1/2 [&_.carousel__prev]:w-6 [&_.carousel__prev]:h-6 [&_.carousel__prev]:bg-merchant-primary/70 [&_.carousel__prev]:rounded-full [&_.carousel__next]:top-1/2 [&_.carousel__next]:-translate-y-1/2 [&_.carousel__next]:w-6 [&_.carousel__next]:h-6 [&_.carousel__next]:bg-merchant-primary/70 [&_.carousel__next]:rounded-full"
@@ -379,11 +449,11 @@ onMounted(async () => {
                   >
                     <template #default="{ isActive }">
                       <div
-                        class="w-full h-full px-1 transition-all"
+                        class="w-full h-full px-1.5 py-1 transition-all"
                         @click="slideTo(index)"
                       >
                         <div
-                          class="relative h-full overflow-hidden transition-all duration-300 bg-white border-2 rounded-lg cursor-pointer group"
+                          class="relative flex flex-col aspect-square overflow-hidden transition-all duration-300 bg-white border-3 rounded-lg cursor-pointer group"
                           :class="
                             isActive
                               ? 'border-merchant-primary shadow-md'
@@ -391,13 +461,13 @@ onMounted(async () => {
                           "
                         >
                           <div
-                            class="relative overflow-hidden aspect-video bg-linear-to-br from-primary/5 to-merchant-primary/5"
+                            class="relative flex-1 min-h-0 w-full overflow-hidden bg-linear-to-br from-primary/5 to-merchant-primary/5"
                           >
                             <img
-                              v-if="merchant.cover_path"
-                              :src="getMerchantBannerUrl(merchant)"
+                              v-if="merchant.logo_path || merchant.logo_url"
+                              :src="getThumbLogoUrl(merchant)"
                               :alt="merchant.name"
-                              class="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+                              class="object-cover w-full h-full"
                             />
                             <div
                               v-else
@@ -408,13 +478,13 @@ onMounted(async () => {
                               ></i>
                             </div>
 
+
+                          </div>
                             <div
                               v-if="isActive"
-                              class="absolute inset-0 border-2 rounded-t-lg border-merchant-primary"
+                              class="absolute inset-0 border-3 border-merchant-primary rounded-lg"
                             ></div>
-                          </div>
-
-                          <div class="p-1 bg-white">
+                          <div class="p-1 bg-white shrink-0">
                             <p
                               class="text-[9px] font-semibold text-center truncate"
                               :class="
@@ -439,7 +509,7 @@ onMounted(async () => {
             </div>
 
             <!-- MOBILE/TABLET -->
-            <div class="flex gap-3 lg:hidden h-60 sm:h-[360px]">
+            <div class="flex gap-3 lg:hidden h-[220px] sm:h-[300px]">
               <!-- Main Carousel Mobile/Tablet -->
               <div class="min-w-0 flex-2 sm:flex-3">
                 <Carousel
@@ -447,7 +517,7 @@ onMounted(async () => {
                   id="merchant-carousel-mobile"
                   v-bind="carouselConfig"
                   v-model="currentSlide"
-                  class="h-full [&_.carousel__prev]:hidden [&_.carousel__next]:hidden"
+                  class="h-full [&_.carousel__prev]:hidden [&_.carousel__next]:hidden rounded-2xl"
                 >
                   <Slide v-for="merchant in merchants" :key="merchant.id">
                     <router-link
@@ -455,11 +525,11 @@ onMounted(async () => {
                         name: 'Merchant Detail',
                         params: { slug: merchant.slug || merchant.id },
                       }"
-                      class="block w-full h-full bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+                      class="block w-full h-full bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl"
                     >
                       <!-- Banner/Cover -->
                       <div
-                        class="relative h-32 overflow-hidden sm:h-68 bg-linear-to-br from-primary/10 to-merchant-primary/10"
+                        class="relative h-32 overflow-hidden sm:h-48 bg-linear-to-br from-primary/10 to-merchant-primary/10"
                       >
                         <img
                           v-if="merchant.cover_path"
@@ -516,40 +586,34 @@ onMounted(async () => {
                             >
                               {{ merchant.name }}
                             </h3>
-                            <div
-                              class="flex items-center gap-1 text-[10px] text-gray-500"
-                            >
-                              <i
-                                class="text-xs pi pi-shopping-bag text-merchant-primary"
-                              ></i>
-                              <span
-                                >{{ merchant.products_count || 0 }} Produk</span
-                              >
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-gray-500 mt-0.5">
+                              <div class="flex items-center gap-1">
+                                <i class="text-xs pi pi-shopping-bag text-merchant-primary"></i>
+                                <span>{{ getMerchantProductCount(merchant) }} {{ getMerchantProductLabel(merchant) }}</span>
+                              </div>
+                              <span v-if="merchant.distance_km" class="text-gray-300">&bull;</span>
+                              <div v-if="merchant.distance_km" class="flex items-center gap-1 text-gray-600">
+                                <i class="text-xs pi pi-map-marker text-danger-foreground"></i>
+                                <span class="font-medium">{{ merchant.distance_km }} km</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         <!-- Location Info -->
                         <div v-if="merchant.primary_address" class="space-y-1">
-                          <div
-                            v-if="merchant.distance_km"
-                            class="flex items-center gap-1 text-[10px] text-gray-600"
-                          >
-                            <i
-                              class="text-xs pi pi-map-marker text-danger-foreground"
-                            ></i>
-                            <span class="font-medium"
-                              >{{ merchant.distance_km }} km</span
-                            >
-                          </div>
+                          
 
                           <div
-                            class="flex items-start gap-1 text-[10px] text-gray-500"
+                            class="flex items-center gap-2 text-[10px] text-gray-500"
                           >
-                            <i class="pi pi-home text-xs shrink-0 mt-0.5"></i>
-                            <span class="line-clamp-2">
-                              {{ merchant.primary_address.detail }},
+                            <i class="pi pi-map-marker text-xs shrink-0"></i>
+                            <span class="line-clamp-1 mt-0.25 capitalize" :title="`${merchant.primary_address.detail}, ${merchant.primary_address.village?.name}, ${merchant.primary_address.district?.name}, ${merchant.primary_address.city?.name}, ${merchant.primary_address.province?.name}`">
+                              {{ merchant.primary_address.detail }}
                               {{ merchant.primary_address.village?.name }}
+                              {{ merchant.primary_address.district?.name }}
+                              {{ merchant.primary_address.city?.name }}
+                              {{ merchant.primary_address.province?.name }}
                             </span>
                           </div>
                         </div>
@@ -568,8 +632,8 @@ onMounted(async () => {
                   id="merchant-thumbnails-mobile"
                   v-model="currentSlide"
                   :dir="'ttb'"
-                  :items-to-show="3"
-                  :wrap-around="true"
+                  :items-to-show="Math.min(2, merchants.length)"
+                  :wrap-around="merchants.length > 2"
                   snap-align="center"
                   :height="'100%'"
                   :touch-drag="true"
@@ -582,11 +646,11 @@ onMounted(async () => {
                   >
                     <template #default="{ isActive }">
                       <div
-                        class="w-full h-full px-1 transition-all cursor-pointer"
+                        class="w-full px-1 py-1 transition-all cursor-pointer"
                         @click="slideTo(index)"
                       >
                         <div
-                          class="relative h-full overflow-hidden transition-all duration-300 bg-white border-2 rounded-lg"
+                          class="relative flex flex-col aspect-square overflow-hidden transition-all duration-300 bg-white border-2 rounded-lg"
                           :class="
                             isActive
                               ? 'border-merchant-primary shadow-md'
@@ -594,13 +658,13 @@ onMounted(async () => {
                           "
                         >
                           <div
-                            class="relative overflow-hidden aspect-5/4 bg-linear-to-br from-primary/5 to-merchant-primary/5"
+                            class="relative flex-1 min-h-0 w-full overflow-hidden bg-linear-to-br from-primary/5 to-merchant-primary/5"
                           >
                             <img
-                              v-if="merchant.cover_path"
-                              :src="getMerchantBannerUrl(merchant)"
+                              v-if="merchant.logo_path || merchant.logo_url"
+                              :src="getThumbLogoUrl(merchant)"
                               :alt="merchant.name"
-                              class="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+                              class="object-cover w-full h-full"
                             />
                             <div
                               v-else
@@ -612,7 +676,7 @@ onMounted(async () => {
                             </div>
                           </div>
 
-                          <div class="p-1 bg-white">
+                          <div class="p-1 bg-white shrink-0">
                             <p
                               class="text-[9px] font-semibold text-center truncate"
                               :class="
@@ -662,6 +726,18 @@ onMounted(async () => {
 /* Leaflet container */
 :deep(.leaflet-container) {
   font-family: inherit;
+}
+
+/* Fix Carousel Slide Background */
+:deep(.carousel__slide),
+:deep(.carousel__track),
+:deep(.carousel__viewport) {
+  background-color: transparent !important;
+}
+
+/* Allow carousel container to be rounded */
+:deep(.carousel__viewport) {
+  border-radius: inherit;
 }
 
 /*
@@ -735,13 +811,13 @@ onMounted(async () => {
   display: block;
 }
 
-.umkm-marker svg {
+:deep(.umkm-marker svg) {
   width: 18px;
   height: 18px;
   display: block;
 }
 
-.umkm-marker.active {
+:deep(.umkm-marker.active) {
   animation: pulse-marker 2s infinite;
 }
 

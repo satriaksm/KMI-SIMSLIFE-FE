@@ -9,7 +9,6 @@ import "./style.css";
 import { useAuthStore } from "@/stores/auth";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import EventCard from "@/components/Card/EventCard.vue";
-import PromoCard from "@/components/Card/PromoCard.vue";
 import "leaflet/dist/leaflet.css";
 import { registerSW } from "virtual:pwa-register";
 
@@ -33,7 +32,6 @@ app.use(router);
 
 app.component("ProductCard", ProductCard);
 app.component("EventCard", EventCard);
-app.component("PromoCard", PromoCard);
 
 registerSW({
   immediate: true,

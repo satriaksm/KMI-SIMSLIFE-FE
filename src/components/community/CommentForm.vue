@@ -12,7 +12,7 @@
         <i class="pi pi-user text-gray-400"></i>
       </div>
 
-      <div class="flex-1">
+      <div class="flex-1 flex flex-col">
         <textarea
           ref="ta"
           v-model="text"
@@ -20,7 +20,7 @@
           rows="1"
           @keydown.enter.prevent="onEnter"
           @input="autoResize"
-          class="min-h-10 max-h-40 w-full resize-none bg-transparent outline-none px-2 py-2 text-[13px] sm:text-sm rounded focus:ring-0"
+          class="w-full resize-none bg-transparent outline-none p-2 text-[13px] sm:text-sm rounded focus:ring-0"
         />
         <div v-if="isReply" class="text-[10px] sm:text-xs text-gray-400 mt-1 ml-1">
           Membalas <span class="font-medium text-gray-700">{{ parentLabel }}</span>

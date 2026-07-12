@@ -37,6 +37,16 @@ const cartItemsCount = computed(() => {
 });
 const showProfileMenu = ref(false);
 
+const isAuthPage = computed(() =>
+  ["Login", "Register", "Forgot Password", "Reset Password", "Email Verification"].includes(route.name)
+);
+
+const showMobileDock = computed(() => {
+  const allowedPaths = ['/', '/explore', '/map', '/community', '/orders', '/profile', '/login'];
+  const currentPath = route.path.replace(/\/$/, '') || '/';
+  return allowedPaths.includes(currentPath);
+});
+
 const baseMenus = [
   {
     key: "home",
@@ -62,13 +72,7 @@ const baseMenus = [
       <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
     </svg>`,
   },
-  // {
-  //   key: "keranjang",
-  //   label: "Keranjang",
-  //   to: isAuthenticated.value ? "/cart" : "/login",
-  //   icon: `<svg xmlns="http://www.w3.org/2000/svg" fill ="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-  //     <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" /> </svg>`,
-  // },
+
   {
     key: "pesanan",
     label: "Pesanan",
@@ -146,6 +150,11 @@ async function goToProfileFromModal() {
 async function goToOrdersFromModal() {
   closeAccountModal();
   await router.push("/orders").catch(() => router.push("/orders"));
+}
+
+async function goToConsultationsFromModal() {
+  closeAccountModal();
+  await router.push("/customer/consultations").catch(() => router.push("/customer/consultations"));
 }
 
 async function logoutFromModal() {
@@ -318,8 +327,9 @@ watch(
 
 <template>
   <div class="flex flex-col min-h-screen pb-16 sm:pb-0">
-    <!-- Navbar Desktop (hidden on mobile) -->
+    <!-- Navbar Desktop (hidden on mobile, hidden on auth pages) -->
     <div
+      v-if="!isAuthPage"
       class="hidden sm:block sticky top-0 z-50 w-full h-[68px] bg-white border-b border-gray-200 shadow-sm"
     >
       <div class="max-w-[1440px] mx-auto h-full px-4">
@@ -455,6 +465,14 @@ watch(
                   <button
                     v-if="!isAdmin"
                     type="button"
+                    @click="goToConsultationsFromModal"
+                    class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100"
+                  >
+                    Konsultasi Saya
+                  </button>
+                  <button
+                    v-if="!isAdmin"
+                    type="button"
                     @click="goToOrdersFromModal"
                     class="w-full px-3 py-2 text-sm font-semibold text-left text-black rounded-lg hover:bg-gray-100"
                   >
@@ -532,6 +550,7 @@ watch(
 
     <!-- Bottom Dock Navigation (Mobile only) -->
     <nav
+      v-if="showMobileDock"
       class="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg sm:hidden"
     >
       <div class="flex items-center justify-around h-16 px-1">

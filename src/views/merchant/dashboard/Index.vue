@@ -54,25 +54,8 @@ const dashboardStats = ref([]);
 const orderStats = ref(null);
 const walletStats = ref(null);
 
-const statusChart = ref(null);
-const categoryChart = ref(null);
-const STATUS_COLORS = [
-  "#22c55e", // green-500 → Published (aktif)
-  "#f59e0b", // amber-500 → Draft
-  "#f87171", // red-400 → Archived
-];
-const CATEGORY_COLORS = [
-  "#3b82f6", // blue-500
-  "#06b6d4", // cyan-500
-  "#a855f7", // violet-500
-  "#64748b", // slate-500 → Lainnya
-];
-
-// ======================
-// CHART REFS
-// ======================
-const statusChartRef = ref(null);
-const categoryChartRef = ref(null);
+const ordersChart = ref(null);
+const ordersChartRef = ref(null);
 
 // ======================
 // CARD GROUPING
@@ -83,65 +66,41 @@ const secondaryStats = computed(() => dashboardStats.value.slice(4));
 // ======================
 // INIT EMPTY CHARTS
 // ======================
-const createStatusChart = (labels, data) => {
-  statusChart.value?.destroy();
+const createOrdersChart = (labels, data) => {
+  ordersChart.value?.destroy();
 
-  statusChart.value = new Chart(statusChartRef.value, {
-    type: "doughnut",
+  ordersChart.value = new Chart(ordersChartRef.value, {
+    type: "line",
     data: {
       labels,
       datasets: [
         {
+          label: "Jumlah Pesanan",
           data,
-          backgroundColor: STATUS_COLORS,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59, 130, 246, 0.1)",
+          fill: true,
+          tension: 0.4,
         },
       ],
     },
     options: {
+      responsive: true,
+      maintainAspectRatio: false,
       animation: {
         duration: 700,
         easing: "easeOutQuart",
       },
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "70%",
-    },
-  });
-};
-
-const createCategoryChart = (labels, data) => {
-  categoryChart.value?.destroy();
-
-  const colors = labels.map(
-    (_, i) => CATEGORY_COLORS[i] || CATEGORY_COLORS[CATEGORY_COLORS.length - 1],
-  );
-
-  categoryChart.value = new Chart(categoryChartRef.value, {
-    type: "pie",
-    data: {
-      labels,
-      datasets: [
-        {
-          data,
-          backgroundColor: colors, // ✅ INI KUNCI
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: {
-        duration: 600,
-        easing: "easeOutCubic",
-      },
       plugins: {
         legend: {
-          position: "top",
-          labels: {
-            usePointStyle: true,
-            boxWidth: 8,
-            padding: 16,
+          display: false,
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
           },
         },
       },
@@ -201,17 +160,11 @@ const fetchDashboard = async () => {
     if (!isJasaMerchant.value) {
       stats.push(
         {
-          title: "Stok Menipis",
-          value: statsData.low_stock ?? 0,
-          icon: "pi pi-exclamation-triangle",
-          color: "bg-yellow-100 text-yellow-600",
-        },
-        {
           title: "Stok Habis",
           value: statsData.out_of_stock ?? 0,
           icon: "pi pi-exclamation-triangle",
           color: "bg-red-100 text-red-600",
-        },
+        }
       );
     }
 
@@ -261,20 +214,10 @@ const fetchDashboard = async () => {
     // CREATE CHARTS (AMAN)
     // ======================
     if (
-      data.charts?.status &&
-      statusChartRef.value instanceof HTMLCanvasElement
+      data.charts?.orders &&
+      ordersChartRef.value instanceof HTMLCanvasElement
     ) {
-      createStatusChart(data.charts.status.labels, data.charts.status.data);
-    }
-
-    if (
-      data.charts?.category &&
-      categoryChartRef.value instanceof HTMLCanvasElement
-    ) {
-      createCategoryChart(
-        data.charts.category.labels,
-        data.charts.category.datasets[0].data,
-      );
+      createOrdersChart(data.charts.orders.labels, data.charts.orders.data);
     }
   } catch (err) {
     if (isDev) {
@@ -324,7 +267,7 @@ onMounted(fetchDashboard);
       <div class="flex items-center gap-3">
         <button
           @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 rounded-full sm:hidden hover:bg-gray-100"
+          class="flex items-center justify-center w-10 h-10 rounded-full lg:hidden hover:bg-gray-100"
         >
           <i class="pi pi-bars"></i>
         </button>
@@ -370,7 +313,7 @@ onMounted(fetchDashboard);
             <div class="flex items-center justify-center w-10 h-10 mb-2 rounded-xl bg-blue-100 text-blue-600">
               <i class="pi pi-shopping-bag"></i>
             </div>
-            <p class="text-xs text-muted-foreground">Pesanan Masuk Hari Ini</p>
+            <p class="text-xs text-muted-foreground">Pesanan Direspon Hari Ini</p>
             <p class="text-xl font-bold text-gray-900">{{ orderStats.today }}</p>
           </div>
           <div class="flex flex-col justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
@@ -446,22 +389,13 @@ onMounted(fetchDashboard);
          CHARTS
     ====================== -->
       <div class="px-4 mt-8 mb-4 space-y-4 sm:px-6">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4">
           <div class="p-4 bg-white shadow-sm rounded-2xl">
             <h3 class="mb-3 text-sm font-semibold">
-              Status {{ catalogLabel }}
+              Pesanan 7 Hari Terakhir
             </h3>
             <div class="relative h-[220px]">
-              <canvas ref="statusChartRef"></canvas>
-            </div>
-          </div>
-
-          <div class="p-4 bg-white shadow-sm rounded-2xl">
-            <h3 class="mb-3 text-sm font-semibold">
-              {{ catalogLabel }} per Kategori
-            </h3>
-            <div class="relative h-[220px]">
-              <canvas ref="categoryChartRef"></canvas>
+              <canvas ref="ordersChartRef"></canvas>
             </div>
           </div>
         </div>

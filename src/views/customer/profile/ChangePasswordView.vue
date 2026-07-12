@@ -96,7 +96,7 @@ const goBack = () => {
 <template>
   <div class="">
     <!-- Header -->
-    <MobileHeader title="Ubah Kata Sandi" @back="goBack" />
+    <MobileHeader title="Ubah Kata Sandi" @back="goBack" variant="primary"/>
 
     <!-- Content -->
     <div class="max-w-3xl px-4 py-6 mx-auto sm:px-6 lg:px-8">
@@ -294,7 +294,8 @@ const goBack = () => {
 
         <!-- Submit Button -->
         <div class="flex gap-2">
-          <div class="hidden w-full sm:inline">
+          <!-- Desktop Buttons -->
+          <div class="hidden sm:flex w-full gap-2">
             <AppButton
               type="button"
               variant="muted-outline"
@@ -304,19 +305,34 @@ const goBack = () => {
             >
               Batal
             </AppButton>
+
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="loading"
+              :disabled="loading"
+              class="w-full"
+            >
+              {{ loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
           </div>
 
-          <AppButton
-            type="submit"
-            variant="primary"
-            size="md"
-            block
-            :loading="loading"
-            :disabled="loading"
-            class="w-full"
-          >
-            {{ loading ? "Menyimpan..." : "Simpan" }}
-          </AppButton>
+          <!-- Mobile Sticky Button -->
+          <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="loading"
+              :disabled="loading"
+              class="w-full"
+            >
+              {{ loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
+          </div>
         </div>
       </form>
       </div>

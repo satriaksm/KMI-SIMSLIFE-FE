@@ -54,10 +54,11 @@ function mapApiStatus(beStatus, o) {
     case "paid":
       return "waiting_review"; // sudah bayar, tunggu konfirmasi UMKM
     case "pending":
-      if (o.payment_method === 'COD') return "waiting_review"; // COD langsung tunggu konfirmasi
+      if (o.payment_method === 'COD' || o.order_type === 'jasa') return "waiting_review"; // COD/Jasa langsung tunggu konfirmasi
       return beStatus;
     case "responsed":
     case "accepted":
+    case "on-progress":
       return "processing";
     case "delivered":
       return o.delivery_type === "pickup" ? "ready" : "shipped";
@@ -91,21 +92,33 @@ function mapMerchantOrder(o) {
     },
     status: mapApiStatus(o.status, o),
     payment_method: o.payment_method || (o.payment?.payment_method || (o.delivery_type === 'pickup' && !o.payment ? "COD" : "Transfer")),
+    order_type: o.order_type,
     delivery_type: o.delivery_type || 'delivery',
     created_at: o.created_at,
-    items: (o.items || []).map((it) => ({
-      id: it.id,
-      name: it.product_name_snapshot || "Produk",
-      variant: it.product_variant_snapshot || "",
-      addons: (it.addons || []).map((a) => ({
-        name: a.addon_name_snapshot || a.addon?.name || "Addon",
-        price: Number(a.addon_price_snapshot || 0),
-      })),
-      qty: it.quantity,
-      price: it.unit_price_snapshot,
-      subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
-      image: getOrderSnapshotUrl(it.id, it.image_snapshot_path),
-    })),
+    items: o.order_type === 'jasa' 
+      ? (o.jasa_items || []).map((it) => ({
+          id: it.id,
+          name: it.jasa_title_snapshot || "Layanan Jasa",
+          variant: it.order_method === 'langsung_pesan' || it.order_method === 'keranjang' ? 'Langsung Pesan' : (it.order_method === 'konsultasi' || it.order_method === 'memerlukan_konsultasi' ? 'Konsultasi' : 'Booking'),
+          addons: [],
+          qty: it.quantity || 1,
+          price: it.price || it.jasa_price_snapshot,
+          subtotal: it.subtotal || it.price,
+          image: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
+        }))
+      : (o.items || []).map((it) => ({
+          id: it.id,
+          name: it.jasa_title_snapshot || it.product_name_snapshot || "Item/Layanan",
+          variant: it.product_variant_snapshot || "",
+          addons: (it.addons || []).map((a) => ({
+            name: a.addon_name_snapshot || a.addon?.name || "Addon",
+            price: Number(a.addon_price_snapshot || 0),
+          })),
+          qty: it.quantity,
+          price: it.unit_price_snapshot,
+          subtotal: it.subtotal_snapshot || it.unit_price_snapshot * it.quantity,
+          image: getOrderSnapshotUrl(it.id, it.image_snapshot_path || it.jasa_image_snapshot),
+        })),
     amounts: {
       subtotal: Number(o.subtotal || 0),
       discount: Number(o.discount_total || 0),
@@ -261,11 +274,11 @@ const handlePageChange = (page) => {
 const tableColumns = [
   { key: "invoice", label: "No. Pesanan" },
   { key: "customer.name", label: "Pelanggan" },
-  { key: "itemsSummary", label: "Produk" },
+  { key: "itemsSummary", label: "Item/Layanan" },
   { key: "created_at", label: "Tanggal" },
   { key: "amounts.total", label: "Total" },
   { key: "payment_method", label: "Pembayaran" },
-  { key: "delivery_type", label: "Pengiriman" },
+  { key: "delivery_type", label: "Pengiriman/Pengerjaan" },
   { key: "status", label: "Status" },
   { key: "actions", label: "" },
 ];
@@ -394,7 +407,7 @@ function leaveOrdersChannel(id) {
       <div class="flex items-center gap-3">
         <button
           @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>
@@ -466,7 +479,7 @@ function leaveOrdersChannel(id) {
           name="search"
           :modelValue="query"
           @update:modelValue="(v) => (query = v)"
-          placeholder="Cari no. pesanan / pelanggan / produk"
+          placeholder="Cari no. pesanan / pelanggan / layanan"
           :hideLabel="true"
           variant="merchant"
           wrapperClass="flex-1"
@@ -520,8 +533,8 @@ function leaveOrdersChannel(id) {
           </template>
 
           <template #cell-itemsSummary="{ item }">
-            <div class="max-w-xs">
-              <div class="text-sm text-gray-800 truncate">
+            <div class="space-y-0.5" v-if="item.items && item.items.length > 0">
+              <div class="text-sm font-medium text-gray-900 truncate max-w-[200px]">
                 {{ item.items[0].name }}
                 <span v-if="item.items.length > 1" class="text-gray-400">
                   +{{ item.items.length - 1 }} lainnya
@@ -533,10 +546,11 @@ function leaveOrdersChannel(id) {
               <div v-if="item.items[0].addons && item.items[0].addons.length" class="text-xs text-gray-400 truncate">
                 + {{ item.items[0].addons.map(a => a.name).join(', ') }}
               </div>
-              <div class="text-xs text-gray-400">
+              <div class="mt-1 text-xs text-gray-500">
                 {{ item.items.reduce((s, it) => s + it.qty, 0) }} item
               </div>
             </div>
+            <div v-else class="text-sm text-gray-500">-</div>
           </template>
 
           <template #cell-created_at="{ item }">
@@ -562,7 +576,7 @@ function leaveOrdersChannel(id) {
 
           <template #cell-delivery_type="{ item }">
             <div class="text-sm text-gray-600">
-              {{ item.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}
+              {{ item.order_type === 'jasa' ? (item.delivery_type === 'in-store' ? 'Di Tempat' : (item.delivery_type === 'on-site' ? 'Panggilan' : 'Online')) : (item.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim') }}
             </div>
           </template>
 
@@ -647,7 +661,7 @@ function leaveOrdersChannel(id) {
                 order.customer.name
               }}</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" v-if="order.items && order.items.length > 0">
               <i class="text-xs text-gray-400 pi pi-box shrink-0"></i>
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-600 truncate block">

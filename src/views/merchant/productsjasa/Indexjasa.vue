@@ -61,26 +61,60 @@ const currentMerchantName = computed(() => {
   return merchant?.name || "UMKM";
 });
 
+const getAddressPart = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object') {
+    return value.name || value.nama || value.label || value.value || '';
+  }
+  return '';
+};
+
+const formatAddress = (address) => {
+  if (!address) return '';
+
+  const parts = [
+    getAddressPart(address.detail),
+    getAddressPart(address.village),
+    getAddressPart(address.district),
+    getAddressPart(address.city),
+    getAddressPart(address.province),
+  ].filter(Boolean);
+
+  return parts.join(', ');
+};
+
+const getMerchantAddressFromObject = (merchant) => {
+  if (!merchant) return "";
+  const primary = merchant.primary_address || merchant.primaryAddress || null;
+  if (primary) {
+    const formatted = formatAddress(primary);
+    if (formatted) return formatted;
+    if (primary.full_address) return primary.full_address;
+  }
+  return merchant.address || merchant.alamat || merchant.full_address || '';
+};
+
 const currentMerchantAddress = computed(() => {
-  const merchant = currentMerchantSlug.value
+  // Try from auth store first (may not have primary_address)
+  const authMerchant = currentMerchantSlug.value
     ? authStore.getMerchantBySlug(currentMerchantSlug.value)
     : authStore.getMerchantById(currentMerchantId.value);
 
-  if (!merchant) return "";
-
-  const primary = merchant.primary_address;
-  if (primary) {
-    const parts = [
-      primary.detail,
-      primary.village,
-      primary.district,
-      primary.city,
-      primary.province,
-    ].filter(Boolean);
-    if (parts.length) return parts.join(", ");
+  if (authMerchant) {
+    const addr = getMerchantAddressFromObject(authMerchant);
+    if (addr) return addr;
   }
 
-  return merchant.address || merchant.alamat || "";
+  // Fallback: try to get from loaded jasas (API now includes merchant with primary_address)
+  if (jasas.value && jasas.value.length > 0) {
+    const apiMerchant = jasas.value[0]?.merchant;
+    if (apiMerchant) {
+      return getMerchantAddressFromObject(apiMerchant);
+    }
+  }
+
+  return "";
 });
 
 // Pagination / totals
@@ -739,25 +773,36 @@ const getStatusLabel = (status) => {
   return labels[status] || status;
 };
 
-const getServiceTypeLabel = (serviceType) => {
-  if (!serviceType) return "-";
-  const type = String(serviceType).toLowerCase();
+const getdeliveryTypeLabel = (deliveryType) => {
+  if (!deliveryType) return "-";
+  const type = String(deliveryType).toLowerCase();
   if (type === "online") return "Online";
-  if (type === "di_tempat_umkm" || type === "at_location") return "Di Tempat UMKM";
-  if (type === "ke_rumah_pelanggan" || type === "on_site") return "Ke Rumah Pelanggan";
+  if (type === "in-store") return "Di Tempat UMKM";
+  if (type === "on-site") return "Ke Rumah Pelanggan";
   return "-";
 };
 
 const getDisplayServiceAddress = (jasa) => {
   if (!jasa) return "-";
-  const serviceType = String(jasa.service_type || "").toLowerCase();
+  const deliveryType = String(jasa.delivery_type || "").toLowerCase();
 
-  if (serviceType === "online") return "Tidak memerlukan alamat";
-  if (serviceType === "ke_rumah_pelanggan" || serviceType === "on_site") {
-    return jasa.service_area || "Area layanan sesuai alamat customer";
+  if (deliveryType === "online") return "Tidak memerlukan alamat";
+  if (deliveryType === "on-site") {
+    return "Sesuai alamat customer saat booking";
   }
-  // For di_tempat_umkm or at_location, show merchant address
-  return jasa.location_address || currentMerchantAddress.value || "-";
+
+  // Try location_address first
+  if (jasa.location_address) return jasa.location_address;
+
+  // Try jasa.merchant.primary_address (snake_case from API)
+  const apiMerchant = jasa.merchant;
+  if (apiMerchant) {
+    const addr = getMerchantAddressFromObject(apiMerchant);
+    if (addr) return addr;
+  }
+
+  // Fallback to currentMerchantAddress (auth store or jasas data)
+  return currentMerchantAddress.value || "-";
 };
 
 // Toggle visibility method
@@ -1110,7 +1155,7 @@ const getPrimaryImageSrc = (jasaItem) => {
                 <div class="space-y-0.5">
                   <div>
                     <span class="font-semibold">Tipe:</span>
-                    {{ getServiceTypeLabel(jasa.service_type) }}
+                    {{ getdeliveryTypeLabel(jasa.delivery_type) }}
                   </div>
                   <div class="break-words">
                     <span class="font-semibold">Lokasi:</span>

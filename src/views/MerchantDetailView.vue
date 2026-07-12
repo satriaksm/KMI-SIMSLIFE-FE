@@ -142,10 +142,10 @@
                   {{ merchant.name }}
                 </h1>
 
-                <div class="mt-2.5 flex items-center gap-2">
+                <div class="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span
                     :class="[
-                      'px-3 py-1 rounded-full text-xs font-semibold shadow-sm',
+                      'px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold shadow-sm flex-shrink-0 whitespace-nowrap',
                       merchant.is_open_now
                         ? 'bg-success-background text-success-foreground'
                         : 'bg-danger-background text-danger-foreground',
@@ -153,32 +153,32 @@
                   >
                     {{ merchant.is_open_now ? "Buka" : "Tutup" }}
                   </span>
-                  <span class="text-xs font-bold text-merchant-primary">
+                  
+                  <span class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 flex-shrink-0 whitespace-nowrap">
+                    <i class="pi pi-tag text-[10px] text-merchant-primary"></i>
                     {{ merchant.segmentation?.name || "UMKM" }}
                   </span>
 
                   <span
                     v-if="formattedDistanceKm"
-                    class="flex items-center gap-1 text-xs font-semibold text-gray-500"
+                    class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 flex-shrink-0 whitespace-nowrap"
                   >
-                    <i
-                      class="text-sm pi pi-map-marker text-danger-foreground"
-                    ></i>
+                    <i class="text-[10px] pi pi-map-marker text-danger-foreground"></i>
                     {{ formattedDistanceKm }}
                   </span>
 
                   <span
                     v-if="merchantRating && totalReviews > 0"
-                    class="flex items-center gap-1 text-xs font-semibold text-gray-600"
+                    class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 flex-shrink-0 whitespace-nowrap"
                   >
-                    <i class="pi pi-star-fill text-orange-400"></i>
-                    {{ averageRating }} ({{ totalReviews }} ulasan)
+                    <i class="text-[10px] pi pi-star-fill text-orange-400"></i>
+                    <span>{{ averageRating }} <span class="text-gray-500">({{ totalReviews }})</span></span>
                   </span>
                   <span
                     v-else
-                    class="flex items-center gap-1 text-xs font-semibold text-gray-400"
+                    class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-500 flex-shrink-0 whitespace-nowrap"
                   >
-                    <i class="pi pi-star-fill"></i>
+                    <i class="text-[10px] pi pi-star-fill text-gray-300"></i>
                     Belum ada rating
                   </span>
                 </div>
