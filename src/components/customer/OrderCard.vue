@@ -162,6 +162,15 @@ const resolvedStatusProps = computed(() => {
       showIcon: true,
     };
   }
+  if (raw === "unpicked") {
+    return {
+      variant: "order",
+      status: "cancelled",
+      label: "Tidak Diambil",
+      size: "sm",
+      showIcon: true,
+    };
+  }
   if (raw === "ready") {
     return {
       variant: "order",

@@ -39,12 +39,26 @@ const getPublicKey = async () => {
 const getServiceWorkerRegistration = async () => {
   if (!isSupported()) return null;
 
-  const existing = await navigator.serviceWorker.getRegistration("/");
-  if (existing) {
-    return existing;
+  try {
+    let registration = await navigator.serviceWorker.getRegistration();
+    
+    // In dev mode, we use push-sw.js. In prod, we use sw.js.
+    const expectedSw = import.meta.env.DEV ? "push-sw.js" : "sw.js";
+    
+    if (registration) {
+      const swUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL;
+      
+      // Jika SW yang terdaftar BUKAN SW yang kita harapkan, abaikan agar diregistrasi ulang
+      if (swUrl && swUrl.includes(expectedSw)) {
+        return registration;
+      }
+    }
+    
+    return await navigator.serviceWorker.register(`/${expectedSw}`, { scope: "/" });
+  } catch (error) {
+    console.error("SW Registration error:", error);
+    return null;
   }
-
-  return navigator.serviceWorker.register("/sw.js", { scope: "/" });
 };
 
 const getCurrentSubscription = async () => {
@@ -52,6 +66,9 @@ const getCurrentSubscription = async () => {
 
   const registration = await getServiceWorkerRegistration();
   if (!registration) return null;
+
+  // Tunggu sampai service worker benar-benar aktif
+  await navigator.serviceWorker.ready;
 
   return registration.pushManager.getSubscription();
 };

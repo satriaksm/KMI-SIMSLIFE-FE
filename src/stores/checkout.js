@@ -102,7 +102,7 @@ export const useCheckoutStore = defineStore("checkout", {
     _resolveImageUrl(image) {
       if (typeof image === "string") return image;
       if (image && typeof image === "object") {
-        return image.src_url ?? image.url ?? "";
+        return image.src ?? image.src_url ?? image.url ?? "";
       }
       return "";
     },
@@ -113,7 +113,7 @@ export const useCheckoutStore = defineStore("checkout", {
       this.productSlug = payload.slug ?? null;
       this.productId = payload.productId ?? null;
       this.productTitle = payload.title ?? null;
-      this.productImage = payload.image ?? null;
+      this.productImage = this._resolveImageUrl(payload.image);
 
       this.store = {
         id: payload.store?.id ?? null,

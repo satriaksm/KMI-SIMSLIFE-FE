@@ -538,6 +538,8 @@ function mapApiStatus(beStatus, o) {
       return "rejected";
     case "undelivered":
       return "undelivered";
+    case "unpicked":
+      return "unpicked";
     default:
       return beStatus;
   }
@@ -564,6 +566,8 @@ function statusProps(beStatus) {
       return { status: "cancelled", variant: "order", label: "Ditolak Penjual" };
     case "undelivered":
       return { status: "cancelled", variant: "order", label: "Gagal Kirim" };
+    case "unpicked":
+      return { status: "cancelled", variant: "order", label: "Tidak Diambil" };
     default:
       return { status: "pending", variant: "order", label: status };
   }

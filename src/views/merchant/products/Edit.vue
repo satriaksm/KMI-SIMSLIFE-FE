@@ -1956,7 +1956,7 @@ const formMinPurchase = computed({
 
         <!-- Submit Button Desktop -->
         <div class="justify-end hidden gap-3 sm:flex">
-          <Button type="submit" variant="merchant" size="md" :loading="loading">
+          <Button @click="onSubmit" type="button" variant="merchant" size="md" :loading="loading">
             <span>{{ loading ? "Menyimpan..." : "Simpan Perubahan" }}</span>
           </Button>
         </div>
@@ -1965,7 +1965,7 @@ const formMinPurchase = computed({
         <div
           class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <Button type="submit" :loading="loading" variant="merchant" block>
+          <Button @click="onSubmit" type="button" :loading="loading" variant="merchant" block>
             Simpan Perubahan
           </Button>
         </div>

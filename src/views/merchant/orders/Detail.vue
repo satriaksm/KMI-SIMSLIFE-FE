@@ -45,6 +45,10 @@ const confirmCountdownText = ref("");
 const isConfirmExpired = ref(false);
 let confirmTimer = null;
 
+const processCountdownText = ref("");
+const isProcessExpired = ref(false);
+let processTimer = null;
+
 function mapApiStatus(beStatus, o) {
   switch (beStatus) {
     case "paid":
@@ -179,8 +183,8 @@ async function fetchOrder() {
         )
       );
     }
-
     startConfirmCountdown();
+    startProcessCountdown();
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
     toast.error("Gagal memuat detail pesanan");
@@ -319,11 +323,26 @@ const timeline = computed(() => {
   if (currentStatus === "delivered") currentStatus = "shipped";
   if (currentStatus === "ready_to_pickup") currentStatus = "ready";
 
-  const order_idx = statuses.indexOf(currentStatus);
+  const o = rawOrder.value;
+  let failIdx = -1;
+  const isFailed = ['cancelled', 'rejected', 'undelivered', 'unpicked'].includes(o?.status);
+  
+  if (isFailed) {
+    if (o.status === 'undelivered' || o.status === 'unpicked') failIdx = statuses.indexOf('completed');
+    else if (o.status === 'rejected') failIdx = statuses.indexOf('accepted');
+    else if (o.status === 'cancelled') {
+       if (o.on_progress_at && isJasa) failIdx = statuses.indexOf(step3Key);
+       else if (o.accepted_at || o.responsed_at) failIdx = isJasa ? statuses.indexOf('on_progress') : statuses.indexOf(step3Key);
+       else failIdx = statuses.indexOf('accepted');
+    }
+  }
+
+  const order_idx = isFailed ? failIdx : statuses.indexOf(currentStatus);
   return steps.map((s, i) => ({
     ...s,
-    done: i <= order_idx && currentStatus !== "cancelled",
-    active: i === order_idx,
+    done: i <= order_idx,
+    active: i === order_idx && !isFailed,
+    isFailed: i === order_idx && isFailed,
   }));
 });
 
@@ -490,6 +509,48 @@ function startConfirmCountdown() {
   confirmTimer = setInterval(tick, 1000);
 }
 
+function startProcessCountdown() {
+  if (processTimer) clearInterval(processTimer);
+
+  const status = rawOrder.value?.status;
+  if (!['accepted', 'on-progress'].includes(status)) {
+    processCountdownText.value = "";
+    isProcessExpired.value = false;
+    return;
+  }
+
+  const refDateStr = status === 'on-progress' && rawOrder.value?.on_progress_at 
+    ? rawOrder.value?.on_progress_at 
+    : (rawOrder.value?.accepted_at ?? rawOrder.value?.created_at);
+
+  if (!refDateStr) return;
+
+  const expireTime = new Date(refDateStr).getTime() + (2 * 60 * 60 * 1000); // 2 hours
+
+  const tick = () => {
+    const now = new Date().getTime();
+    const distance = expireTime - now;
+
+    if (distance < 0) {
+      clearInterval(processTimer);
+      isProcessExpired.value = true;
+      processCountdownText.value = "00:00:00";
+    } else {
+      isProcessExpired.value = false;
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      processCountdownText.value =
+        String(hours).padStart(2, '0') + ":" +
+        String(minutes).padStart(2, '0') + ":" +
+        String(seconds).padStart(2, '0');
+    }
+  };
+
+  tick();
+  processTimer = setInterval(tick, 1000);
+}
+
 
 async function confirmAction() {
   let targetStatus;
@@ -504,14 +565,14 @@ async function confirmAction() {
   actionLoading.value = true;
   try {
     let payload = targetStatus;
-    if ((targetStatus === 'completed' || targetStatus === 'undelivered') && proofImage.value) {
+    if ((targetStatus === 'completed' || targetStatus === 'undelivered' || targetStatus === 'unpicked') && proofImage.value) {
       payload = new FormData();
       payload.append('status', targetStatus);
       payload.append('proof_image', proofImage.value);
-      if (targetStatus === 'undelivered' && failedReason.value) {
+      if ((targetStatus === 'undelivered' || targetStatus === 'unpicked') && failedReason.value) {
         payload.append('failed_reason', failedReason.value);
       }
-    } else if (targetStatus === 'undelivered' && !proofImage.value) {
+    } else if ((targetStatus === 'undelivered' || targetStatus === 'unpicked') && !proofImage.value) {
         toast.error("Bukti foto wajib diunggah untuk pesanan gagal kirim.");
         actionLoading.value = false;
         return;
@@ -596,6 +657,7 @@ onMounted(() => {
 onUnmounted(() => {
   leaveOrderChannel(route.params?.orderId);
   if (confirmTimer) clearInterval(confirmTimer);
+  if (processTimer) clearInterval(processTimer);
 });
 
 watch(
@@ -742,12 +804,11 @@ function leaveOrderChannel(id) {
       </button>
     </div>
 
-    <div v-else class=" px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6">
+    <div v-else class=" px-4 py-2 mx-auto space-y-4 sm:px-6 sm:py-6 pb-40 sm:pb-6">
       <!-- ======================== -->
       <!-- TIMELINE                 -->
       <!-- ======================== -->
       <div
-        v-if="order.status !== 'cancelled'"
         class="p-4 bg-white shadow-sm rounded-2xl"
       >
         <h2 class="mb-4 text-sm font-semibold text-gray-700">Status Pesanan</h2>
@@ -758,19 +819,21 @@ function leaveOrderChannel(id) {
               <div
                 :class="[
                   'w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0 border-2 transition',
-                  step.done
-                    ? 'bg-merchant-primary border-merchant-primary text-white'
-                    : 'bg-white border-gray-300 text-gray-400',
+                  step.isFailed
+                    ? 'bg-red-500 border-red-500 text-white'
+                    : step.done
+                      ? 'bg-merchant-primary border-merchant-primary text-white'
+                      : 'bg-white border-gray-300 text-gray-400',
                 ]"
               >
-                <i :class="['pi text-xs', step.icon]"></i>
+                <i :class="['pi text-xs', step.isFailed ? 'pi-times' : step.icon]"></i>
               </div>
               <!-- Label -->
               <div class="px-1 mt-2 text-center">
                 <p
                   :class="[
                     'text-xs font-semibold',
-                    step.done ? 'text-merchant-primary' : 'text-gray-400',
+                    step.isFailed ? 'text-red-600' : step.done ? 'text-merchant-primary' : 'text-gray-400',
                   ]"
                 >
                   {{ step.label }}
@@ -785,7 +848,7 @@ function leaveOrderChannel(id) {
               v-if="idx < timeline.length - 1"
               :class="[
                 'flex-1 h-0.5 mt-4 transition',
-                timeline[idx + 1]?.done ? 'bg-merchant-primary' : 'bg-gray-200',
+                timeline[idx + 1]?.isFailed ? 'bg-red-200' : timeline[idx + 1]?.done ? 'bg-merchant-primary' : 'bg-gray-200',
               ]"
             ></div>
           </template>
@@ -830,6 +893,29 @@ function leaveOrderChannel(id) {
           <div class="flex-1">
             <p class="text-xs text-gray-500">Batas waktu konfirmasi pesanan</p>
             <p class="text-lg font-bold text-amber-700 font-mono">{{ confirmCountdownText }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Countdown pengerjaan pesanan -->
+      <div
+        v-if="processCountdownText && ['processing', 'on_progress'].includes(order.status)"
+        class="p-4 bg-white shadow-sm rounded-2xl"
+      >
+        <div v-if="isProcessExpired" class="flex items-center gap-3">
+          <i class="text-xl text-red-500 pi pi-clock shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-red-700">Batas waktu pengerjaan habis</p>
+            <p class="text-xs text-red-500 mt-0.5">Pesanan akan otomatis dibatalkan sistem.</p>
+          </div>
+        </div>
+        <div v-else class="flex items-center gap-3">
+          <div class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 shrink-0">
+            <i class="text-lg pi pi-clock text-blue-600"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-xs text-gray-500">Batas waktu pengerjaan/persiapan</p>
+            <p class="text-lg font-bold text-blue-700 font-mono">{{ processCountdownText }}</p>
           </div>
         </div>
       </div>
@@ -1024,7 +1110,41 @@ function leaveOrderChannel(id) {
       <!-- ======================== -->
       <!-- ACTION BUTTON            -->
       <!-- ======================== -->
-      <div class="pb-6 space-y-2">
+      <!-- Desktop Buttons -->
+      <div class="hidden sm:block space-y-2 mt-2">
+        <Button
+          v-if="nextActionLabel"
+          variant="merchant"
+          block
+          :loading="actionLoading"
+          @click="handleNextAction"
+          size="lg"
+        >
+          <i class="pi pi-check-circle"></i>
+          {{ nextActionLabel }}
+        </Button>
+        <Button
+          v-if="canCancel"
+          variant="danger-outline"
+          block
+          :disabled="actionLoading"
+          @click="handleCancel"
+        >
+          Tolak / Batalkan Pesanan
+        </Button>
+        <Button
+          v-if="canUndelivered"
+          variant="warning-outline"
+          block
+          :disabled="actionLoading"
+          @click="handleUndelivered"
+        >
+          {{ rawOrder?.delivery_type === 'pickup' ? 'Tandai Tidak Diambil' : 'Tandai Gagal Kirim' }}
+        </Button>
+      </div>
+
+      <!-- Mobile Sticky Buttons -->
+      <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe flex flex-col gap-2">
         <Button
           v-if="nextActionLabel"
           variant="merchant"

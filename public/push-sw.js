@@ -11,6 +11,14 @@ const toJson = (data) => {
   }
 };
 
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
   const payload = toJson(event.data) || {};
   const title = payload.title || "SUMILIR";

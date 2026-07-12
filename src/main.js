@@ -12,6 +12,21 @@ import EventCard from "@/components/Card/EventCard.vue";
 import "leaflet/dist/leaflet.css";
 import { registerSW } from "virtual:pwa-register";
 
+// Clean up any stale service workers (e.g. from previous dev-sw.js or selfDestroying ones)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    const expectedSw = import.meta.env.DEV ? "push-sw.js" : "sw.js";
+    
+    for (const registration of registrations) {
+      const swUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL;
+      if (swUrl && !swUrl.includes(expectedSw)) {
+        console.log(`Unregistering stale service worker: ${swUrl} (expected ${expectedSw})`);
+        registration.unregister();
+      }
+    }
+  });
+}
+
 // Minimal waktu splash (ms)
 const MIN_SPLASH_MS = Number(import.meta.env.VITE_SPLASH_MIN_MS || 1000);
 
@@ -33,9 +48,11 @@ app.use(router);
 app.component("ProductCard", ProductCard);
 app.component("EventCard", EventCard);
 
-registerSW({
-  immediate: true,
-});
+if (!import.meta.env.DEV) {
+  registerSW({
+    immediate: true,
+  });
+}
 
 // ✅ Auth initialization moved to App.vue (synchronous from localStorage)
 // Removed async initAuth() to prevent race condition that clears user on page refresh
