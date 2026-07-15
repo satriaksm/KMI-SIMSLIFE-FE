@@ -1009,14 +1009,26 @@ const getPrimaryImageSrc = (jasaItem) => {
         <div
           v-for="(jasa, index) in jasas"
           :key="jasa.id"
-          class="overflow-hidden transition bg-white border border-gray-100 rounded-lg shadow-md hover:shadow-lg"
-          :class="
-            !jasa.is_active || jasa.status === 'draft' ? 'opacity-75' : ''
-          "
+          class="overflow-hidden transition bg-white border rounded-lg shadow-md hover:shadow-lg"
+          :class="[
+            !jasa.is_active || jasa.status === 'draft' ? 'opacity-75' : '',
+            jasa.status === 'published'
+              ? 'border-green-200'
+              : jasa.status === 'draft'
+              ? 'border-amber-200'
+              : 'border-red-200',
+          ]"
         >
           <!-- Card Header dengan Nomor -->
           <div
-            class="flex items-center justify-between px-4 py-3 bg-linear-to-r from-merchant-primary to-merchant-primary/80"
+            class="flex items-center justify-between px-4 py-3"
+            :class="[
+              jasa.status === 'published'
+                ? 'bg-linear-to-r from-green-600 to-green-500'
+                : jasa.status === 'draft'
+                ? 'bg-linear-to-r from-amber-500 to-amber-400'
+                : 'bg-linear-to-r from-red-600 to-red-500',
+            ]"
           >
             <div class="flex items-center gap-3">
               <span
@@ -1030,12 +1042,7 @@ const getPrimaryImageSrc = (jasaItem) => {
             </div>
             <span
               :class="[
-                'px-2 py-1 rounded-full text-xs font-medium shrink-0',
-                jasa.status === 'published'
-                  ? 'bg-green-100 text-green-700'
-                  : jasa.status === 'draft'
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700',
+                'px-2 py-1 rounded-full text-xs font-semibold shrink-0 bg-white/20 text-white border border-white/20',
               ]"
             >
               {{
