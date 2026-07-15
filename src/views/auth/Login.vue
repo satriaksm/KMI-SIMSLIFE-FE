@@ -152,6 +152,12 @@ const handleLogin = async (values) => {
   isLoading.value = true;
   errorMessage.value = "";
 
+  if (!values.email || !values.password) {
+    errorMessage.value = "Email atau password harus diisi";
+    isLoading.value = false;
+    return;
+  }
+
   try {
     // 1. Login via authStore
     const userData = await authStore.login({

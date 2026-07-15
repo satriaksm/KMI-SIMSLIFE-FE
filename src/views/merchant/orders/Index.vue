@@ -70,6 +70,8 @@ function mapApiStatus(beStatus, o) {
       return "rejected";
     case "undelivered":
       return "undelivered";
+    case "unpicked":
+      return "unpicked";
     default:
       return beStatus;
   }
@@ -338,6 +340,13 @@ function statusProps(status) {
       variant: "order",
       status: "cancelled",
       label: "Gagal Kirim",
+      size: "sm",
+      showIcon: true,
+    },
+    unpicked: {
+      variant: "order",
+      status: "cancelled",
+      label: "Tidak Diambil",
       size: "sm",
       showIcon: true,
     },

@@ -431,6 +431,8 @@ function mapApiStatus(beStatus, o) {
       return "rejected";
     case "undelivered":
       return "undelivered";
+    case "unpicked":
+      return "unpicked";
     default:
       return beStatus;
   }
@@ -529,7 +531,7 @@ const filteredOrders = computed(() => {
   // Filter by status
   if (selectedStatus.value) {
     if (selectedStatus.value === 'cancelled') {
-        result = result.filter((o) => ['cancelled', 'rejected', 'undelivered'].includes(o.status));
+        result = result.filter((o) => ['cancelled', 'rejected', 'undelivered', 'unpicked'].includes(o.status));
     } else {
         result = result.filter((o) => o.status === selectedStatus.value);
     }

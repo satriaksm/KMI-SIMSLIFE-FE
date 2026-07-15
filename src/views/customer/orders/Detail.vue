@@ -95,8 +95,8 @@
         </div>
 
         <!-- Status header -->
-        <div v-if="order.status !== 'cancelled'" class="p-4 bg-white border border-gray-200 rounded-2xl">
-                  <h2 class="mb-4 text-sm font-semibold text-gray-700">Status Pesanan</h2>
+        <div class="p-4 bg-white border border-gray-200 rounded-2xl">
+          <h2 class="mb-4 text-sm font-semibold text-gray-700">Status Pesanan</h2>
 
           <!-- Countdown konfirmasi UMKM -->
           <div
@@ -135,27 +135,26 @@
               class="relative z-0 flex flex-col items-center flex-1 gap-2"
             >
               <div
-                class="flex items-center justify-center text-sm border rounded-full w-9 h-9"
+                class="flex items-center justify-center text-sm border rounded-full w-9 h-9 transition-colors"
                 :class="
-                  s.done
-                    ? 'bg-primary/10 border-primary text-primary'
-                    : 'bg-white border-gray-200 text-muted-foreground'
+                  s.isFailed
+                    ? 'bg-red-500 border-red-500 text-white'
+                    : s.done
+                      ? 'bg-primary border-primary text-white'
+                      : 'bg-white border-gray-300 text-gray-400'
                 "
               >
-                <i :class="['pi', s.icon]" />
+                <i :class="['pi text-xs', s.isFailed ? 'pi-times' : s.icon]" />
               </div>
-              <div
-                class="text-center leading-tight px-0.5"
-                style="font-size: 9.5px"
-                :class="
-                  s.done
-                    ? 'text-primary font-semibold'
-                    : 'text-muted-foreground'
-                "
-              >
+              <div class="px-1 text-center">
+                <span
+                  class="text-[10px] sm:text-xs font-semibold whitespace-pre-line line-clamp-2"
+                  :class="s.isFailed ? 'text-red-600' : (s.done ? 'text-primary' : 'text-gray-400')"
+                >
                 {{ s.label }}
+                </span>
               </div>
-            </div>
+        </div>
           </div>
         </div>
 
@@ -508,6 +507,12 @@
           <div v-else-if="order?.status === 'pending' && countdownText" class="mb-3 text-center text-sm font-medium text-amber-700 bg-amber-50 py-2 rounded-xl">
             Sisa waktu pembayaran: <span class="font-bold">{{ countdownText }}</span>
           </div>
+          <div v-else-if="['pending', 'paid'].includes(order?.status) && confirmCountdownText" class="mb-3 text-center text-sm font-medium text-blue-700 bg-blue-50 py-2 rounded-xl">
+            Menunggu respon penjual: <span class="font-bold">{{ confirmCountdownText }}</span>
+          </div>
+          <div v-else-if="['responsed', 'accepted', 'on-progress'].includes(order?.status) && processCountdownText" class="mb-3 text-center text-sm font-medium text-blue-700 bg-blue-50 py-2 rounded-xl">
+            Batas waktu penjual menyelesaikan: <span class="font-bold">{{ processCountdownText }}</span>
+          </div>
           <!-- Desktop Buttons -->
           <div class="hidden sm:block space-y-2 mt-2">
             <Button
@@ -609,12 +614,16 @@ import echo from "@/libs/echo";
 // Countdown timer for payment
 const countdownText = ref("");
 const isPaymentExpired = ref(false);
-let timer = null;
 
-// Countdown timer for UMKM confirmation
 const confirmCountdownText = ref("");
 const isConfirmExpired = ref(false);
+
+const processCountdownText = ref("");
+const isProcessExpired = ref(false);
+
+let timer = null;
 let confirmTimer = null;
+let processTimer = null;
 
 const route = useRoute();
 const router = useRouter();
@@ -630,7 +639,8 @@ let orderChannel = null;
 
 const trackLineStyle = computed(() => {
   if (!order.value?.tracking) return {};
-  const n = order.value.tracking.length;
+  const t = order.value.tracking;
+  const n = t.length;
   const half = 100 / (2 * n);
   return { left: `${half}%`, right: `${half}%` };
 });
@@ -668,7 +678,24 @@ const order = computed(() => {
     undelivered: [false, false, false, false, false],
     unpicked: [false, false, false, false, false],
   };
-  const dones = trackingMap[status] || [false, false, false, false, false];
+  
+  let failIdx = -1;
+  const isFailed = ['cancelled', 'rejected', 'undelivered', 'unpicked'].includes(status);
+  
+  if (isFailed) {
+    if (status === 'undelivered' || status === 'unpicked') failIdx = 4;
+    else if (status === 'rejected') failIdx = 2;
+    else if (status === 'cancelled') {
+      if (o.on_progress_at && o.order_type === 'jasa') failIdx = 4;
+      else if (o.accepted_at || o.responsed_at) failIdx = 3;
+      else if (o.paid_at || isCOD) failIdx = 2;
+      else failIdx = 1;
+    }
+  }
+
+  const dones = isFailed 
+    ? Array(5).fill(false).map((_, i) => i <= failIdx)
+    : (trackingMap[status] || [false, false, false, false, false]);
   const merchantAddressObj = o.merchant?.primary_address || o.merchant?.primaryAddress;
 
   return {
@@ -682,27 +709,31 @@ const order = computed(() => {
         key: "placed",
         icon: "pi-receipt",
         done: dones[0],
+        isFailed: isFailed && failIdx === 0,
         label: "Pesanan\nDibuat",
       },
       {
         key: "paid",
         icon: isCOD ? "pi-clock" : "pi-credit-card",
         done: dones[1],
+        isFailed: isFailed && failIdx === 1,
         label: isCOD ? "Menunggu\nKonfirmasi" : "Pembayaran\nDiterima",
       },
       {
         key: "prepared",
         icon: o.order_type === 'jasa' ? "pi-cog" : "pi-box",
         done: dones[2],
+        isFailed: isFailed && failIdx === 2,
         label: o.order_type === 'jasa' ? "Pesanan\nDiterima" : "Sedang\nDisiapkan",
       },
       {
         key: "shipped",
         icon: o.order_type === 'jasa' ? (o.delivery_type === 'online' ? 'pi-globe' : 'pi-map-marker') : (o.delivery_type === "pickup" ? "pi-map-marker" : "pi-truck"),
         done: dones[3],
+        isFailed: isFailed && failIdx === 3,
         label: o.order_type === 'jasa' ? "Sedang\nDikerjakan" : (o.delivery_type === "pickup" ? "Siap\nDiambil" : "Sedang\nDiantar"),
       },
-      { key: "home", icon: "pi-home", done: dones[4], label: "Selesai" },
+      { key: "home", icon: "pi-home", done: dones[4], isFailed: isFailed && failIdx === 4, label: "Selesai" },
     ],
 
     pickup: {
@@ -801,6 +832,7 @@ async function fetchOrder() {
     rawOrder.value = res?.data ?? res ?? null;
     startCountdown();
     startConfirmCountdown();
+    startProcessCountdown();
   } catch (e) {
     console.error("Gagal memuat detail pesanan:", e);
     toast.error("Gagal memuat detail pesanan");
@@ -890,6 +922,52 @@ function startConfirmCountdown() {
 
   tick();
   confirmTimer = setInterval(tick, 1000);
+}
+
+/**
+ * Countdown: batas waktu UMKM menyelesaikan pesanan (2 jam).
+ */
+function startProcessCountdown() {
+  if (processTimer) clearInterval(processTimer);
+
+  const status = rawOrder.value?.status;
+  if (!['responsed', 'accepted', 'on-progress'].includes(status)) {
+    processCountdownText.value = "";
+    isProcessExpired.value = false;
+    return;
+  }
+
+  // Hitung dari on_progress_at atau accepted_at atau created_at
+  const refDateStr = status === 'on-progress' && rawOrder.value?.on_progress_at 
+    ? rawOrder.value?.on_progress_at 
+    : (rawOrder.value?.accepted_at ?? rawOrder.value?.created_at);
+
+  if (!refDateStr) return;
+
+  const expireTime = new Date(refDateStr).getTime() + (2 * 60 * 60 * 1000); // +2 hours
+
+  const tick = () => {
+    const now = new Date().getTime();
+    const distance = expireTime - now;
+
+    if (distance < 0) {
+      clearInterval(processTimer);
+      isProcessExpired.value = true;
+      processCountdownText.value = "00:00:00";
+    } else {
+      isProcessExpired.value = false;
+      const hours = Math.floor(distance / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      processCountdownText.value = 
+        String(hours).padStart(2, '0') + ":" + 
+        String(minutes).padStart(2, '0') + ":" + 
+        String(seconds).padStart(2, '0');
+    }
+  };
+
+  tick();
+  processTimer = setInterval(tick, 1000);
 }
 
 async function handleCancel() {
@@ -1034,6 +1112,7 @@ onUnmounted(() => {
   leaveOrderChannel(orderId.value);
   if (timer) clearInterval(timer);
   if (confirmTimer) clearInterval(confirmTimer);
+  if (processTimer) clearInterval(processTimer);
 });
 
 watch(orderId, (next, prev) => {

@@ -166,7 +166,7 @@
               Pilihan UMKM terbaik di Banyuanyar
             </p>
           </div>
-          <router-link to="/explore?mode=umkm" class="hidden text-sm font-semibold sm:block text-primary hover:text-primary/80">
+          <router-link to="?mode=umkm" class="hidden text-sm font-semibold sm:block text-primary hover:text-primary/80">
             Lihat Semua
           </router-link>
         </div>

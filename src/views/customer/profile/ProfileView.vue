@@ -187,6 +187,24 @@ const refreshPushStatus = async () => {
   const state = await getSubscriptionState();
   pushPermission.value = state.permission;
   pushEnabled.value = state.enabled;
+
+  // Jika browser kehilangan subscription (quirk localhost) tapi user sebelumnya menyalakan (intent = on), subscribe ulang
+  const intent = localStorage.getItem("push_intent");
+  if (!state.enabled && state.permission === "granted" && intent === "on") {
+    try {
+      await subscribePushNotifications();
+      pushEnabled.value = true;
+    } catch {
+      pushEnabled.value = false;
+    }
+  }
+  
+  // Update intent agar sinkron
+  if (pushEnabled.value) {
+    localStorage.setItem("push_intent", "on");
+  } else {
+    localStorage.setItem("push_intent", "off");
+  }
 };
 
 const togglePushNotifications = async () => {
@@ -200,9 +218,11 @@ const togglePushNotifications = async () => {
   try {
     if (pushEnabled.value) {
       await unsubscribePushNotifications();
+      localStorage.setItem("push_intent", "off");
       toast.success("Notifikasi PWA dimatikan.");
     } else {
       await subscribePushNotifications();
+      localStorage.setItem("push_intent", "on");
       toast.success("Notifikasi PWA diaktifkan.");
     }
 
@@ -215,6 +235,32 @@ const togglePushNotifications = async () => {
     toast.error(msg);
   } finally {
     pushLoading.value = false;
+  }
+};
+
+const testLocalNotification = async () => {
+  if (Notification.permission !== "granted") {
+    toast.error("Izin notifikasi belum diberikan.");
+    return;
+  }
+  
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration) {
+      toast.error("Service worker tidak ditemukan. Pastikan status notifikasi sudah Aktif.");
+      return;
+    }
+    
+    await registration.showNotification("Notifikasi SUMILIR", {
+      body: "Hore! Notifikasi PWA berfungsi dengan baik di perangkat Anda.",
+      icon: "/icon192.png",
+      tag: "test-notification"
+    });
+    
+    toast.success("Notifikasi test berhasil dikirim (lihat notifikasi sistem Anda).");
+  } catch (error) {
+    toast.error("Gagal memunculkan notifikasi test.");
+    console.error(error);
   }
 };
 
@@ -475,17 +521,28 @@ onMounted(async () => {
                     <p class="text-xs text-gray-500 mt-0.5 leading-snug">{{ pushStatusMessage }}</p>
                   </div>
                 </div>
-                <button
-                  @click="togglePushNotifications"
-                  :disabled="pushLoading"
-                  class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none"
-                  :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block w-4 h-4 transition-transform transform bg-white rounded-full"
-                    :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
-                  />
-                </button>
+                <div class="flex items-center gap-3 shrink-0">
+                  <!-- <button
+                    v-if="pushEnabled"
+                    @click="testLocalNotification"
+                    class="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    Test
+                  </button> -->
+                  <button
+                    @click="togglePushNotifications"
+                    :disabled="pushLoading"
+                    class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
+                    :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
+                  >
+                    <span
+                      class="inline-flex items-center justify-center w-4 h-4 transition-transform transform bg-white rounded-full"
+                      :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
+                    >
+                      <i v-if="pushLoading" class="pi pi-spin pi-spinner text-[10px]" :class="pushEnabled ? 'text-merchant-primary' : 'text-gray-400'"></i>
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <!-- Accordion for merchant access -->
@@ -852,16 +909,24 @@ onMounted(async () => {
               <button
                 @click="togglePushNotifications"
                 :disabled="pushLoading"
-                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none"
+                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
                 :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
               >
                 <span
-                  class="inline-block w-4 h-4 transition-transform transform bg-white rounded-full"
+                  class="inline-flex items-center justify-center w-4 h-4 transition-transform transform bg-white rounded-full"
                   :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
-                />
+                >
+                  <i v-if="pushLoading" class="pi pi-spin pi-spinner text-[10px]" :class="pushEnabled ? 'text-merchant-primary' : 'text-gray-400'"></i>
+                </span>
               </button>
             </div>
-
+<!-- <button
+                    v-if="pushEnabled"
+                    @click="testLocalNotification"
+                    class="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    Test
+                  </button> -->
             <!-- Accordion for merchant access (mobile) -->
             <div
               v-if="authStore.isAdmin"
