@@ -34,8 +34,7 @@ const schema = yup.object({
     .required("Nomor telepon wajib diisi"),
   nik: yup
     .string()
-    .matches(/^[0-9]{16}$/, "NIK harus 16 digit")
-    .required("NIK wajib diisi"),
+    .nullable(),
   password: yup
     .string()
     .required("Password wajib diisi")
@@ -146,7 +145,7 @@ const goToCreateMerchant = () => {
               placeholder="1234567890123456"
               maxlength="16"
               class="sm:col-span-2"
-              required
+              
             />
 
             <!-- Password -->
