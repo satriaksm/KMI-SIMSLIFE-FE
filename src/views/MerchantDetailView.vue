@@ -66,11 +66,11 @@
         <div
           class="relative w-full overflow-hidden bg-linear-to-b from-gray-200 to-gray-100 aspect-24/9 lg:aspect-4/1"
         >
-          <img
+          <ResponsiveImage
             v-if="merchant.banner_url"
-            :src="merchant.banner_url"
+            :src="merchant.banner_urls?.original || merchant.banner_url"
             alt="Background"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
           />
           <div
             v-else
@@ -117,11 +117,11 @@
               <div
                 class="flex items-center justify-center w-20 h-20 overflow-hidden border shadow-inner rounded-2xl bg-white/20 backdrop-blur-sm shrink-0 border-white/30"
               >
-                <img
+                <ResponsiveImage
                   v-if="merchant.logo_url"
-                  :src="merchant.logo_url"
+                  :src="merchant.logo_urls?.thumb || merchant.logo_url"
                   alt="Logo Toko"
-                  class="object-cover w-full h-full"
+                  customClass="object-cover w-full h-full"
                 />
                 <span v-else>
                   <svg
@@ -142,10 +142,10 @@
                   {{ merchant.name }}
                 </h1>
 
-                <div class="mt-2.5 flex items-center gap-2">
+                <div class="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span
                     :class="[
-                      'px-3 py-1 rounded-full text-xs font-semibold shadow-sm',
+                      'px-2.5 py-1 rounded-full text-[11px] sm:text-xs font-semibold shadow-sm flex-shrink-0 whitespace-nowrap',
                       merchant.is_open_now
                         ? 'bg-success-background text-success-foreground'
                         : 'bg-danger-background text-danger-foreground',
@@ -153,19 +153,20 @@
                   >
                     {{ merchant.is_open_now ? "Buka" : "Tutup" }}
                   </span>
-                  <span class="text-xs font-bold text-merchant-primary">
+                  
+                  <span class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 flex-shrink-0 whitespace-nowrap">
+                    <i class="pi pi-tag text-[10px] text-merchant-primary"></i>
                     {{ merchant.segmentation?.name || "UMKM" }}
                   </span>
 
                   <span
                     v-if="formattedDistanceKm"
-                    class="flex items-center gap-1 text-xs font-semibold text-gray-500"
+                    class="flex items-center gap-1 px-2.5 py-1 bg-gray-100 rounded-full text-[11px] sm:text-xs font-medium text-gray-700 flex-shrink-0 whitespace-nowrap"
                   >
-                    <i
-                      class="text-sm pi pi-map-marker text-danger-foreground"
-                    ></i>
+                    <i class="text-[10px] pi pi-map-marker text-danger-foreground"></i>
                     {{ formattedDistanceKm }}
                   </span>
+
                 </div>
               </div>
 
@@ -218,9 +219,35 @@
 
       <!-- Tab Content: Menu -->
       <div v-show="activeTab === 'menu'" class="px-4 py-4 mx-auto max-w-7xl">
+        <!-- Sort Filters -->
+        <div class="flex gap-2 pb-4 overflow-x-auto no-scrollbar">
+          <button
+            v-for="opt in sortOptions"
+            :key="opt.key"
+            type="button"
+            class="px-3 py-1.5 text-sm border rounded-full whitespace-nowrap transition"
+            :class="
+              activeSort === opt.key
+                ? 'bg-secondary text-white border-secondary'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-secondary/40'
+            "
+            @click="toggleSort(opt.key)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <!-- Initial Loading Skeleton -->
+        <div
+          v-if="isLoadingMenu"
+          class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+        >
+          <ProductCardSkeleton v-for="i in 12" :key="'menu-skeleton-' + i" />
+        </div>
+
         <!-- Empty State -->
         <div
-          v-if="
+          v-else-if="
             (menuKind === 'jasa' && jasaList.length === 0) ||
             (menuKind === 'product' && productList.length === 0)
           "
@@ -309,6 +336,8 @@
                   >
                 </template>
               </p>
+
+
             </div>
           </router-link>
 
@@ -344,7 +373,7 @@
           <h3 class="mb-3 text-base font-bold text-gray-900">
             Jam Operasional
           </h3>
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-4 sm:grid-flow-col">
             <div
               v-for="day in operationalHours"
               :key="day.name"
@@ -435,6 +464,7 @@
           >
             <span>Rute</span>
           </AppButton>
+
         </div>
       </div>
     </template>
@@ -481,6 +511,7 @@ import LeafletMap from "@/components/LeafletMap.vue";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import AppButton from "@/components/common/Button.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 const toast = useToast();
 
@@ -504,6 +535,25 @@ const productList = ref([]);
 const loading = ref(true);
 const activeTab = ref("menu");
 const menuKind = ref("jasa"); // 'product' | 'jasa'
+const isLoadingMenu = ref(false);
+
+// Sorting state
+const sortOptions = [
+  { key: "newest", label: "Terbaru" },
+  { key: "price_asc", label: "Termurah" },
+  { key: "price_desc", label: "Termahal" },
+];
+const activeSort = ref("newest");
+
+function toggleSort(key) {
+  if (activeSort.value !== key) {
+    activeSort.value = key;
+    // Reload items
+    if (merchant.value) {
+      fetchMerchantMenu(merchant.value, route.params.slug, { append: false });
+    }
+  }
+}
 
 // Infinite scroll state (mirip SearchPage/ProductLayananHome)
 const loadMoreRef = ref(null);
@@ -538,10 +588,19 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Merchant rating (from API response, not composable)
+const merchantRating = computed(() => merchant.value?.rating_summary || null)
+
+
+
+
+
 // Sync data state
 const merchantInfo = ref({
   address: "",
 });
+
+
 const operationalHours = ref([]);
 const latitude = ref(null);
 const longitude = ref(null);
@@ -872,14 +931,40 @@ const resolveJasaImage = (jasa) => {
       jasa.images.find((img) => img.is_cover) || jasa.images[0];
 
     // API returns url/src_url
-    if (coverImage.id) return getImageUrl(coverImage.id);
     if (coverImage.src_url) return getImageUrl(coverImage.src_url);
     if (coverImage.url) return getImageUrl(coverImage.url);
-
+    if (coverImage.id) return getImageUrl(coverImage.id);
+    if (coverImage.image_path) return getImageUrl(coverImage.image_path);
   }
 
   return null;
 };
+
+/**
+ * Normalize jasa image payload — ensures cover_img and images have full URLs.
+ * Backend provides public URLs; this ensures getImageUrl resolves them correctly.
+ */
+function normalizeJasaImagePayload(jasaData) {
+  if (!jasaData || typeof jasaData !== "object") return jasaData;
+  const normalized = { ...jasaData };
+  if (normalized.cover_img && typeof normalized.cover_img === "object") {
+    const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      : "";
+    normalized.cover_img = { id: normalized.cover_img.id ?? null, url: srcUrl, src_url: srcUrl };
+  }
+  if (Array.isArray(normalized.images)) {
+    normalized.images = normalized.images.map((img) => {
+      if (!img || typeof img !== "object") return img;
+      const srcUrl = img.src_url || img.url || img.image_path || img.id
+        ? getImageUrl(img.src_url || img.url || img.image_path || String(img.id))
+        : "";
+      return { id: img.id ?? null, url: srcUrl, src_url: srcUrl, is_cover: img.is_cover ?? false };
+    });
+  }
+  if (normalized.image) normalized.image = getImageUrl(normalized.image);
+  return normalized;
+}
 
 const goToProductDetail = (product) => {
   if (!product?.slug) return;
@@ -979,6 +1064,7 @@ async function fetchMerchantMenu(
 
   // Reset lists to avoid stale UI when navigating between merchants
   if (!append) {
+    isLoadingMenu.value = true;
     jasaList.value = [];
     productList.value = [];
     currentPage.value = 1;
@@ -997,7 +1083,7 @@ async function fetchMerchantMenu(
       const { data } = await api.get(
         `/api/public/merchants/${merchantSlug}/products`,
         {
-          params: { per_page: perPage, page: currentPage.value },
+          params: { per_page: perPage, page: currentPage.value, sort: activeSort.value },
         },
       );
 
@@ -1013,7 +1099,11 @@ async function fetchMerchantMenu(
       hasMore.value = parsed.current < parsed.last;
       await ensureSentinelObserved();
     } finally {
-      if (append) isLoadingMore.value = false;
+      if (append) {
+        isLoadingMore.value = false;
+      } else {
+        isLoadingMenu.value = false;
+      }
     }
     return;
   }
@@ -1030,12 +1120,13 @@ async function fetchMerchantMenu(
       const { data } = await api.get(
         `/api/public/merchants/${merchantSlug}/jasas`,
         {
-          params: { per_page: perPage, page: currentPage.value },
+          params: { per_page: perPage, page: currentPage.value, sort: activeSort.value },
         },
       );
 
       const parsed = parseLaravelPaginator(data);
-      const mapped = (parsed.items ?? []).map((j) => ({
+      const normalizedItems = (parsed.items ?? []).map(normalizeJasaImagePayload);
+      const mapped = normalizedItems.map((j) => ({
         ...j,
         // keep image resolver compat
         image: j?.image ?? null,
@@ -1050,7 +1141,11 @@ async function fetchMerchantMenu(
       hasMore.value = parsed.current < parsed.last;
       await ensureSentinelObserved();
     } finally {
-      if (append) isLoadingMore.value = false;
+      if (append) {
+        isLoadingMore.value = false;
+      } else {
+        isLoadingMenu.value = false;
+      }
     }
     return;
   }
@@ -1167,6 +1262,10 @@ watch(
 );
 
 watch(() => route.params.slug, fetchMerchantData, { immediate: true });
+
+watch(
+  () => route.hash,
+);
 </script>
 
 <style scoped>

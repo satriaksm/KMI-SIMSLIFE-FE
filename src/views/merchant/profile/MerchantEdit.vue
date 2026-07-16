@@ -1,23 +1,14 @@
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="
-          router.push(
-            merchantSlug
-              ? `/merchant-center/${merchantSlug}/profile`
-              : '/merchant-profile',
-          )
-        "
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="text-xl pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Edit Informasi UMKM</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Edit Informasi UMKM"
+      :backRoute="
+        merchantSlug
+          ? `/merchant-center/${merchantSlug}/profile`
+          : '/merchant-profile'
+      "
+    />
 
     <!-- Desktop Header with Breadcrumb -->
     <div class="hidden py-6 sm:block bg-gray-50">
@@ -87,17 +78,15 @@
           </div>
         </div>
       </div>
-      <!-- Mobile: Card with Cover & Logo -->
-      <div
-        class="mx-4 mb-4 overflow-hidden bg-white shadow-sm sm:hidden rounded-2xl"
-      >
-        <!-- Cover Image -->
-        <div class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1">
-          <img
+      <!-- Cover & Logo -->
+      <div class="relative mx-4 mb-2 overflow-visible bg-white sm:mx-0 sm:mb-4 sm:shadow-sm">
+        <div class="relative w-full overflow-hidden rounded-2xl aspect-24/9 lg:aspect-4/1">
+          <ResponsiveImage
             v-if="hasFormCover"
             :src="form.coverImage"
+            :urls="form.coverImage === initialData.banner_url ? initialData.banner_urls : null"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
             @error="onCoverImgError"
           />
           <div
@@ -106,7 +95,7 @@
             aria-hidden="true"
           >
             <svg
-              class="w-10 h-10 text-white"
+              class="w-12 h-12 text-white sm:w-16 sm:h-16"
               fill="currentColor"
               viewBox="0 0 24 24"
             >
@@ -117,122 +106,29 @@
           </div>
           <button
             @click="handleUploadCover"
-            class="absolute flex items-center justify-center w-10 h-10 text-white transition-opacity rounded-full shadow-lg top-3 right-3 bg-merchant-primary hover:opacity-90"
+            class="absolute flex items-center justify-center w-10 h-10 p-0 text-white transition-opacity rounded-full shadow-lg sm:p-3 sm:w-12 sm:h-12 top-3 right-3 sm:top-6 sm:right-6 bg-merchant-primary hover:opacity-90"
           >
-            <i class="text-base pi pi-camera"></i>
+            <i class="text-base pi pi-camera sm:text-xl"></i>
           </button>
         </div>
 
-        <!-- Logo - Overlapping -->
-        <div class="relative px-4 pb-4 pt-14">
-          <div class="absolute -top-12 left-4">
-            <div class="relative">
-              <img
-                v-if="hasFormLogo"
-                :src="form.logo"
-                alt="Logo"
-                class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl"
-                @error="onLogoImgError"
-              />
-              <span
-                v-else
-                class="flex items-center justify-center w-24 h-24 bg-gray-100 border-4 border-white shadow-lg rounded-2xl"
-                aria-hidden="true"
-              >
-                <svg
-                  class="w-10 h-10 text-gray-300"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z"
-                  />
-                </svg>
-              </span>
-              <button
-                @click="handleUploadLogo"
-                class="absolute bottom-0 right-0 flex items-center justify-center w-8 h-8 text-white transition-opacity rounded-full shadow-lg bg-merchant-primary hover:opacity-90"
-              >
-                <i class="text-xs pi pi-camera"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Desktop: Cover & Logo -->
-      <div
-        class="relative hidden mb-4 overflow-visible bg-white shadow-sm sm:block rounded-xl"
-      >
-        <div class="overflow-hidden rounded-xl">
-          <div
-            class="relative w-full overflow-hidden aspect-24/9 lg:aspect-4/1"
-          >
-            <img
-              v-if="hasFormCover"
-              :src="form.coverImage"
-              alt="Cover"
-              class="absolute inset-0 object-cover w-full h-full"
-              @error="onCoverImgError"
-            />
-            <div
-              v-else
-              class="absolute inset-0 flex items-center justify-center bg-linear-to-br from-muted-background to-muted-foreground"
-              aria-hidden="true"
-            >
-              <svg
-                class="w-12 h-12 text-white lg:w-16 lg:h-16"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM5 19V5h14v14H5zm8-7a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm-6 7l3-4 2.5 3 3.5-5 4 6H7z"
-                />
-              </svg>
-            </div>
-          </div>
-        </div>
-        <button
-          @click="handleUploadCover"
-          class="absolute p-3 text-white transition-opacity rounded-full shadow-lg top-6 right-6 bg-merchant-primary hover:opacity-90"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-        </button>
-
-        <div class="absolute -bottom-12 left-8">
+        <div class="absolute -bottom-10 sm:-bottom-12 left-4 sm:left-8">
           <div class="relative">
-            <img
+            <ResponsiveImage
               v-if="hasFormLogo"
               :src="form.logo"
+              :urls="form.logo === initialData.logo_url ? initialData.logo_urls : null"
               alt="Logo"
-              class="object-cover w-32 h-32 border-4 border-white shadow-lg rounded-2xl"
+              customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
               @error="onLogoImgError"
             />
             <span
               v-else
-              class="flex items-center justify-center w-32 h-32 bg-gray-100 border-4 border-white shadow-lg rounded-2xl"
+              class="flex items-center justify-center w-24 h-24 bg-gray-100 border-4 border-white shadow-lg sm:w-32 sm:h-32 rounded-2xl"
               aria-hidden="true"
             >
               <svg
-                class="w-12 h-12 text-gray-300"
+                class="w-12 h-12 text-gray-300 sm:w-16 sm:h-16"
                 fill="currentColor"
                 viewBox="0 0 24 24"
               >
@@ -243,34 +139,16 @@
             </span>
             <button
               @click="handleUploadLogo"
-              class="absolute bottom-0 right-0 p-2 text-white transition-opacity rounded-full shadow-lg bg-merchant-primary hover:opacity-90"
+              class="absolute bottom-0 right-0 flex items-center justify-center w-8 h-8 p-0 text-white transition-opacity rounded-full shadow-lg sm:w-10 sm:h-10 sm:p-2 bg-merchant-primary hover:opacity-90"
             >
-              <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
+              <i class="text-xs pi pi-camera sm:text-sm"></i>
             </button>
           </div>
         </div>
       </div>
 
       <!-- Form Content -->
-      <div class="sm:pt-16">
+      <Form :validation-schema="editProfileSchema" @submit="handleSave" class="pt-16">
         <!-- Mobile: Single Card -->
         <div
           class="p-4 mx-4 mb-2 space-y-5 bg-white shadow-sm sm:hidden rounded-2xl"
@@ -281,48 +159,42 @@
 
           <!-- Nama UMKM -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Nama UMKM
-            </label>
-            <input
+            <TextField
+              name="name"
               v-model="form.name"
-              type="text"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-              placeholder="Masukkan nama toko"
+              label="Nama UMKM"
+              placeholder="Masukkan nama UMKM"
+              variant="merchant"
+              required
             />
           </div>
 
           <!-- Kontak -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Kontak
-            </label>
-            <input
+            <TextField
+              name="contact"
               v-model="form.contact"
               type="tel"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+              label="Kontak"
               placeholder="Masukkan nomor kontak"
+              variant="merchant"
+              required
             />
           </div>
 
           <!-- Tentang -->
           <div>
-            <label
-              class="block mb-2 text-sm font-semibold text-merchant-primary"
-            >
-              Tentang
-            </label>
-            <textarea
+            <TextField
+              name="description"
               v-model="form.description"
-              rows="4"
-              class="w-full p-3 text-sm text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
-              placeholder="Ceritakan tentang toko Anda..."
-            ></textarea>
+              :textarea="true"
+              :rows="4"
+              label="Tentang"
+              placeholder="Ceritakan tentang UMKM Anda..."
+              variant="merchant"
+            />
           </div>
+
 
           <!-- Lokasi (Langsung di halaman, bukan modal) -->
           <div>
@@ -333,9 +205,14 @@
 
             <!-- Map Picker -->
             <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+              </div>
               <MapPicker
+                ref="mapRefMobile"
                 v-model:lat="latitude"
                 v-model:lng="longitude"
+                @manual-change="handleManualLocationChange"
                 :zoom="15"
                 height="192px"
                 variant="merchant"
@@ -345,7 +222,7 @@
             <div class="pt-4 mb-4">
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SelectField
-                  name="form.province_id"
+                  name="province_id"
                   label="Provinsi"
                   v-model="form.province_id"
                   :loading="provincesLoading"
@@ -353,18 +230,20 @@
                     provinces.map((p) => ({ value: p.id, label: p.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
-                  name="form.city_id"
+                  name="city_id"
                   label="Kabupaten/Kota"
                   v-model="form.city_id"
                   :loading="citiesLoading"
                   :disabled="!form.province_id"
                   :options="cities.map((c) => ({ value: c.id, label: c.name }))"
                   variant="merchant"
+                  required
                 />
                 <SelectField
-                  name="form.district_id"
+                  name="district_id"
                   label="Kecamatan"
                   v-model="form.district_id"
                   :loading="districtsLoading"
@@ -373,9 +252,10 @@
                     districts.map((d) => ({ value: d.id, label: d.name }))
                   "
                   variant="merchant"
+                  required
                 />
                 <SelectField
-                  name="form.village_id"
+                  name="village_id"
                   label="Desa/Kelurahan"
                   v-model="form.village_id"
                   :loading="villagesLoading"
@@ -384,13 +264,14 @@
                     villages.map((v) => ({ value: v.id, label: v.name }))
                   "
                   variant="merchant"
+                  required
                 />
               </div>
               <!-- Detail alamat -->
               <div class="mt-3">
                 <TextField
-                  name="form.address"
-                  textarea="true"
+                  name="address"
+                  :textarea="true"
                   v-model="form.address"
                   label="Alamat Lengkap"
                   placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
@@ -401,37 +282,37 @@
           </div>
 
           <!-- Jam Operasional -->
-          <div>
-            <h3 class="mb-3 text-base font-bold text-merchant-primary">
+          <div class="pt-4">
+            <h3 class="mb-4 text-xl font-bold text-merchant-primary">
               Jam Operasional
             </h3>
-            <div class="space-y-2">
+            <div class="space-y-3">
               <div
                 v-for="(day, index) in form.operationalHours"
                 :key="index"
                 class="overflow-hidden transition-all bg-gray-50 rounded-xl"
               >
                 <!-- Header row -->
-                <div class="flex items-center justify-between p-3">
-                  <div class="flex items-center gap-3">
+                <div class="flex items-center justify-between p-4">
+                  <div class="flex items-center gap-4">
                     <span
-                      class="px-3 py-1.5 rounded-lg text-xs font-semibold min-w-[75px] text-center transition-colors"
+                      class="px-4 py-2 rounded-lg text-sm font-semibold min-w-[100px] text-center transition-colors"
                       :class="
                         day.isOpen
                           ? 'bg-merchant-primary text-white'
                           : 'bg-gray-200 text-gray-500'
                       "
                     >
-                      {{ day.shortName }}
+                      {{ day.name }}
                     </span>
                     <div>
                       <span
                         v-if="day.isOpen"
-                        class="text-sm font-medium text-gray-700"
+                        class="text-base font-medium text-gray-700"
                       >
-                        {{ day.open || "06:00" }} - {{ day.close || "18:00" }}
+                        {{ day.open || "06:00" }} — {{ day.close || "18:00" }}
                       </span>
-                      <span v-else class="text-sm font-medium text-gray-400">
+                      <span v-else class="text-base font-medium text-gray-400">
                         Tutup
                       </span>
                     </div>
@@ -447,46 +328,43 @@
                       @change="onDayToggle(index)"
                     />
                     <div
-                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
+                      class="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-merchant-primary"
                     ></div>
                   </label>
                 </div>
 
                 <!-- Inline time inputs (shown when open) -->
-                <div v-if="day.isOpen" class="px-3 pb-3">
-                  <div class="flex items-center gap-2">
+                <div v-if="day.isOpen" class="px-4 pb-4">
+                  <div class="flex items-center gap-3">
                     <div class="flex-1">
                       <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Buka</label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Buka</label
                       >
                       <input
                         type="time"
-                        :value="day.open || '06:00'"
-                        @input="
-                          day.open = $event.target.value;
-                          updateDayHours(index);
-                        "
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        v-model="day.open"
+                        class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
+                        :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
                     </div>
-                    <span class="mt-5 text-xs text-gray-400">—</span>
+                    <span class="mt-6 text-sm text-gray-400">—</span>
                     <div class="flex-1">
                       <label
-                        class="block mb-1 text-[10px] font-medium text-gray-500"
-                        >Tutup</label
+                        class="block mb-1.5 text-xs font-medium text-gray-500"
+                        >Jam Tutup</label
                       >
                       <input
                         type="time"
-                        :value="day.close || '18:00'"
-                        @input="
-                          day.close = $event.target.value;
-                          updateDayHours(index);
-                        "
-                        class="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        v-model="day.close"
+                        class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
+                        :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
                     </div>
                   </div>
+                  <p v-if="day.open && day.close && day.close <= day.open" class="mt-2 text-xs font-medium text-red-500">
+                    Jam tutup harus setelah jam buka.
+                  </p>
                 </div>
               </div>
             </div>
@@ -495,7 +373,7 @@
 
         <!-- Desktop: Original Layout -->
         <div
-          class="hidden p-6 mb-4 space-y-8 bg-white shadow-sm sm:block rounded-xl"
+          class="hidden p-6  mb-4 space-y-8 bg-white shadow-sm sm:block rounded-xl"
         >
           <h2 class="text-2xl font-bold text-merchant-primary">
             Informasi UMKM
@@ -507,48 +385,44 @@
           >
             <!-- Nama UMKM -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Nama UMKM
-              </label>
-              <input
+              <TextField
+                name="name"
                 v-model="form.name"
-                type="text"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Nama UMKM"
                 placeholder="Masukkan nama UMKM"
+                variant="merchant"
+                              required
+
               />
             </div>
 
             <!-- Kontak -->
             <div>
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Kontak
-              </label>
-              <input
+              <TextField
+                name="contact"
                 v-model="form.contact"
                 type="tel"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                label="Kontak"
                 placeholder="Masukkan nomor kontak"
+                variant="merchant"
+                              required
+
               />
             </div>
 
             <!-- Tentang - Full Width -->
             <div class="md:col-span-2">
-              <label
-                class="block mb-2 text-base font-medium text-merchant-primary"
-              >
-                Tentang
-              </label>
-              <textarea
+              <TextField
+                name="description"
                 v-model="form.description"
-                rows="4"
-                class="w-full p-4 text-base text-gray-700 transition-shadow bg-gray-100 resize-none rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary"
+                :textarea="true"
+                :rows="4"
+                label="Tentang"
                 placeholder="Ceritakan tentang UMKM Anda..."
-              ></textarea>
+                variant="merchant"
+              />
             </div>
+
 
             <!-- Lokasi - Full Width -->
             <div class="md:col-span-2">
@@ -560,9 +434,14 @@
 
               <!-- Map Picker (Langsung di halaman, bukan modal) -->
               <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+                </div>
                 <MapPicker
+                  ref="mapRefDesktop"
                   v-model:lat="latitude"
                   v-model:lng="longitude"
+                  @manual-change="handleManualLocationChange"
                   :zoom="15"
                   height="320px"
                   variant="merchant"
@@ -573,7 +452,7 @@
               <div class="pt-4 mb-4">
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <SelectField
-                    name="form.province_id"
+                    name="province_id"
                     label="Provinsi"
                     v-model="form.province_id"
                     :loading="provincesLoading"
@@ -585,7 +464,7 @@
                   />
 
                   <SelectField
-                    name="form.city_id"
+                    name="city_id"
                     label="Kabupaten/Kota"
                     v-model="form.city_id"
                     :loading="citiesLoading"
@@ -598,7 +477,7 @@
                   />
 
                   <SelectField
-                    name="form.district_id"
+                    name="district_id"
                     label="Kecamatan"
                     v-model="form.district_id"
                     :loading="districtsLoading"
@@ -611,7 +490,7 @@
                   />
 
                   <SelectField
-                    name="form.village_id"
+                    name="village_id"
                     label="Desa/Kelurahan"
                     v-model="form.village_id"
                     :loading="villagesLoading"
@@ -626,8 +505,8 @@
 
                 <div class="mt-3">
                   <TextField
-                    name="form.address"
-                    textarea="true"
+                    name="address"
+                    :textarea="true"
                     v-model="form.address"
                     label="Alamat Lengkap (Opsional)"
                     placeholder="Contoh: Jl. Sudirman No. 123, RT 02/RW 05"
@@ -700,12 +579,9 @@
                       >
                       <input
                         type="time"
-                        :value="day.open || '06:00'"
-                        @input="
-                          day.open = $event.target.value;
-                          updateDayHours(index);
-                        "
-                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        v-model="day.open"
+                        class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
+                        :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
                     </div>
                     <span class="mt-6 text-sm text-gray-400">—</span>
@@ -716,15 +592,15 @@
                       >
                       <input
                         type="time"
-                        :value="day.close || '18:00'"
-                        @input="
-                          day.close = $event.target.value;
-                          updateDayHours(index);
-                        "
-                        class="w-full px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
+                        v-model="day.close"
+                        class="w-full px-4 py-2.5 text-sm bg-white border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent"
+                        :class="day.open && day.close && day.close <= day.open ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-merchant-primary'"
                       />
                     </div>
                   </div>
+                  <p v-if="day.open && day.close && day.close <= day.open" class="mt-2 text-xs font-medium text-red-500">
+                    Jam tutup harus setelah jam buka.
+                  </p>
                 </div>
               </div>
             </div>
@@ -733,23 +609,29 @@
 
         <!-- Desktop Save Button -->
         <div class="justify-end hidden mt-6 sm:flex">
-          <AppButton @click="handleSave" :loading="isSaving" variant="merchant">
+          <AppButton type="submit" :loading="isSaving" variant="merchant">
             Simpan
           </AppButton>
         </div>
+        
+        <!-- Hidden submit for mobile fallback -->
+        <button ref="hiddenSubmitBtn" type="submit" class="hidden"></button>
 
         <!-- Mobile Action Button - Fixed at Bottom -->
         <div
-          class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
+          class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <button
-            @click="handleSave"
-            class="w-full py-3 text-sm font-semibold text-center text-white transition-opacity bg-merchant-primary rounded-xl hover:opacity-90"
+          <AppButton 
+            type="button" 
+            @click="triggerSubmit"
+            :loading="isSaving" 
+            variant="merchant"
+            block
           >
             Simpan
-          </button>
+          </AppButton>
         </div>
-      </div>
+      </Form>
     </div>
 
     <input
@@ -767,13 +649,24 @@
       class="hidden"
       @change="onLogoSelected"
     />
+    
+    <ImageCropperModal
+      :show="showCropper"
+      :image-url="cropperImageUrl"
+      :aspect-ratio="cropperAspectRatio"
+      :title="cropperTitle"
+      @close="showCropper = false"
+      @crop="handleCrop"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, nextTick } from "vue";
+import { compressImage } from "@/utils/imageCompressor";
 import { useRouter, useRoute } from "vue-router";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { onMounted, watch } from "vue";
 import { useMerchants } from "@/composables/useMerchants";
 import { useAuthStore } from "@/stores/auth";
@@ -786,10 +679,21 @@ import {
 import TextField from "@/components/forms/TextField.vue";
 import SelectField from "@/components/forms/SelectField.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
+import * as yup from "yup";
+import { Form } from "vee-validate";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
+import ImageCropperModal from "@/components/common/ImageCropperModal.vue";
 
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+const showCropper = ref(false);
+const cropperImageUrl = ref("");
+const cropperType = ref(""); // 'cover' or 'logo'
+const cropperAspectRatio = ref(1);
+const cropperTitle = ref("");
 
 const isDev = import.meta.env.DEV;
 const router = useRouter();
@@ -820,6 +724,13 @@ const breadcrumbItems = computed(() => [
   },
 ]);
 
+const initialData = ref({
+  logo_url: null,
+  logo_urls: null,
+  banner_url: null,
+  banner_urls: null,
+});
+
 const form = ref({
   name: "",
   contact: "",
@@ -831,6 +742,7 @@ const form = ref({
   district_id: null,
   province_id: null,
   village_id: null,
+  NPWP: "",
   operationalHours: [
     {
       key: "monday",
@@ -897,6 +809,36 @@ const latitude = ref(null);
 const longitude = ref(null);
 const coverInput = ref(null);
 const logoInput = ref(null);
+const hiddenSubmitBtn = ref(null);
+
+const triggerSubmit = () => {
+  if (hiddenSubmitBtn.value) {
+    hiddenSubmitBtn.value.click();
+  }
+};
+
+const { isSyncing, syncMapToAddress, syncAddressToMap } = useAddressMapSync();
+const mapRefMobile = ref(null);
+const mapRefDesktop = ref(null);
+const isPrefilling = ref(false);
+
+const handleManualLocationChange = async ({ lat, lng }) => {
+  isPrefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => { form.value.province_id = id; },
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => { form.value.city_id = id; },
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => { form.value.district_id = id; },
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => { form.value.village_id = id; },
+    });
+  } finally {
+    isPrefilling.value = false;
+  }
+};
 
 const hasFormLogo = computed(() => {
   const val = form.value?.logo;
@@ -928,9 +870,11 @@ const cities = ref([]);
 const districts = ref([]);
 const villages = ref([]);
 
+
 watch(
   () => form.value.province_id,
   async (pid) => {
+    if (isPrefilling.value) return;
     form.value.city_id = null;
     form.value.district_id = null;
     form.value.village_id = null;
@@ -948,6 +892,7 @@ watch(
 watch(
   () => form.value.city_id,
   async (cid) => {
+    if (isPrefilling.value) return;
     form.value.district_id = null;
     form.value.village_id = null;
 
@@ -963,6 +908,7 @@ watch(
 watch(
   () => form.value.district_id,
   async (did) => {
+    if (isPrefilling.value) return;
     form.value.village_id = null;
     villages.value = [];
 
@@ -970,6 +916,28 @@ watch(
       await loadVillages(did);
     }
   },
+);
+
+watch(
+  () => form.value.village_id,
+  (val) => {
+    if (isPrefilling.value) return;
+    if (val) {
+      const provName = provinces.value.find((p) => p.id == form.value.province_id)?.name;
+      const cityName = cities.value.find((c) => c.id == form.value.city_id)?.name;
+      const distName = districts.value.find((d) => d.id == form.value.district_id)?.name;
+      const villName = villages.value.find((v) => v.id == val)?.name;
+
+      const combinedRef = {
+        panTo: (lat, lng, zoom) => {
+          if (mapRefMobile.value) mapRefMobile.value.panTo(lat, lng, zoom);
+          if (mapRefDesktop.value) mapRefDesktop.value.panTo(lat, lng, zoom);
+        }
+      };
+
+      syncAddressToMap([villName, distName, cityName, provName], combinedRef);
+    }
+  }
 );
 
 // Ambil data wilayah dari service
@@ -1065,6 +1033,7 @@ onMounted(async () => {
   // Kalau edit data lama (prefill)
 
   try {
+    isPrefilling.value = true;
     if (!merchantSlug.value) {
       toast.error("Merchant tidak valid");
       router.push("/merchant-register");
@@ -1073,8 +1042,11 @@ onMounted(async () => {
 
     const data = await fetchMerchantProfile(merchantSlug.value);
 
-    latitude.value = data?.primary_address?.latitude ?? null;
-    longitude.value = data?.primary_address?.longitude ?? null;
+    const latRaw = data?.primary_address?.latitude ?? data?.latitude ?? null;
+    const lngRaw = data?.primary_address?.longitude ?? data?.longitude ?? null;
+
+    latitude.value = latRaw !== null && latRaw !== undefined ? Number(latRaw) : null;
+    longitude.value = lngRaw !== null && lngRaw !== undefined ? Number(lngRaw) : null;
 
     form.value.name = data?.name ?? "";
     form.value.contact = data?.phone ?? "";
@@ -1097,6 +1069,8 @@ onMounted(async () => {
     }
     form.value.village_id = data?.primary_address?.village_id ?? null;
 
+    form.value.NPWP = data?.NPWP ?? "";
+
     form.value.logo =
       typeof data?.logo_url === "string" && data.logo_url.trim()
         ? data.logo_url
@@ -1106,6 +1080,13 @@ onMounted(async () => {
       typeof data?.banner_url === "string" && data.banner_url.trim()
         ? data.banner_url
         : "";
+
+    initialData.value = {
+      logo_url: form.value.logo,
+      logo_urls: data?.logo_urls || null,
+      banner_url: form.value.coverImage,
+      banner_urls: data?.banner_urls || null,
+    };
 
     const hours = data?.operational_hours ?? {};
 
@@ -1135,6 +1116,10 @@ onMounted(async () => {
     isLoading.value = false;
   } catch (error) {
     isLoading.value = false;
+  } finally {
+    nextTick(() => {
+      isPrefilling.value = false;
+    });
   }
 });
 
@@ -1148,12 +1133,16 @@ const onCoverSelected = (e) => {
     return;
   }
 
-  form.value.coverFile = file;
-  form.value.coverImage = URL.createObjectURL(file);
-
-  if (isDev) {
-    console.log("Cover file:", file);
-  }
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    cropperImageUrl.value = event.target.result;
+    cropperType.value = "cover";
+    cropperAspectRatio.value = 4 / 1;
+    cropperTitle.value = "Sesuaikan Cover UMKM";
+    showCropper.value = true;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
 };
 
 const onLogoSelected = (e) => {
@@ -1166,11 +1155,37 @@ const onLogoSelected = (e) => {
     return;
   }
 
-  form.value.logoFile = file;
-  form.value.logo = URL.createObjectURL(file);
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    cropperImageUrl.value = event.target.result;
+    cropperType.value = "logo";
+    cropperAspectRatio.value = 1;
+    cropperTitle.value = "Sesuaikan Logo UMKM";
+    showCropper.value = true;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = "";
+};
 
-  if (isDev) {
-    console.log("Logo file:", file);
+const handleCrop = async (croppedFile) => {
+  showCropper.value = false;
+  try {
+    const compressedFile = await compressImage(croppedFile, 1920);
+    if (cropperType.value === "cover") {
+      form.value.coverFile = compressedFile;
+      form.value.coverImage = URL.createObjectURL(compressedFile);
+    } else if (cropperType.value === "logo") {
+      form.value.logoFile = compressedFile;
+      form.value.logo = URL.createObjectURL(compressedFile);
+    }
+  } catch (err) {
+    if (cropperType.value === "cover") {
+      form.value.coverFile = croppedFile;
+      form.value.coverImage = URL.createObjectURL(croppedFile);
+    } else if (cropperType.value === "logo") {
+      form.value.logoFile = croppedFile;
+      form.value.logo = URL.createObjectURL(croppedFile);
+    }
   }
 };
 
@@ -1184,15 +1199,30 @@ const handleUploadLogo = () => {
 
 const onDayToggle = (index) => {
   const day = form.value.operationalHours[index];
-  if (day.isOpen && !day.open) {
-    day.open = "06:00";
-    day.close = "18:00";
+  if (!day) return;
+
+  if (day.isOpen) {
+    day.open = day.open || "06:00";
+    day.close = day.close || "18:00";
+    day.hours = `[${day.open} - ${day.close}]`;
+  } else {
+    day.open = null;
+    day.close = null;
+    day.hours = "Tutup";
   }
 };
 
 const updateDayHours = (index) => {
-  // No-op — time inputs directly mutate day.open / day.close via @input
-  // Kept as hook for future validation if needed
+  const day = form.value.operationalHours[index];
+  if (!day) return;
+
+  const open = day.open || "06:00";
+  const close = day.close || "18:00";
+
+  day.open = open;
+  day.close = close;
+  day.isOpen = true;
+  day.hours = `[${open} - ${close}]`;
 };
 
 const buildOperationalHoursPayload = () => {
@@ -1213,7 +1243,36 @@ const buildOperationalHoursPayload = () => {
   return result;
 };
 
+const editProfileSchema = yup.object().shape({
+  name: yup.string().required("Nama UMKM wajib diisi"),
+  contact: yup.string().required("Kontak wajib diisi"),
+  NPWP: yup.string().nullable(),
+});
+
+const getOperationalHoursErrors = () => {
+  const errors = [];
+  form.value.operationalHours.forEach((day) => {
+    if (day.isOpen) {
+      const open = day.open || "06:00";
+      const close = day.close || "18:00";
+      if (close <= open) {
+        errors.push({
+          day: day.name,
+          message: `Jam tutup untuk hari ${day.name} harus setelah jam buka.`,
+        });
+      }
+    }
+  });
+  return errors;
+};
+
 const handleSave = async () => {
+  const timeErrors = getOperationalHoursErrors();
+  if (timeErrors.length > 0) {
+    toast.error(timeErrors[0].message);
+    return;
+  }
+
   if (isDev) {
     console.log("Saving changes...", form.value);
   }
@@ -1231,6 +1290,9 @@ const handleSave = async () => {
     fd.append("name", form.value.name || "");
     fd.append("phone", form.value.contact || "");
     fd.append("description", form.value.description || "");
+
+    // Tax info
+    fd.append("NPWP", form.value.NPWP || "");
 
     // Address - only append if value exists (don't send empty strings for integers)
     if (form.value.province_id) {
@@ -1271,6 +1333,13 @@ const handleSave = async () => {
     }
 
     await updateMerchantProfile(merchantSlug.value, fd);
+
+    
+    // Redirect only on success
+    const targetSlug = merchantSlug.value ?? authStore.merchantSlug;
+    router.push(
+      targetSlug ? `/merchant-center/${targetSlug}/profile` : "/merchant-profile",
+    );
   } catch (error) {
     if (isDev) {
       console.error("Error updating merchant profile:", error);
@@ -1289,11 +1358,6 @@ const handleSave = async () => {
   } finally {
     isSaving.value = false;
   }
-
-  const targetSlug = merchantSlug.value ?? authStore.merchantSlug;
-  router.push(
-    targetSlug ? `/merchant-center/${targetSlug}/profile` : "/merchant-profile",
-  );
 };
 </script>
 

@@ -84,12 +84,32 @@ watch(
   { immediate: true },
 );
 
-// ✅ Menu items dengan dynamic merchantId
+// ✅ Menu items berdasarkan tipe merchant
 const menuItems = computed(() => {
   const segmentationId = Number(currentMerchant.value?.segmentation?.id);
+  const isJasaMerchant = segmentationId === 3;
 
-  const productOrServiceItem =
-    segmentationId === 3
+  return [
+    {
+      label: "Dashboard",
+      icon: "pi-chart-bar",
+      route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
+    },
+
+    {
+      label: "Pesanan Masuk",
+      icon: "pi-shopping-bag",
+      route: `/merchant-center/${currentMerchantSlug.value}/orders`,
+    },
+    // 📊 Laporan — semua merchant
+    {
+      label: "Laporan",
+      icon: "pi-file",
+      route: `/merchant-center/${currentMerchantSlug.value}/reports`,
+    },
+
+    // 📦 Produk / Jasa
+    isJasaMerchant
       ? {
           label: "Jasa",
           icon: "pi-briefcase",
@@ -99,41 +119,16 @@ const menuItems = computed(() => {
           label: "Produk",
           icon: "pi-box",
           route: `/merchant-center/${currentMerchantSlug.value}/products`,
-        };
+        },
 
-  return [
-    {
-      label: "Dashboard",
-      icon: "pi-chart-bar",
-      route: `/merchant-center/${currentMerchantSlug.value}/dashboard`,
-    },
-    // {
-    //   label: "Pesanan",
-    //   icon: "pi-shopping-bag",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/orders`,
-    // },
-
-    productOrServiceItem,
-    // {
-    //   label: "Komunitas",
-    //   icon: "pi-comments",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/community`,
-    // },
+    // 🎫 Voucher — semua merchant
     {
       label: "Voucher",
       icon: "pi-tag",
       route: `/merchant-center/${currentMerchantSlug.value}/vouchers`,
     },
-    // {
-    //   label: "Review & Ulasan",
-    //   icon: "pi-star",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/reviews`,
-    // },
-    // {
-    //   label: "Chat dengan Pembeli",
-    //   icon: "pi-comments",
-    //   route: `/merchant-center/${currentMerchantSlug.value}/chats`,
-    // },
+
+    // 📅 Events — semua merchant
     {
       label: "Events",
       icon: "pi-calendar",
@@ -162,6 +157,12 @@ const closeSidebar = () => {
 };
 
 const navigateTo = (routePath) => {
+  // Guard: jangan navigasi jika routePath tidak valid
+  if (!routePath || typeof routePath !== 'string') return;
+  // Guard: jika route untuk merchant tapi slug kosong, abort
+  if (routePath.includes('/merchant-center/') && !currentMerchantSlug.value) {
+    return;
+  }
   router.push(routePath);
   if (window.innerWidth < 1024) {
     closeSidebar();
@@ -202,7 +203,7 @@ defineExpose({
       <div
         v-if="isOpen"
         @click="closeSidebar"
-        class="fixed inset-0 z-40 bg-black/50 sm:hidden"
+        class="fixed inset-0 z-40 bg-black/50 lg:hidden"
       ></div>
     </transition>
 
@@ -211,29 +212,28 @@ defineExpose({
       :class="[
         'fixed top-0 left-0 h-full bg-white shadow-sm z-40 transition-all duration-300 flex flex-col',
         isOpen ? 'translate-x-0' : '-translate-x-full',
-        'sm:translate-x-0',
-        isOpen ? 'w-64' : 'w-64 sm:w-16',
+        'lg:translate-x-0',
+        isOpen ? 'w-64' : 'w-64 lg:w-16',
       ]"
     >
       <!-- Header -->
       <div
         :class="[
-          'flex items-center  h-23 ',
+          'flex items-center h-24',
           isOpen
             ? 'justify-between px-4'
-            : 'justify-between px-4 sm:justify-center ',
+            : 'justify-between px-4 lg:justify-center',
         ]"
       >
         <router-link to="/">
           <img
             :src="LogoWithText"
             alt="SUMILIR"
-            class=""
             :class="[
-              '',
+              'h-8 transition-all duration-300',
               isOpen
-                ? 'ms-3 opacity-100 h-8'
-                : 'sm:opacity-0 sm:h-0 sm:ms-0 ms-3 h-8',
+                ? 'ms-3 opacity-100'
+                : 'lg:opacity-0 lg:h-0 lg:ms-0 ms-3',
             ]"
           />
         </router-link>
@@ -262,7 +262,7 @@ defineExpose({
                 'w-full flex items-center rounded-lg text-sm font-medium transition-all',
                 isOpen
                   ? 'px-4 py-3 gap-3'
-                  : 'px-4 py-3 gap-3 sm:px-3 sm:justify-center sm:gap-0',
+                  : 'px-4 py-3 gap-3 lg:px-3 lg:justify-center lg:gap-0',
                 isActive(item.route)
                   ? 'bg-merchant-primary/10 text-merchant-primary'
                   : 'text-gray-700 hover:bg-gray-50',
@@ -283,7 +283,7 @@ defineExpose({
                   'transition-all duration-300',
                   isOpen
                     ? 'opacity-100 w-auto'
-                    : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden sm:hidden',
+                    : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden lg:hidden',
                 ]"
               >
                 {{ item.label }}
@@ -295,47 +295,6 @@ defineExpose({
 
       <!-- Footer -->
       <div class="p-3 space-y-2 border-t border-gray-200">
-        <!-- Notification -->
-        <!-- <button
-          :class="[
-            'w-full flex items-center rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition',
-            isOpen
-              ? 'justify-between px-4 py-3'
-              : 'justify-between px-4 py-3 sm:justify-center sm:px-3 sm:relative',
-          ]"
-          :title="!isOpen ? 'Notifikasi' : ''"
-        >
-          <div
-            :class="[
-              'flex items-center',
-              isOpen ? 'gap-3' : 'gap-3 sm:gap-0 sm:relative',
-            ]"
-          >
-            <i class="flex-shrink-0 text-lg text-gray-600 pi pi-bell"></i>
-            <span
-              :class="[
-                'transition-all duration-300',
-                isOpen
-                  ? 'opacity-100 w-auto'
-                  : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
-              ]"
-            >
-              Notifikasi
-            </span>
-          </div>
-          <span
-            v-if="notificationCount > 0"
-            :class="[
-              'bg-merchant-primary text-white text-xs font-bold rounded-full text-center transition-all duration-300',
-              isOpen
-                ? 'px-2 py-0.5 min-w-6'
-                : 'px-2 py-0.5 min-w-6 sm:absolute sm:-top-1 sm:-right-1 sm:w-5 sm:h-5 sm:p-0 sm:flex sm:items-center sm:justify-center',
-            ]"
-          >
-            {{ notificationCount }}
-          </span>
-        </button> -->
-
         <!-- Logout -->
         <button
           @click="logout"
@@ -343,7 +302,7 @@ defineExpose({
             'w-full flex items-center rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition',
             isOpen
               ? 'px-4 py-3 gap-3'
-              : 'px-4 py-3 gap-3 sm:justify-center sm:px-3 sm:gap-0',
+              : 'px-4 py-3 gap-3 lg:justify-center lg:px-3 lg:gap-0',
           ]"
           :title="!isOpen ? 'Log Out' : ''"
         >
@@ -353,14 +312,14 @@ defineExpose({
               'transition-all duration-300',
               isOpen
                 ? 'opacity-100 w-auto'
-                : 'opacity-100 w-auto sm:opacity-0 sm:w-0 sm:overflow-hidden',
+                : 'opacity-100 w-auto lg:opacity-0 lg:w-0 lg:overflow-hidden',
             ]"
           >
             Log Out
           </span>
         </button>
 
-        <!-- ✅ Profile Card - Display current merchant based on route -->
+        <!-- Profile Card -->
         <div v-if="isOpen" class="mt-2 overflow-hidden rounded-xl">
           <!-- Merchant info header -->
           <div
@@ -393,7 +352,7 @@ defineExpose({
                 <i class="text-sm pi pi-user"></i>
               </button>
 
-              <!-- Switcher toggle (only show if multiple merchants) -->
+              <!-- Switcher toggle -->
               <button
                 v-if="showMerchantSelector"
                 @click="showMerchantSwitcher = !showMerchantSwitcher"
@@ -439,7 +398,6 @@ defineExpose({
                     : '',
                 ]"
               >
-                <!-- Avatar -->
                 <div
                   :class="[
                     'flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-sm font-bold text-white',
@@ -467,7 +425,6 @@ defineExpose({
                   </p>
                 </div>
 
-                <!-- Status dot -->
                 <span
                   :class="[
                     'w-2 h-2 rounded-full shrink-0',
@@ -476,7 +433,6 @@ defineExpose({
                   :title="merchant.status"
                 ></span>
 
-                <!-- Active check -->
                 <i
                   v-if="merchant.slug === currentMerchantSlug"
                   class="text-xs pi pi-check text-merchant-primary shrink-0"
@@ -486,8 +442,8 @@ defineExpose({
           </transition>
         </div>
 
-        <!-- Collapsed State -->
-        <div v-else class="flex-col items-center hidden gap-1 sm:flex">
+        <!-- Collapsed State (Profile only icon) -->
+        <div v-if="!isOpen" class="flex flex-col items-center gap-1">
           <button
             @click="
               navigateTo(`/merchant-center/${currentMerchantSlug}/profile`)
@@ -500,7 +456,7 @@ defineExpose({
             </span>
           </button>
 
-          <!-- Collapsed switcher: show dots if multiple merchants -->
+          <!-- Show dots if multiple merchants -->
           <div v-if="showMerchantSelector" class="flex gap-1">
             <span
               v-for="m in allMerchants.slice(0, 4)"
@@ -520,8 +476,8 @@ defineExpose({
     <!-- Main Content Area -->
     <div
       :class="[
-        'flex-1 w-full min-h-screen overflow-x-hidden transition-all duration-300',
-        !isOpen ? 'sm:ml-16' : 'sm:ml-64',
+        'flex-1 min-w-0 min-h-screen transition-all duration-300',
+        !isOpen ? 'lg:ml-16' : 'lg:ml-64',
       ]"
     >
       <router-view :key="$route.fullPath" v-slot="{ Component }">

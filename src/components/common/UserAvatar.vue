@@ -44,8 +44,11 @@ const hasProfilePicture = computed(() => {
 });
 
 const profileUrl = computed(() => {
+  if (props.user?.profile_picture_urls?.thumb) {
+    return props.user.profile_picture_urls.thumb;
+  }
   if (props.user?.profile_picture && typeof props.user.profile_picture === 'string' && props.user.profile_picture.startsWith('http')) {
-    return props.user.profile_picture;
+    return props.user.profile_picture + '&size=thumb';
   }
   return getUserProfileUrl(props.user);
 });

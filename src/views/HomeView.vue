@@ -1,9 +1,56 @@
 <template>
   <div class="min-h-screen">
+    <!-- Mobile Sticky Search -->
+    <transition
+      enter-active-class="transition-all ease-out duration-250"
+      enter-from-class="-translate-y-full opacity-0"
+      enter-to-class="translate-y-0 opacity-100"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-from-class="translate-y-0 opacity-100"
+      leave-to-class="-translate-y-full opacity-0"
+    >
+      <div
+        class="sticky top-0 z-50 bg-white border-b border-gray-200 sm:hidden"
+      >
+        <div
+          v-if="showMobileStickySearch"
+          class="flex items-center gap-2 px-3 py-3"
+          @focusin="stickySearchFocused = true"
+          @focusout="stickySearchFocused = false"
+        >
+          <!-- SEARCH INPUT -->
+          <form @submit.prevent="submitMobileSearch" class="flex-1">
+            <div class="relative">
+              <TextField
+                :modelValue="mobileSearchQuery"
+                @update:modelValue="(v) => (mobileSearchQuery = v)"
+                name="mobileSearch"
+                placeholder="Cari produk atau UMKM…"
+                variant="primary"
+              />
+            </div>
+          </form>
+          <button
+            v-if="!isAdmin"
+            @click="goToCart"
+            class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
+          >
+            <i class="text-lg pi pi-shopping-cart"></i>
+
+            <span
+              v-if="cartCount > 0"
+              class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+            >
+              {{ cartCount > 9 ? "9+" : cartCount }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </transition>
     <!-- HERO (banner + search bar) - disamakan dengan Home.vue -->
     <section id="hero" class="relative">
       <div
-        class="relative w-full overflow-hidden bg-gray-100 aspect-3/1 sm:aspect-21/9 lg:aspect-24/9 xl:aspect-4/1"
+        class="relative w-full overflow-hidden bg-gray-100 aspect-2.5/1 sm:aspect-21/9 lg:aspect-24/9 xl:aspect-4/1"
       >
         <!-- Loading skeleton -->
         <div
@@ -25,15 +72,17 @@
             :key="`${event.id}-${event.updated_at}`"
           >
             <div
-              class="relative w-full h-full group cursor-grab active:cursor-grabbing"
+              @click="goToEvent()"
+              class="relative w-full h-full cursor-pointer group"
             >
               <img
-                :key="`banner-${event.id}-${event.updated_at}`"
                 :src="getEventBannerUrl(event)"
-                :alt="event.event_name"
-                class="object-cover w-full h-full pointer-events-none select-none"
-                draggable="false"
-                @error="(e) => (e.target.src = '/placeholder-banner.png')"
+                class="absolute inset-0 object-cover w-full h-full scale-110 blur-xl opacity-60"
+                aria-hidden="true"
+              />
+              <img
+                :src="getEventBannerUrl(event)"
+                class="relative object-contain w-full h-full"
               />
             </div>
           </Slide>
@@ -53,13 +102,13 @@
 
       <!-- Search Bar Container -->
       <div
-        class="relative z-10 flex justify-center px-4 mx-auto mt-2 sm:-mt-10 max-w-7xl"
+        class="relative z-20 flex justify-center px-4 mx-auto -mt-6 sm:-mt-10 max-w-7xl"
       >
         <div class="w-full sm:w-[906px]">
           <div
-            class="overflow-hidden bg-white border border-gray-100 shadow-xl rounded-2xl"
+            class="overflow-hidden bg-white border border-gray-200 shadow-lg sm:rounded-2xl rounded-xl"
           >
-            <div class="p-4 border-b border-gray-100 sm:p-5">
+            <div class="p-3 sm:p-4">
               <Form @submit="onSearch">
                 <div class="flex items-center w-full gap-2 sm:gap-3">
                   <TextField
@@ -71,11 +120,12 @@
                     :hideLabel="true"
                     variant="primary"
                     wrapperClass="flex-1 min-w-0"
+                    customClass="!h-10 sm:!h-11"
                   />
                   <Button
                     type="submit"
                     variant="secondary"
-                    class="px-3 text-sm sm:text-base sm:px-4"
+                    class="px-3 text-sm sm:text-base sm:px-4 !h-10 sm:!h-11"
                   >
                     Search
                   </Button>
@@ -83,38 +133,16 @@
               </Form>
             </div>
 
-            <div class="p-4 sm:p-5">
-              <div class="grid grid-cols-4 gap-3 sm:gap-4">
-                <button
+            <div class="p-3 sm:p-4 pt-0 sm:pt-0">
+              <div class="grid grid-cols-4 gap-2 sm:gap-3">
+                <CategoryCard
                   v-for="nav in segmentNavigates"
                   :key="nav.label"
-                  type="button"
-                  class="flex flex-col items-center gap-2 p-3 transition bg-white border group rounded-xl"
-                  :class="
-                    activeMode === nav.mode
-                      ? 'border-secondary/40 bg-secondary/10'
-                      : 'border-transparent hover:border-secondary/30 hover:bg-secondary/20'
-                  "
+                  :label="nav.label"
+                  :icon="nav.icon"
+                  :active="activeMode === nav.mode"
                   @click="selectMode(nav.mode)"
-                >
-                  <div
-                    class="flex items-center justify-center w-12 h-12 transition rounded-lg sm:w-14 sm:h-14 group-hover:scale-105"
-                    :class="
-                      activeMode === nav.mode ? 'bg-secondary' : 'bg-primary'
-                    "
-                  >
-                    <img
-                      :src="nav.icon"
-                      :alt="nav.label"
-                      class="w-7 h-7 sm:w-8 sm:h-8"
-                    />
-                  </div>
-                  <span
-                    class="text-xs text-gray-700 sm:text-sm group-hover:text-secondary/70"
-                  >
-                    {{ nav.label }}
-                  </span>
-                </button>
+                />
               </div>
             </div>
           </div>
@@ -122,8 +150,369 @@
       </div>
     </section>
 
-    <!-- Content -->
-    <div class="p-4 mx-auto space-y-6 max-w-7xl">
+    
+    <!-- HOME CONTENT -->
+    <template v-if="!activeMode || activeMode === 'home'">
+      <!-- UMKM Section -->
+    <section id="umkm-recommendation" class="relative py-8">
+      <div class="px-4 mx-auto max-w-7xl sm:px-6">
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900 sm:text-3xl">
+              Temukan UMKM yang Kamu Butuhkan
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 sm:text-base">
+              Pilihan UMKM terbaik di Banyuanyar
+            </p>
+          </div>
+          <router-link to="?mode=umkm" class="hidden text-sm font-semibold sm:block text-primary hover:text-primary/80">
+            Lihat Semua
+          </router-link>
+        </div>
+
+        <!-- Skeleton Loading -->
+        <div
+          v-if="isLoadingMerchants"
+          class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-6"
+        >
+          <ProductCardSkeleton v-for="i in 10" :key="i" />
+        </div>
+
+        <!-- Merchants Grid -->
+        <div v-else-if="recommendedMerchants.length > 0">
+          <div
+            class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-6"
+          >
+            <MerchantCard
+              v-for="merchant in recommendedMerchants"
+              :key="merchant.id"
+              :merchant="merchant"
+            />
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="py-20 text-center">
+          <i class="mb-4 text-6xl text-gray-300 pi pi-shop"></i>
+          <p class="mb-2 text-lg font-semibold text-gray-700">
+            Belum ada UMKM terdaftar
+          </p>
+          <p class="text-gray-500">Coba lagi nanti</p>
+        </div>
+      </div>
+    </section>
+      <!-- MAP PREVIEW SECTION -->
+    <MapPreviewSection />
+      <!-- STATISTICS SECTION -->
+    <section class="relative py-12 bg-white sm:py-16">
+      <div class="relative px-4 mx-auto max-w-7xl sm:px-6">
+        <!-- Section Header -->
+        <div class="mb-8 text-center sm:mb-12">
+          <h3 class="mb-3 text-2xl font-bold text-gray-900 sm:text-3xl">
+            Berkembang Bersama UMKM Banyuanyar Lainnya
+          </h3>
+          <p class="text-sm text-gray-600 sm:text-base">
+            Ragam usaha dan layanan UMKM Banyuanyar kini terhimpun dalam satu
+            platform. Mulai dari kebutuhan harian hingga layanan lokal, semuanya
+            dapat diakses dengan lebih mudah, cepat, dan nyaman oleh masyarakat.
+          </p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div
+          class="grid grid-cols-1 gap-6 sm:flex sm:items-stretch sm:divide-x sm:divide-gray-200 sm:gap-0"
+        >
+          <!-- Total Merchants -->
+          <div
+            class="relative overflow-hidden transition-all duration-300 bg-white group sm:flex-1 sm:px-6 sm:py-6 rounded-2xl sm:rounded-none sm:first:rounded-l-2xl sm:last:rounded-r-2xl"
+            @mouseenter="replayMerchants++"
+          >
+            <div class="flex flex-col justify-center h-full p-6 sm:p-0">
+              <!-- Counter -->
+              <div
+                class="mb-2 text-4xl font-bold text-center text-gray-900 transition-all duration-300 sm:text-5xl hover:text-secondary"
+              >
+                <AnimatedCounter
+                  :value="statistics.total_merchants"
+                  suffix="+"
+                  :duration="1200"
+                  :replayKey="replayMerchants"
+                />
+              </div>
+
+              <!-- Label -->
+              <div
+                class="text-sm font-medium text-center text-gray-600 sm:text-base"
+              >
+                UMKM Terdaftar
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Products -->
+          <div
+            class="relative overflow-hidden transition-all duration-300 bg-white group sm:flex-1 sm:px-6 sm:py-6 rounded-2xl sm:rounded-none sm:first:rounded-l-2xl sm:last:rounded-r-2xl"
+            @mouseenter="replayProducts++"
+          >
+            <div class="flex flex-col justify-center h-full p-6 sm:p-0">
+              <!-- Counter -->
+              <div
+                class="mb-2 text-4xl font-bold text-center text-gray-900 transition-all duration-300 sm:text-5xl hover:text-secondary"
+              >
+                <AnimatedCounter
+                  :value="statistics.total_products"
+                  suffix="+"
+                  :duration="1200"
+                  :replayKey="replayProducts"
+                />
+              </div>
+
+              <!-- Label -->
+              <div
+                class="text-sm font-medium text-center text-gray-600 sm:text-base"
+              >
+                Produk & Jasa
+              </div>
+            </div>
+          </div>
+
+          <!-- Total Categories -->
+          <div
+            class="relative overflow-hidden transition-all duration-300 bg-white group sm:flex-1 sm:px-6 sm:py-6 rounded-2xl sm:rounded-none sm:first:rounded-l-2xl sm:last:rounded-r-2xl"
+            @mouseenter="replayCategories++"
+          >
+            <div class="flex flex-col justify-center h-full p-6 sm:p-0">
+              <!-- Counter -->
+              <div
+                class="mb-2 text-4xl font-bold text-center text-gray-900 transition-all duration-300 sm:text-5xl hover:text-secondary"
+              >
+                <AnimatedCounter
+                  :value="statistics.total_categories"
+                  suffix="+"
+                  :duration="1200"
+                  :replayKey="replayCategories"
+                />
+              </div>
+
+              <!-- Label -->
+              <div
+                class="text-sm font-medium text-center text-gray-600 sm:text-base"
+              >
+                Kategori
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+      <!-- Footer -->
+    <footer class="relative overflow-hidden text-white bg-primary">
+      <div class="absolute inset-0 pointer-events-none opacity-10">
+        <div
+          class="absolute rounded-full w-72 h-72 -top-32 -left-32 bg-white/30 blur-3xl"
+        ></div>
+        <div
+          class="absolute rounded-full w-96 h-96 -bottom-48 -right-40 bg-white/20 blur-3xl"
+        ></div>
+      </div>
+
+      <div class="relative px-4 mx-auto max-w-7xl sm:px-6">
+        <div class="grid gap-10 py-12 md:grid-cols-3 md:py-16">
+          <div>
+            <div class="flex items-center gap-3 mb-4">
+              <img :src="WhiteWithText" alt="SUMILIR" class="h-10" />
+            </div>
+
+            <p class="max-w-sm text-sm leading-relaxed text-white/80">
+              SUMILIR adalah platform digital yang mempertemukan UMKM Banyuanyar
+              dengan masyarakat, agar produk lokal lebih mudah ditemukan,
+              dipercaya, dan dibeli.
+            </p>
+
+            <div class="flex items-center gap-3 mt-6">
+              <img
+                :src="InfoteknoIcon"
+                alt="Infotekno"
+                class="flex items-center justify-center h-16 p-2 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Infotekno"
+              />
+              <img
+                :src="SekolahVokasiUNSIcon"
+                alt="Sekolah Vokasi UNS"
+                class="flex items-center justify-center h-16 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Sekolah Vokasi UNS"
+              />
+              <img
+                :src="PemkotSurakartaIcon"
+                alt="Pemkot Surakarta"
+                class="flex items-center justify-center h-16 p-2 transition-all duration-200 hover:bg-white/10 hover:scale-105"
+                title="Pemkot Surakarta"
+              />
+            </div>
+
+            <!-- <div class="flex items-center gap-3 mt-6">
+              <a
+                href="https://www.facebook.com/pages/Kantor-Kelurahan-Banyuanyar"
+                target="_blank"
+                class="flex items-center justify-center w-10 h-10 transition border rounded-full border-white/20 hover:border-white/40 hover:bg-white/10"
+                aria-label="Facebook"
+              >
+                <i class="text-lg pi pi-facebook"></i>
+              </a>
+
+              <a
+                href="https://www.instagram.com/explore/locations/251082119/kantor-kelurahan-banyuanyar"
+                target="_blank"
+                class="flex items-center justify-center w-10 h-10 transition border rounded-full border-white/20 hover:border-white/40 hover:bg-white/10"
+                aria-label="Instagram"
+              >
+                <i class="text-lg pi pi-instagram"></i>
+              </a>
+            </div>
+            <p class="mt-4 text-xs text-white/60">
+              Informasi & pembaruan kegiatan dapat diikuti melalui kanal resmi
+              di atas.
+            </p> -->
+          </div>
+
+          <div>
+            <h4 class="text-base font-semibold tracking-wide">Navigasi</h4>
+            <ul class="mt-4 space-y-3 text-sm">
+              <li>
+                <router-link
+                  to="/explore?mode=UMKM"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i> Semua
+                  UMKM
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/explore?mode=toko"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Produk Toko
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/explore?mode=kuliner"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Produk Kuliner
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/explore?mode=jasa"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i>
+                  Layanan Jasa
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/map"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i> Peta UMKM
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  to="/community"
+                  class="inline-flex items-center gap-2 transition text-white/80 hover:text-white"
+                >
+                  <i class="text-xs pi pi-angle-right opacity-80"></i> Komunitas
+                </router-link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-base font-semibold tracking-wide">Informasi</h4>
+
+            <div class="mt-4 space-y-4">
+              <div class="flex gap-3 text-sm text-white/80">
+                <i class="pi pi-map-marker mt-0.5 shrink-0 opacity-80"></i>
+                <a
+                  href="https://maps.google.com/?q=Jl.+Adi+Sumarmo+No.163,+Banyuanyar,+Kec.+Banjarsari,+Kota+Surakarta,+Jawa+Tengah+57137"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="transition hover:text-white"
+                >
+                  Kelurahan Banyuanyar, Surakarta, Jawa Tengah
+                  <span class="block mt-1 text-xs text-white/60">
+                    Jl. Adi Sumarmo No.163, Banyuanyar, Kec. Banjarsari, Kota
+                    Surakarta, Jawa Tengah 57137
+                  </span>
+                </a>
+              </div>
+              <div class="flex gap-3 text-sm text-white/80">
+                <i class="pi pi-phone mt-0.5 shrink-0 opacity-80"></i>
+                <p>
+                  <a
+                    href="tel:+62882003634666"
+                    class="transition hover:text-white"
+                  >
+                    0882-0036-34666 (Kelurahan Banyuanyar)
+                  </a>
+                  <br />
+                  <a
+                    href="tel:+6281931966044"
+                    class="transition hover:text-white"
+                  >
+                    0819-3196-6044 (Fasilitator Pemerintahan)
+                  </a>
+
+                  <!-- <span class="block mt-1 text-xs text-white/60">
+                  </span> -->
+                </p>
+              </div>
+              <div class="flex gap-3 text-sm text-white/80">
+                <i class="pi pi-envelope mt-0.5 shrink-0 opacity-80"></i>
+                <p>
+                  <a
+                    href="mailto:kelh.banyuanyar@gmail.com"
+                    class="transition hover:text-white"
+                  >
+                    kelh.banyuanyar@gmail.com
+                  </a>
+                  <!-- <span class="block mt-1 text-xs text-white/60">
+                  </span> -->
+                </p>
+              </div>
+
+              <div class="pt-2">
+                <router-link
+                  to="/merchant-register"
+                  class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-white rounded-xl text-primary hover:bg-white/90"
+                >
+                  <i class="text-xs pi pi-plus"></i>
+                  Daftarkan UMKM
+                </router-link>
+
+                <p class="mt-2 text-xs text-white/60">
+                  Ingin UMKM Anda tampil di SUMILIR? Ajukan melalui menu
+                  pendaftaran UMKM atau datang langsung ke Kantor Kelurahan
+                  Banyuanyar.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+    </template>
+
+    <!-- EXPLORE CONTENT -->
+    <template v-else>
+      <!-- Content -->
+    <div id="explore-content" class="p-4 mx-auto space-y-6 max-w-7xl">
       <!-- Pilih Kategori -->
       <section v-if="enableCategoryFilter && !isUmkmMode">
         <h2 class="mb-4 text-lg font-semibold">Pilih Kategori</h2>
@@ -203,12 +592,9 @@
       <!-- Rekomendasi -->
       <section>
         <div class="flex flex-col gap-3 mb-4">
-          <h2 class="text-lg font-semibold">
-            {{ sectionTitle }}
-          </h2>
 
           <!-- Sort chips (mirip SearchPage) -->
-          <div class="flex gap-2 overflow-x-auto no-scrollbar">
+          <div class="flex gap-2 overflow-x-auto no-scrollbar sm:pt-4">
             <button
               v-for="opt in filteredInstantSorts"
               :key="opt.key"
@@ -280,6 +666,25 @@
       </section>
     </div>
 
+    
+    </template>
+<!-- Floating Cart Button (Mobile only) -->
+    <button
+      v-if="isAuthenticated && !isAdmin && !showMobileStickySearch"
+      type="button"
+      @click="goToCart"
+      aria-label="Keranjang"
+      class="fixed z-40 flex items-center justify-center w-10 h-10 text-white transition-transform rounded-full shadow-lg sm:hidden top-3 right-3 bg-primary active:scale-95"
+    >
+      <i class="text-lg pi pi-shopping-cart" />
+      <span
+        v-if="cartCount > 0"
+        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger-foreground text-white text-[10px] font-bold flex items-center justify-center leading-none"
+      >
+        {{ cartCount > 99 ? "99+" : cartCount }}
+      </span>
+    </button>
+
     <!-- BACK TO TOP BUTTON -->
     <button
       v-show="showBackToTop"
@@ -304,6 +709,15 @@ import {
   watch,
   nextTick,
 } from "vue";
+
+import MapPreviewSection from "@/components/home/MapPreviewSection.vue";
+import AnimatedCounter from "@/components/common/AnimatedCounter.vue";
+import InfoteknoIcon from "@/assets/images/infotekno.png";
+import SekolahVokasiUNSIcon from "@/assets/images/LOGO SV BIRU.png";
+import PemkotSurakartaIcon from "@/assets/images/surakarta.png";
+import WhiteWithText from "@/assets/icons/White-with-Text.png";
+import { useHomeStatistics } from "@/composables/useHomeStatistics";
+
 import { Form } from "vee-validate";
 import { Carousel, Slide } from "vue3-carousel";
 import "vue3-carousel/dist/carousel.css";
@@ -313,12 +727,14 @@ import { useToast } from "vue-toastification";
 import { getImageUrl, getEventBannerUrl } from "@/libs/getImageUrl.js";
 import { usePublicEvents } from "@/composables/usePublicEvents";
 import { useRoute, useRouter } from "vue-router";
-import * as ProductService from "@/services/api/product";
-import { searchProducts, searchMerchants } from "@/services/api/search";
+import { useSearch } from "@/composables/useSearch";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
 
 import TextField from "@/components/forms/TextField.vue";
 import Button from "@/components/common/Button.vue";
 import ProductCard from "@/components/Card/ProductCard.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ProductCardSkeleton from "@/components/Card/ProductCardSkeleton.vue";
 import CategoryCard from "@/components/Card/CategoryCard.vue";
 import MerchantCard from "@/components/Card/MerchantCard.vue";
@@ -327,6 +743,7 @@ import jasaIcon from "@/assets/icons/Jasa.svg";
 import kulinerIcon from "@/assets/icons/Kuliner.svg";
 import tokoIcon from "@/assets/icons/Toko.svg";
 import merchantIcon from "@/assets/icons/merchant.svg";
+import { data } from "autoprefixer";
 
 // =========================
 // STATE
@@ -336,9 +753,49 @@ const toast = useToast();
 const route = useRoute();
 const router = useRouter();
 
+const authStore = useAuthStore();
+const cartStore = useCartStore();
+
+const isAuthenticated = computed(() => authStore.isAuthenticated);
+const isAdmin = computed(() => authStore.isAdmin);
+const cartCount = computed(() => cartStore.totalItems);
+
+// Mobile sticky search
+const mobileScrollY = ref(0);
+const mobileSearchQuery = ref("");
+const stickySearchFocused = ref(false);
+
+const showMobileStickySearch = computed(
+  () => mobileScrollY.value > 80 || stickySearchFocused.value,
+);
+
+function submitMobileSearch() {
+  const q = (mobileSearchQuery.value || "").trim();
+  if (!q) return;
+  router.push({ path: "/search", query: { q } });
+  mobileSearchQuery.value = "";
+}
+
+function goToCart() {
+  router.push("/cart");
+}
+
 // Nearest sorting needs user coordinates (reuse logic from SearchPage)
 const myLatitude = ref(null);
 const myLongitude = ref(null);
+
+const {
+  products,
+  jasas,
+  merchants,
+  productsMeta,
+  jasasMeta,
+  merchantsMeta,
+  loadingProducts,
+  loadingMerchants,
+  fetchProducts,
+  fetchMerchants,
+} = useSearch();
 
 // If user is not authenticated, /api/profile/address will 401.
 // Cache that fact so we don't keep hitting the endpoint.
@@ -349,15 +806,10 @@ let profileCoordsPromise = null;
 
 const searchInputRef = ref(null);
 const searchQuery = ref("");
-const jasaList = ref([]);
-const productList = ref([]);
-const merchantList = ref([]);
+
 const categories = ref([]);
 const loadingCategories = ref(true);
 const selectedCategoryId = ref(null);
-const loadingJasa = ref(false);
-const loadingProducts = ref(false);
-const loadingMerchants = ref(false);
 const showAllCategories = ref(false);
 
 // Infinite scroll state (mirip SearchPage.vue)
@@ -371,8 +823,36 @@ const isLoadMoreQueued = ref(false);
 
 // Back to top
 const showBackToTop = ref(false);
-// Mode halaman: umkm | jasa | toko | kuliner
-const activeMode = ref("umkm");
+// Mode halaman: umkm | jasa | toko | kuliner | home
+const activeMode = ref("");
+
+const replayMerchants = ref(0);
+const replayProducts = ref(0);
+const replayCategories = ref(0);
+
+const {
+  statistics,
+  loading: statsLoading,
+  fetchStatistics,
+} = useHomeStatistics();
+
+const isLoadingMerchants = ref(true);
+const recommendedMerchants = ref([]);
+const loadRecommendedMerchants = async () => {
+  isLoadingMerchants.value = true;
+  try {
+    const params = { limit: 10 };
+    const response = await api.get("/api/public/home/recommended-merchants", {
+      params,
+    });
+    recommendedMerchants.value = response.data.data || [];
+  } catch (error) {
+    console.error("Failed to load merchants:", error);
+  } finally {
+    isLoadingMerchants.value = false;
+  }
+};
+
 
 // ================= SORT (tanpa filter) =================
 // Product/Jasa: nearest, cheapest, expensive, latest, oldest
@@ -530,6 +1010,7 @@ async function ensureMyCoordinates({ allowDevice } = { allowDevice: true }) {
 }
 
 function handleScroll() {
+  mobileScrollY.value = window.scrollY;
   showBackToTop.value = window.scrollY > 300;
 
   // Fallback infinite scroll (kalau IntersectionObserver tidak terpanggil)
@@ -682,12 +1163,21 @@ const allowedModes = new Set(["umkm", "kuliner", "toko", "jasa"]);
 watch(
   () => route.query.mode,
   async (mode) => {
-    if (!mode) return;
+    if (!mode) { activeMode.value = ""; return; }
     const normalized = String(mode);
     if (!allowedModes.has(normalized)) return;
-    if (activeMode.value === normalized) return;
+    if (activeMode.value !== normalized) {
+      activeMode.value = normalized;
+    }
 
-    activeMode.value = normalized;
+    // Scroll ke section item saat navigasi mode
+    setTimeout(() => {
+      const el = document.getElementById("explore-content");
+      if (el) {
+        const y = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 100);
   },
   { immediate: true },
 );
@@ -740,8 +1230,31 @@ const modeToSegments = {
 };
 
 const selectMode = async (mode) => {
-  if (activeMode.value === mode) return;
-  activeMode.value = mode;
+  // Jika mode yang diklik sama dengan mode aktif saat ini (Unselect)
+  if (activeMode.value === mode) {
+    activeMode.value = "";
+    
+    // Hapus parameter 'mode' dari URL agar kembali bersih
+    const { mode: _, ...restQuery } = route.query;
+    router.replace({ query: restQuery });
+    
+    // Opsional: Gulir kembali ke atas (hero) jika unselect
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } 
+  // Jika memilih mode baru
+  else {
+    activeMode.value = mode;
+    router.replace({ query: { ...route.query, mode } });
+
+    // Scroll ke bagian bawah (section explore)
+    setTimeout(() => {
+      const el = document.getElementById("explore-content");
+      if (el) {
+        const y = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top: y, behavior: "smooth" });
+      }
+    }, 100);
+  }
 };
 
 // Selected category name
@@ -775,44 +1288,10 @@ function getJasaId(jasa) {
   return jasa?.jasa_id ?? jasa?.id;
 }
 
-// Filtered jasa list (hanya jasa yang layak tampil ke customer)
-const filteredJasaList = computed(() => {
-  // Jasa dari endpoint public search sudah semestinya "layak tampil".
-  // Jangan terlalu ketat filter client-side, karena beberapa payload tidak
-  // mengirim field `status` / `is_active` (contoh: hasil `/api/public/search`).
-  let result = (jasaList.value || []).filter((j) => {
-    const status = j?.status;
-    if (status === "draft" || status === "inactive") return false;
-    if (j?.is_active === false) return false;
-    return true;
-  });
+const filteredJasaList = computed(() => jasas.value || []);
 
-  // Filter by category
-  if (selectedCategoryId.value) {
-    result = result.filter(
-      (j) => j.jasa_category_id === selectedCategoryId.value,
-    );
-  }
-
-  return result || [];
-});
-
-const filteredProductList = computed(() => {
-  let result = productList.value || [];
-
-  // Filter by category (client-side fallback; server-side juga difetch dengan category_id)
-  if (selectedCategoryId.value) {
-    const cid = Number(selectedCategoryId.value);
-    result = result.filter((p) =>
-      Array.isArray(p?.categories)
-        ? p.categories.some((c) => Number(c?.id) === cid)
-        : false,
-    );
-  }
-
-  return result;
-});
-
+const filteredProductList = computed(() => products.value || []);
+const merchantList = computed(() => merchants.value || []);
 // Adapt jasa -> ProductCard shape (agar satu card bisa dipakai untuk jasa / product)
 const jasaToProductCard = (jasa) => {
   const fixed = Number(jasa?.fixed_price || 0);
@@ -839,6 +1318,9 @@ const jasaToProductCard = (jasa) => {
     // Fallback compatibility for any UI relying on min/max.
     min_price: price,
     max_price: price,
+    // Primary: cover_img (ProductCard now handles this)
+    cover_img: jasa?.cover_img || null,
+    // Fallback: cover_image (used by older code)
     cover_image: resolveJasaImage(jasa),
     merchant: merchantFromJasa,
   };
@@ -866,11 +1348,13 @@ const currentCardItems = computed(() => {
   return activeMode.value === "jasa" ? cardItems.value : productCardItems.value;
 });
 
+const isPageLoading = ref(true);
+
 const loadingItems = computed(() => {
+  if (isPageLoading.value) return true;
+  if (isLoadingMore.value) return false;
   if (activeMode.value === "umkm") return loadingMerchants.value;
-  return activeMode.value === "jasa"
-    ? loadingJasa.value
-    : loadingProducts.value;
+  return loadingProducts.value;
 });
 
 const isEmpty = computed(() => {
@@ -1020,12 +1504,14 @@ async function queueLoadMore() {
   if (isLoadMoreQueued.value) return;
 
   isLoadMoreQueued.value = true;
+  isLoadingMore.value = true;
   currentPage.value += 1;
 
   try {
     await loadMore();
   } finally {
     isLoadMoreQueued.value = false;
+    isLoadingMore.value = false;
   }
 }
 
@@ -1045,31 +1531,12 @@ async function loadMore() {
 }
 
 const fetchJasas = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingJasa.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
-      // explore jasa -> gunakan endpoint search supaya bisa nearest/price/date
+  await fetchProducts(
+    {
       q: undefined,
       segments: ["UMKM Jasa"],
       ...sortParams,
@@ -1077,85 +1544,31 @@ const fetchJasas = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
+  const current = Number(jasasMeta.value?.current_page ?? 1);
+  const last = Number(jasasMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    // Backward compatible parser:
-    // - legacy: { jasas, jasas_meta }
-    // - current ApiResponse: { data, meta: { jasas, jasas_meta } }
-    const rootJasas = Array.isArray(payload?.jasas) ? payload.jasas : [];
-    const metaJasas = Array.isArray(payload?.meta?.jasas)
-      ? payload.meta.jasas
-      : [];
-
-    const items = rootJasas.length > 0 ? rootJasas : metaJasas;
-
-    const meta = payload?.jasas_meta ??
-      payload?.meta?.jasas_meta ?? {
-        current_page: Number(payload?.meta?.current_page ?? 1),
-        last_page: Number(payload?.meta?.last_page ?? 1),
-      };
-    const mapped = items.map((j) => ({
-      ...j,
-      image: resolveJasaImage(j),
-    }));
-
-    if (append) {
-      jasaList.value.push(...mapped);
-    } else {
-      jasaList.value = mapped;
-    }
-
-    const current = Number(meta?.current_page ?? 1);
-    const last = Number(meta?.last_page ?? 1);
-    hasMore.value = current < last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data jasa:", e);
-    toast.error("Gagal memuat data layanan. Silakan coba lagi nanti.");
-    if (!append) {
-      jasaList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingJasa.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
 const fetchProductsByMode = async ({ append } = { append: false }) => {
   const segments = modeToSegments[activeMode.value];
   if (!segments) {
-    productList.value = [];
+    products.value = [];
     hasMore.value = false;
     return;
   }
 
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingProducts.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForProducts();
 
-    const sortParams = buildSortParamsForProducts();
-    const params = {
+  await fetchProducts(
+    {
       q: undefined,
       segments,
       ...sortParams,
@@ -1163,81 +1576,39 @@ const fetchProductsByMode = async ({ append } = { append: false }) => {
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    };
+    },
+    append,
+  );
 
-    const payload = await searchProducts(params);
-    const parsed = parseLaravelPaginator(payload);
+  const current = Number(productsMeta.value?.current_page ?? 1);
+  const last = Number(productsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
 
-    if (append) productList.value.push(...(parsed.items ?? []));
-    else productList.value = parsed.items ?? [];
-
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data produk:", e);
-    toast.error("Gagal memuat data produk. Silakan coba lagi nanti.");
-    if (!append) {
-      productList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingProducts.value = false;
-  }
+  await ensureSentinelObserved();
 };
 
-const fetchMerchants = async ({ append } = { append: false }) => {
-  if (append) {
-    if (isLoadingMore.value) return;
-    isLoadingMore.value = true;
-  } else {
-    loadingMerchants.value = true;
-  }
-  try {
-    await preloadProfileCoordinates();
+const fetchMerchantsExplore = async ({ append } = { append: false }) => {
+  await preloadProfileCoordinates();
 
-    if (
-      activeInstantSorts.value.includes("nearest") &&
-      !hasMyCoordinates.value
-    ) {
-      const ok = await ensureMyCoordinates({ allowDevice: true });
-      if (!ok) {
-        toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
-        );
-        return;
-      }
-    }
+  const sortParams = buildSortParamsForMerchants();
 
-    const sortParams = buildSortParamsForMerchants();
-    const res = await searchMerchants({
+  await fetchMerchants(
+    {
       q: undefined,
       ...sortParams,
       lat: hasMyCoordinates.value ? myLatitude.value : undefined,
       lng: hasMyCoordinates.value ? myLongitude.value : undefined,
       page: String(currentPage.value),
       per_page: String(perPage),
-    });
+    },
+    append,
+  );
 
-    const parsed = parseLaravelPaginator(res);
-    if (append) {
-      merchantList.value.push(...(parsed.items ?? []));
-    } else {
-      merchantList.value = parsed.items ?? [];
-    }
-    hasMore.value = parsed.current < parsed.last;
-    await ensureSentinelObserved();
-  } catch (e) {
-    console.error("Gagal memuat data merchant:", e);
-    toast.error("Gagal memuat data UMKM. Silakan coba lagi nanti.");
-    if (!append) {
-      merchantList.value = [];
-      hasMore.value = false;
-    }
-  } finally {
-    if (append) isLoadingMore.value = false;
-    else loadingMerchants.value = false;
-  }
+  const current = Number(merchantsMeta.value?.current_page ?? 1);
+  const last = Number(merchantsMeta.value?.last_page ?? 1);
+  hasMore.value = current < last;
+
+  await ensureSentinelObserved();
 };
 
 let isModeChanging = false;
@@ -1246,6 +1617,7 @@ watch(
   () => activeMode.value,
   async () => {
     isModeChanging = true;
+    isPageLoading.value = true;
     // reset UI filters saat mode berganti
     selectedCategoryId.value = null;
     showAllCategories.value = false;
@@ -1262,7 +1634,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1272,6 +1644,7 @@ watch(
     await nextTick();
     setupObserver();
     isModeChanging = false;
+    isPageLoading.value = false;
   },
 );
 
@@ -1284,7 +1657,7 @@ watch(
     currentPage.value = 1;
 
     if (activeMode.value === "umkm") {
-      await fetchMerchants();
+      await fetchMerchantsExplore();
     } else if (activeMode.value === "jasa") {
       await fetchJasas();
     } else {
@@ -1319,11 +1692,22 @@ watch(
   },
 );
 
+const goToEvent = () => {
+  router.push({ name: "Event List" }).catch(() => router.push("/event"));
+};
+
 // fetch data
 onMounted(async () => {
   window.addEventListener("scroll", handleScroll, { passive: true });
   window.addEventListener("resize", updateViewportWidth, { passive: true });
   updateViewportWidth();
+
+  if (isAuthenticated.value && !isAdmin.value) {
+    cartStore.fetchCartCount();
+  }
+
+  fetchStatistics();
+  loadRecommendedMerchants();
 
   // fetch banner event (independen dari fetch data jasa)
   isLoadingBanner.value = true;
@@ -1359,12 +1743,14 @@ onMounted(async () => {
   resetInfiniteScroll();
   currentPage.value = 1;
   if (activeMode.value === "umkm") {
-    await fetchMerchants();
+    await fetchMerchantsExplore();
   } else if (activeMode.value === "jasa") {
     await fetchJasas();
   } else {
     await fetchProductsByMode();
   }
+
+  isPageLoading.value = false;
 
   await nextTick();
   setupObserver();

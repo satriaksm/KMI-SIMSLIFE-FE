@@ -19,6 +19,11 @@ import MobilePagination from "@/components/common/MobilePagination.vue";
 import BulkActionBar from "@/components/common/BulkActionBar.vue";
 import { useProducts } from "@/composables/useProducts";
 import { useCategories } from "@/composables/useCategories";
+import {
+  getProductModerationBlock,
+  isProductPublishBlocked,
+} from "@/utils/moderation";
+import ProductModerationBlockModal from "@/components/reports/ProductModerationBlockModal.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -100,6 +105,7 @@ const showBulkDeleteModal = ref(false);
 // ✅ ADD: Status change confirmation modals
 const showStatusChangeModal = ref(false);
 const showBulkStatusChangeModal = ref(false);
+const showModerationBlockModal = ref(false);
 
 // Selected items for actions
 const selectedProductForVisibility = ref(null);
@@ -108,6 +114,7 @@ const selectedProductForDelete = ref(null);
 const selectedProductForStatusChange = ref(null);
 const newStatusForChange = ref(null);
 const newBulkStatus = ref(null);
+const moderationBlockInfo = ref(null);
 
 // Combined modal state for body scroll lock
 const isAnyModalOpen = computed(() => {
@@ -118,8 +125,9 @@ const isAnyModalOpen = computed(() => {
     showVisibilityModal.value ||
     showDeleteModal.value ||
     showBulkDeleteModal.value ||
-    showStatusChangeModal.value || // ✅ ADD
-    showBulkStatusChangeModal.value // ✅ ADD
+    showStatusChangeModal.value ||
+    showBulkStatusChangeModal.value ||
+    showModerationBlockModal.value
   );
 });
 
@@ -509,9 +517,49 @@ const toggleProductVisibility = (product) => {
   showVisibilityModal.value = true;
 };
 
+const openModerationBlockModal = (product, extra = {}) => {
+  moderationBlockInfo.value =
+    getProductModerationBlock(product) ||
+    {
+      message:
+        extra.message ||
+        "Anda tidak dapat mempublish produk ini karena terkena pelanggaran.",
+      reportId: extra.reportId ?? null,
+      productName: extra.productName ?? product?.name ?? null,
+      productSlug: extra.productSlug ?? product?.slug ?? null,
+      adminNote: extra.adminNote ?? null,
+      canAppeal: extra.canAppeal ?? true,
+      hasPendingAppeal: extra.hasPendingAppeal ?? false,
+      blocked: true,
+    };
+  showModerationBlockModal.value = true;
+};
+
+const closeModerationBlockModal = () => {
+  showModerationBlockModal.value = false;
+  moderationBlockInfo.value = null;
+};
+
+const handleAppealSubmitted = () => {
+  toast.info(
+    "Sanggahan berhasil dikirim. Tim moderasi akan meninjau permintaan Anda.",
+  );
+  loadProducts();
+};
+
 // ✅ UPDATED: Confirm visibility change - Show final confirmation
 const confirmVisibilityChange = (newStatus) => {
   if (!selectedProductForVisibility.value) return;
+
+  if (
+    newStatus === "published" &&
+    isProductPublishBlocked(selectedProductForVisibility.value)
+  ) {
+    const product = selectedProductForVisibility.value;
+    closeVisibilityModal();
+    openModerationBlockModal(product);
+    return;
+  }
 
   selectedProductForStatusChange.value = selectedProductForVisibility.value;
   newStatusForChange.value = newStatus;
@@ -534,7 +582,13 @@ const confirmSingleStatusChange = async () => {
     toast.success(`Status produk berhasil diubah menjadi ${statusLabel}`);
     closeStatusChangeModal();
   } catch (error) {
-    // error toast sudah di composable
+    if (error?.moderationBlock) {
+      closeStatusChangeModal();
+      openModerationBlockModal(
+        selectedProductForStatusChange.value,
+        error.moderationBlock,
+      );
+    }
   }
 };
 
@@ -626,6 +680,12 @@ watch(currentMerchantId, (newId, oldId) => {
 // ✅ Watch currentPage untuk auto-load
 watch(currentPage, () => {
   loadProducts();
+});
+
+// Sinkronkan selectAll dengan realita seleksi (desktop ↔ mobile)
+watch(selectedProducts, (newVal) => {
+  selectAll.value =
+    products.value.length > 0 && newVal.length === products.value.length;
 });
 
 watch(perPage, (val, oldVal) => {
@@ -746,13 +806,13 @@ const tableActions = [
   <div class="">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6"
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:bg-gray-50 sm:z-30 sm:px-6"
     >
       <div class="flex items-center gap-3">
         <!-- Hamburger Button (Mobile) -->
         <button
           @click="emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>
@@ -786,16 +846,16 @@ const tableActions = [
           @click="goToCreate"
           variant="merchant"
           size="sm"
-          customClass="!hidden sm:!inline"
+          customClass="!hidden md:!inline"
         >
           <i class="pi pi-plus"></i>
-          <span class="hidden ml-2 sm:inline">Tambah Produk</span>
+          <span class="hidden ml-2 md:inline">Tambah Produk</span>
         </Button>
         <Button
           @click="goToCreate"
           variant="merchant"
           size="md"
-          customClass="sm:!hidden"
+          customClass="md:!hidden"
         >
           <i class="pi pi-plus"></i>
         </Button>
@@ -803,16 +863,16 @@ const tableActions = [
           @click="openExportModal"
           variant="merchant-outline"
           size="sm"
-          customClass="!hidden sm:!inline"
+          customClass="!hidden md:!inline"
         >
           <i class="pi pi-download"></i>
-          <span class="hidden ml-2 sm:inline">Export</span>
+          <span class="hidden ml-2 md:inline">Export</span>
         </Button>
         <Button
           @click="openExportModal"
           variant="merchant-outline"
           size="md"
-          customClass="sm:!hidden"
+          customClass="md:!hidden"
         >
           <i class="pi pi-download"></i>
         </Button>
@@ -1140,7 +1200,7 @@ const tableActions = [
                 <!-- ✅ FIXED: Gunakan helper getImageUrl -->
                 <img
                   v-if="item.cover_image?.src_url"
-                  :src="item.cover_image.src_url"
+                  :src="item.cover_image.thumb_url || item.cover_image.src_url"
                   :alt="item.name"
                   class="object-cover w-full h-full"
                   @error="(e) => (e.target.style.display = 'none')"
@@ -1757,6 +1817,29 @@ const tableActions = [
           />
         </div>
 
+        <!-- Moderation warning for admin-archived products -->
+        <div
+          v-if="
+            selectedProductForVisibility &&
+            isProductPublishBlocked(selectedProductForVisibility)
+          "
+          class="flex items-start gap-3 p-4 border bg-danger-background/10 border-danger-foreground/20 rounded-xl"
+        >
+          <i
+            class="pi pi-ban text-danger-foreground text-lg shrink-0 mt-0.5"
+          ></i>
+          <div>
+            <p class="text-sm font-semibold text-danger-foreground">
+              Produk terkena pelanggaran
+            </p>
+            <p class="text-xs text-danger-foreground/80 mt-1">
+              Produk ini diarsipkan oleh admin karena pelanggaran dan tidak
+              dapat dipublish kembali hingga sanggahan diterima atau laporan
+              ditarik.
+            </p>
+          </div>
+        </div>
+
         <!-- Publish Action -->
         <button
           @click="confirmVisibilityChange('published')"
@@ -1860,10 +1943,10 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForDelete.cover_image?.src_url"
-              :src="selectedProductForDelete.cover_image.src_url"
+              v-if="selectedProductForDelete.cover_image"
+              :src="selectedProductForDelete.cover_image.thumb_url || selectedProductForDelete.cover_image.src_url"
               :alt="selectedProductForDelete.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -1958,10 +2041,10 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image?.src_url"
-                :src="product.cover_image.src_url"
+                v-if="product.cover_image"
+                :src="product.cover_image.thumb_url || product.cover_image.src_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"
@@ -2046,10 +2129,10 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForStatusChange.cover_image?.src_url"
-              :src="selectedProductForStatusChange.cover_image.src_url"
+              v-if="selectedProductForStatusChange.cover_image"
+              :src="selectedProductForStatusChange.cover_image.thumb_url || selectedProductForStatusChange.cover_image.src_url"
               :alt="selectedProductForStatusChange.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -2188,10 +2271,10 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl -->
+              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image?.src_url"
-                :src="product.cover_image.src_url"
+                v-if="product.cover_image"
+                :src="product.cover_image.thumb_url || product.cover_image.src_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"
@@ -2255,6 +2338,13 @@ const tableActions = [
         </div>
       </template>
     </ResponsiveModal>
+
+    <ProductModerationBlockModal
+      :show="showModerationBlockModal"
+      :block-info="moderationBlockInfo"
+      @close="closeModerationBlockModal"
+      @appeal-submitted="handleAppealSubmitted"
+    />
   </div>
 </template>
 

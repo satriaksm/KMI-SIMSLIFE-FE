@@ -1,10 +1,11 @@
 <template>
   <div
-    class="sm:bg-gray-50 bg-primary flex items-center flex-col sm:justify-center justify-end sm:pb-8"
+    class="relative sm:bg-gray-50 bg-white flex items-center flex-col min-h-[calc(100vh-64px)] sm:min-h-screen sm:justify-center justify-start sm:pb-8"
   >
+    <div class="absolute top-0 left-0 w-full h-[50vh] bg-primary sm:hidden"></div>
     <!-- Mobile header -->
     <div
-      class="sm:hidden flex flex-col flex-1/3 justify-end sm:px-0 px-4 py-2 sm:pt-0 pt-8"
+      class="relative z-10 sm:hidden flex flex-col shrink-0 justify-end w-full sm:px-0 px-4 py-2 sm:pt-0 pt-8"
     >
       <h2
         class="sm:hidden inline text-2xl sm:text-3xl font-bold text-center sm:text-left mb-2 text-white"
@@ -12,14 +13,14 @@
         Reset Password
       </h2>
       <p
-        class="sm:hidden inline text-[10px] sm:text-sm text-center sm:text-left mb-6 text-white"
+        class="sm:hidden inline text-[12px] sm:text-sm text-center sm:text-left mb-6 text-white"
       >
         Atur ulang password Anda dengan aman
       </p>
     </div>
 
     <div
-      class="flex flex-col justify-center sm:flex-0 flex-2/3 p-8 sm:p-12 sm:max-w-xl w-full bg-white sm:rounded-4xl rounded-t-4xl sm:shadow-lg shadow-none"
+      class="relative z-10 flex flex-col justify-start sm:flex-0 grow sm:grow-0 flex-2/3 p-8 sm:p-12 sm:max-w-xl w-full bg-white sm:rounded-4xl rounded-t-4xl sm:shadow-lg shadow-none"
     >
       <!-- Desktop header -->
       <div class="hidden sm:flex gap-3 items-center mb-2">
@@ -51,25 +52,51 @@
             placeholder="Ulangi password"
           />
 
-          <AppButton
-            type="submit"
-            :loading="isLoading"
-            variant="primary"
-            size="md"
-            block
-          >
-            Setel Ulang Password
-          </AppButton>
+          <!-- Desktop Buttons -->
+          <div class="hidden sm:block space-y-4">
+            <AppButton
+              type="submit"
+              :loading="isLoading"
+              variant="primary"
+              size="md"
+              block
+            >
+              Setel Ulang Password
+            </AppButton>
 
-          <AppButton
-            type="button"
-            variant="primary-outline"
-            size="md"
-            block
-            @click="goToLogin"
-          >
-            Kembali ke Login
-          </AppButton>
+            <AppButton
+              type="button"
+              variant="primary-outline"
+              size="md"
+              block
+              @click="goToLogin"
+            >
+              Kembali ke Login
+            </AppButton>
+          </div>
+
+          <!-- Mobile Sticky Buttons -->
+          <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe space-y-4">
+            <AppButton
+              type="submit"
+              :loading="isLoading"
+              variant="primary"
+              size="md"
+              block
+            >
+              Setel Ulang Password
+            </AppButton>
+
+            <AppButton
+              type="button"
+              variant="primary-outline"
+              size="md"
+              block
+              @click="goToLogin"
+            >
+              Kembali ke Login
+            </AppButton>
+          </div>
         </div>
       </Form>
     </div>

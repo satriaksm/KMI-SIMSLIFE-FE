@@ -66,6 +66,7 @@ export const useAuthStore = defineStore("auth", () => {
       phone: data.phone ?? null,
       profile_picture:
         typeof data?.profile_picture === "string" ? data.profile_picture : null,
+      profile_picture_urls: data?.profile_picture_urls || null,
       roles: data.roles,
       merchants: data.merchants || [],
       // ✅ Robust boolean conversion for super admin
