@@ -1471,11 +1471,18 @@ const handleSave = async () => {
       fd.append("cover", form.value.coverFile);
     }
 
-    await updateMerchantProfile(merchantSlug.value, fd);
+    const updatedMerchant = await updateMerchantProfile(merchantSlug.value, fd);
 
-    
+    // Panggil initAuth untuk memperbarui list merchant di store auth (jika ada perubahan nama/slug)
+    await authStore.initAuth();
+
+    // Ambil slug terbaru
+    const targetSlug = updatedMerchant?.slug || merchantSlug.value || authStore.merchantSlug;
+    if (targetSlug && targetSlug !== authStore.merchantSlug) {
+      authStore.setSelectedMerchantSlug(targetSlug);
+    }
+
     // Redirect only on success
-    const targetSlug = merchantSlug.value ?? authStore.merchantSlug;
     router.push(
       targetSlug ? `/merchant-center/${targetSlug}/profile` : "/merchant-profile",
     );
