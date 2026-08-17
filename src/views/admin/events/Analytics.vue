@@ -462,84 +462,24 @@ const getRankBadgeClass = (idx) => {
         <p v-else class="text-sm text-gray-400 text-center py-6">Belum ada voucher yang digunakan</p>
       </div>
 
-      <!-- ── 6. RATING + PAYMENT ─────────────────────────────────────── -->
+      <!-- ── 6. SEGMENTATION ─────────────────────────────────────────────── -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <!-- Rating -->
+        <!-- Segmentation -->
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 class="text-base font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <i class="pi pi-star text-[#194a7a]"></i> Kepuasan Pelanggan
+          <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
+            <i class="pi pi-sitemap text-[#194a7a]"></i> Distribusi Segmentasi UMKM
           </h2>
-          <div v-if="analytics.rating.total_reviews > 0">
-            <div class="flex items-center gap-6 mb-6">
-              <div class="text-center">
-                <p class="text-5xl font-black text-gray-900">{{ analytics.rating.avg_rating }}</p>
-                <div class="flex gap-0.5 justify-center mt-1">
-                  <i v-for="s in 5" :key="s" class="pi pi-star-fill text-sm" :class="s <= Math.round(analytics.rating.avg_rating) ? 'text-[#f4c46c]' : 'text-gray-200'"></i>
-                </div>
-                <p class="text-xs text-gray-400 mt-1 font-medium">{{ formatNum(analytics.rating.total_reviews) }} ulasan</p>
-              </div>
-              <div class="flex-1 space-y-2">
-                <div v-for="s in [5,4,3,2,1]" :key="s" class="flex items-center gap-2">
-                  <span class="text-xs text-gray-500 w-4 font-bold">{{ s }}★</span>
-                  <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                    <div class="h-full rounded-full bg-[#f4c46c] transition-all"
-                         :style="{ width: analytics.rating.total_reviews > 0 ? ((analytics.rating.distribution[s] / analytics.rating.total_reviews) * 100) + '%' : '0%' }">
-                    </div>
-                  </div>
-                  <span class="text-xs text-gray-400 w-4 font-medium">{{ analytics.rating.distribution[s] }}</span>
-                </div>
-              </div>
-            </div>
-            <!-- Per merchant ratings -->
-            <div class="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
-              <div v-for="m in analytics.rating.per_merchant" :key="m.merchant_id"
-                   class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors">
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-bold text-gray-900 truncate">{{ m.name }}</p>
-                  <p class="text-[10px] text-gray-500 font-medium">{{ m.review_count }} ulasan</p>
-                </div>
-                <div class="flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-gray-100 shadow-sm">
-                  <i class="pi pi-star-fill text-[#f4c46c] text-[10px]"></i>
-                  <span class="text-sm font-black text-gray-900">{{ m.avg_rating }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-else class="text-center py-8">
-            <i class="pi pi-star text-4xl text-gray-200 mb-2"></i>
-            <p class="text-sm text-gray-400">Belum ada ulasan</p>
-          </div>
-        </div>
-
-        <!-- Payment Methods + Segmentation -->
-        <div class="space-y-6">
-          <!-- Payment -->
-          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i class="pi pi-credit-card text-[#194a7a]"></i> Metode Pembayaran
-            </h2>
-            <div class="space-y-2">
-              <div v-for="p in analytics.payment_methods" :key="p.payment_method" class="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#194a7a]/20 transition-colors">
-                <span class="text-sm font-bold text-gray-700 capitalize">{{ p.payment_method || 'N/A' }}</span>
-                <span class="text-sm font-black text-[#194a7a] bg-white px-3 py-1 rounded-lg shadow-sm border border-gray-100">{{ formatNum(p.count) }}x</span>
-              </div>
-            </div>
-          </div>
-          <!-- Segmentation -->
-          <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i class="pi pi-sitemap text-[#194a7a]"></i> Distribusi Segmentasi UMKM
-            </h2>
-            <div class="space-y-2">
-              <div v-for="seg in analytics.segmentation_distribution" :key="seg.segmentation"
-                   class="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#44a4b4]/20 transition-colors">
-                <span class="text-sm font-bold text-gray-700">{{ seg.segmentation }}</span>
-                <span class="px-3 py-1 bg-[#44a4b4]/10 text-[#44a4b4] text-xs font-black rounded-lg shadow-sm">{{ seg.count }} UMKM</span>
-              </div>
+          <div class="space-y-2">
+            <div v-for="seg in analytics.segmentation_distribution" :key="seg.segmentation"
+                 class="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-[#44a4b4]/20 transition-colors">
+              <span class="text-sm font-bold text-gray-700">{{ seg.segmentation }}</span>
+              <span class="px-3 py-1 bg-[#44a4b4]/10 text-[#44a4b4] text-xs font-black rounded-lg shadow-sm">{{ seg.count }} UMKM</span>
             </div>
           </div>
         </div>
+        
+        <!-- Empty space for layout balance -->
+        <div></div>
       </div>
 
     </template>
