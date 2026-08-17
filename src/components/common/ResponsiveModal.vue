@@ -84,7 +84,7 @@ const handleBackdropClick = () => {
     leave-to-class="opacity-0"
   >
     <div
-      v-if="show"
+      v-show="show"
       @click="handleBackdropClick"
       :class="[
         'fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center p-0 sm:p-4',
@@ -93,7 +93,7 @@ const handleBackdropClick = () => {
     ></div>
   </transition>
 
-  <!-- ✅ UPDATED: Modal Container dengan max-height -->
+  <!-- Modal Container dengan max-height -->
   <transition
     enter-active-class="transition-all duration-300 ease-out"
     enter-from-class="translate-y-full sm:opacity-0 sm:scale-95 sm:translate-y-0"
@@ -103,7 +103,7 @@ const handleBackdropClick = () => {
     leave-to-class="translate-y-full sm:opacity-0 sm:scale-95 sm:translate-y-0"
   >
     <div
-      v-if="show"
+      v-show="show"
       @click.stop
       :class="[
         // Mobile: Full width, bottom sheet, max 85vh
@@ -117,14 +117,14 @@ const handleBackdropClick = () => {
         'overflow-hidden',
       ]"
     >
-      <!-- ✅ Header - Fixed (tidak scroll) -->
+      <!--Header - Fixed (tidak scroll) -->
       <div
         :class="[
           'flex items-center justify-between px-4 sm:px-6 py-4',
           'border-b border-gray-200',
           'bg-white rounded-t-3xl sm:rounded-t-2xl',
-          'flex-shrink-0', // ✅ Prevent shrinking
-          'sticky top-0 z-10', // ✅ Sticky on mobile scroll
+          'flex-shrink-0', //Prevent shrinking
+          'sticky top-0 z-10', //Sticky on mobile scroll
           headerClass,
         ]"
       >
@@ -149,26 +149,26 @@ const handleBackdropClick = () => {
         </button>
       </div>
 
-      <!-- ✅ Body - Scrollable Area -->
+      <!--Body - Scrollable Area -->
       <div
         :class="[
           'flex-1 overflow-y-auto overflow-x-hidden',
           'px-4 sm:px-6 py-4 mb-4 sm:mb-0',
-          'custom-scrollbar', // ✅ Custom scrollbar class
+          'custom-scrollbar', //Custom scrollbar class
           bodyClass,
         ]"
       >
         <slot></slot>
       </div>
 
-      <!-- ✅ Footer - Fixed (tidak scroll) -->
+      <!--Footer - Fixed (tidak scroll) -->
       <div
         v-if="showFooter || $slots.footer"
         :class="[
           'border-t border-gray-200 p-4',
           'bg-white rounded-b-3xl sm:rounded-b-2xl',
-          'flex-shrink-0', // ✅ Prevent shrinking
-          'sticky sm:static bottom-0', // ✅ Sticky on mobile
+          'flex-shrink-0', //Prevent shrinking
+          'sticky sm:static bottom-0', //Sticky on mobile
           footerClass,
         ]"
       >
@@ -179,7 +179,7 @@ const handleBackdropClick = () => {
 </template>
 
 <style scoped>
-/* ✅ Custom scrollbar for modal body */
+/*Custom scrollbar for modal body */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -199,18 +199,18 @@ const handleBackdropClick = () => {
   background: #94a3b8;
 }
 
-/* ✅ Firefox scrollbar */
+/*Firefox scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
 
-/* ✅ Smooth scrolling */
+/*Smooth scrolling */
 .custom-scrollbar {
   scroll-behavior: smooth;
 }
 
-/* ✅ Mobile: Handle safe area (iPhone notch, etc.) */
+/*Mobile: Handle safe area (iPhone notch, etc.) */
 @media (max-width: 640px) {
   .custom-scrollbar {
     /* Add padding bottom for safe area */

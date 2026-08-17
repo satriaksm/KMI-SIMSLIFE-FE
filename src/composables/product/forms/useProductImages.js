@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { compressImage } from "@/utils/imageCompressor";
 
 export function useProductImages({ maxImages, maxSizeBytes, toast }) {
   const productImages = ref([]);
@@ -10,7 +11,7 @@ export function useProductImages({ maxImages, maxSizeBytes, toast }) {
     fileInput.value?.click();
   };
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const files = Array.from(event.target.files);
     const remainingSlots = maxImages - productImages.value.length;
 
@@ -20,27 +21,35 @@ export function useProductImages({ maxImages, maxSizeBytes, toast }) {
       return;
     }
 
-    files.slice(0, remainingSlots).forEach((file) => {
+    const filesToProcess = files.slice(0, remainingSlots);
+    for (const file of filesToProcess) {
       if (!file.type.startsWith("image/")) {
         toast.error(`File ${file.name} bukan gambar`);
-        return;
+        continue;
       }
       if (file.size > maxSizeBytes) {
         toast.error(`Gambar ${file.name} terlalu besar`);
-        return;
+        continue;
       }
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
+      try {
+        const compressedFile = await compressImage(file, 1920);
         productImages.value.push({
           id: Date.now() + Math.random(),
-          file,
-          preview: e.target.result,
+          file: compressedFile,
+          preview: URL.createObjectURL(compressedFile),
         });
         coverImageIndex.value = 0;
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        // Fallback
+        productImages.value.push({
+          id: Date.now() + Math.random(),
+          file: file,
+          preview: URL.createObjectURL(file),
+        });
+        coverImageIndex.value = 0;
+      }
+    }
 
     event.target.value = "";
   };

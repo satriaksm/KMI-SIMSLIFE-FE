@@ -3,6 +3,7 @@ import { ref } from "vue";
 import * as ProductService from "@/services/api/product";
 import { useToast } from "vue-toastification";
 import { saveBlob } from "@/libs/saveBlob.js";
+import { parseModerationBlockError } from "@/utils/moderation";
 
 export function useProducts() {
   const isDev = import.meta.env.DEV;
@@ -297,7 +298,16 @@ export function useProducts() {
       if (isDev) {
         console.error(error);
       }
-      toast.error("Gagal memperbarui status produk");
+
+      const moderationBlock = parseModerationBlockError(error);
+      if (moderationBlock) {
+        error.moderationBlock = moderationBlock;
+        throw error;
+      }
+
+      toast.error(
+        error.response?.data?.message || "Gagal memperbarui status produk",
+      );
       throw error;
     } finally {
       loading.value = false;

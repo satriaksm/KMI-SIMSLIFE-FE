@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import { useToast } from "vue-toastification";
 import { useChat } from "@/composables/useChat";
 import { useAuthStore } from "@/stores/auth";
 import Button from "@/components/common/Button.vue";
@@ -29,6 +31,13 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits([
+  "offer-accepted",
+  "offer-rejected",
+  "service-link-created",
+  "close",
+]);
+
 const {
   activeConversation,
   messages,
@@ -38,6 +47,7 @@ const {
   sendMessage,
   makeOffer,
   respondOffer,
+  createServiceLink,
 } = useChat();
 
 const authStore = useAuthStore();
@@ -49,6 +59,15 @@ const offerNote = ref("");
 const sending = ref(false);
 const sendingOffer = ref(false);
 const error = ref("");
+
+// ⭐ Service link state
+const showServiceLinkPrompt = ref(false);
+const agreedOfferPrice = ref(0);
+const acceptedMessageId = ref(null);
+const creatingServiceLink = ref(false);
+const serviceLinkDate = ref("");
+const serviceLinkTime = ref("");
+const serviceLinkNotes = ref("");
 
 const headerTitle = computed(() => {
   if (props.title) return props.title;
@@ -193,7 +212,76 @@ async function handleOffer() {
 
 async function handleRespondOffer(messageId, accept) {
   if (!activeConversation.value || !isBuyer.value) return;
-  await respondOffer(activeConversation.value.id, messageId, accept);
+
+  const toast = useToast();
+
+  try {
+    const result = await respondOffer(activeConversation.value.id, messageId, accept);
+
+    if (accept && result?.offer_price) {
+      // Show prompt to create service link
+      showServiceLinkPrompt.value = true;
+      agreedOfferPrice.value = result.offer_price;
+      acceptedMessageId.value = messageId;
+    } else {
+      toast.success(accept ? "Penawaran diterima!" : "Penawaran ditolak");
+      emit(accept ? "offer-accepted" : "offer-rejected", {
+        conversationId: activeConversation.value.id,
+        messageId,
+        price: result?.offer_price,
+        jasa: activeConversation.value?.jasa,
+      });
+    }
+  } catch (err) {
+    console.error("Error responding to offer:", err);
+    error.value = err.response?.data?.message || "Gagal merespons penawaran";
+  }
+}
+
+// ⭐ Create service link from accepted offer
+async function createServiceLinkFromAcceptedOffer() {
+  if (!activeConversation.value || !acceptedMessageId.value) return;
+
+  const toast = useToast();
+  creatingServiceLink.value = true;
+
+  try {
+    const serviceLink = await createServiceLink(
+      activeConversation.value.id,
+      agreedOfferPrice.value,
+      {
+        booking_date: serviceLinkDate.value,
+        booking_time: serviceLinkTime.value,
+        notes: serviceLinkNotes.value,
+      }
+    );
+
+    toast.success("Link layanan berhasil dibuat!");
+    emit("service-link-created", {
+      conversation_id: activeConversation.value.id,
+      agreed_price: agreedOfferPrice.value,
+      booking_date: serviceLinkDate.value,
+      booking_time: serviceLinkTime.value,
+      service_link_id: serviceLink?.id,
+      serviceLink,
+    });
+
+    closeServiceLinkPrompt();
+  } catch (err) {
+    console.error("Error creating service link:", err);
+    toast.error("Gagal membuat link layanan");
+  } finally {
+    creatingServiceLink.value = false;
+  }
+}
+
+function closeServiceLinkPrompt() {
+  showServiceLinkPrompt.value = false;
+  agreedOfferPrice.value = 0;
+  acceptedMessageId.value = null;
+  serviceLinkDate.value = "";
+  serviceLinkTime.value = "";
+  serviceLinkNotes.value = "";
 }
 </script>
 
@@ -413,6 +501,78 @@ async function handleRespondOffer(messageId, accept) {
           "
           class="w-full resize-none text-xs sm:text-sm px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-1 focus:ring-merchant-primary focus:border-merchant-primary bg-white"
         ></textarea>
+      </div>
+
+      <!-- ⭐ Service Link Creation Prompt -->
+      <div
+        v-if="showServiceLinkPrompt"
+        class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 space-y-3"
+      >
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-semibold text-emerald-800 flex items-center gap-2">
+            <i class="pi pi-check-circle"></i>
+            Penawaran Diterima!
+          </p>
+          <button
+            @click="closeServiceLinkPrompt"
+            class="text-emerald-600 hover:text-emerald-800"
+          >
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+
+        <p class="text-xs text-emerald-700">
+          Harga yang disepakati: <strong class="text-lg">{{ formatCurrency(agreedOfferPrice) }}</strong>
+        </p>
+
+        <div class="space-y-2">
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Tanggal Booking (opsional)</label>
+            <input
+              v-model="serviceLinkDate"
+              type="date"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Waktu Booking (opsional)</label>
+            <input
+              v-model="serviceLinkTime"
+              type="time"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-600 mb-1 block">Catatan (opsional)</label>
+            <textarea
+              v-model="serviceLinkNotes"
+              rows="2"
+              placeholder="Tambahkan catatan untuk booking ini..."
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <Button
+            variant="muted-outline"
+            size="sm"
+            @click="closeServiceLinkPrompt"
+            class="flex-1"
+          >
+            Batal
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            :loading="creatingServiceLink"
+            @click="createServiceLinkFromAcceptedOffer"
+            class="flex-1 bg-emerald-600 hover:bg-emerald-700"
+          >
+            <i class="pi pi-link mr-1"></i>
+            Buat Link Layanan
+          </Button>
+        </div>
       </div>
     </div>
   </div>

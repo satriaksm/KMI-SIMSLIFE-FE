@@ -10,7 +10,7 @@
               <div class="w-32 h-32 rounded-full bg-admin-primary/10 flex items-center justify-center border-2 border-gray-200 overflow-hidden">
                 <img
                   v-if="user.profile_picture_path"
-                  :src="getUserProfileUrl(user)"
+                  :src="getUserProfileUrl(user, 'thumb')"
                   :alt="user.name"
                   class="w-full h-full object-cover"
                   @error="(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = `<span class='text-5xl font-bold text-admin-primary'>${user.name?.charAt(0).toUpperCase()}</span>`; }"
@@ -163,7 +163,7 @@
                     class="w-14 h-14 rounded-full bg-merchant-primary/10 flex items-center justify-center overflow-hidden border-2 border-gray-200"
                   >
                     <img
-                      :src="getMerchantLogoUrl(merchant)"
+                      :src="getMerchantLogoUrl(merchant, 'thumb')"
                       alt="Logo"
                       class="w-full h-full object-cover"
                       @error="(e) => { e.target.style.display = 'none'; e.target.parentElement.innerHTML = `<span class='text-xl font-bold text-merchant-primary'>${merchant.name?.charAt(0).toUpperCase()}</span>`; }"

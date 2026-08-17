@@ -10,6 +10,16 @@ const api = axios.create({
   },
 });
 
+// Public API without credentials (for CORS public endpoints)
+const publicApi = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+  withCredentials: false,
+  headers: {
+    Accept: "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+  },
+});
+
 /**
  * 🛠 Helper untuk membaca cookie browser
  */
@@ -51,3 +61,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+export { publicApi };

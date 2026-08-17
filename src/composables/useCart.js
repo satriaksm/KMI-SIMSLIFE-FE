@@ -90,6 +90,8 @@ export function useCart() {
 
       cartStores.value = (data.data || []).map((cart) => ({
         id: cart.cart_id,
+        cartId: cart.cart_id,
+        merchantId: cart.merchant?.id ?? null,
         name: cart.merchant.name,
         slug: cart.merchant.slug,
         phone: cart.merchant.phone,
@@ -108,6 +110,10 @@ export function useCart() {
             item.snapshot.image?.src_url ||
             item.snapshot.image ||
             "",
+          image_urls:
+            item.product_details?.cover_image?.src_urls ||
+            item.snapshot.image?.src_urls ||
+            null,
 
           unitPrice: item.changes?.price_changed
             ? Number(item.live.unit_price)

@@ -105,6 +105,28 @@ const getActionTypeLabel = (type) => {
   return labels[type] || type;
 };
 
+const formatLogDescription = (log) => {
+  if (!log) return '';
+  const targetName = log.target?.name || log.target?.email || log.target?.slug || 'Target tidak diketahui';
+  
+  if (log.action_type === 'status_change') {
+    const oldStatus = log.status_before || log.metadata?.old_status || 'sebelumnya';
+    const newStatus = log.status_after || log.metadata?.new_status || 'baru';
+    return `Mengubah status "${targetName}" dari ${oldStatus} menjadi ${newStatus}.`;
+  }
+  
+  if (log.action_type === 'manual_override' && log.metadata?.new_admin_email) {
+    return `Menambahkan admin baru dengan email ${log.metadata.new_admin_email}.`;
+  }
+  
+  if (log.action_type === 'manual_override' && log.metadata?.deleted_admin_email) {
+    return `Menghapus admin dengan email ${log.metadata.deleted_admin_email}.`;
+  }
+
+  // Fallback
+  return `Melakukan tindakan ${getActionTypeLabel(log.action_type)} pada "${targetName}".`;
+};
+
 onMounted(async () => {
   await loadAdmin();
   await loadActivityLogs();
@@ -206,8 +228,11 @@ onMounted(async () => {
               <strong>Alasan:</strong> {{ log.reason }}
             </p>
 
-            <div v-if="log.metadata" class="text-xs text-gray-500 bg-gray-50 rounded p-2">
-              <pre class="whitespace-pre-wrap">{{ JSON.stringify(log.metadata, null, 2) }}</pre>
+            <div class="text-sm text-gray-700 bg-blue-50/50 rounded-lg p-3 border border-blue-100">
+              <div class="flex items-start gap-2">
+                <i class="pi pi-info-circle text-blue-500 mt-0.5"></i>
+                <p>{{ formatLogDescription(log) }}</p>
+              </div>
             </div>
           </div>
         </div>

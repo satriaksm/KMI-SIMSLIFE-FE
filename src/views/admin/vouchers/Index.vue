@@ -75,6 +75,13 @@ watch(() => route.name, () => {
       class="fixed sm:static top-0 left-0 right-0 flex justify-between items-center py-6 px-4 sm:px-6 bg-white z-10 border-b border-gray-200 shadow-sm"
     >
       <div class="flex items-center gap-3 min-w-0">
+        <!-- Hamburger Button (Mobile Only) -->
+        <button
+          @click="$emit('toggle-sidebar')"
+          class="lg:hidden w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center shrink-0"
+        >
+          <i class="pi pi-bars text-gray-600"></i>
+        </button>
         <div class="min-w-0">
           <Breadcrumb :items="breadcrumbItems" />
           <p class="text-xs sm:text-sm text-muted-foreground mt-1 truncate">

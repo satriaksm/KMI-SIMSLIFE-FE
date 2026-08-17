@@ -130,7 +130,12 @@ onMounted(async () => {
     <div v-else-if="stats">
       <!-- Header with Export Button -->
       <div class="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 class="text-2xl sm:text-3xl font-bold text-merchant-primary">Admin Dashboard</h1>
+        <div class="flex items-center gap-3">
+          <button @click="$emit('toggle-sidebar')" class="lg:hidden w-10 h-10 rounded-full hover:bg-gray-200 flex items-center justify-center shrink-0 text-gray-600 bg-white shadow-sm border border-gray-200">
+            <i class="pi pi-bars"></i>
+          </button>
+          <h1 class="text-2xl sm:text-3xl font-bold text-merchant-primary">Admin Dashboard</h1>
+        </div>
         
         <Button
           @click="openExportModal"

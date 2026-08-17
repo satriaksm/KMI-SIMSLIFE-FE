@@ -19,6 +19,8 @@ const errorMessage = ref("");
 const showSuccessModal = ref(false);
 const createdUserId = ref(null);
 const createdUserName = ref("");
+const password = ref("");
+const formRef = ref(null);
 
 const schema = yup.object({
   name: yup.string().required("Nama wajib diisi").min(3, "Minimal 3 karakter"),
@@ -32,8 +34,7 @@ const schema = yup.object({
     .required("Nomor telepon wajib diisi"),
   nik: yup
     .string()
-    .matches(/^[0-9]{16}$/, "NIK harus 16 digit")
-    .required("NIK wajib diisi"),
+    .nullable(),
   password: yup
     .string()
     .required("Password wajib diisi")
@@ -68,8 +69,13 @@ const handleRegister = async (values) => {
     showSuccessModal.value = true;
   } catch (error) {
     console.error("Create customer error:", error);
-    errorMessage.value =
-      error.response?.data?.message || "Gagal membuat customer";
+    if (error.response?.status === 422 && error.response?.data?.errors) {
+      formRef.value?.setErrors(error.response.data.errors);
+      errorMessage.value = "Silakan periksa kembali isian Anda.";
+    } else {
+      errorMessage.value =
+        error.response?.data?.message || "Gagal membuat customer";
+    }
   } finally {
     isLoading.value = false;
   }
@@ -100,7 +106,7 @@ const goToCreateMerchant = () => {
           </p>
         </div>
 
-        <Form @submit="handleRegister" :validation-schema="schema">
+        <Form ref="formRef" @submit="handleRegister" :validation-schema="schema">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <!-- Name -->
             <TextField
@@ -139,18 +145,35 @@ const goToCreateMerchant = () => {
               placeholder="1234567890123456"
               maxlength="16"
               class="sm:col-span-2"
-              required
+              
             />
 
             <!-- Password -->
-            <TextField
-              variant="merchant"
-              name="password"
-              label="Password"
-              type="password"
-              placeholder="Minimal 8 karakter"
-              required
-            />
+            <div>
+              <TextField
+                variant="merchant"
+                name="password"
+                label="Password"
+                type="password"
+                placeholder="Minimal 8 karakter"
+                v-model="password"
+                required
+              />
+              <div class="mt-2 text-sm flex flex-col gap-1">
+                <div :class="/[A-Z]/.test(password) ? 'text-green-600' : 'text-red-500'">
+                  <i :class="/[A-Z]/.test(password) ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i> Mengandung huruf besar
+                </div>
+                <div :class="/[a-z]/.test(password) ? 'text-green-600' : 'text-red-500'">
+                  <i :class="/[a-z]/.test(password) ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i> Mengandung huruf kecil
+                </div>
+                <div :class="/\d/.test(password) ? 'text-green-600' : 'text-red-500'">
+                  <i :class="/\d/.test(password) ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i> Mengandung angka
+                </div>
+                <div :class="/[!@#$%^&*\-_]/.test(password) ? 'text-green-600' : 'text-red-500'">
+                  <i :class="/[!@#$%^&*\-_]/.test(password) ? 'pi pi-check-circle' : 'pi pi-times-circle'" class="mr-1"></i> Mengandung simbol (!@#$%^&*-_)
+                </div>
+              </div>
+            </div>
 
             <!-- Password Confirmation -->
             <TextField

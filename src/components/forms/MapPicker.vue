@@ -45,7 +45,7 @@ const props = defineProps({
   readonly: { type: Boolean, default: false },
   variant: { type: String, default: "primary" }, // primary | user | merchant
 });
-const emit = defineEmits(["update:lat", "update:lng"]);
+const emit = defineEmits(["update:lat", "update:lng", "manual-change"]);
 
 const mapEl = ref(null);
 let map;
@@ -101,8 +101,11 @@ function setMarker(latlng) {
     if (!props.readonly) {
       marker.on("dragend", () => {
         const { lat, lng } = marker.getLatLng();
-        emit("update:lat", +lat.toFixed(6));
-        emit("update:lng", +lng.toFixed(6));
+        const finalLat = +lat.toFixed(6);
+        const finalLng = +lng.toFixed(6);
+        emit("update:lat", finalLat);
+        emit("update:lng", finalLng);
+        emit("manual-change", { lat: finalLat, lng: finalLng });
       });
     }
   } else {
@@ -133,8 +136,11 @@ function locateMe() {
 
   const onSuccess = (pos) => {
     const { latitude, longitude } = pos.coords;
-    emit("update:lat", +latitude.toFixed(6));
-    emit("update:lng", +longitude.toFixed(6));
+    const finalLat = +latitude.toFixed(6);
+    const finalLng = +longitude.toFixed(6);
+    emit("update:lat", finalLat);
+    emit("update:lng", finalLng);
+    emit("manual-change", { lat: finalLat, lng: finalLng });
     updateLatLng(latitude, longitude, true);
     isLocating.value = false;
   };
@@ -211,7 +217,7 @@ onMounted(() => {
   const startLat = props.lat ?? -7.539493;
   const startLng = props.lng ?? 110.80573;
 
-  map = L.map(mapEl.value).setView([startLat, startLng], props.zoom);
+  map = L.map(mapEl.value, { attributionControl: false }).setView([startLat, startLng], props.zoom);
   L.tileLayer(tileUrl, { attribution }).addTo(map);
 
   if (props.lat != null && props.lng != null) {
@@ -221,8 +227,11 @@ onMounted(() => {
   if (!props.readonly) {
     map.on("click", (e) => {
       const { lat, lng } = e.latlng;
-      emit("update:lat", +lat.toFixed(6));
-      emit("update:lng", +lng.toFixed(6));
+      const finalLat = +lat.toFixed(6);
+      const finalLng = +lng.toFixed(6);
+      emit("update:lat", finalLat);
+      emit("update:lng", finalLng);
+      emit("manual-change", { lat: finalLat, lng: finalLng });
       setMarker(e.latlng);
     });
   }
@@ -238,6 +247,15 @@ watch(
 onBeforeUnmount(() => {
   if (map) map.remove();
 });
+
+function panTo(lat, lng, zoomLvl = null) {
+  if (lat != null && lng != null) {
+    updateLatLng(lat, lng, false);
+    if (map) map.setView([lat, lng], zoomLvl || props.zoom);
+  }
+}
+
+defineExpose({ panTo, locateMe });
 </script>
 
 <template>

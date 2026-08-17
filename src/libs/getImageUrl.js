@@ -15,21 +15,22 @@ const resolveApiImageUrl = (imageIdOrPath) => {
         const parsedUrl = new URL(path);
         const pathname = parsedUrl.pathname || "";
 
+        // If already /api/images/{id}, return as-is
         if (pathname.startsWith("/api/images/")) {
           return path;
         }
 
+        // If full URL points to /storage/ (public files), use it directly
+        // This handles: http://localhost:8000/storage/jasa/1/photo.jpg
+        // Stored files should be served directly via /storage/ path
         if (pathname.includes("/storage/")) {
-          const [, storagePathRaw = ""] = pathname.split("/storage/");
-          const storagePath = decodeURIComponent(storagePathRaw);
-          if (storagePath) {
-            return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
-          }
+          return path;
         }
       } catch {
         return path;
       }
 
+      // Other http URLs — return as-is
       return path;
     }
 
@@ -38,22 +39,18 @@ const resolveApiImageUrl = (imageIdOrPath) => {
     if (path.startsWith("/api/images/")) {
       return `${backendBase}${path}`;
     }
-    if (path.startsWith("api/images/")) {
-      return `${backendBase}/${path}`;
-    }
 
     if (path.startsWith("/storage/")) {
-      const storagePath = path.replace(/^\/storage\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+      // Serve directly: /storage/xxx -> full URL
+      return `${backendBase}/storage/${path.replace(/^\/storage\//, "")}`;
     }
+
     if (path.startsWith("storage/")) {
-      const storagePath = path.replace(/^storage\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(storagePath)}`;
+      return `${backendBase}/storage/${path.replace(/^storage\//, "")}`;
     }
 
     if (path.startsWith("/jasa/")) {
-      const jasaPath = path.replace(/^\//, "");
-      return `${apiBase}/api/images/${encodeURIComponent(jasaPath)}`;
+      return `${apiBase}/api/images/${encodeURIComponent(path.replace(/^\//, ""))}`;
     }
 
     if (path.startsWith("jasa/")) {
@@ -65,6 +62,7 @@ const resolveApiImageUrl = (imageIdOrPath) => {
     }
   }
 
+  // Numeric ID → proxy through /api/images/{id}
   return `${apiBase}/api/images/${encodeURIComponent(imageIdOrPath)}`;
 };
 
@@ -81,7 +79,7 @@ export const getImageUrlJasa = (imageIdOrPath) => {
  * @param {Object} event - Event object with id
  * @returns {string} Event banner URL
  */
-export function getEventBannerUrl(event) {
+export function getEventBannerUrl(event, size = 'original') {
   if (!event?.id) {
     return null;
   }
@@ -98,14 +96,14 @@ export function getEventBannerUrl(event) {
     ? new Date(event.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/event-banners/${event.id}?t=${timestamp}`;
+  return `${apiUrl}/api/event-banners/${event.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get merchant logo URL via streaming API
  * Konsisten dengan event banner dan user profile picture
  */
-export function getMerchantLogoUrl(merchant) {
+export function getMerchantLogoUrl(merchant, size = 'original') {
   if (!merchant?.id) {
     return '/placeholder.png';
   }
@@ -116,14 +114,14 @@ export function getMerchantLogoUrl(merchant) {
     ? new Date(merchant.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/merchant-logo/${merchant.id}?t=${timestamp}`;
+  return `${apiUrl}/api/merchant-logo/${merchant.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get user profile picture URL via streaming API
  * Konsisten dengan event banner dan merchant logo
  */
-export function getUserProfileUrl(user) {
+export function getUserProfileUrl(user, size = 'original') {
   if (!user?.id) {
     console.warn('getUserProfileUrl: user.id is missing', user);
     return '/placeholder.png';
@@ -141,30 +139,37 @@ export function getUserProfileUrl(user) {
     ? new Date(user.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/user-profile/${user.id}?t=${timestamp}`;
+  return `${apiUrl}/api/user-profile/${user.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get merchant banner URL via streaming API
  */
-export function getMerchantBannerUrl(merchant) {
+export function getMerchantBannerUrl(merchant, size = 'original') {
   if (!merchant?.id) return "/placeholder.png";
-  return `${API_BASE_URL}/api/merchant-banner/${merchant.id}`;
+
+  const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const timestamp = merchant.updated_at
+    ? new Date(merchant.updated_at).getTime()
+    : Date.now();
+
+  return `${apiUrl}/api/merchant-banner/${merchant.id}?size=${size}&t=${timestamp}`;
 }
 
 /**
  * Get community post image URL via streaming API
  * Konsisten dengan event banner, merchant logo, dan user profile picture
  */
-export function getCommunityImageUrl(imageId) {
+export function getCommunityImageUrl(imageId, size = 'original', timestamp = null) {
   if (!imageId) {
     return '/placeholder.png';
   }
 
   const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-  // ✅ Cache-busting dengan timestamp
-  const timestamp = Date.now();
+  // Jika ada timestamp gunakan itu, jika tidak, kita bisa biarkan statis agar bisa di-cache dengan baik
+  // Jangan pakai Date.now() secara default karena akan merusak sistem cache browser
+  const query = timestamp ? `&t=${timestamp}` : '';
 
-  return `${apiUrl}/api/community-images/${imageId}?t=${timestamp}`;
+  return `${apiUrl}/api/community-images/${imageId}?size=${size}${query}`;
 }
