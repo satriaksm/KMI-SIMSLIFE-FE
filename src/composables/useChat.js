@@ -94,13 +94,65 @@ export function useChat() {
     return data.data || data;
   }
 
+  // Respond to an offer (accept or reject) - called by BUYER
+  async function respondOffer(conversationId, messageId, accept) {
+    loading.value = true;
+    try {
+      const { data } = await api.put(
+        `/api/chats/${conversationId}/offers/${messageId}/respond`,
+        {
+          accept: accept === true,
+        }
+      );
+      // Update the message in local state
+      const msgIndex = messages.value.findIndex((m) => m.id === messageId);
+      if (msgIndex >= 0) {
+        messages.value[msgIndex] = {
+          ...messages.value[msgIndex],
+          offer_status: accept ? "accepted" : "rejected",
+        };
+      }
+      return data.data || data;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Accept an offer on a conversation (merchant only)
   async function acceptOffer(conversationId) {
     const { data } = await api.put(`/api/chats/${conversationId}/offer/accept`);
     if (activeConversation.value) {
-      activeConversation.value.status = 'deal_accepted';
+      activeConversation.value.status = "deal_accepted";
     }
     return data.data || data;
+  }
+
+  // Create service link from accepted offer (negotiated price)
+  async function createServiceLink(conversationId, agreedPrice, scheduleData = {}) {
+    loading.value = true;
+    try {
+      const { data } = await api.post(`/api/chats/${conversationId}/service-link`, {
+        agreed_price: agreedPrice,
+        booking_date: scheduleData.booking_date || null,
+        booking_time: scheduleData.booking_time || null,
+        notes: scheduleData.notes || "",
+      });
+      return data.data || data;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Fetch buyer's conversations
+  async function fetchBuyerConversations(params = {}) {
+    loading.value = true;
+    try {
+      const { data } = await api.get("/api/chats/buyer", { params });
+      conversations.value = data.data || data;
+      return conversations.value;
+    } finally {
+      loading.value = false;
+    }
   }
 
   // Update conversation status (merchant only)
@@ -129,7 +181,10 @@ export function useChat() {
     startConversation,
     sendMessage,
     makeOffer,
+    respondOffer,
     acceptOffer,
+    createServiceLink,
+    fetchBuyerConversations,
     updateConversationStatus,
     deleteConversation,
   };

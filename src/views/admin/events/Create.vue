@@ -9,6 +9,7 @@ import InputDateField from "@/components/forms/InputDateField.vue";
 import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import { useEvents } from "@/composables/useEvents";
+import { compressImage } from "@/utils/imageCompressor";
 import api from "@/libs/axios";
 
 const router = useRouter();
@@ -21,9 +22,10 @@ const availableVouchers = ref([]);
 const selectedMerchantIds = ref([]);
 const selectedVoucherIds = ref([]);
 
-// Search queries for modals
+// Search queries and filters for modals
 const searchMerchantModal = ref("");
 const searchVoucherModal = ref("");
+const filterSegmentation = ref("");
 
 // Modal visibility
 const showMerchantModal = ref(false);
@@ -46,11 +48,28 @@ const fetchInitialData = async () => {
 };
 
 const filteredMerchants = computed(() => {
-  if (!searchMerchantModal.value) return availableMerchants.value;
-  return availableMerchants.value.filter(m => 
-    m.name.toLowerCase().includes(searchMerchantModal.value.toLowerCase())
-  );
+  let filtered = availableMerchants.value;
+  if (searchMerchantModal.value) {
+    filtered = filtered.filter(m => 
+      m.name.toLowerCase().includes(searchMerchantModal.value.toLowerCase()) ||
+      m.slug?.toLowerCase().includes(searchMerchantModal.value.toLowerCase())
+    );
+  }
+  if (filterSegmentation.value) {
+    filtered = filtered.filter(m => m.segmentation?.id === parseInt(filterSegmentation.value) || m.segmentation_id === parseInt(filterSegmentation.value));
+  }
+  return filtered;
 });
+
+const selectedMerchantsCount = computed(() => selectedMerchantIds.value.length);
+
+const selectAllMerchants = () => {
+  if (selectedMerchantIds.value.length === filteredMerchants.value.length) {
+    selectedMerchantIds.value = [];
+  } else {
+    selectedMerchantIds.value = filteredMerchants.value.map(m => m.id);
+  }
+};
 
 const filteredVouchers = computed(() => {
   if (!searchVoucherModal.value) return availableVouchers.value;
@@ -84,24 +103,13 @@ const allowedStatus = computed(() => {
   today.setHours(0, 0, 0, 0);
 
   if (!formValues.value.event_start_date || !formValues.value.event_end_date) {
-    return { status: "draft", options: statusOptions, message: "", isError: false };
+    return { status: formValues.value.status || "draft", options: statusOptions, message: "", isError: false };
   }
 
   const startDate = new Date(formValues.value.event_start_date);
   const endDate = new Date(formValues.value.event_end_date);
   startDate.setHours(0, 0, 0, 0);
   endDate.setHours(0, 0, 0, 0);
-
-  if (startDate < today) {
-    return {
-      status: "draft",
-      options: [{ value: "draft", label: "Draft" }],
-      message: "Tanggal mulai tidak boleh di masa lalu.",
-      messageColor: "text-red-600",
-      isError: true,
-      disabled: true,
-    };
-  }
 
   if (endDate < today) {
     return {
@@ -113,30 +121,17 @@ const allowedStatus = computed(() => {
     };
   }
 
-  if (startDate.getTime() === today.getTime()) {
-    return {
-      status: formValues.value.status || "published",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "published", label: "Published" },
-      ],
-      message: "Event dimulai hari ini.",
-      messageColor: "text-green-600",
-      isError: false,
-    };
-  }
-
-  if (startDate > today) {
-    return {
-      status: "draft",
-      options: [{ value: "draft", label: "Draft" }],
-      message: "Event belum memasuki tanggal mulai.",
-      messageColor: "text-blue-600",
-      isError: false,
-    };
-  }
-
-  return { status: "draft", options: statusOptions, message: "", isError: false };
+  // For current or future events, allow draft and published
+  return {
+    status: formValues.value.status && formValues.value.status !== 'archived' ? formValues.value.status : "published",
+    options: [
+      { value: "draft", label: "Draft" },
+      { value: "published", label: "Published" },
+    ],
+    message: startDate <= today ? "Event sedang berjalan." : "Event belum memasuki tanggal mulai.",
+    messageColor: startDate <= today ? "text-green-600" : "text-blue-600",
+    isError: false,
+  };
 });
 
 const statusOptions = [
@@ -157,13 +152,24 @@ const schema = yup.object({
   event_end_date: yup.date().required("Tanggal selesai wajib diisi").min(yup.ref("event_start_date")),
 });
 
-const handleBannerChange = (event) => {
+const handleBannerChange = async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-  bannerFile.value = file;
-  const reader = new FileReader();
-  reader.onload = (e) => { bannerPreview.value = e.target?.result; };
-  reader.readAsDataURL(file);
+
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error("Ukuran banner maksimal 5MB");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const compressedFile = await compressImage(file, 1920);
+    bannerFile.value = compressedFile;
+    bannerPreview.value = URL.createObjectURL(compressedFile);
+  } catch (err) {
+    bannerFile.value = file;
+    bannerPreview.value = URL.createObjectURL(file);
+  }
 };
 
 const removeBanner = () => {
@@ -228,6 +234,7 @@ onMounted(fetchInitialData);
             <div class="space-y-6">
               <TextField
                 name="event_name"
+                v-model="formValues.event_name"
                 variant="merchant"
                 label="Nama Event"
                 placeholder="Contoh: Promo Ramadan 2025"
@@ -236,6 +243,7 @@ onMounted(fetchInitialData);
 
               <TextField
                 name="event_description"
+                v-model="formValues.event_description"
                 variant="merchant"
                 label="Deskripsi Event"
                 placeholder="Deskripsi lengkap tentang event..."
@@ -274,10 +282,15 @@ onMounted(fetchInitialData);
               <div class="p-4 rounded-xl border border-gray-100" :class="allowedStatus.isError ? 'bg-red-50 border-red-100' : 'bg-gray-50'">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-sm font-bold text-gray-700">Status Event</span>
-                  <span class="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider" 
-                    :class="formValues.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'">
-                    {{ formValues.status }}
-                  </span>
+                  <select 
+                    v-model="formValues.status"
+                    class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-bold focus:ring-2 focus:ring-merchant-primary outline-none"
+                    :disabled="allowedStatus.options.length <= 1"
+                  >
+                    <option v-for="opt in allowedStatus.options" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
                 </div>
                 <p v-if="allowedStatus.message" class="text-xs italic" :class="allowedStatus.messageColor">
                   <i class="pi pi-info-circle mr-1"></i> {{ allowedStatus.message }}
@@ -365,9 +378,40 @@ onMounted(fetchInitialData);
     </div>
 
     <!-- Merchant Modal -->
-    <ResponsiveModal :show="showMerchantModal" @close="showMerchantModal = false" title="Pilih Merchant" size="lg">
+    <ResponsiveModal :show="showMerchantModal" @close="showMerchantModal = false" title="Pilih Merchant" size="xl">
       <div class="space-y-4 p-1">
-        <TextField name="modal_search_m" v-model="searchMerchantModal" placeholder="Cari nama merchant..." icon="pi pi-search" hide-label />
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <TextField name="modal_search_m" v-model="searchMerchantModal" placeholder="Cari nama merchant..." icon="pi pi-search" hide-label customClass="mb-0 h-full" />
+          <div class="relative h-[42px]">
+            <select
+              v-model="filterSegmentation"
+              class="w-full h-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
+            >
+              <option value="">Semua Segmentasi</option>
+              <option value="1">UMKM Toko</option>
+              <option value="2">UMKM Kuliner</option>
+              <option value="3">UMKM Jasa</option>
+            </select>
+            <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
+          </div>
+          <div class="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 h-[42px]">
+            <label class="flex items-center gap-3 cursor-pointer group w-full">
+              <div class="relative w-5 h-5 flex items-center justify-center shrink-0">
+                <input
+                  type="checkbox"
+                  :checked="selectedMerchantsCount === filteredMerchants.length && filteredMerchants.length > 0"
+                  @change="selectAllMerchants"
+                  class="peer absolute opacity-0 w-full h-full cursor-pointer"
+                />
+                <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                  <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+                </div>
+              </div>
+              <span class="text-sm font-bold text-gray-700 truncate">Pilih Semua</span>
+            </label>
+            <span class="text-[10px] font-bold text-merchant-primary whitespace-nowrap ml-2" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Terpilih</span>
+          </div>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
           <label v-for="m in filteredMerchants" :key="m.id" 
             class="flex items-center p-3 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer transition-all"

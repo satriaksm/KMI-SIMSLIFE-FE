@@ -25,6 +25,8 @@ const registerExportModal = inject("registerExportModal", null);
 const searchQuery = ref("");
 const currentPage = ref(1);
 const perPage = ref(10);
+const sortBy = ref("");
+const sortDir = ref("");
 
 // Modals
 const showFilterModal = ref(false);
@@ -49,6 +51,12 @@ const activeFilters = ref({
   segmentation: "",
 });
 
+// Status change modal
+const showStatusModal = ref(false);
+const selectedStatusMerchant = ref(null);
+const newMerchantStatus = ref('');
+const statusChangeLoading = ref(false);
+
 const isAnyModalOpen = computed(
   () =>
     showFilterModal.value ||
@@ -57,6 +65,35 @@ const isAnyModalOpen = computed(
     showRejectModal.value,
 );
 useBodyScrollLock(isAnyModalOpen);
+
+const merchantStatusOptions = [
+  { value: 'approved', label: 'Disetujui', color: 'text-green-700 bg-green-50 border-green-200' },
+  { value: 'suspended', label: 'Dibekukan', color: 'text-red-700 bg-red-50 border-red-200' },
+  { value: 'archived', label: 'Diarsipkan', color: 'text-gray-700 bg-gray-50 border-gray-200' },
+  { value: 'rejected', label: 'Ditolak', color: 'text-orange-700 bg-orange-50 border-orange-200' },
+];
+
+const openMerchantStatusModal = (merchant) => {
+  selectedStatusMerchant.value = merchant;
+  newMerchantStatus.value = merchant.status;
+  showStatusModal.value = true;
+};
+
+const confirmMerchantStatusChange = async () => {
+  if (!selectedStatusMerchant.value || !newMerchantStatus.value) return;
+  statusChangeLoading.value = true;
+  try {
+    await api.patch(`/api/admin/merchants/${selectedStatusMerchant.value.id}/status`, { status: newMerchantStatus.value });
+    toast.success(`Status merchant berhasil diubah`);
+    showStatusModal.value = false;
+    selectedStatusMerchant.value = null;
+    loadMerchants();
+  } catch (error) {
+    toast.error(error.response?.data?.message || 'Gagal mengubah status');
+  } finally {
+    statusChangeLoading.value = false;
+  }
+};
 
 // Table config
 const tableColumns = [
@@ -128,6 +165,8 @@ const loadMerchants = async () => {
       segmentation_id: activeFilters.value.segmentation,
       page: currentPage.value,
       per_page: perPage.value,
+      sort_by: sortBy.value,
+      sort_order: sortDir.value,
     });
   } catch (error) {
     console.error("Failed to load merchants:", error);
@@ -274,7 +313,7 @@ const exportPDF = async () => {
     link.click();
     link.remove();
 
-    toast.success("Laporan merchant berhasil diunduh");
+    toast.success("Laporan UMKM berhasil diunduh");
     closeExportModal();
   } catch (error) {
     console.error("Export PDF failed:", error);
@@ -287,6 +326,13 @@ const exportPDF = async () => {
 // Actions
 const goToDetail = (merchant) => {
   router.push({ name: "Admin - Merchant Detail", params: { id: merchant.id } });
+};
+
+const handleSortChange = ({ key, dir }) => {
+  sortBy.value = key;
+  sortDir.value = dir;
+  currentPage.value = 1;
+  loadMerchants();
 };
 
 // Pagination methods
@@ -322,8 +368,8 @@ onMounted(() => {
 <template>
   <div class="p-4 sm:p-6">
     <!-- Search & Toolbar -->
-    <div class="space-y-2 sm:space-y-4 mb-4 bg-white">
-      <div class="sm:flex sm:items-center sm:gap-4 pb-1">
+    <div class="mb-4 space-y-2 bg-white sm:space-y-4">
+      <div class="pb-1 sm:flex sm:items-center sm:gap-4">
         <div class="flex-1 mb-2 sm:mb-0">
           <TextField
             name="search"
@@ -345,7 +391,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -368,7 +414,7 @@ onMounted(() => {
           <span>Filter</span>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute -top-2 -right-2 bg-primary text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold"
+            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
           >
             {{ activeFilterCount }}
           </span>
@@ -386,11 +432,14 @@ onMounted(() => {
         :total-pages="totalPages"
         :pagination-info="paginationInfo"
         :show-checkbox="false"
+        :sort-by="sortBy"
+        :sort-dir="sortDir"
         empty-message="Tidak ada merchant yang ditemukan"
         @row-click="goToDetail"
         @page-change="goToPage"
         @next-page="nextPage"
         @prev-page="prevPage"
+        @sort-change="handleSortChange"
       >
         <template #cell-logo="{ item }">
           <div class="flex items-center justify-center">
@@ -399,7 +448,7 @@ onMounted(() => {
               class="w-10 h-10 rounded-full overflow-hidden"
             >
               <img
-                :src="getMerchantLogoUrl(item)"
+                :src="getMerchantLogoUrl(item, 'thumb')"
                 :alt="item.name"
                 class="w-full h-full object-cover"
                 @error="
@@ -423,7 +472,7 @@ onMounted(() => {
 
         <template #cell-owner="{ item }">
           <div>
-            <p class="font-medium text-sm">{{ item.user?.name || "-" }}</p>
+            <p class="text-sm font-medium">{{ item.user?.name || "-" }}</p>
             <p class="text-xs text-gray-500">{{ item.user?.email || "-" }}</p>
           </div>
         </template>
@@ -459,6 +508,16 @@ onMounted(() => {
               <i class="pi pi-eye"></i>
             </Button>
 
+            <Button
+              @click.stop="openMerchantStatusModal(item)"
+              variant="outline"
+              size="sm"
+              class="!border-blue-400 !text-blue-600 hover:!bg-blue-50"
+              title="Ubah Status"
+            >
+              <i class="pi pi-pencil"></i>
+            </Button>
+
             <!-- Show approve/reject buttons only for pending -->
             <template v-if="item.status === 'pending'">
               <Button
@@ -489,14 +548,14 @@ onMounted(() => {
     <!-- Mobile List -->
     <div class="sm:hidden">
       <div v-if="loading" class="flex justify-center py-12">
-        <i class="pi pi-spin pi-spinner text-4xl text-merchant-primary"></i>
+        <i class="text-4xl pi pi-spin pi-spinner text-merchant-primary"></i>
       </div>
 
       <div
         v-else-if="!merchants || merchants.length === 0"
-        class="text-center py-12"
+        class="py-12 text-center"
       >
-        <i class="pi pi-building text-6xl text-gray-300 mb-4"></i>
+        <i class="mb-4 text-6xl text-gray-300 pi pi-building"></i>
         <p class="text-gray-500">Tidak ada merchant</p>
       </div>
 
@@ -505,7 +564,7 @@ onMounted(() => {
           v-for="m in merchants"
           :key="m.id"
           @click="goToDetail(m)"
-          class="bg-white rounded-lg shadow-sm p-4 active:bg-gray-50 transition"
+          class="p-4 transition bg-white rounded-lg shadow-sm active:bg-gray-50"
         >
           <div class="flex items-start gap-3 mb-3">
             <div
@@ -513,7 +572,7 @@ onMounted(() => {
               class="w-12 h-12 rounded-full overflow-hidden shrink-0"
             >
               <img
-                :src="getMerchantLogoUrl(m)"
+                :src="getMerchantLogoUrl(m, 'thumb')"
                 :alt="m.name"
                 class="w-full h-full object-cover"
                 @error="
@@ -546,7 +605,7 @@ onMounted(() => {
             <StatusLabel :status="m.status" variant="merchant" size="sm" />
           </div>
 
-          <div class="flex items-center justify-between text-xs border-t pt-2">
+          <div class="flex items-center justify-between pt-2 text-xs border-t">
             <StatusLabel
               :status="
                 m.segmentation?.code ||
@@ -557,7 +616,7 @@ onMounted(() => {
               size="sm"
             />
             <span class="text-gray-600">
-              <i class="pi pi-box mr-1"></i>
+              <i class="mr-1 pi pi-box"></i>
               {{ m.products_count || 0 }} Produk
             </span>
           </div>
@@ -565,7 +624,7 @@ onMounted(() => {
           <!-- ✅ NEW: Mobile action buttons for pending -->
           <div
             v-if="m.status === 'pending'"
-            class="flex gap-2 mt-3 pt-3 border-t"
+            class="flex gap-2 pt-3 mt-3 border-t"
             @click.stop
           >
             <Button
@@ -574,7 +633,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-green-500 !text-green-600"
             >
-              <i class="pi pi-check mr-1"></i>
+              <i class="mr-1 pi pi-check"></i>
               Approve
             </Button>
             <Button
@@ -583,7 +642,7 @@ onMounted(() => {
               size="sm"
               custom-class="flex-1 !border-red-500 !text-red-600"
             >
-              <i class="pi pi-times mr-1"></i>
+              <i class="mr-1 pi pi-times"></i>
               Reject
             </Button>
           </div>
@@ -627,7 +686,7 @@ onMounted(() => {
       </div>
 
       <template #footer>
-        <div class="flex gap-3 justify-end">
+        <div class="flex justify-end gap-3">
           <Button @click="resetFilters" variant="secondary">Reset</Button>
           <Button @click="applyFilters" variant="merchant">Terapkan</Button>
         </div>
@@ -638,11 +697,11 @@ onMounted(() => {
     <ResponsiveModal
       :show="showExportModal"
       @close="closeExportModal"
-      title="Export Laporan Merchants"
-      subtitle="Unduh laporan data merchants dalam format PDF"
+      title="Export Laporan UMKM"
+      subtitle="Unduh laporan data UMKM dalam format PDF"
     >
       <div class="space-y-4">
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="p-4 border border-blue-200 rounded-lg bg-blue-50">
           <div class="flex items-start gap-3">
             <i class="pi pi-info-circle text-blue-600 text-xl mt-0.5"></i>
             <div class="flex-1">
@@ -650,8 +709,8 @@ onMounted(() => {
                 Laporan akan mencakup:
               </p>
               <ul class="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                <li>Data lengkap merchants (Nama, Owner, Email, Phone)</li>
-                <li>Segmentasi dan status merchants</li>
+                <li>Data lengkap UMKM (Nama, Pemilik, Email, Telepon)</li>
+                <li>Segmentasi dan status UMKM</li>
                 <li>Jumlah produk yang dimiliki</li>
                 <li>Filter yang diterapkan (Status, Segmentasi, Pencarian)</li>
                 <li>Informasi waktu download dan user yang mendownload</li>
@@ -664,10 +723,10 @@ onMounted(() => {
           @click="exportPDF"
           variant="merchant"
           size="lg"
-          custom-class="w-full justify-center"
+          custom-class="justify-center w-full"
           :loading="exportLoading"
         >
-          <i class="pi pi-download mr-2"></i>
+          <i class="mr-2 pi pi-download"></i>
           <span>Download Laporan PDF</span>
         </Button>
       </div>
@@ -680,9 +739,9 @@ onMounted(() => {
       title="Approve Merchant"
       subtitle="Apakah Anda yakin ingin meng-approve merchant ini?"
     >
-      <div class="text-center py-4">
-        <i class="pi pi-check-circle text-green-500 text-4xl mb-4"></i>
-        <p class="text-gray-800 font-semibold mb-2">
+      <div class="py-4 text-center">
+        <i class="mb-4 text-4xl text-green-500 pi pi-check-circle"></i>
+        <p class="mb-2 font-semibold text-gray-800">
           Merchant "{{ selectedMerchant?.name }}" akan di-approve
         </p>
         <p class="text-sm text-gray-500">
@@ -723,7 +782,7 @@ onMounted(() => {
       <div class="space-y-4">
         <textarea
           v-model="rejectionReason"
-          class="w-full p-3 border rounded-md focus:ring-1 focus:ring-primary focus:outline-none resize-none"
+          class="w-full p-3 border rounded-md resize-none focus:ring-1 focus:ring-primary focus:outline-none"
           rows="3"
           placeholder="Masukkan alasan penolakan di sini..."
         ></textarea>
@@ -747,6 +806,61 @@ onMounted(() => {
           </Button>
         </div>
       </template>
+    </ResponsiveModal>
+
+    <!-- Merchant Status Change Modal -->
+    <ResponsiveModal
+      :show="showStatusModal"
+      @close="showStatusModal = false"
+      title="Ubah Status Merchant"
+      :subtitle="selectedStatusMerchant ? selectedStatusMerchant.name : ''"
+    >
+      <div class="space-y-4" v-if="selectedStatusMerchant">
+        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <i class="pi pi-building text-gray-500"></i>
+          <div>
+            <p class="text-xs text-gray-500">Status saat ini</p>
+            <StatusLabel :status="selectedStatusMerchant.status" variant="merchant" size="sm" />
+          </div>
+        </div>
+
+        <div>
+          <p class="text-sm font-medium text-gray-700 mb-3">Pilih status baru:</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="opt in merchantStatusOptions"
+              :key="opt.value"
+              @click="newMerchantStatus = opt.value"
+              :class="[
+                'flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all',
+                newMerchantStatus === opt.value
+                  ? opt.color + ' ring-2 ring-offset-1 ring-current'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              ]"
+            >
+              <i :class="['pi', newMerchantStatus === opt.value ? 'pi-check-circle' : 'pi-circle', 'text-sm']"></i>
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button
+            @click="showStatusModal = false"
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmMerchantStatusChange"
+            :disabled="statusChangeLoading || newMerchantStatus === selectedStatusMerchant.status"
+            class="flex-1 px-4 py-2 bg-merchant-primary text-white rounded-lg text-sm font-medium hover:bg-merchant-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+          >
+            <i v-if="statusChangeLoading" class="pi pi-spin pi-spinner text-sm"></i>
+            {{ statusChangeLoading ? 'Menyimpan...' : 'Simpan Perubahan' }}
+          </button>
+        </div>
+      </div>
     </ResponsiveModal>
   </div>
 </template>

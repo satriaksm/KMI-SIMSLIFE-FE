@@ -299,7 +299,7 @@ onMounted(async () => {
   const startLat = normalize(props.lat) ?? -2.5;
   const startLng = normalize(props.lng) ?? 118.0;
 
-  map = L.map(mapEl.value).setView([startLat, startLng], props.zoom);
+  map = L.map(mapEl.value, { attributionControl: false }).setView([startLat, startLng], props.zoom);
   L.tileLayer(tileUrl, { attribution }).addTo(map);
 
   // If initial coordinates exist, center map to marker location.

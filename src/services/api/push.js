@@ -1,0 +1,194 @@
+import api from "@/libs/axios";
+
+const isSupported = () =>
+  typeof window !== "undefined" &&
+  window.isSecureContext &&
+  "serviceWorker" in navigator &&
+  "PushManager" in window &&
+  "Notification" in window;
+
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; ++index) {
+    outputArray[index] = rawData.charCodeAt(index);
+  }
+
+  return outputArray;
+};
+
+const getPushSubscriptionStatus = async () => {
+  const response = await api.get("/api/push-subscriptions/status");
+  return response.data?.data ?? response.data ?? { audiences: [] };
+};
+
+const getPublicKey = async () => {
+  const response = await api.get("/api/push/public-key");
+  const publicKey = response.data?.publicKey;
+
+  if (!publicKey) {
+    throw new Error("Kunci publik push notification belum dikonfigurasi.");
+  }
+
+  return publicKey;
+};
+
+const getServiceWorkerRegistration = async () => {
+  if (!isSupported()) return null;
+
+  try {
+    let registration = await navigator.serviceWorker.getRegistration();
+    
+    // In dev mode, we use push-sw.js. In prod, we use sw.js.
+    const expectedSw = import.meta.env.DEV ? "push-sw.js" : "sw.js";
+    
+    if (registration) {
+      const swUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL;
+      
+      // Jika SW yang terdaftar BUKAN SW yang kita harapkan, abaikan agar diregistrasi ulang
+      if (swUrl && swUrl.includes(expectedSw)) {
+        return registration;
+      }
+    }
+    
+    return await navigator.serviceWorker.register(`/${expectedSw}`, { scope: "/" });
+  } catch (error) {
+    console.error("SW Registration error:", error);
+    return null;
+  }
+};
+
+const getCurrentSubscription = async () => {
+  if (!isSupported()) return null;
+
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) return null;
+
+  // Tunggu sampai service worker benar-benar aktif
+  await navigator.serviceWorker.ready;
+
+  return registration.pushManager.getSubscription();
+};
+
+const getSubscriptionState = async () => {
+  if (!isSupported()) {
+    return {
+      supported: false,
+      permission: "unsupported",
+      enabled: false,
+      subscription: null,
+    };
+  }
+
+  const subscription = await getCurrentSubscription();
+
+  return {
+    supported: true,
+    permission: Notification.permission,
+    enabled: Boolean(subscription),
+    subscription,
+  };
+};
+
+const subscribe = async () => {
+  if (!isSupported()) {
+    throw new Error(
+      "Push notification hanya bisa aktif di HTTPS atau localhost yang aman.",
+    );
+  }
+
+  const permission =
+    Notification.permission === "granted"
+      ? Notification.permission
+      : await Notification.requestPermission();
+
+  if (permission !== "granted") {
+    throw new Error("Izin notifikasi belum diberikan.");
+  }
+
+  const registration = await getServiceWorkerRegistration();
+  if (!registration) {
+    throw new Error("Service worker belum siap.");
+  }
+
+  const existing = await registration.pushManager.getSubscription();
+
+  const syncPayload = (subscription) => subscription.toJSON();
+
+  if (existing) {
+    await api.post("/api/push-subscriptions", syncPayload(existing));
+    return existing;
+  }
+
+  const publicKey = await getPublicKey();
+  let subscription;
+
+  try {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        "Browser sedang memblokir Push API. Jika Anda memakai mode incognito/private, buka halaman ini di window biasa lalu aktifkan notifikasi ulang.",
+      );
+    }
+
+    throw error;
+  }
+
+  await api.post("/api/push-subscriptions", syncPayload(subscription));
+  return subscription;
+};
+
+/** Sinkronkan endpoint browser ke user yang sedang login (setelah ganti akun). */
+const syncPushSubscriptionForCurrentUser = async () => {
+  if (!isSupported() || Notification.permission !== "granted") {
+    return false;
+  }
+
+  const subscription = await getCurrentSubscription();
+  if (!subscription) {
+    return false;
+  }
+
+  await api.post("/api/push-subscriptions", subscription.toJSON());
+
+  return true;
+};
+
+const unsubscribe = async () => {
+  if (!isSupported()) {
+    throw new Error(
+      "Push notification hanya bisa dimatikan di HTTPS atau localhost yang aman.",
+    );
+  }
+
+  const subscription = await getCurrentSubscription();
+
+  if (!subscription) {
+    return false;
+  }
+
+  await api.delete("/api/push-subscriptions", {
+    data: {
+      endpoint: subscription.endpoint,
+    },
+  });
+
+  await subscription.unsubscribe();
+  return true;
+};
+
+export {
+  getPushSubscriptionStatus,
+  getSubscriptionState,
+  isSupported as supportsPushNotifications,
+  subscribe as subscribePushNotifications,
+  syncPushSubscriptionForCurrentUser,
+  unsubscribe as unsubscribePushNotifications,
+};

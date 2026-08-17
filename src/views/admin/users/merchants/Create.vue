@@ -17,6 +17,7 @@ import ErrorAlert from "@/components/forms/ErrorAlert.vue";
 import MapPicker from "@/components/forms/MapPicker.vue";
 import { useToast } from "vue-toastification";
 import AppButton from "@/components/common/Button.vue";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 const router = useRouter();
 const route = useRoute();
@@ -29,6 +30,10 @@ const isDev = import.meta.env.DEV;
 
 const latitude = ref(null);
 const longitude = ref(null);
+
+const { syncMapToAddress, syncAddressToMap, isSyncing } = useAddressMapSync();
+const mapRef = ref(null);
+const prefilling = ref(false);
 
 // Segmentation (Select from API)
 const segmentations = ref([]);
@@ -112,7 +117,7 @@ watch(selectedUserId, (newVal) => {
 
 // ✅ FIXED: Add user_id to schema and sync with selectedUserId
 const schema = yup.object({
-  user_id: yup.number().required("User wajib dipilih"),
+  user_id: yup.number().typeError("Silakan pilih user terlebih dahulu").required("User wajib dipilih"),
   name: yup.string().required("Nama wajib diisi"),
   phone: yup
     .string()
@@ -256,7 +261,27 @@ async function loadSegmentations() {
   }
 }
 
-watch(provinceId, async (val) => {
+const handleManualLocationChange = async ({ lat, lng }) => {
+  prefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => provinceId.value = id,
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => cityId.value = id,
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => districtId.value = id,
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => villageId.value = id
+    });
+  } finally {
+    prefilling.value = false;
+  }
+};
+
+watch(provinceId, async (val, prev) => {
+  if (prefilling.value) return;
+  if (val === prev) return;
   cityId.value = "";
   districtId.value = "";
   villageId.value = "";
@@ -265,17 +290,32 @@ watch(provinceId, async (val) => {
   villages.value = [];
   await loadCities(val);
 });
-watch(cityId, async (val) => {
+watch(cityId, async (val, prev) => {
+  if (prefilling.value) return;
+  if (val === prev) return;
   districtId.value = "";
   villageId.value = "";
   districts.value = [];
   villages.value = [];
   await loadDistricts(val);
 });
-watch(districtId, async (val) => {
+watch(districtId, async (val, prev) => {
+  if (prefilling.value) return;
+  if (val === prev) return;
   villageId.value = "";
   villages.value = [];
   await loadVillages(val);
+});
+watch(villageId, (val) => {
+  if (prefilling.value) return;
+  if (val) {
+    const provName = provinces.value.find((p) => String(p.id) === String(provinceId.value))?.name;
+    const cityName = cities.value.find((c) => String(c.id) === String(cityId.value))?.name;
+    const distName = districts.value.find((d) => String(d.id) === String(districtId.value))?.name;
+    const villName = villages.value.find((v) => String(v.id) === String(val))?.name;
+    
+    syncAddressToMap([villName, distName, cityName, provName], mapRef);
+  }
 });
 
 // Submit pakai endpoint admin
@@ -586,13 +626,18 @@ const selectedUser = computed(() =>
 
             <!-- Pemetaan Lokasi -->
             <div class="sm:col-span-2">
-              <label class="block text-sm font-bold mb-2 text-black">
-                Pemetaan Lokasi <span class="text-red-500">*</span>
-              </label>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-bold text-black">
+                  Pemetaan Lokasi <span class="text-red-500">*</span>
+                </label>
+                <span v-if="isSyncing" class="text-xs text-merchant-primary animate-pulse font-medium">Menyesuaikan...</span>
+              </div>
               <MapPicker
+                ref="mapRef"
                 variant="merchant"
                 v-model:lat="latitude"
                 v-model:lng="longitude"
+                @manual-change="handleManualLocationChange"
                 :zoom="15"
               />
 

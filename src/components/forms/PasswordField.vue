@@ -54,7 +54,7 @@ const toggleButtonClass = computed(() => {
 
 const inputClasses = (invalid) =>
   [
-    "w-full px-4 py-2.5 pr-10 text-sm border rounded-xl focus:outline-none",
+    "w-full px-4 py-2.5 pr-10 text-sm border rounded-xl focus:outline-none bg-white",
     invalid
       ? "border-danger-foreground focus:ring-2 focus:ring-danger-foreground"
       : `${borderClass.value} focus:ring-2 ${focusRingClass.value}`,

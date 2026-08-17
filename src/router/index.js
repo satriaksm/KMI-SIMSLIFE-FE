@@ -281,6 +281,15 @@ const routes = [
           title: "Laporan Saya | SUMILIR",
         },
       },
+      {
+        path: "reports/:id",
+        name: "AppealReport",
+        component: () => import("@/views/reports/AppealView.vue"),
+        meta: {
+          requiresAuth: true,
+          title: "Sanggahan Laporan | SUMILIR",
+        },
+      },
     ],
   },
 

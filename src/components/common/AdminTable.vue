@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, watch } from "vue";
 
 const props = defineProps({
   // Data
@@ -61,6 +61,14 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  sortBy: {
+    type: String,
+    default: "",
+  },
+  sortDir: {
+    type: String,
+    default: "", // 'asc' | 'desc'
+  },
 });
 
 const emit = defineEmits([
@@ -70,6 +78,7 @@ const emit = defineEmits([
   "page-change",
   "next-page",
   "prev-page",
+  "sort-change",
 ]);
 
 // Computed
@@ -115,15 +124,171 @@ const prevPage = () => {
   if (props.currentPage > 1) emit("prev-page");
 };
 
+const localSortBy = ref(props.sortBy);
+const localSortDir = ref(props.sortDir);
+
+watch(() => props.sortBy, val => localSortBy.value = val);
+watch(() => props.sortDir, val => localSortDir.value = val);
+
+const doLocalSort = (key) => {
+  if (localSortBy.value === key) {
+    if (localSortDir.value === 'desc') localSortDir.value = 'asc';
+    else if (localSortDir.value === 'asc') {
+      localSortDir.value = '';
+      localSortBy.value = '';
+    }
+  } else {
+    localSortBy.value = key;
+    localSortDir.value = 'asc';
+  }
+};
+
+// Override handleSort to just use local sort if the parent isn't using the server-side
+const handleSort = (key) => {
+  doLocalSort(key);
+  
+  // also emit for parent if needed
+  let newDir = 'desc';
+  if (props.sortBy === key) {
+    if (props.sortDir === 'desc') newDir = 'asc';
+    else if (props.sortDir === 'asc') {
+      newDir = '';
+    }
+  }
+  emit('sort-change', { key, dir: newDir });
+};
+
 // Get nested value from object by key path (e.g., 'user.name')
 const getNestedValue = (obj, path) => {
   if (!path) return "";
   return path.split(".").reduce((acc, part) => acc && acc[part], obj);
 };
+
+// Filtering logic
+import { ref, onMounted, onUnmounted } from 'vue';
+const activeFilterColumn = ref(null);
+const columnFilters = ref({});
+const filterSearch = ref({});
+
+const getColumnConfig = (key) => props.columns.find(c => c.key === key) || {};
+
+const formatFilterValue = (key, val) => {
+  const col = getColumnConfig(key);
+  if (col.filterFormat) return col.filterFormat(val);
+  return val;
+};
+
+const emitFilterChange = () => {
+  emit('filter-change', columnFilters.value);
+};
+
+const toggleFilter = (key) => {
+  if (activeFilterColumn.value === key) {
+    activeFilterColumn.value = null;
+  } else {
+    activeFilterColumn.value = key;
+    if (!columnFilters.value[key]) {
+      columnFilters.value[key] = getUniqueValues(key);
+    }
+  }
+};
+
+const closeFilter = () => {
+  activeFilterColumn.value = null;
+};
+
+const handleClickOutside = (e) => {
+  if (!e.target.closest('.filter-dropdown-container')) {
+    closeFilter();
+  }
+};
+
+onMounted(() => document.addEventListener('click', handleClickOutside));
+onUnmounted(() => document.removeEventListener('click', handleClickOutside));
+
+const getUniqueValues = (key) => {
+  const vals = props.items.map(item => {
+    let val = getNestedValue(item, key);
+    return formatFilterValue(key, val);
+  }).filter(v => v !== null && v !== undefined && v !== '');
+  return [...new Set(vals)];
+};
+
+const isValueFiltered = (key, val) => {
+  if (!columnFilters.value[key]) return true;
+  return columnFilters.value[key].includes(val);
+};
+
+const toggleFilterValue = (key, val) => {
+  if (!columnFilters.value[key]) {
+    columnFilters.value[key] = getUniqueValues(key);
+  }
+  const idx = columnFilters.value[key].indexOf(val);
+  if (idx > -1) {
+    columnFilters.value[key].splice(idx, 1);
+  } else {
+    columnFilters.value[key].push(val);
+  }
+  emitFilterChange();
+};
+
+const toggleAllFilter = (key) => {
+  const uniques = getUniqueValues(key);
+  if (columnFilters.value[key] && columnFilters.value[key].length === uniques.length) {
+    columnFilters.value[key] = [];
+  } else {
+    columnFilters.value[key] = uniques;
+  }
+  emitFilterChange();
+};
+
+const getFilteredItems = computed(() => {
+  let filtered = [...props.items];
+  Object.keys(columnFilters.value).forEach(key => {
+    const activeFilters = columnFilters.value[key];
+    if (activeFilters && activeFilters.length > 0) {
+      filtered = filtered.filter(item => {
+        const val = formatFilterValue(key, getNestedValue(item, key));
+        return activeFilters.includes(val);
+      });
+    } else if (activeFilters && activeFilters.length === 0) {
+      filtered = []; // If everything is unchecked, show nothing
+    }
+  });
+  if (localSortBy.value && localSortDir.value) {
+    filtered.sort((a, b) => {
+      let valA = getNestedValue(a, localSortBy.value);
+      let valB = getNestedValue(b, localSortBy.value);
+      
+      if (valA === null || valA === undefined) valA = '';
+      if (valB === null || valB === undefined) valB = '';
+      
+      if (valA < valB) return localSortDir.value === 'asc' ? -1 : 1;
+      if (valA > valB) return localSortDir.value === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  return filtered;
+});
+
+const resetFiltersAndSort = () => {
+  columnFilters.value = {};
+  localSortBy.value = '';
+  localSortDir.value = '';
+  activeFilterColumn.value = null;
+  emitFilterChange();
+  emit('sort-change', { key: '', dir: '' });
+};
+
+defineExpose({
+  resetFiltersAndSort
+});
+
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow overflow-hidden">
+  <div class="bg-white rounded-lg shadow">
     <!-- Loading State -->
     <div v-if="loading" class="flex justify-center items-center py-20">
       <div class="w-12 h-12 border-4 border-muted-foreground border-t-merchant-primary rounded-full animate-spin"></div>
@@ -139,7 +304,7 @@ const getNestedValue = (obj, path) => {
     </div>
 
     <!-- Table Content -->
-    <div v-else class="w-full overflow-x-auto">
+    <div v-else class="w-full overflow-x-auto min-h-[400px]">
       <div class="min-w-[1000px]">
         <table class="w-full">
           <thead>
@@ -160,10 +325,46 @@ const getNestedValue = (obj, path) => {
               <th
                 v-for="column in columns"
                 :key="column.key"
-                class="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-                :class="column.sortable ? 'cursor-pointer hover:bg-muted-background/60 transition' : ''"
+                class="px-6 py-4 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none relative"
+                :class="column.class || ''"
               >
-                {{ column.label }}
+                <div class="flex items-center gap-1 filter-dropdown-container">
+                  <span 
+                    :class="column.sortable ? 'cursor-pointer hover:text-merchant-primary transition' : ''"
+                    @click="column.sortable ? handleSort(column.key) : null"
+                  >
+                    {{ column.label }}
+                  </span>
+                  
+                  <div v-if="column.sortable" @click.stop="handleSort(column.key)" class="flex flex-col items-center justify-center -space-y-[0.15rem] cursor-pointer">
+                    <i class="pi pi-chevron-up text-[0.6rem]" :class="localSortBy === column.key && localSortDir === 'asc' ? 'text-merchant-primary font-bold' : 'text-gray-300'"></i>
+                    <i class="pi pi-chevron-down text-[0.6rem]" :class="localSortBy === column.key && localSortDir === 'desc' ? 'text-merchant-primary font-bold' : 'text-gray-300'"></i>
+                  </div>
+                  
+                  <!-- Filter Icon -->
+                  <div v-if="column.filterable" class="ml-1 cursor-pointer" @click.stop="toggleFilter(column.key)">
+                    <i class="pi pi-filter text-[0.75rem]" :class="activeFilterColumn === column.key || (columnFilters[column.key] && columnFilters[column.key].length !== getUniqueValues(column.key).length) ? 'text-merchant-primary font-bold' : 'text-gray-300 hover:text-merchant-primary'"></i>
+                  </div>
+                  
+                  <!-- Filter Dropdown Popup -->
+                  <div v-if="column.filterable && activeFilterColumn === column.key" class="absolute top-full left-0 mt-2 bg-white border border-merchant-primary/20 shadow-xl rounded-xl w-56 z-50 p-3 ring-1 ring-black/5" @click.stop>
+                    <div class="flex items-center gap-2 mb-3 px-2 py-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                      <i class="pi pi-search text-merchant-primary text-xs"></i>
+                      <input type="text" v-model="filterSearch[column.key]" placeholder="Cari filter..." class="w-full text-xs border-none bg-transparent focus:ring-0 p-0 text-black placeholder:text-gray-400" />
+                    </div>
+                    <div class="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                      <label class="flex items-center gap-3 px-2 py-2 hover:bg-merchant-primary/5 rounded-lg cursor-pointer text-xs text-gray-700 transition font-medium">
+                        <input type="checkbox" :checked="!columnFilters[column.key] || columnFilters[column.key].length === getUniqueValues(column.key).length" @change="toggleAllFilter(column.key)" class="rounded text-merchant-primary focus:ring-merchant-primary w-3.5 h-3.5 border-gray-300" />
+                        Pilih Semua
+                      </label>
+                      <div class="h-px bg-gray-100 my-1"></div>
+                      <label v-for="val in getUniqueValues(column.key).filter(v => !filterSearch[column.key] || String(v).toLowerCase().includes(filterSearch[column.key].toLowerCase()))" :key="val" class="flex items-center gap-3 px-2 py-2 hover:bg-merchant-primary/5 rounded-lg cursor-pointer text-xs text-gray-700 transition">
+                        <input type="checkbox" :checked="isValueFiltered(column.key, val)" @change="toggleFilterValue(column.key, val)" class="rounded text-merchant-primary focus:ring-merchant-primary w-3.5 h-3.5 border-gray-300" />
+                        {{ val }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
               </th>
 
               <!-- Actions Column -->
@@ -178,7 +379,7 @@ const getNestedValue = (obj, path) => {
 
           <tbody class="divide-y divide-muted-background">
             <tr
-              v-for="item in items"
+              v-for="item in getFilteredItems"
               :key="item.id"
               @click="handleRowClick(item)"
               class="hover:bg-muted-background transition"
@@ -303,6 +504,20 @@ const getNestedValue = (obj, path) => {
 
 <style scoped>
 /* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 .overflow-x-auto::-webkit-scrollbar {
   height: 8px;
 }
