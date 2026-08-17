@@ -13,10 +13,12 @@ import { useEventMerchants } from "@/composables/useEventMerchants";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 import api from "@/libs/axios";
 import LogoText from "@/assets/icons/LogoWithText.png";
+import AnalyticsTab from "./Analytics.vue";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const activeTab = ref("info"); // "info" | "analytics"
 
 const { fetchEventDetail, deleteEvent, inviteMerchants, loading } = useEvents();
 const { 
@@ -59,6 +61,7 @@ const breadcrumbItems = computed(() => [
   { label: event.value?.event_name || "Detail Event" },
 ]);
 
+const postingToCommunity = ref(false);
 const showAllVouchers = ref(false);
 const displayedVouchers = computed(() => {
   if (!event.value?.vouchers) return [];
@@ -239,6 +242,26 @@ function formatCurrency(value) {
 
 const goBack = () => router.push({ name: "Admin - Events" });
 
+const handlePostToCommunity = async () => {
+  if (postingToCommunity.value) return;
+  postingToCommunity.value = true;
+  try {
+    const response = await api.post(`/api/admin/events/${event.value.id}/post-to-community`);
+    if (response.data.success) {
+      toast.success(response.data.message);
+      // Optional: open the post in a new tab or navigate there
+      // window.open(`/community/post/${response.data.post_id}`, '_blank');
+    } else {
+      toast.error(response.data.message || 'Gagal memposting ke komunitas');
+    }
+  } catch (error) {
+    console.error('Post to community error:', error);
+    toast.error(error.response?.data?.message || 'Gagal memposting ke komunitas');
+  } finally {
+    postingToCommunity.value = false;
+  }
+};
+
 // Open modal and reset
 const openAddVoucherModal = async () => {
   try {
@@ -418,6 +441,33 @@ const exportDetailPDF = async () => {
   }
 };
 
+// ✅ Export Excel method
+const exportExcelLoading = ref(false);
+const exportDetailExcel = async () => {
+  exportExcelLoading.value = true;
+  try {
+    const response = await api.get(`/api/admin/events/${event.value.id}/export-excel`, {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `event-analytics-${event.value.id}-${new Date().toISOString().split('T')[0]}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    toast.success("Laporan analitik event (Excel) berhasil diunduh");
+    showExportModal.value = false;
+  } catch (error) {
+    console.error("Export Excel failed:", error);
+    toast.error(error.response?.data?.message || "Gagal mengunduh laporan Excel");
+  } finally {
+    exportExcelLoading.value = false;
+  }
+};
+
 // ✅ Open export modal method
 const openExportModal = () => {
   console.log('openExportModal called in Detail.vue');
@@ -463,6 +513,10 @@ onMounted(async () => {
             Kembali
           </button>
           <div class="w-px h-6 bg-gray-200 mx-1"></div>
+          <Button @click="handlePostToCommunity" variant="primary-outline" size="sm" :disabled="postingToCommunity">
+            <i class="pi" :class="postingToCommunity ? 'pi-spinner pi-spin' : 'pi-share-alt'"></i>
+            <span class="ml-2">{{ postingToCommunity ? 'Memposting...' : 'Post Komunitas' }}</span>
+          </Button>
           <Button @click="goToEdit" variant="merchant-outline" size="sm">
             <i class="pi pi-pencil mr-2 text-xs"></i>
             Edit Event
@@ -475,8 +529,31 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event">
+    <!-- Tab Switcher -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-6" v-if="event">
+      <div class="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+        <button
+          @click="activeTab = 'info'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'info' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-info-circle mr-2"></i>Informasi Event
+        </button>
+        <button
+          @click="activeTab = 'analytics'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'analytics' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-chart-bar mr-2"></i>Analisis Event
+        </button>
+      </div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div v-if="event && activeTab === 'analytics'" class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <AnalyticsTab :event-id="event.id" />
+    </div>
+
+    <!-- Main Content (Info Tab) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event && activeTab === 'info'">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Left Column: Banner & Info -->
         <div class="lg:col-span-2 space-y-8">
@@ -1090,24 +1167,55 @@ onMounted(async () => {
             </div>
           </div>
           
-          <ul class="space-y-3">
+          <ul class="space-y-3 mb-6">
             <li v-for="(item, i) in ['Informasi fundamental event', 'Daftar merchant yang terdaftar', 'Rincian voucher dan periode', 'Status dan statistik partisipasi']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
               <i class="pi pi-check-circle text-merchant-primary text-xs shrink-0"></i>
               {{ item }}
             </li>
           </ul>
+
+          <Button
+            @click="exportDetailPDF"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportLoading"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Laporan PDF
+          </Button>
         </div>
 
-        <Button
-          @click="exportDetailPDF"
-          variant="merchant"
-          size="lg"
-          block
-          :loading="exportLoading"
-        >
-          <i class="pi pi-download mr-2"></i>
-          Download Laporan PDF
-        </Button>
+        <div class="bg-gradient-to-br from-green-50 to-green-100/50 border border-green-100 rounded-2xl p-6 mt-4">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <i class="pi pi-file-excel text-2xl text-green-600"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-900">Format Laporan Excel</h4>
+              <p class="text-xs text-gray-500">Data analitik komprehensif KMI Simslife</p>
+            </div>
+          </div>
+          
+          <ul class="space-y-3 mb-6">
+            <li v-for="(item, i) in ['Statistik lengkap (rating, performa)', 'Ranking UMKM & Kategori Terlaris', 'Performa produk & metode pembayaran', 'Data multi-sheet yang mudah diolah']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
+              <i class="pi pi-check-circle text-green-600 text-xs shrink-0"></i>
+              {{ item }}
+            </li>
+          </ul>
+
+          <Button
+            @click="exportDetailExcel"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportExcelLoading"
+            class="!bg-green-600 hover:!bg-green-700 !border-green-600"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Excel
+          </Button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>
