@@ -157,7 +157,7 @@
             </div>
 
             <!-- RIGHT COLUMN: Map & Detail Alamat -->
-            <div class="space-y-4">
+            <div class="space-y-4 mb-12 sm:mb-0">
 
               <!-- Pemetaan Lokasi -->
               <div class="flex flex-col gap-4 pt-6 sm:pt-0">
@@ -534,7 +534,7 @@ const handleRegister = async (values) => {
       name: values.name,
       phone: values.phone,
       description: values.description,
-      NPWP: values.NPWP || null,
+      NPWP: values.NPWP && values.NPWP.trim() !== "" ? values.NPWP.trim() : null,
       segmentation_id: Number(values.segmentation_id),
       address: {
         province_id: Number(values.address.province_id),

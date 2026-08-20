@@ -118,8 +118,9 @@
                 class="flex items-center justify-center w-20 h-20 overflow-hidden border shadow-inner rounded-2xl bg-white/20 backdrop-blur-sm shrink-0 border-white/30"
               >
                 <ResponsiveImage
-                  v-if="merchant.logo_url"
-                  :src="merchant.logo_urls?.thumb || merchant.logo_url"
+                  v-if="merchantLogoMediumUrl || merchant.logo_url"
+                  :src="merchantLogoMediumUrl || merchant.logo_url"
+                  :urls="merchant.logo_urls"
                   alt="Logo Toko"
                   customClass="object-cover w-full h-full"
                 />
@@ -530,6 +531,33 @@ const route = useRoute();
 const router = useRouter();
 
 const merchant = ref(null);
+
+const merchantLogoMediumUrl = computed(() => {
+  const m = merchant.value;
+  if (!m) return null;
+
+  if (m.logo_urls?.medium) {
+    return m.logo_urls.medium;
+  }
+
+  if (m.logo_url) {
+    const raw = m.logo_url;
+    if (typeof raw === "string" && !raw.includes("size=")) {
+      const sep = raw.includes("?") ? "&" : "?";
+      return `${raw}${sep}size=medium`;
+    }
+    return raw;
+  }
+
+  if (m.logo_path) {
+    return `${
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+    }/storage/${m.logo_path}`;
+  }
+
+  return null;
+});
+
 const jasaList = ref([]);
 const productList = ref([]);
 const loading = ref(true);

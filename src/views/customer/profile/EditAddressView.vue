@@ -109,7 +109,11 @@ const villageOptions = computed(() =>
 // METHODS
 // =========================
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 async function loadProvinces() {
@@ -457,7 +461,7 @@ onMounted(async () => {
                 type="button"
                 variant="muted-outline"
                 class="w-full"
-                @click="router.back()"
+                @click="goBack"
               >
                 Batal
               </AppButton>

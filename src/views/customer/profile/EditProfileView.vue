@@ -121,7 +121,11 @@ const handleCancel = () => {
 };
 
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 const handlePhotoUpload = () => {

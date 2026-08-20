@@ -89,7 +89,11 @@ const onSubmit = handleSubmit(async (formValues) => {
 });
 
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 </script>
 

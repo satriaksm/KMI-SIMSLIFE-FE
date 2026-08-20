@@ -673,12 +673,12 @@
                   <div
                     class="flex-shrink-0 w-12 h-12 overflow-hidden bg-gray-200 rounded-full"
                   >
-                    <ResponsiveImage
-                      v-if="product?.merchant?.logo_url"
-                      :src="product.merchant.logo_url"
-                      :urls="product.merchant.logo_urls"
-                      alt="UMKM logo"
-                      customClass="object-cover w-full h-full"
+                    <img
+                      v-if="merchantLogoThumbUrl"
+                      :src="merchantLogoThumbUrl"
+                      :alt="product?.merchant?.name || 'UMKM logo'"
+                      class="object-cover w-full h-full"
+                      loading="lazy"
                     />
                     <span v-else>
                       <svg
@@ -1130,43 +1130,6 @@
     </template>
   </ResponsiveModal>
 
-  <!-- Penilaian Produk -->
-  <div class="px-4 py-6 bg-gray-50">
-    <div class="max-w-2xl mx-auto">
-      <!-- Rating Summary Header -->
-      <div class="mb-4">
-        <h3 class="text-lg font-bold text-gray-900 mb-2">Penilaian Produk</h3>
-        <div v-if="product?.rating_summary && product.rating_summary.total_reviews > 0" class="flex items-center gap-3">
-          <div class="flex items-center gap-1">
-            <i
-              v-for="star in 5"
-              :key="star"
-              :class="[
-                'text-xl',
-                star <= Math.round(product.rating_summary.average_rating) ? 'pi pi-star-fill text-orange-400' : 'pi pi-star text-gray-300'
-              ]"
-            ></i>
-          </div>
-          <span class="font-semibold text-gray-700">{{ product.rating_summary.average_rating?.toFixed(1) || '0.0' }}</span>
-          <span class="text-sm text-gray-500">({{ product.rating_summary.total_reviews }} keseluruhan)</span>
-        </div>
-        <p v-else class="text-sm text-gray-500">Belum ada ulasan</p>
-      </div>
-
-      <!-- Reviews List -->
-      <ReviewSection
-        v-if="product?.id"
-        resourceType="product"
-        :resourceId="product.id"
-        title=""
-        :showHeader="false"
-      />
-      <div v-else class="empty-review-state">
-        <i class="pi pi-star"></i>
-        <p>Belum ada ulasan untuk produk ini.</p>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
@@ -1185,7 +1148,6 @@ import { useBodyScrollLock } from "@/composables/useBodyScrollLock.js";
 import Button from "@/components/common/Button.vue";
 import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
-import ReviewSection from "@/components/common/ReviewSection.vue";
 import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import Textfield from "@/components/forms/TextField.vue";
 import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
@@ -1195,7 +1157,6 @@ import { useToast } from "vue-toastification";
 import { useCartStore } from "@/stores/cart";
 import { useAuthStore } from "@/stores/auth";
 import { useCart } from "@/composables/useCart";
-import echo from "@/libs/echo";
 const { addToCart: addCart, loading: loadingCart, fetchCartCount } = useCart();
 const authStore = useAuthStore();
 const isAdmin = computed(() => authStore.isAdmin);
@@ -1247,6 +1208,32 @@ const displayedDescription = computed(() => {
   return desc.slice(0, DESCRIPTION_LIMIT) + "...";
 });
 
+const merchantLogoThumbUrl = computed(() => {
+  const merchant = product.value?.merchant;
+  if (!merchant) return null;
+
+  if (merchant.logo_urls?.thumb) {
+    return merchant.logo_urls.thumb;
+  }
+
+  if (merchant.logo_url) {
+    const raw = merchant.logo_url;
+    if (typeof raw === "string" && !raw.includes("size=")) {
+      const sep = raw.includes("?") ? "&" : "?";
+      return `${raw}${sep}size=thumb`;
+    }
+    return raw;
+  }
+
+  if (merchant.logo_path) {
+    return `${
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+    }/storage/${merchant.logo_path}`;
+  }
+
+  return null;
+});
+
 function handleTouchStart(e) {
   if (!e.touches || e.touches.length === 0) return;
   touchStartX.value = e.touches[0].clientX;
@@ -1280,10 +1267,10 @@ function getOptionValueImage(optionIndex, valueId) {
   const option = product.value?.options?.[optionIndex - 1];
   if (!option || !option.values) return null;
   const value = option.values.find((v) => Number(v.id) === Number(valueId));
-  if (!value?.src_url && !value?.image_url) return null;
+  if (!value?.src_url && !value?.image_url && !value?.thumb_url && !value?.urls) return null;
   return {
-    src: value.thumb_url || value.src_url || value.image_url,
-    urls: null // Force using only the 150x thumbnail
+    src: value.thumb_url || value.urls?.thumb || value.src_url || value.image_url,
+    urls: value.urls || null
   };
 }
 
@@ -1470,7 +1457,11 @@ const goToCart = () => {
 };
 useBodyScrollLock(isAnyModalOpen);
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 // -------------- stock/price helpers (kept dari kode Anda, sedikit disesuaikan) --------------
@@ -1681,13 +1672,14 @@ async function doFetchProduct(slug) {
           }
           
           if (src) {
+            const urls = img.image_urls || img.urls || img.src_urls || {
+              original: img.original_url || img.src_url || src,
+              medium: img.medium_url || (src.includes('/api/images/') ? `${src}${src.includes('?') ? '&' : '?'}size=medium` : src),
+              thumb: img.thumb_url || (src.includes('/api/images/') ? `${src}${src.includes('?') ? '&' : '?'}size=thumb` : src),
+            };
             return {
               src,
-              urls: img.image_urls || img.urls || img.src_urls || {
-                original: img.src_url,
-                medium: img.medium_url,
-                thumb: img.thumb_url
-              }
+              urls
             };
           }
         }
@@ -1894,55 +1886,6 @@ onBeforeUnmount(() => {
   window.removeEventListener("scroll", handleScroll);
 });
 
-watch(
-  () => product.value?.id,
-  (next, prev) => {
-    if (prev) {
-      leaveInventoryChannel(prev);
-    }
-    if (next) {
-      subscribeInventoryChannel(next);
-    }
-  },
-);
-
-onUnmounted(() => {
-  if (product.value?.id) {
-    leaveInventoryChannel(product.value.id);
-  }
-});
-
-function subscribeInventoryChannel(productId) {
-  if (!productId) return;
-
-  inventoryChannel = echo.channel(`products.${productId}`);
-  inventoryChannel.listen(".inventory.stock.updated", (payload) => {
-    if (!payload || Number(payload.product_id) !== Number(productId)) {
-      return;
-    }
-
-    const variantId = Number(payload.variant_id);
-    const stockValue = Number(payload.stock ?? 0);
-    const idx = stockCombinations.value.findIndex(
-      (c) => Number(c.product_variant_id) === variantId,
-    );
-
-    if (idx >= 0) {
-      stockCombinations.value[idx] = {
-        ...stockCombinations.value[idx],
-        stock: stockValue,
-      };
-    }
-
-    validateQuantity();
-  });
-}
-
-function leaveInventoryChannel(productId) {
-  if (!productId) return;
-  echo.leave(`products.${productId}`);
-  inventoryChannel = null;
-}
 watch(product, (p) => {
   if (!p) return;
 
@@ -2122,7 +2065,7 @@ function buyNow() {
     productId: product.value?.id ?? null,
     slug: product.value?.slug,
     title: product.value?.name,
-    image: selectedImage.value || productImages.value?.[0] || "",
+    image: selectedImage.value?.src || selectedImage.value || productImages.value?.[0]?.src || productImages.value?.[0] || "",
     store: {
       id: store.id ?? null,
       merchantId: store.id ?? null,

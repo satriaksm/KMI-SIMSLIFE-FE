@@ -178,7 +178,11 @@ const {
 const hasFetchedProductsOnce = ref(false);
 const hasFetchedMerchantsOnce = ref(false);
 function goBack() {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 }
 const goToProductDetail = (product) => {
   const slug = product?.slug;
@@ -1208,6 +1212,7 @@ onBeforeUnmount(() => {
                 (item.jasa_id ?? item.id)
               "
               :product="item"
+              imageSize="medium"
               @click="handleResultClick(item)"
             />
 
@@ -1254,6 +1259,7 @@ onBeforeUnmount(() => {
             v-for="merchant in merchants"
             :key="merchant.id"
             :merchant="merchant"
+            imageSize="medium"
           />
 
           <!-- skeleton append -->

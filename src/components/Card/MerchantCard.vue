@@ -12,8 +12,8 @@
       <!-- Logo/Image -->
       <div class="relative bg-muted-background aspect-square">
         <img
-          v-if="merchant.logo_url"
-          :src="merchant.logo_url"
+          v-if="merchantLogoUrl"
+          :src="merchantLogoUrl"
           :alt="merchant.name"
           class="object-cover w-full h-full"
         />
@@ -27,7 +27,7 @@
         <!-- Badge Segmentation -->
         <div
           v-if="merchant.segmentation"
-          class="absolute px-2 py-1 text-xs font-medium rounded-full text-merchant-primary top-2 left-2 bg-white/90 backdrop-blur-sm"
+          class="absolute px-2 py-1 text-xs font-medium rounded-full text-merchant-primary top-2 left-2 bg-white/90 backdrop-blur-sm border"
         >
           {{ merchant.segmentation.name }}
         </div>
@@ -109,6 +109,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  imageSize: {
+    type: String,
+    default: "medium",
+  },
 });
 
 const distanceKm = computed(() => {
@@ -145,16 +149,40 @@ const merchantLogoUrl = computed(() => {
 
   if (!merchant) return "";
 
-  if (merchant.logo_url) {
-    return merchant.logo_url;
+  const size = props.imageSize || "medium";
+
+  if (merchant.logo_urls?.[size]) {
+    return merchant.logo_urls[size];
   }
 
-  if (merchant.id && merchant.logo_path) {
-    return getMerchantLogoUrl(merchant);
+  if (size === "medium" && merchant.logo_urls?.medium) {
+    return merchant.logo_urls.medium;
+  }
+
+  if (merchant.logo_urls?.thumb) {
+    return merchant.logo_urls.thumb;
+  }
+
+  if (merchant.logo_urls?.original) {
+    return merchant.logo_urls.original;
+  }
+
+  if (merchant.logo_url) {
+    const rawUrl = merchant.logo_url;
+    if (typeof rawUrl === "string") {
+      if (rawUrl.includes("size=")) {
+        return rawUrl.replace(/size=[a-zA-Z0-9_-]+/, `size=${size}`);
+      }
+      const sep = rawUrl.includes("?") ? "&" : "?";
+      return `${rawUrl}${sep}size=${size}`;
+    }
+    return rawUrl;
   }
 
   if (merchant.logo_path) {
-    return getImageUrl(merchant.logo_path);
+    return `${
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+    }/storage/${merchant.logo_path}`;
   }
 
   return "";

@@ -369,20 +369,30 @@
                     {{ p.title }}
                   </div>
                   <div class="text-xs text-gray-600">{{ p.desc }}</div>
+                  <div v-if="p.restricted_jasa_ids && p.restricted_jasa_ids.length > 0" class="mt-1">
+                    <span class="inline-flex items-center text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                      Khusus {{ p.restricted_jasa_ids.length }} layanan tertentu
+                    </span>
+                  </div>
                 </div>
                 <button
-                  class="px-3 py-1 text-xs font-semibold rounded-full"
+                  class="px-3 py-1 text-xs font-semibold rounded-full transition"
+                  :disabled="!isJasaPromoEligible(p)"
                   :class="
                     selectedPromo && selectedPromo.code === p.code
                       ? 'bg-amber-500 text-white'
-                      : 'bg-amber-100 text-amber-900'
+                      : !isJasaPromoEligible(p)
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
                   "
                   @click="usePromo(p)"
                 >
                   {{
                     selectedPromo && selectedPromo.code === p.code
                       ? "Dipakai"
-                      : "Gunakan"
+                      : !isJasaPromoEligible(p)
+                        ? "Tidak Cocok"
+                        : "Gunakan"
                   }}
                 </button>
               </div>
@@ -682,6 +692,7 @@ const openPromo = ref(false);
 const selectedPromo = ref(null);
 const promos = ref([]);
 const promosLoading = ref(false);
+const currentJasaId = ref(null);
 
 async function loadVouchersForJasa(merchantSlug) {
   if (!merchantSlug) return;
@@ -706,6 +717,7 @@ async function loadVouchersForJasa(merchantSlug) {
       desc: v.voucher_description || "",
       type: v.voucher_type === "percent" ? "percent" : "flat",
       value: v.value,
+      restricted_jasa_ids: v.restricted_jasa_ids || [],
       raw: v,
     }));
   } catch (e) {
@@ -715,8 +727,25 @@ async function loadVouchersForJasa(merchantSlug) {
   }
 }
 
+function isJasaPromoEligible(promo) {
+  if (!promo) return false;
+  const raw = promo.raw || {};
+  if (raw.is_expired) return false;
+
+  const restrictedIds = promo.restricted_jasa_ids || raw.restricted_jasa_ids || [];
+  if (Array.isArray(restrictedIds) && restrictedIds.length > 0) {
+    if (currentJasaId.value && !restrictedIds.map(Number).includes(Number(currentJasaId.value))) {
+      return false;
+    }
+  }
+
+  const base = Number(order.price || 0);
+  const minPurchase = Number(raw.min_purchase_amount || 0);
+  return base >= minPurchase;
+}
+
 function computeDiscount(promo) {
-  if (!promo) return 0;
+  if (!promo || !isJasaPromoEligible(promo)) return 0;
 
   const base = Number(order.price || 0);
   const raw = promo.raw || {};
@@ -737,7 +766,7 @@ function computeDiscount(promo) {
 }
 
 function usePromo(p) {
-  if (!p) return;
+  if (!p || !isJasaPromoEligible(p)) return;
 
   const discount = computeDiscount(p);
   if (discount <= 0) {
@@ -915,7 +944,8 @@ onMounted(async () => {
 
   try {
     const { data } = await api.get(`/api/public/jasas/${encodeURIComponent(order.jasaSlug)}`);
-    const payload = data?.data ?? data;
+    const payload = data?.data ?? data ?? {};
+    currentJasaId.value = payload?.id || Number(route.query.id || route.query.jasa_id || 0) || null;
 
     // Prioritas sumber nomor WhatsApp penjual:
     // 1) Link khusus di jasa (whatsapp_link)

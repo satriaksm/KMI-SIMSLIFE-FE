@@ -68,12 +68,15 @@ const resolveApiImageUrl = (imageIdOrPath) => {
   return `${apiBase}/api/images/${encodeURIComponent(imageIdOrPath)}`;
 };
 
-export const getImageUrl = (imageIdOrPath) => {
-  return resolveApiImageUrl(imageIdOrPath);
+export const getImageUrl = (imageIdOrPath, size = null) => {
+  const url = resolveApiImageUrl(imageIdOrPath);
+  if (!url || !size) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}size=${size}`;
 };
 
-export const getImageUrlJasa = (imageIdOrPath) => {
-  return resolveApiImageUrl(imageIdOrPath);
+export const getImageUrlJasa = (imageIdOrPath, size = null) => {
+  return getImageUrl(imageIdOrPath, size);
 };
 
 /**
@@ -105,7 +108,7 @@ export function getEventBannerUrl(event) {
  * Get merchant logo URL via streaming API
  * Konsisten dengan event banner dan user profile picture
  */
-export function getMerchantLogoUrl(merchant) {
+export function getMerchantLogoUrl(merchant, size = null) {
   if (!merchant?.id) {
     return '/placeholder.png';
   }
@@ -116,7 +119,8 @@ export function getMerchantLogoUrl(merchant) {
     ? new Date(merchant.updated_at).getTime()
     : Date.now();
 
-  return `${apiUrl}/api/merchant-logo/${merchant.id}?t=${timestamp}`;
+  const sizeQuery = size ? `&size=${size}` : '';
+  return `${apiUrl}/api/merchant-logo/${merchant.id}?t=${timestamp}${sizeQuery}`;
 }
 
 /**

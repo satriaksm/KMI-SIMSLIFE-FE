@@ -182,6 +182,17 @@
             />
           </div>
 
+          <!-- NPWP -->
+          <div>
+            <TextField
+              name="NPWP"
+              v-model="form.NPWP"
+              label="NPWP (Opsional)"
+              placeholder="Contoh: 12.345.678.9-012.345"
+              variant="merchant"
+            />
+          </div>
+
           <!-- Tentang -->
           <div>
             <TextField
@@ -407,6 +418,17 @@
                 variant="merchant"
                               required
 
+              />
+            </div>
+
+            <!-- NPWP -->
+            <div class="md:col-span-2">
+              <TextField
+                name="NPWP"
+                v-model="form.NPWP"
+                label="NPWP (Opsional)"
+                placeholder="Contoh: 12.345.678.9-012.345"
+                variant="merchant"
               />
             </div>
 

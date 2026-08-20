@@ -172,14 +172,14 @@
 
             <!-- Product Image -->
             <div
-              class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 group-hover:-translate-y-0.5 duration-200 transition-transform relative"
+              class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 group-hover:-translate-y-0.5 duration-200 transition-transform relative cursor-pointer"
               @click="goToProductPage(item)"
             >
-              <ResponsiveImage
-                :src="item.image_urls?.thumb || getThumbImageUrl(item.image)"
-                :urls="{ thumb: item.image_urls?.thumb }"
+              <img
+                :src="getItemThumbUrl(item)"
                 :alt="item.name"
-                customClass="object-cover w-full h-full"
+                class="object-cover w-full h-full"
+                loading="lazy"
               />
               <div
                 v-if="item.isUnavailable"
@@ -428,11 +428,12 @@
               "
             >
               <!-- IMAGE OPTION -->
-              <ResponsiveImage
+              <img
                 v-if="opt.uses_image && val.image_url"
                 :src="val.image_urls?.thumb || getThumbImageUrl(val.image_url)"
-                :urls="{ thumb: val.image_urls?.thumb }"
-                customClass="object-cover w-8 h-8 rounded"
+                class="object-cover w-8 h-8 rounded"
+                loading="lazy"
+                :alt="val.value"
               />
 
               <div class="flex flex-col items-start">
@@ -600,11 +601,27 @@ import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
 import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 const getThumbImageUrl = (url) => {
-  const imgUrl = url ? String(url) : "";
-  if (imgUrl && imgUrl.includes('/api/')) {
-    return `${imgUrl.split('?')[0]}?size=thumb`;
+  if (!url) return "";
+  const imgUrl =
+    typeof url === "object"
+      ? url.src || url.thumb_url || url.src_url || url.url || ""
+      : String(url);
+  if (!imgUrl) return "";
+  if (imgUrl.includes("/api/images/") || imgUrl.includes("/api/cart/")) {
+    if (!imgUrl.includes("size=")) {
+      const sep = imgUrl.includes("?") ? "&" : "?";
+      return `${imgUrl}${sep}size=thumb`;
+    }
+    return imgUrl;
   }
   return imgUrl;
+};
+
+const getItemThumbUrl = (item) => {
+  if (!item) return "/placeholder.png";
+  if (item.thumb_url) return item.thumb_url;
+  if (item.image_urls?.thumb) return item.image_urls.thumb;
+  return getThumbImageUrl(item.image);
 };
 
 // =========================
@@ -1372,7 +1389,11 @@ const formatIDR = (value) => {
 
 // Navigation
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 const goToHome = () => {
@@ -1380,7 +1401,7 @@ const goToHome = () => {
 };
 
 const checkoutFromCart = (storeId) => {
-  const store = cartStores.value.find((s) => s.id === storeId);
+  const store = cartStores.value.find((s) => s.id === storeId || s.cartId === storeId);
   if (!store) return;
 
   const selectedStoreItems = store.items.filter((item) =>
@@ -1392,16 +1413,19 @@ const checkoutFromCart = (storeId) => {
     return;
   }
 
+  const merchantId = store.merchantId ?? store.merchant?.id ?? store.id;
+
   checkoutStore.setFromCart({
     store: {
-      id: store.merchantId ?? null,
-      merchantId: store.merchantId ?? null,
+      id: merchantId,
+      merchantId: merchantId,
       cartId: store.cartId ?? store.id ?? null,
-      slug: store.slug ?? null,
-      name: store.name,
-      address: store.address,
+      slug: store.slug ?? store.merchant?.slug ?? null,
+      name: store.name ?? store.merchant?.name ?? "",
+      address: store.address ?? store.merchant?.address ?? "",
       phone:
         store.phone ||
+        store.merchant?.phone ||
         store.phone_number ||
         store.whatsapp ||
         store.whatsapp_number ||
@@ -1409,6 +1433,7 @@ const checkoutFromCart = (storeId) => {
     },
     items: selectedStoreItems.map((item) => ({
       id: item.id,
+      productId: item.productId ?? item.productDetails?.id ?? item.product_id ?? item.id,
       name: item.name,
       image: item.image,
       quantity: item.quantity,

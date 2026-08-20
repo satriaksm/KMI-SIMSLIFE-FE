@@ -1,5 +1,5 @@
 <template>
-  <div class="relative" @click.stop.prevent>
+  <div class="relative bg-white rounded-full" @click.stop.prevent>
     <!-- 3-dots button -->
     <button
       @click.stop.prevent="toggleMenu"

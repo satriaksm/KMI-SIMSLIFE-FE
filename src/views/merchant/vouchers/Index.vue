@@ -1689,6 +1689,40 @@ onBeforeRouteLeave(() => {
               {{ formatDateID(selectedVoucherDetail.voucher_end_date) }}
             </p>
           </div>
+
+          <div>
+            <p class="text-xs text-muted-foreground">Cakupan Item</p>
+            <p class="font-semibold text-merchant-primary">
+              {{
+                ((selectedVoucherDetail.restricted_products?.length || 0) +
+                 (selectedVoucherDetail.restricted_jasas?.length || 0)) > 0
+                  ? `${(selectedVoucherDetail.restricted_products?.length || 0) + (selectedVoucherDetail.restricted_jasas?.length || 0)} Item Tertentu`
+                  : "Semua Produk & Jasa"
+              }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="((selectedVoucherDetail.restricted_products?.length || 0) + (selectedVoucherDetail.restricted_jasas?.length || 0)) > 0" class="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+          <p class="text-xs font-semibold text-gray-700">Daftar Produk / Jasa yang Berlaku:</p>
+          <div class="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+            <span
+              v-for="p in selectedVoucherDetail.restricted_products || []"
+              :key="`dt-p-${p.id}`"
+              class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+            >
+              <i class="pi pi-box text-[10px] mr-1"></i>
+              {{ p.name || p.nama }}
+            </span>
+            <span
+              v-for="j in selectedVoucherDetail.restricted_jasas || []"
+              :key="`dt-j-${j.id}`"
+              class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+            >
+              <i class="pi pi-wrench text-[10px] mr-1"></i>
+              {{ j.title || j.nama || j.name }}
+            </span>
+          </div>
         </div>
 
         <div>

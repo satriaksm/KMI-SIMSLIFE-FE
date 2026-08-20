@@ -188,6 +188,7 @@
               v-for="merchant in recommendedMerchants"
               :key="merchant.id"
               :merchant="merchant"
+              imageSize="medium"
             />
           </div>
         </div>
@@ -636,6 +637,7 @@
               :key="m.id"
               :merchant="m"
               class="w-full"
+              imageSize="medium"
             />
 
             <!-- Append skeletons saat infinite scroll load more -->
@@ -651,7 +653,7 @@
               :to="item.to"
               class="block"
             >
-              <ProductCard :product="item.product" customClass="w-full" />
+              <ProductCard :product="item.product" customClass="w-full" imageSize="medium" />
             </router-link>
 
             <!-- Append skeletons saat infinite scroll load more -->
@@ -1384,24 +1386,27 @@ const selectCategory = (categoryId) => {
 // normalisasi path gambar jasa → URL lengkap dari backend (sama seperti produk)
 const resolveJasaImage = (jasa) => {
   // Prioritas: API URL (cover_img.src_url, images[].src_url) > ID
-  if (jasa?.cover_img?.id) return getImageUrl(jasa.cover_img.id);
-  if (jasa?.cover_img?.src_url) return getImageUrl(jasa.cover_img.src_url);
-  if (jasa?.cover_img?.url) return getImageUrl(jasa.cover_img.url);
+  if (jasa?.cover_img?.medium_url) return jasa.cover_img.medium_url;
+  if (jasa?.cover_img?.id) return getImageUrl(jasa.cover_img.id, "medium");
+  if (jasa?.cover_img?.src_url) return getImageUrl(jasa.cover_img.src_url, "medium");
+  if (jasa?.cover_img?.url) return getImageUrl(jasa.cover_img.url, "medium");
 
   // Some endpoints return cover_image object: { id, src_url }
   if (jasa?.cover_image && typeof jasa.cover_image === "object") {
-    if (jasa.cover_image?.id) return getImageUrl(jasa.cover_image.id);
-    if (jasa.cover_image?.src_url) return getImageUrl(jasa.cover_image.src_url);
-    if (jasa.cover_image?.url) return getImageUrl(jasa.cover_image.url);
+    if (jasa.cover_image?.medium_url) return jasa.cover_image.medium_url;
+    if (jasa.cover_image?.id) return getImageUrl(jasa.cover_image.id, "medium");
+    if (jasa.cover_image?.src_url) return getImageUrl(jasa.cover_image.src_url, "medium");
+    if (jasa.cover_image?.url) return getImageUrl(jasa.cover_image.url, "medium");
   }
 
   // Prioritaskan relasi images (cover image)
   if (jasa.images && jasa.images.length > 0) {
     const coverImage =
       jasa.images.find((img) => img.is_cover) || jasa.images[0];
-    if (coverImage.id) return getImageUrl(coverImage.id);
-    if (coverImage.src_url) return getImageUrl(coverImage.src_url);
-    if (coverImage.url) return getImageUrl(coverImage.url);
+    if (coverImage.medium_url) return coverImage.medium_url;
+    if (coverImage.id) return getImageUrl(coverImage.id, "medium");
+    if (coverImage.src_url) return getImageUrl(coverImage.src_url, "medium");
+    if (coverImage.url) return getImageUrl(coverImage.url, "medium");
   }
 
   return "";

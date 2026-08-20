@@ -512,6 +512,37 @@ const routes = [
           title: "Dashboard UMKM | SUMILIR",
         },
       },
+      {
+        path: "orders",
+        children: [
+          {
+            path: "",
+            name: "Merchant - Orders",
+            component: () => import("@/views/merchant/orders/Index.vue"),
+            meta: {
+              title: "Orders",
+            },
+          },
+          {
+            path: ":orderId",
+            name: "Merchant - Order Detail",
+            component: () => import("@/views/merchant/orders/Detail.vue"),
+            meta: {
+              title: "Order Detail",
+            },
+          },
+        ],
+      },
+
+      {
+        path: "reports",
+        name: "Merchant - Reports",
+        component: () => import("@/views/merchant/reports/Index.vue"),
+        meta: {
+          title: "Laporan UMKM | SUMILIR",
+        },
+      },
+      
 
       // ===========================
       // PRODUK UMKM TOKO/KULINER
