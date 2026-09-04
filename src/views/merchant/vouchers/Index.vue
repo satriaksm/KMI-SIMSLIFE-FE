@@ -84,7 +84,7 @@ const selectedVoucherForDelete = ref(null);
 
 const searchQuery = ref("");
 const currentPage = ref(1);
-const perPage = ref();
+const perPage = ref(10);
 const selectedVouchersCount = computed(() => selectedVouchers.value.length);
 const selectedVouchersData = computed(() =>
   vouchers.value.filter((v) => selectedVouchers.value.includes(v.id)),
@@ -163,6 +163,7 @@ const paginationInfo = computed(() => ({
 }));
 
 const perPageOptions = [
+  { label: "10", value: 10 },
   { label: "25", value: 25 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
@@ -170,7 +171,7 @@ const perPageOptions = [
 
 const breadcrumbItems = computed(() => [
   {
-    label: "List Voucher",
+    label: "Daftar Voucher",
   },
 ]);
 
@@ -279,6 +280,15 @@ const handleSearch = () => {
   currentPage.value = 1;
   loadVouchers();
 };
+
+let searchTimeout;
+watch(searchQuery, () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1;
+    loadVouchers();
+  }, 400);
+});
 
 const toggleSelectAll = () => {
   if (selectAll.value) {
@@ -487,8 +497,8 @@ onBeforeRouteLeave(() => {
     >
       <div class="flex items-center gap-3">
         <button
-          @click="$emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          @click="emit('toggle-sidebar')"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>
@@ -524,44 +534,41 @@ onBeforeRouteLeave(() => {
     <div class="h-24 sm:h-0"></div>
 
     <!-- Search & Toolbar -->
-    <div class="px-4 my-2 space-y-2 sm:my-4 sm:px-6 sm:space-y-4">
-      <!-- Search Bar -->
-      <div class="pb-1 sm:flex sm:items-center sm:gap-4">
-        <div class="flex-1 mb-2 sm:mb-0">
-          <TextField
-            name="search"
-            variant="merchant"
-            v-model="searchQuery"
-            placeholder="Cari voucher"
-            icon="pi-search"
-            @keyup.enter="handleSearch"
-          />
-        </div>
+    <div class="px-4 mb-2 space-y-2 sm:mb-4 pt-2 sm:pt-6 sm:px-6 sm:space-y-4">
+      <!-- SEARCH + FILTER + REFRESH -->
+      <div class="flex items-center gap-2">
+        <TextField
+          name="search"
+          :modelValue="searchQuery"
+          @update:modelValue="(v) => (searchQuery = v)"
+          placeholder="Cari voucher..."
+          :hideLabel="true"
+          variant="merchant"
+          wrapperClass="flex-1"
+          :alignWithPassword="false"
+          @keyup.enter="handleSearch"
+        />
 
-        <!-- Desktop: Filter button inline -->
-        <Button
+        <button
+          type="button"
           @click="openFilterModal"
-          variant="muted-outline"
-          size="md"
-          custom-class="!hidden sm:!flex items-center gap-2 whitespace-nowrap relative !rounded-xl !py-2"
+          class="hidden sm:flex relative items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
         >
-          <i class="pi pi-filter"></i>
-          <span>Filter</span>
+          <i class="text-gray-500 pi pi-sliders-h"></i>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
+            class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
           >
-            {{ activeFilterCount }}
+            !
           </span>
-        </Button>
-
+        </button>
         <SelectField
           name="per_page"
           variant="merchant"
           size="sm"
           v-model="perPage"
           :options="perPageOptions"
-          class="hidden sm:block"
+          class="max-w-24 shrink-0 hidden sm:flex"
           placeholder="10"
         />
       </div>
@@ -715,9 +722,9 @@ onBeforeRouteLeave(() => {
         </div>
       </div>
 
-      <!-- Mobile: Toolbar (Pilih Semua + Filter) -->
+      <!-- Mobile: Pilih Semua -->
       <div
-        class="flex flex-row items-center justify-between gap-4 px-3 pb-1 rounded-lg sm:hidden"
+        class="flex items-center sm:hidden justify-between"
       >
         <label class="flex items-center cursor-pointer group">
           <input
@@ -732,33 +739,31 @@ onBeforeRouteLeave(() => {
             Pilih Semua
           </span>
         </label>
-
-        <div class="flex items-center h-10 gap-1">
-          <Button
-            @click="openFilterModal"
-            variant="muted-outline"
-            size="md"
-            custom-class="!flex sm:!hidden items-center gap-2 whitespace-nowrap relative h-full items-stretch h-full"
+        <div class="flex gap-2">
+          <button
+          type="button"
+          @click="openFilterModal"
+          class="flex sm:hidden relative items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
           >
-            <i class="pi pi-filter"></i>
-            <span>Filter</span>
+            <i class="text-gray-500 pi pi-sliders-h"></i>
             <span
               v-if="activeFilterCount > 0"
-              class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
+              class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
             >
-              {{ activeFilterCount }}
+              !
             </span>
-          </Button>
+          </button>
           <SelectField
             name="per_page"
             variant="merchant"
             size="sm"
             v-model="perPage"
             :options="perPageOptions"
-            class="sm:hidden w-fit"
+            class="max-w-24 shrink-0 sm:hidden"
             placeholder="10"
           />
         </div>
+                
       </div>
     </div>
 

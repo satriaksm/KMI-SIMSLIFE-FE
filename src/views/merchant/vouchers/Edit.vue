@@ -411,6 +411,8 @@ watch(usage_limit_per_user, (v) => setFieldValue("usage_limit_per_user", v));
 // SUBMIT HANDLER
 // ============================================================
 const onSubmit = veeHandleSubmit(async () => {
+  if (loading.value) return;
+
   if (!isValidMerchant.value) {
     toast.error("Merchant tidak valid");
     return;
@@ -442,6 +444,7 @@ const onSubmit = veeHandleSubmit(async () => {
     jasa_ids: applies_to.value === "specific" ? selectedJasaIds.value : [],
   };
 
+  loading.value = true;
   try {
     await editMerchantVoucher(
       currentMerchantSlug.value,
@@ -450,7 +453,10 @@ const onSubmit = veeHandleSubmit(async () => {
     );
 
     router.push(`/merchant-center/${currentMerchantSlug.value}/vouchers`);
-  } catch (err) {}
+  } catch (err) {
+  } finally {
+    loading.value = false;
+  }
 });
 </script>
 
@@ -759,7 +765,7 @@ const onSubmit = veeHandleSubmit(async () => {
                       {{ formatPrice(p.min_price || p.price || p.harga || (p.variants && p.variants[0]?.price) || 0) }}
                     </p>
                   </div>
-                  <span class="px-2 py-0.5 text-[10px] font-medium rounded-md bg-blue-50 text-blue-600 shrink-0">
+                  <span class="px-2 py-0.5 text-[10px] font-medium rounded-md bg-merchant-primary text-white shrink-0">
                     Produk
                   </span>
                 </div>
@@ -931,12 +937,13 @@ const onSubmit = veeHandleSubmit(async () => {
         </div>
 
         <!-- Desktop Submit Button -->
-        <div class="justify-end hidden sm:flex">
+        <div class="justify-end hidden gap-3 sm:flex">
           <Button
             @click="onSubmit"
+            type="button"
             variant="merchant"
             size="md"
-            :disabled="loading"
+            :loading="loading"
           >
             <span>{{ loading ? "Menyimpan..." : "Simpan Perubahan" }}</span>
           </Button>
@@ -946,8 +953,14 @@ const onSubmit = veeHandleSubmit(async () => {
         <div
           class="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-200 sm:hidden"
         >
-          <Button type="submit" :loading="loading" variant="merchant" block>
-            {{ loading ? "Menyimpan..." : "Simpan Perubahan" }}
+          <Button
+            @click="onSubmit"
+            type="button"
+            :loading="loading"
+            variant="merchant"
+            block
+          >
+            <span>{{ loading ? "Menyimpan..." : "Simpan Perubahan" }}</span>
           </Button>
         </div>
       </Form>

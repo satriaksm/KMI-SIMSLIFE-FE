@@ -169,9 +169,21 @@ export function useProducts() {
       saveBlob(res.data, filename);
       toast.success("Export PDF berhasil diunduh");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Gagal export PDF");
+      if (err.response?.data instanceof Blob && err.response.data.type?.includes("json")) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          toast.error(json.message || "Gagal export PDF");
+        } catch {
+          toast.error("Gagal export PDF");
+        }
+      } else {
+        toast.error(err.response?.data?.message || "Gagal export PDF");
+      }
+      throw err;
+    } finally {
+      loadingExport.value = false;
     }
-    loadingExport.value = false;
   };
 
   const exportExcel = async (merchantSlug, params = {}) => {
@@ -194,7 +206,18 @@ export function useProducts() {
       saveBlob(res.data, filename);
       toast.success("Export Excel berhasil diunduh");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Gagal export Excel");
+      if (err.response?.data instanceof Blob && err.response.data.type?.includes("json")) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          toast.error(json.message || "Gagal export Excel");
+        } catch {
+          toast.error("Gagal export Excel");
+        }
+      } else {
+        toast.error(err.response?.data?.message || "Gagal export Excel");
+      }
+      throw err;
     } finally {
       loadingExport.value = false;
     }

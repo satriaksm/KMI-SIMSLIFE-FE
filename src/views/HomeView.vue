@@ -50,7 +50,7 @@
     <!-- HERO (banner + search bar) - disamakan dengan Home.vue -->
     <section id="hero" class="relative">
       <div
-        class="relative w-full overflow-hidden bg-gray-100 aspect-2.5/1 sm:aspect-21/9 lg:aspect-24/9 xl:aspect-4/1"
+        class="relative w-full overflow-hidden bg-gray-100 aspect-2/1 sm:aspect-21/9 lg:aspect-24/9 xl:aspect-4/1"
       >
         <!-- Loading skeleton -->
         <div

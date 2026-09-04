@@ -282,7 +282,7 @@ onMounted(fetchDashboard);
   <div class="min-h-screen bg-gray-50 pb-12">
     <!-- HEADER -->
     <div
-      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-4 sm:py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
+      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-6 bg-white sm:static sm:px-6 border-b border-gray-100 sm:border-0"
     >
       <div class="flex items-center gap-3">
         <button
@@ -297,7 +297,7 @@ onMounted(fetchDashboard);
             :merchantId="currentMerchantSlug"
           />
           <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-            Ringkasan omset dan aktivitas toko {{ currentMerchantName }}
+            Ringkasan omset dan aktivitas toko
           </p>
         </div>
       </div>
@@ -309,16 +309,25 @@ onMounted(fetchDashboard);
           :disabled="loading"
           variant="merchant-outline"
           size="sm"
-          customClass="hidden sm:inline-flex"
+          customClass="!hidden md:!inline-flex"
         >
           <i :class="['pi pi-refresh text-xs sm:mr-1.5', { 'animate-spin': loading }]"></i>
           <span class="hidden sm:block">Segarkan</span>
+        </Button>
+        <Button
+          @click="fetchDashboard"
+          :disabled="loading"
+          variant="merchant-outline"
+          size="md"
+          customClass="sm:hidden"
+        >
+          <i :class="['pi pi-refresh sm:mr-1.5', { 'animate-spin': loading }]"></i>
         </Button>
       </div>
     </div>
 
     <!-- spacer -->
-    <div class="h-20 sm:h-0"></div>
+    <div class="h-24 sm:h-0"></div>
 
     <!-- Loading State -->
     <div
@@ -330,7 +339,7 @@ onMounted(fetchDashboard);
       ></div>
     </div>
 
-    <div v-else class="px-4 space-y-6 sm:px-6 mt-6 ">
+    <div v-else class="px-4 space-y-6 sm:px-6 mt-4 sm:mt-6 ">
       <!-- ==============================================
            1. REKAP OMSET & PENJUALAN TOKO
       =============================================== -->

@@ -58,7 +58,7 @@ const currentMerchantId = computed(() => {
 // ✅ Breadcrumb items
 const breadcrumbItems = computed(() => [
   {
-    label: "List Produk",
+    label: "Daftar Produk",
   },
 ]);
 
@@ -97,6 +97,7 @@ const selectAll = ref(false);
 
 // Modals
 const showExportModal = ref(false);
+const exportingType = ref(null); // 'pdf' | 'excel' | null
 const showFilterModal = ref(false);
 const showBulkActionModal = ref(false);
 const showVisibilityModal = ref(false);
@@ -163,12 +164,13 @@ const activeFilters = ref({
 
 const currentPage = ref(1);
 const perPageOptions = [
+  { label: "10", value: 10 },
   { label: "25", value: 25 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
 ];
 
-const perPage = ref(); // default
+const perPage = ref(10); // default
 
 // ✅ NEW: Build sort_by parameter untuk API
 const buildSortByParam = (filters) => {
@@ -211,6 +213,15 @@ const handleSearch = () => {
   currentPage.value = 1;
   loadProducts();
 };
+
+let searchTimeout;
+watch(searchQuery, () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1;
+    loadProducts();
+  }, 400);
+});
 
 // ✅ Toggle product selection using slug
 const toggleProductSelection = (productSlug) => {
@@ -285,6 +296,7 @@ const closeFilterModal = () => {
 };
 
 const closeExportModal = () => {
+  if (loadingExport.value) return;
   showExportModal.value = false;
 };
 
@@ -337,17 +349,28 @@ const buildExportParams = () => {
   return params;
 };
 
-// Export Excel (via BE)
-const confirmExportExcel = async () => {
-  await exportExcel(currentMerchantSlug.value, buildExportParams());
-  closeExportModal();
+// Export handler (PDF / Excel)
+const handleExport = async (type) => {
+  if (!currentMerchantSlug.value || loadingExport.value) return;
+
+  exportingType.value = type;
+  try {
+    const params = buildExportParams();
+    if (type === "pdf") {
+      await exportPDF(currentMerchantSlug.value, params);
+    } else {
+      await exportExcel(currentMerchantSlug.value, params);
+    }
+    showExportModal.value = false;
+  } catch (error) {
+    console.error("Export error:", error);
+  } finally {
+    exportingType.value = null;
+  }
 };
 
-// Export PDF (via BE)
-const confirmExportPDF = async () => {
-  await exportPDF(currentMerchantSlug.value, buildExportParams());
-  closeExportModal();
-};
+const confirmExportExcel = () => handleExport("excel");
+const confirmExportPDF = () => handleExport("pdf");
 
 // ✅ UPDATED: goToCreate with merchantId
 const goToCreate = () => {
@@ -806,7 +829,7 @@ const tableActions = [
   <div class="">
     <!-- Header - FIXED -->
     <div
-      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:bg-gray-50 sm:z-30 sm:px-6"
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:z-30 sm:px-6"
     >
       <div class="flex items-center gap-3">
         <!-- Hamburger Button (Mobile) -->
@@ -863,18 +886,22 @@ const tableActions = [
           @click="openExportModal"
           variant="merchant-outline"
           size="sm"
+          :loading="loadingExport"
           customClass="!hidden md:!inline"
         >
-          <i class="pi pi-download"></i>
-          <span class="hidden ml-2 md:inline">Export</span>
+          <i v-if="!loadingExport" class="mr-1.5 pi pi-download text-xs"></i>
+          <span class="hidden md:inline">Export</span>
         </Button>
+
+        <!-- Mobile Export Button -->
         <Button
           @click="openExportModal"
           variant="merchant-outline"
           size="md"
+          :loading="loadingExport"
           customClass="md:!hidden"
         >
-          <i class="pi pi-download"></i>
+          <i v-if="!loadingExport" class="pi pi-download text-xs"></i>
         </Button>
       </div>
     </div>
@@ -883,44 +910,41 @@ const tableActions = [
     <div class="h-24 sm:h-0"></div>
 
     <!-- Search & Toolbar -->
-    <div class="px-4 my-2 space-y-2 sm:my-4 sm:px-6 sm:space-y-4">
-      <!-- Search Bar -->
-      <div class="pb-1 sm:flex sm:items-center sm:gap-4">
-        <div class="flex-1 mb-2 sm:mb-0">
-          <TextField
-            name="search"
-            variant="merchant"
-            v-model="searchQuery"
-            placeholder="Cari produk"
-            icon="pi-search"
-            @keyup.enter="handleSearch"
-          />
-        </div>
+    <div class="px-4 mb-2 space-y-2 sm:mb-4 pt-2 sm:pt-6 sm:px-6 sm:space-y-4">
+      <!-- SEARCH + FILTER + REFRESH -->
+      <div class="flex items-center gap-2">
+        <TextField
+          name="search"
+          :modelValue="searchQuery"
+          @update:modelValue="(v) => (searchQuery = v)"
+          placeholder="Cari produk..."
+          :hideLabel="true"
+          variant="merchant"
+          wrapperClass="flex-1"
+          :alignWithPassword="false"
+          @keyup.enter="handleSearch"
+        />
 
-        <!-- Desktop: Filter button inline -->
-        <Button
+        <button
+          type="button"
           @click="openFilterModal"
-          variant="muted-outline"
-          size="md"
-          custom-class="!hidden sm:!flex items-center gap-2 whitespace-nowrap relative !rounded-xl !py-2"
+          class="hidden sm:flex relative items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
         >
-          <i class="pi pi-filter"></i>
-          <span>Filter</span>
+          <i class="text-gray-500 pi pi-sliders-h"></i>
           <span
             v-if="activeFilterCount > 0"
-            class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
+            class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
           >
-            {{ activeFilterCount }}
+            !
           </span>
-        </Button>
-
+        </button>
         <SelectField
           name="per_page"
           variant="merchant"
           size="sm"
           v-model="perPage"
           :options="perPageOptions"
-          class="hidden sm:block"
+          class="max-w-24 shrink-0 hidden sm:flex"
           placeholder="10"
         />
       </div>
@@ -1106,9 +1130,9 @@ const tableActions = [
         </div>
       </div>
 
-      <!-- Mobile: Toolbar (Pilih Semua + Filter) -->
+      <!-- Mobile: Pilih Semua -->
       <div
-        class="flex flex-row items-center justify-between gap-4 px-3 pb-1 rounded-lg sm:hidden"
+        class="flex items-center sm:hidden justify-between"
       >
         <label class="flex items-center cursor-pointer group">
           <input
@@ -1124,29 +1148,27 @@ const tableActions = [
           </span>
         </label>
 
-        <div class="flex items-center h-10 gap-1">
-          <Button
+        <div class="flex gap-2">
+          <button
+            type="button"
             @click="openFilterModal"
-            variant="muted-outline"
-            size="md"
-            custom-class="!flex sm:!hidden items-center gap-2 whitespace-nowrap relative h-full items-stretch h-full"
+            class="sm:hidden flex items-center justify-center transition bg-white border border-gray-300 w-11 h-11 rounded-xl hover:bg-gray-50 shrink-0"
           >
-            <i class="pi pi-filter"></i>
-            <span>Filter</span>
+            <i class="text-gray-500 pi pi-sliders-h"></i>
             <span
               v-if="activeFilterCount > 0"
-              class="absolute flex items-center justify-center w-5 h-5 text-xs font-semibold text-white rounded-full -top-2 -right-2 bg-primary"
+              class="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white rounded-full bg-merchant-primary"
             >
-              {{ activeFilterCount }}
+              !
             </span>
-          </Button>
+          </button>
           <SelectField
             name="per_page"
             variant="merchant"
             size="sm"
             v-model="perPage"
             :options="perPageOptions"
-            class="sm:hidden w-fit"
+            class="max-w-24 shrink-0 sm:hidden"
             placeholder="10"
           />
         </div>
@@ -1158,7 +1180,7 @@ const tableActions = [
       <!-- Mobile: Card List -->
       <div
         v-if="!loadingFetchProducts"
-        class="flex flex-col gap-2 py-2 sm:hidden"
+        class="flex flex-col gap-2 pb-2 sm:hidden"
       >
         <ProductCard
           v-for="product in products"
@@ -1197,10 +1219,9 @@ const tableActions = [
               <div
                 class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
               >
-                <!-- ✅ FIXED: Gunakan helper getImageUrl -->
                 <img
-                  v-if="item.cover_image?.src_url"
-                  :src="item.cover_image.thumb_url || item.cover_image.src_url"
+                  v-if="item.cover_image?.thumb_url"
+                  :src="item.cover_image.thumb_url"
                   :alt="item.name"
                   class="object-cover w-full h-full"
                   @error="(e) => (e.target.style.display = 'none')"
@@ -1664,62 +1685,66 @@ const tableActions = [
       </template>
     </ResponsiveModal>
 
-    <!-- UPDATED: Export Modal - Single Footer -->
+    <!-- Export Modal -->
     <ResponsiveModal
       v-model:show="showExportModal"
-      title="Export Data"
-      show-footer
+      title="Export Daftar Produk"
       footer-class="sm:hidden"
       @close="closeExportModal"
     >
-      <!-- Content -->
-      <div class="space-y-3">
+      <div class="space-y-3 pt-1">
+        <!-- PDF Export Button -->
         <button
-          @click="confirmExportPDF"
+          @click="handleExport('pdf')"
           :disabled="loadingExport"
-          class="flex items-center w-full gap-4 p-4 text-left transition border border-muted-background rounded-xl hover:bg-muted-background hover:border-merchant-primary group"
-          :class="
-            loadingExport
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-muted-background hover:border-merchant-primary'
-          "
+          class="flex items-center w-full gap-4 p-4 text-left transition border border-gray-200 rounded-2xl hover:bg-gray-50 hover:border-merchant-primary active:scale-[0.99] group shadow-2xs"
+          :class="loadingExport ? 'opacity-60 cursor-not-allowed' : ''"
         >
           <div
-            class="flex items-center justify-center w-12 h-12 transition-transform rounded-lg shrink-0 bg-danger-background group-hover:scale-110"
+            class="flex items-center justify-center w-12 h-12 transition-transform rounded-xl shrink-0 bg-red-50 text-red-600 border border-red-100 group-hover:scale-105"
           >
-            <i class="text-2xl pi pi-file-pdf text-danger-foreground"></i>
+            <i v-if="loadingExport && exportingType === 'pdf'" class="pi pi-spin pi-spinner text-xl"></i>
+            <i v-else class="text-2xl pi pi-file-pdf"></i>
           </div>
-          <div>
-            <h4 class="text-sm font-semibold text-black sm:text-base">
-              Export ke PDF
-            </h4>
-            <p class="text-xs sm:text-sm text-muted-foreground">
-              Download data produk dalam format PDF
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-gray-900 sm:text-base">
+                Export ke PDF
+              </h4>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-100">
+                .pdf
+              </span>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5">
+              {{ loadingExport && exportingType === 'pdf' ? 'Sedang membuat berkas PDF...' : 'Download data produk rapi siap cetak format PDF' }}
             </p>
           </div>
         </button>
 
+        <!-- Excel Export Button -->
         <button
-          @click="confirmExportExcel"
+          @click="handleExport('excel')"
           :disabled="loadingExport"
-          class="flex items-center w-full gap-4 p-4 text-left transition border border-muted-background rounded-xl hover:bg-muted-background hover:border-merchant-primary group"
-          :class="
-            loadingExport
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-muted-background hover:border-merchant-primary'
-          "
+          class="flex items-center w-full gap-4 p-4 text-left transition border border-gray-200 rounded-2xl hover:bg-gray-50 hover:border-merchant-primary active:scale-[0.99] group shadow-2xs"
+          :class="loadingExport ? 'opacity-60 cursor-not-allowed' : ''"
         >
           <div
-            class="flex items-center justify-center w-12 h-12 transition-transform rounded-lg shrink-0 bg-success-background group-hover:scale-110"
+            class="flex items-center justify-center w-12 h-12 transition-transform rounded-xl shrink-0 bg-emerald-50 text-emerald-600 border border-emerald-100 group-hover:scale-105"
           >
-            <i class="text-2xl pi pi-file-excel text-success-foreground"></i>
+            <i v-if="loadingExport && exportingType === 'excel'" class="pi pi-spin pi-spinner text-xl"></i>
+            <i v-else class="text-2xl pi pi-file-excel"></i>
           </div>
-          <div>
-            <h4 class="text-sm font-semibold text-black sm:text-base">
-              Export ke Excel
-            </h4>
-            <p class="text-xs sm:text-sm text-muted-foreground">
-              Download dalam format Excel (.xlsx)
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h4 class="text-sm font-bold text-gray-900 sm:text-base">
+                Export ke Excel
+              </h4>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                .xlsx
+              </span>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5">
+              {{ loadingExport && exportingType === 'excel' ? 'Sedang membuat berkas Excel...' : 'Download data spreadsheet untuk analisis lanjutan' }}
             </p>
           </div>
         </button>
@@ -1727,7 +1752,7 @@ const tableActions = [
 
       <!-- Footer Actions -->
       <template #footer>
-        <Button @click="closeExportModal" block variant="merchant">
+        <Button @click="closeExportModal" :disabled="loadingExport" block variant="merchant">
           Tutup
         </Button>
       </template>
@@ -1943,10 +1968,9 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForDelete.cover_image"
-              :src="selectedProductForDelete.cover_image.thumb_url || selectedProductForDelete.cover_image.src_url"
+              v-if="selectedProductForDelete?.cover_image?.thumb_url"
+              :src="selectedProductForDelete.cover_image.thumb_url"
               :alt="selectedProductForDelete.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -2041,10 +2065,9 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image"
-                :src="product.cover_image.thumb_url || product.cover_image.src_url"
+                v-if="product.cover_image?.thumb_url"
+                :src="product.cover_image.thumb_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"
@@ -2129,10 +2152,9 @@ const tableActions = [
           class="flex items-center gap-3 p-4 bg-muted-background rounded-xl"
         >
           <div class="w-16 h-16 overflow-hidden bg-white rounded-lg shrink-0">
-            <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
             <img
-              v-if="selectedProductForStatusChange.cover_image"
-              :src="selectedProductForStatusChange.cover_image.thumb_url || selectedProductForStatusChange.cover_image.src_url"
+              v-if="selectedProductForStatusChange?.cover_image?.thumb_url"
+              :src="selectedProductForStatusChange.cover_image.thumb_url"
               :alt="selectedProductForStatusChange.name"
               class="object-cover w-full h-full"
               @error="(e) => (e.target.style.display = 'none')"
@@ -2271,10 +2293,9 @@ const tableActions = [
             <div
               class="w-12 h-12 overflow-hidden rounded-lg shrink-0 bg-muted-background"
             >
-              <!-- ✅ FIXED: Gunakan helper getImageUrl / thumbnail -->
               <img
-                v-if="product.cover_image"
-                :src="product.cover_image.thumb_url || product.cover_image.src_url"
+                v-if="product.cover_image?.thumb_url"
+                :src="product.cover_image.thumb_url"
                 :alt="product.name"
                 class="object-cover w-full h-full"
                 @error="(e) => (e.target.style.display = 'none')"

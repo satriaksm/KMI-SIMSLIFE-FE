@@ -1,6 +1,6 @@
 # SUMILIR - Frontend (Vue 3 + Vite)
 
-## Deskripsi Singkat 🖼️
+## Deskripsi Singkat 
 
 Repository ini berisi kode sumber untuk sisi antarmuka pengguna (Frontend) dari platform **SUMILIR** (Sistem Informasi Manajemen Layanan Inovasi & Fleksibilitas Ekonomi UMKM). Aplikasi ini dibangun sebagai *Single Page Application* (SPA) modern yang cepat dan responsif menggunakan **Vue 3 (Composition API)** dan **Vite**, serta terhubung langsung dengan Backend API Laravel [SUMILIR-BE](https://github.com/satriaksm/KMI-SIMSLIFE-BE.git).
 
@@ -8,7 +8,7 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 
 ---
 
-## Model Transaksi & Pembayaran 💳
+## Model Transaksi & Pembayaran 
 
 > Alur transaksi disesuaikan dengan kebutuhan pasar lokal kelurahan (*hyperlocal*) tanpa potongan fee transaksi:
 > * **Cash on Delivery (COD):** Pembeli membayar saat pesanan tiba di tujuan.
@@ -17,7 +17,7 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 
 ---
 
-## Fitur Utama di Frontend ✨
+## Fitur Utama di Frontend 
 
 ### 🛍️ 1. Untuk Pelanggan (Customer)
 * **Jelajah & Pencarian:** Pencarian produk dan jasa UMKM lokal dengan filter kategori, harga, dan rating.
@@ -30,8 +30,8 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 * **Dashboard Merchant:** Ringkasan performa penjualan, total pendapatan, dan pesanan terbaru.
 * **Manajemen Katalog:** Pengelolaan produk, varian harga, add-on pilihan, jasa layanan, portofolio, dan galeri foto.
 * **Manajemen Pesanan:** Konfirmasi pesanan masuk dan riwayat pesanan pelanggan.
-* **Pemasaran & Promosi:** Pembuatan voucher diskon toko dan pendaftaran ke event promosi kelurahan.
-* **Pengaturan Toko & Lokasi Peta:** Penentuan titik koordinat lokasi toko di peta, jam operasional.
+* **Pemasaran & Promosi:** Pembuatan voucher diskon UMKM dan pendaftaran ke event promosi kelurahan.
+* **Pengaturan UMKM & Lokasi Peta:** Penentuan titik koordinat lokasi UMKM di peta, jam operasional.
 
 ### 🛡️ 3. Untuk Administrator
 * **Dashboard Analitik:** Ringkasan pertumbuhan pengguna, transaksi, dan aktivitas UMKM.
@@ -41,7 +41,7 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 
 ---
 
-## Tech Stack Utama 🎨
+## Tech Stack Utama 
 
 * **Framework:** Vue 3 (Composition API & `<script setup>`)
 * **Build Tool:** Vite 7
@@ -57,7 +57,7 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 
 ---
 
-## Panduan Instalasi & Menjalankan 🚀
+## Panduan Instalasi & Menjalankan 
 
 ### 1. Prasyarat
 * Node.js (versi 18.x atau 20.x ke atas direkomendasikan)
@@ -113,7 +113,7 @@ Frontend ini melayani tiga kategori peran pengguna: **Pelanggan**, **Pelaku UMKM
 
 ---
 
-## Build untuk Produksi 📦
+## Build untuk Produksi 
 
 Untuk mengompilasi dan mem-bundle aplikasi sebelum dideploy:
 

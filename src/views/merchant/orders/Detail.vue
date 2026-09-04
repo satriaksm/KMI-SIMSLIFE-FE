@@ -1,44 +1,29 @@
 <template>
-  <div class="min-h-screen bg-gray-50 pb-10">
-    <!-- Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-4 bg-white sm:static sm:px-6 sm:py-6 border-b border-gray-100 sm:border-0"
-    >
-      <div class="flex items-center gap-3">
-        <button
-          @click="goBack"
-          class="flex items-center justify-center w-10 h-10 transition bg-white border border-gray-200 rounded-full hover:bg-muted-background"
-        >
-          <i class="pi pi-arrow-left text-gray-700"></i>
-        </button>
-        <div>
-          <!-- Desktop Breadcrumb -->
-          <div class="hidden sm:block">
-            <Breadcrumb
-              :items="breadcrumbItems"
-              :merchantId="merchantSlug"
-            />
-            <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-              Detail informasi dan konfirmasi transaksi pesanan
-            </p>
-          </div>
-          <!-- Mobile Title -->
-          <div class="sm:hidden">
-            <h1 class="text-base font-semibold text-gray-900">
-              Detail Pesanan
-            </h1>
-            <p class="text-xs text-muted-foreground font-mono">
-              {{ order?.invoice || '-' }}
-            </p>
-          </div>
-        </div>
+  <div class="min-h-screen bg-gray-50 pb-28 sm:pb-10">
+    <!-- Mobile Header -->
+    <MerchantMobileHeader
+      title="Detail Pesanan"
+      :backRoute="merchantSlug ? `/merchant-center/${merchantSlug}/orders` : null"
+      @back="goBack"
+    />
+
+    <!-- Desktop Header -->
+    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
+      <div class="px-4 mx-auto sm:px-6">
+        <Breadcrumb
+          :items="breadcrumbItems"
+          :merchantId="merchantSlug"
+        />
+        <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
+          Detail informasi dan konfirmasi transaksi pesanan
+        </p>
       </div>
     </div>
 
     <!-- Spacer for mobile fixed header -->
-    <div class="h-20 sm:h-0"></div>
+    <div class="h-[72px] sm:h-0"></div>
 
-    <div class="max-w-5xl px-4 mx-auto sm:px-6 sm:py-6 space-y-4">
+    <div class="px-4 mx-auto sm:px-6 sm:py-6 space-y-4 pt-4">
       <!-- Loading State -->
       <div v-if="loading" class="space-y-4">
         <div class="p-6 bg-white border border-gray-200 rounded-2xl animate-pulse space-y-4">
@@ -100,10 +85,10 @@
               </p>
             </div>
 
-            <!-- Action Buttons for Pending / Waiting Review / Processing -->
+            <!-- Desktop Action Buttons for Pending / Waiting Review / Processing -->
             <div
               v-if="order.status === 'waiting_review' || order.status === 'pending' || order.status === 'processing'"
-              class="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200/60"
+              class="hidden sm:flex items-center gap-2 shrink-0"
             >
               <Button
                 variant="danger-outline"
@@ -138,7 +123,7 @@
                   <i class="pi pi-receipt text-merchant-primary"></i>
                   Informasi Pesanan
                 </h3>
-                <span class="text-xs font-mono font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md">
+                <span class="text-xs font-mono font-semibold text-white bg-merchant-primary px-2.5 py-1 rounded-md">
                   {{ order.invoice }}
                 </span>
               </div>
@@ -152,14 +137,16 @@
                 </div>
                 <div>
                   <span class="text-gray-400 block text-xs">Metode Pembayaran</span>
-                  <span class="font-medium text-gray-800">
-                    {{ order.payment_method === 'WhatsApp' ? 'Belum Ditetapkan' : (order.payment_method || 'Belum Ditetapkan') }}
+                  <span v-if="isCancelledStatus(order.status)" class="font-medium text-gray-800">-</span>
+                  <span v-else class="inline-flex items-center gap-1.5 font-medium text-gray-800">
+                    <i :class="[getPaymentBadge(order.payment_method).icon, getPaymentBadge(order.payment_method).iconClass, 'text-xs']"></i>
+                    <span>{{ getPaymentBadge(order.payment_method).label }}</span>
                   </span>
                 </div>
-                <div v-if="!['cancelled', 'rejected', 'undelivered', 'unpicked', 'batal', 'gagal'].includes(order.status)">
+                <div>
                   <span class="text-gray-400 block text-xs">Metode Pengiriman</span>
                   <span class="font-medium text-gray-800">
-                    {{ order.order_type === 'jasa' ? (order.delivery_type === 'in-store' ? 'Di Tempat' : (order.delivery_type === 'on-site' ? 'Panggilan' : 'Online')) : (order.delivery_type === 'delivery' ? 'Kirim ke Alamat' : (order.delivery_type === 'pickup' ? 'Ambil Sendiri' : (order.delivery_type === 'WhatsApp' ? 'Belum Ditetapkan' : order.delivery_type))) }}
+                    {{ isCancelledStatus(order.status) ? '-' : (order.order_type === 'jasa' ? (order.delivery_type === 'in-store' ? 'Di Tempat' : (order.delivery_type === 'on-site' ? 'Panggilan' : 'Online')) : (order.delivery_type === 'delivery' ? 'Kirim ke Alamat' : (order.delivery_type === 'pickup' ? 'Ambil Sendiri' : (order.delivery_type === 'WhatsApp' ? 'Belum Ditetapkan' : order.delivery_type)))) }}
                   </span>
                 </div>
               </div>
@@ -217,7 +204,7 @@
             </div>
 
             <!-- Notes Card -->
-            <div v-if="order.note || (order.delivery_note && !['cancelled', 'rejected', 'undelivered', 'unpicked', 'batal', 'gagal'].includes(order.status))" class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl space-y-3">
+            <div v-if="order.note || (order.delivery_note && !isCancelledStatus(order.status))" class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl space-y-3">
               <h3 class="text-sm font-bold text-gray-900 flex items-center gap-2">
                 <i class="pi pi-comment text-merchant-primary"></i>
                 Catatan Pesanan
@@ -226,7 +213,7 @@
                 <span class="font-semibold block text-gray-500 mb-0.5">Catatan Pembeli:</span>
                 {{ order.note }}
               </div>
-              <div v-if="order.delivery_note && !['cancelled', 'rejected', 'undelivered', 'unpicked', 'batal', 'gagal'].includes(order.status)" class="text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <div v-if="order.delivery_note && !isCancelledStatus(order.status)" class="text-xs text-gray-700 bg-gray-50 p-3 rounded-xl border border-gray-100">
                 <span class="font-semibold block text-gray-500 mb-0.5">Catatan Pengiriman:</span>
                 {{ order.delivery_note }}
               </div>
@@ -292,7 +279,7 @@
                   <span>- Rp {{ formatIDR(order.amounts.discount) }}</span>
                 </div>
 
-                <div v-if="order.amounts.shipping > 0" class="flex justify-between text-gray-600">
+                <div v-if="order.amounts.shipping > 0 && !isCancelledStatus(order.status)" class="flex justify-between text-gray-600">
                   <span>Ongkos Kirim</span>
                   <span>Rp {{ formatIDR(order.amounts.shipping) }}</span>
                 </div>
@@ -308,6 +295,34 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Mobile Bottom Action Bar -->
+    <div
+      v-if="order && (order.status === 'waiting_review' || order.status === 'pending' || order.status === 'processing')"
+      class="fixed bottom-0 left-0 right-0 z-40 p-3.5 bg-white border-t border-gray-200 shadow-lg sm:hidden flex items-center gap-3"
+    >
+      <Button
+        variant="danger-outline"
+        size="md"
+        class="flex-1"
+        @click="openCancelModal"
+        :disabled="updatingStatus"
+      >
+        <i class="pi pi-times mr-1.5 text-xs"></i>
+        Batalkan
+      </Button>
+      <Button
+        variant="merchant"
+        size="md"
+        class="flex-1"
+        @click="openCompleteModal"
+        :disabled="updatingStatus"
+        customClass="bg-green-600 hover:bg-green-700 text-white font-medium"
+      >
+        <i class="pi pi-check mr-1.5 text-xs"></i>
+        Konfirmasi Selesai
+      </Button>
     </div>
 
     <!-- Confirm Complete Modal -->
@@ -500,9 +515,11 @@ import { useToast } from "vue-toastification";
 import { getMerchantOrderDetail, updateOrderStatus } from "@/services/api/order";
 import { formatDate, formatTime } from "@/libs/format.js";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
+import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
 
 const router = useRouter();
 const route = useRoute();
@@ -520,8 +537,12 @@ const updatingStatus = ref(false);
 const showCompleteModal = ref(false);
 const showCancelModal = ref(false);
 
+// Lock body scroll when modal is open
+const isAnyModalOpen = computed(() => showCompleteModal.value || showCancelModal.value);
+useBodyScrollLock(isAnyModalOpen);
+
 const breadcrumbItems = computed(() => [
-  { label: "Pesanan Masuk", to: `/merchant-center/${merchantSlug.value}/orders` },
+  { label: "Pesanan Masuk", path: `/merchant-center/${merchantSlug.value}/orders` },
   { label: `Detail Pesanan` },
 ]);
 
@@ -553,6 +574,54 @@ function mapApiStatus(beStatus, o) {
     default:
       return beStatus;
   }
+}
+
+function isCancelledStatus(status) {
+  if (!status) return false;
+  return ["cancelled", "rejected", "undelivered", "unpicked", "batal", "gagal"].includes(String(status).toLowerCase());
+}
+
+function getPaymentBadge(method) {
+  const m = String(method || "").trim();
+  const lower = m.toLowerCase();
+
+  if (lower === "qris") {
+    return {
+      label: "QRIS",
+      icon: "pi pi-qrcode",
+      iconClass: "text-merchant-primary",
+    };
+  }
+
+  if (lower.includes("transfer")) {
+    return {
+      label: m || "Transfer Bank",
+      icon: "pi pi-credit-card",
+      iconClass: "text-blue-600",
+    };
+  }
+
+  if (lower === "cod" || lower === "tunai" || lower === "cash") {
+    return {
+      label: m || "COD",
+      icon: "pi pi-wallet",
+      iconClass: "text-emerald-600",
+    };
+  }
+
+  if (lower === "whatsapp" || lower === "belum ditetapkan" || !m) {
+    return {
+      label: "Belum Ditetapkan",
+      icon: "pi pi-clock",
+      iconClass: "text-gray-400",
+    };
+  }
+
+  return {
+    label: m,
+    icon: "pi pi-wallet",
+    iconClass: "text-gray-500",
+  };
 }
 
 function getOrderSnapshotUrl(orderItemId, path) {
@@ -601,9 +670,9 @@ function transformOrder(o) {
       phone: o.tel || o.user_phone_snapshot || o.user?.phone || "",
     },
     status: mapApiStatus(o.status, o),
-    payment_method: o.payment_method || o.metode_pembayaran || "COD",
+    payment_method: o.payment_method === 'WhatsApp' ? 'Belum Ditetapkan' : (o.payment_method || o.metode_pembayaran || 'Belum Ditetapkan'),
     order_type: o.order_type || (o.jasa_id ? "jasa" : "product"),
-    delivery_type: o.delivery_type || (o.catatan_alamat ? "delivery" : "pickup"),
+    delivery_type: o.delivery_type === 'WhatsApp' ? 'Belum Ditetapkan' : (o.delivery_type || (o.catatan_alamat ? "delivery" : "Belum Ditetapkan")),
     created_at: o.created_at,
     items: o.order_type === "jasa" || o.jasa_id
       ? (o.jasa_items || []).map((it) => ({

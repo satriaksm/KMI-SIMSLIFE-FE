@@ -164,6 +164,7 @@ export function useVouchers() {
   };
 
   const createMerchantVoucher = async (merchantSlug, payload) => {
+    loading.value = true;
     try {
       const voucher = await voucherApi.createMerchantVoucher(
         merchantSlug,
@@ -181,10 +182,13 @@ export function useVouchers() {
       const message = error.response?.data?.message || "Gagal membuat voucher";
       toast.error(message);
       throw error;
+    } finally {
+      loading.value = false;
     }
   };
 
   const editMerchantVoucher = async (merchantSlug, voucherId, payload) => {
+    loading.value = true;
     try {
       const voucher = await voucherApi.editMerchantVoucher(
         merchantSlug,
@@ -204,6 +208,8 @@ export function useVouchers() {
         error.response?.data?.message || "Gagal memperbarui voucher";
       toast.error(message);
       throw error;
+    } finally {
+      loading.value = false;
     }
   };
 

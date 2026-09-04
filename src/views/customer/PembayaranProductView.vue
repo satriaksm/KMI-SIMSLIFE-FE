@@ -904,40 +904,6 @@ function clearPromo() {
   amounts.value.diskon = 0;
 }
 
-function getItemStockSummary(item) {
-  const stock = Number(item?.stock || 0);
-  const quantity = Number(item?.quantity || 0);
-  const shortage = Math.max(0, quantity - stock);
-
-  return {
-    stock,
-    shortage,
-  };
-}
-
-function getPromoStockSummary(promo) {
-  if (!promo) return null;
-
-  const totalRemaining =
-    promo.usage_limit === null
-      ? null
-      : Math.max(0, Number(promo.usage_limit || 0) - Number(promo.usages_count || 0));
-
-  const userRemaining =
-    promo.usage_limit_per_user === null
-      ? null
-      : Math.max(
-          0,
-          Number(promo.usage_limit_per_user || 0) -
-            Number(promo.user_usages_count || 0),
-        );
-
-  return {
-    totalRemaining,
-    userRemaining,
-  };
-}
-
 // Nama/telp dari auth
 const customerName = computed(() => auth.user?.name || form.value.nama || "");
 const customerPhone = computed(() =>
@@ -958,93 +924,72 @@ const isFormValid = computed(() => {
 // WhatsApp text
 const openWhatsapp = async () => {
   if (!isFormValid.value) {
-    alert("Mohon lengkapi data pemesan");
+    toast.error("Mohon lengkapi data pemesan terlebih dahulu");
     return;
   }
 
-  let productDetails = "";
+  const storeName = checkout.store?.name || order.value?.store?.name || "";
+  const greeting = storeName
+    ? `Halo *${storeName}*, saya ingin memesan produk berikut:`
+    : "Halo, saya ingin memesan produk berikut:";
 
-  if (checkout.from === "cart") {
-    productDetails = checkout.cartItems
-      .map(
-        (i, idx) =>
-          (() => {
-            const stockInfo = getItemStockSummary(i);
-            return (
-              `${idx + 1}. ${i.name}\n` +
-              (i.variant ? `Varian: ${i.variant}\n` : "") +
-              (i.size ? `Ukuran: ${i.size}\n` : "") +
-              `Jumlah: ${i.quantity}x\n` +
-              `Stok tersedia: ${stockInfo.stock}\n` +
-              (stockInfo.shortage > 0
-                ? `Kurang stok: ${stockInfo.shortage}\n`
-                : "") +
-              `Harga: Rp ${formatIDR(
-                (i.unitPrice + i.addonTotalPrice) * i.quantity,
-              )}`
-            );
-          })(),
-      )
-      .join("\n\n");
-  } else {
-    const stockInfo = getItemStockSummary({
-      quantity: checkout.qty,
-      stock: checkout.combination?.stock || 0,
-    });
+  const productDetails = checkoutItems.value
+    .map((item, idx) => {
+      const prefix = checkoutItems.value.length > 1 ? `${idx + 1}. ` : "";
+      const lines = [`${prefix}*${item.name}*`];
 
-    productDetails = [
-      `Produk: ${order.value.title}`,
-      order.value.size ? `Ukuran: ${order.value.size}` : "",
-      order.value.variant ? `Varian: ${order.value.variant}` : "",
-      checkout.selectedAddons.length
-        ? `Tambahan: ${checkout.selectedAddons.map((a) => a.name).join(", ")}`
-        : "",
-      `Jumlah: ${checkout.qty}x`,
-      `Stok tersedia: ${stockInfo.stock}`,
-      stockInfo.shortage > 0 ? `Kurang stok: ${stockInfo.shortage}` : "",
-      `Subtotal: Rp ${formatIDR(total.value)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
+      if (item.variant) {
+        lines.push(`   • Varian: ${item.variant}`);
+      }
 
-  const promoStockInfo = getPromoStockSummary(selectedPromo.value);
-  const voucherInfo = selectedPromo.value
-    ? [
-        "\n*VOUCHER*",
-        `Voucher: ${selectedPromo.value.name} (${selectedPromo.value.code})`,
-        promoStockInfo?.totalRemaining === null
-          ? "Sisa voucher: unlimited"
-          : `Sisa voucher: ${promoStockInfo.totalRemaining}`,
-        promoStockInfo?.userRemaining === null
-          ? null
-          : `Sisa voucher per user: ${promoStockInfo.userRemaining}`,
-      ]
-        .filter(Boolean)
-        .join("\n")
+      const addonNames = (item.addons || [])
+        .map((a) => a.name || a.label)
+        .filter(Boolean);
+      if (addonNames.length > 0) {
+        lines.push(`   • Tambahan: ${addonNames.join(", ")}`);
+      }
+
+      const unitTotal = item.price + getAddonTotal(item);
+      lines.push(
+        `   • Jumlah: ${item.quantity}x (Rp ${formatIDR(unitTotal)})`,
+      );
+      lines.push(`   • Subtotal: Rp ${formatIDR(unitTotal * item.quantity)}`);
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const catatanText = form.value.catatanProduk?.trim()
+    ? `\n*Catatan Pesanan:*\n"${form.value.catatanProduk.trim()}"`
     : "";
 
-  const text = [
-    "*PESANAN BARU DARI SUMILIR*",
+  const textLines = [
+    "*PESANAN BARU - SUMILIR*",
+    greeting,
     "\n*DATA PEMESAN*",
-    `Nama: ${customerName.value}`,
-    `Telp: ${customerPhone.value}`,
+    `• Nama: ${customerName.value}`,
+    `• No. WhatsApp: ${customerPhone.value}`,
     "\n*DETAIL PESANAN*",
     productDetails,
-    form.value.catatanProduk ? `\nCatatan: ${form.value.catatanProduk}` : "",
-    voucherInfo,
-    "\n*RINCIAN HARGA*",
-    `Harga Produk: Rp ${formatIDR(amounts.value.product)}`,
-    amounts.value.diskon > 0
-      ? `Diskon (${selectedPromo.value?.code}): -Rp ${formatIDR(
-          amounts.value.diskon,
-        )}`
-      : "",
-    `*Total: Rp ${formatIDR(total.value)}*`,
-    "\n_Metode pengiriman dan pembayaran akan disepakati melalui chat ini._",
-  ]
-    .filter(Boolean)
-    .join("\n");
+    catatanText,
+    "\n*RINCIAN PEMBAYARAN*",
+    `• Total Produk: Rp ${formatIDR(amounts.value.product)}`,
+  ];
+
+  if (amounts.value.diskon > 0 && selectedPromo.value) {
+    textLines.push(
+      `• Diskon Voucher (${selectedPromo.value.code}): -Rp ${formatIDR(
+        amounts.value.diskon,
+      )}`,
+    );
+  }
+
+  textLines.push(`• *Total Tagihan: Rp ${formatIDR(total.value)}*`);
+  textLines.push(
+    "\n_Mohon konfirmasi ketersediaan pesanan serta metode pengiriman dan pembayarannya. Terima kasih!_",
+  );
+
+  const text = textLines.filter(Boolean).join("\n");
 
   let phone = merchantPhoneNormalized.value;
 

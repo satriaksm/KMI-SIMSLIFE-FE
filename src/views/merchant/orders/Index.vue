@@ -75,6 +75,11 @@ function mapApiStatus(beStatus, o) {
   }
 }
 
+function isCancelledStatus(status) {
+  if (!status) return false;
+  return ["cancelled", "rejected", "undelivered", "unpicked", "batal", "gagal"].includes(String(status).toLowerCase());
+}
+
 function getOrderSnapshotUrl(orderItemId, path) {
   if (!path) return null;
   if (path.startsWith('http')) return path;
@@ -93,7 +98,7 @@ function mapMerchantOrder(o) {
     status: mapApiStatus(o.status, o),
     payment_method: o.payment_method === 'WhatsApp' ? 'Belum Ditetapkan' : (o.payment_method || o.metode_pembayaran || 'Belum Ditetapkan'),
     order_type: o.order_type || (o.jasa_id ? 'jasa' : 'product'),
-    delivery_type: o.delivery_type || (o.catatan_alamat ? 'delivery' : 'pickup'),
+    delivery_type: o.delivery_type === 'WhatsApp' ? 'Belum Ditetapkan' : (o.delivery_type || (o.catatan_alamat ? 'delivery' : 'Belum Ditetapkan')),
     created_at: o.created_at,
     items: o.order_type === 'jasa' || o.jasa_id
       ? (o.jasa_items || []).map((it) => ({
@@ -148,6 +153,88 @@ function mapMerchantOrder(o) {
   };
 }
 
+function getDeliveryBadge(o) {
+  const isNotResponded =
+    o.status === "waiting_review" ||
+    o.status === "pending" ||
+    o.delivery_type === "WhatsApp" ||
+    o.delivery_type === "Belum Ditetapkan" ||
+    !o.delivery_type;
+
+  if (isNotResponded && o.delivery_type !== "pickup" && o.delivery_type !== "in-store") {
+    return {
+      label: "Belum Ditetapkan",
+      icon: "pi pi-truck",
+      class: "bg-gray-100 text-gray-700 border-gray-200",
+    };
+  }
+
+  if (o.delivery_type === "pickup" || o.delivery_type === "in-store") {
+    return {
+      label: o.order_type === "jasa" ? "Di Tempat" : "Ambil Sendiri",
+      icon: "pi pi-shopping-bag",
+      class: "bg-amber-50 text-amber-700 border-amber-200",
+    };
+  }
+
+  if (o.delivery_type === "delivery") {
+    return {
+      label: o.order_type === "jasa" ? (o.delivery_type === "on-site" ? "Panggilan" : "Online") : "Kirim",
+      icon: "pi pi-truck",
+      class: "bg-blue-50 text-blue-700 border-blue-200",
+    };
+  }
+
+  return {
+    label: o.delivery_type || "Belum Ditetapkan",
+    icon: "pi pi-truck",
+    class: "bg-gray-100 text-gray-700 border-gray-200",
+  };
+}
+
+function getPaymentBadge(method) {
+  const m = String(method || "").trim();
+  const lower = m.toLowerCase();
+
+  if (lower === "qris") {
+    return {
+      label: "QRIS",
+      icon: "pi pi-qrcode",
+      iconClass: "text-merchant-primary",
+    };
+  }
+
+  if (lower.includes("transfer")) {
+    return {
+      label: m || "Transfer Bank",
+      icon: "pi pi-credit-card",
+      iconClass: "text-blue-600",
+    };
+  }
+
+  if (lower === "cod" || lower === "tunai" || lower === "cash") {
+    return {
+      label: m || "COD",
+      icon: "pi pi-wallet",
+      iconClass: "text-emerald-600",
+    };
+  }
+
+  if (lower === "whatsapp" || lower === "belum ditetapkan" || !m) {
+    return {
+      label: "Belum Ditetapkan",
+      icon: "pi pi-wallet",
+      iconClass: "text-gray-400",
+    };
+  }
+
+  return {
+    label: m,
+    icon: "pi pi-wallet",
+    iconClass: "text-gray-500",
+  };
+}
+
 async function fetchOrders() {
   if (!currentMerchantSlug.value) return;
   ordersLoading.value = true;
@@ -169,13 +256,13 @@ async function fetchOrders() {
     const meta = res?.meta?.pagination || res?.pagination || {};
     totalPages.value = meta.last_page || 1;
     currentPage.value = meta.current_page || 1;
-    perPage.value = meta.per_page || 10;
+    const currentPerPage = Number(perPage.value) || meta.per_page || 10;
     
     paginationInfo.value = {
-      start: (currentPage.value - 1) * perPage.value + (allOrders.value.length ? 1 : 0),
-      end: (currentPage.value - 1) * perPage.value + allOrders.value.length,
+      start: (currentPage.value - 1) * currentPerPage + (allOrders.value.length ? 1 : 0),
+      end: (currentPage.value - 1) * currentPerPage + allOrders.value.length,
       total: meta.total || allOrders.value.length,
-      per_page: perPage.value
+      per_page: currentPerPage
     };
 
     const countsData = res?.meta?.counts || {};
@@ -248,12 +335,37 @@ function resetFilters() {
 // ========================
 const currentPage = ref(1);
 const totalPages = ref(1);
-const perPage = ref(10);
+const perPageOptions = [
+  { label: "10", value: 10 },
+  { label: "25", value: 25 },
+  { label: "50", value: 50 },
+  { label: "100", value: 100 },
+];
+const perPage = ref(Number(localStorage.getItem("orders_per_page")) || 10);
 const paginationInfo = ref({
   start: 0,
   end: 0,
   total: 0,
-  per_page: 10
+  per_page: perPage.value
+});
+
+let perPageDebounceTimer = null;
+const debouncedLoadOrdersByPerPage = () => {
+  if (perPageDebounceTimer) {
+    clearTimeout(perPageDebounceTimer);
+  }
+
+  perPageDebounceTimer = setTimeout(() => {
+    currentPage.value = 1;
+    fetchOrders();
+  }, 400);
+};
+
+watch(perPage, (val, oldVal) => {
+  if (val === oldVal) return;
+
+  localStorage.setItem("orders_per_page", val);
+  debouncedLoadOrdersByPerPage();
 });
 
 watch(activeTab, () => {
@@ -419,7 +531,7 @@ onMounted(() => {
     </div>
     <div class="h-24 sm:h-0"></div>
 
-    <div class="px-4 py-0 space-y-2 sm:px-6 sm:py-6">
+    <div class="px-4 space-y-2 sm:px-6 py-2 sm:py-6">
       <!-- STICKY WRAPPER UNTUK TABS DAN SEARCH -->
       <div class=" z-10 top-[88px] sm:top-0 bg-gray-50 pt-0 pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 sm:pt-0 space-y-2">
         <!-- STATUS TABS -->
@@ -486,7 +598,18 @@ onMounted(() => {
               !
             </span>
           </button>
+          <SelectField
+            name="per_page"
+            variant="merchant"
+            size="sm"
+            v-model="perPage"
+            :options="perPageOptions"
+            class="max-w-24 shrink-0"
+            placeholder="10"
+          />
         </div>
+
+
       </div>
 
       <!-- DESKTOP TABLE -->
@@ -510,7 +633,7 @@ onMounted(() => {
               </div>
               <span
                 class="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-md"
-                :class="item.order_type === 'jasa' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'"
+                :class="item.order_type === 'jasa' ? 'bg-primary text-white' : 'bg-merchant-primary text-white'"
               >
                 {{ item.order_type === 'jasa' ? 'Layanan Jasa' : 'Produk' }}
               </span>
@@ -580,24 +703,27 @@ onMounted(() => {
           </template>
 
           <template #cell-payment_method="{ item }">
-            <span class="inline-flex items-center gap-1.5 text-xs text-gray-700 font-medium">
-              <i :class="item.payment_method === 'QRIS' ? 'pi pi-qrcode text-merchant-primary' : (item.payment_method === 'Transfer Bank' || item.payment_method === 'Transfer' ? 'pi pi-credit-card text-blue-600' : 'pi pi-wallet text-gray-500')"></i>
-              <span>{{ item.payment_method }}</span>
+            <span v-if="isCancelledStatus(item.status)" class="text-gray-400 text-sm">
+              
+            </span>
+            <span v-else class="inline-flex items-center gap-1.5 text-xs text-gray-700 font-medium">
+              <i :class="[getPaymentBadge(item.payment_method).icon, getPaymentBadge(item.payment_method).iconClass]"></i>
+              <span>{{ getPaymentBadge(item.payment_method).label }}</span>
             </span>
           </template>
 
           <template #cell-delivery_type="{ item }">
             <div>
-              <span v-if="['cancelled', 'rejected', 'undelivered', 'unpicked', 'batal', 'gagal'].includes(item.status)" class="text-gray-400 text-sm">
-                -
+              <span v-if="isCancelledStatus(item.status)" class="text-gray-400 text-sm">
+                
               </span>
               <span
                 v-else
                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border"
-                :class="item.delivery_type === 'pickup' || item.delivery_type === 'in-store' ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-blue-50 text-blue-800 border-blue-200'"
+                :class="getDeliveryBadge(item).class"
               >
-                <i :class="item.delivery_type === 'pickup' || item.delivery_type === 'in-store' ? 'pi pi-shopping-bag text-[10px]' : 'pi pi-truck text-[10px]'"></i>
-                <span>{{ item.order_type === 'jasa' ? (item.delivery_type === 'in-store' ? 'Di Tempat' : (item.delivery_type === 'on-site' ? 'Panggilan' : 'Online')) : (item.delivery_type === 'delivery' ? 'Kirim ke Alamat' : (item.delivery_type === 'pickup' ? 'Ambil Sendiri' : (item.delivery_type === 'WhatsApp' ? 'Belum Ditetapkan' : item.delivery_type))) }}</span>
+                <i :class="[getDeliveryBadge(item).icon, 'text-[10px]']"></i>
+                <span>{{ item.order_type === 'jasa' && getDeliveryBadge(item).label === 'Kirim' ? (item.delivery_type === 'on-site' ? 'Panggilan' : 'Online') : (getDeliveryBadge(item).label === 'Kirim' ? 'Kirim ke Alamat' : getDeliveryBadge(item).label) }}</span>
               </span>
             </div>
           </template>
@@ -670,7 +796,7 @@ onMounted(() => {
                 </span>
                 <span
                   class="px-1.5 py-0.5 text-[9px] font-semibold rounded"
-                  :class="order.order_type === 'jasa' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'"
+                  :class="order.order_type === 'jasa' ? 'bg-primary text-white' : 'bg-merchant-primary text-white'"
                 >
                   {{ order.order_type === 'jasa' ? 'Jasa' : 'Produk' }}
                 </span>
@@ -719,18 +845,22 @@ onMounted(() => {
             <!-- Card Footer: Payment, Delivery & Amount -->
             <div class="flex items-center justify-between pt-2 border-t border-gray-100">
               <div class="flex flex-wrap items-center gap-1.5">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-700">
-                  <i class="text-[9px] pi pi-credit-card"></i>
-                  <span>{{ order.payment_method }}</span>
+                <span v-if="isCancelledStatus(order.status)" class="text-xs text-gray-400 font-medium">
+                  
                 </span>
-                <span
-                  v-if="!['cancelled', 'rejected', 'undelivered', 'unpicked', 'batal', 'gagal'].includes(order.status)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium"
-                  :class="order.delivery_type === 'pickup' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'"
-                >
-                  <i :class="order.delivery_type === 'pickup' ? 'pi pi-shopping-bag text-[9px]' : 'pi pi-truck text-[9px]'"></i>
-                  <span>{{ order.delivery_type === 'pickup' ? 'Ambil Sendiri' : 'Kirim' }}</span>
-                </span>
+                <template v-else>
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-700">
+                    <i :class="[getPaymentBadge(order.payment_method).icon, getPaymentBadge(order.payment_method).iconClass, 'text-[10px]']"></i>
+                    <span>{{ getPaymentBadge(order.payment_method).label }}</span>
+                  </span>
+                  <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium"
+                    :class="getDeliveryBadge(order).class"
+                  >
+                    <i :class="[getDeliveryBadge(order).icon, 'text-[9px]']"></i>
+                    <span>{{ getDeliveryBadge(order).label }}</span>
+                  </span>
+                </template>
               </div>
               <div class="text-right">
                 <span class="text-sm font-bold text-gray-900">
@@ -834,6 +964,32 @@ onMounted(() => {
                 Terlama
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- ===== PER PAGE SECTION ===== -->
+        <div class="pt-6 space-y-4 border-t border-muted-foreground/30">
+          <h3
+            class="flex items-center gap-2 text-sm font-bold tracking-wide text-black uppercase"
+          >
+            <i class="pi pi-list text-merchant-primary"></i>
+            Jumlah per Halaman
+          </h3>
+          <div class="grid grid-cols-4 gap-2">
+            <button
+              v-for="opt in perPageOptions"
+              :key="opt.value"
+              type="button"
+              @click="perPage = opt.value"
+              class="px-3 py-2.5 text-sm font-medium transition border-2 rounded-lg text-center"
+              :class="
+                perPage === opt.value
+                  ? 'border-merchant-primary bg-merchant-primary/10 text-merchant-primary font-bold'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+              "
+            >
+              {{ opt.label }}
+            </button>
           </div>
         </div>
       </div>
