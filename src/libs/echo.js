@@ -13,47 +13,47 @@ const wsScheme = import.meta.env.VITE_REVERB_SCHEME || "http";
 // Fungsi getCookie manual sudah TIDAK DIPERLUKAN LAGI karena Axios akan mengurusnya secara otomatis.
 
 const echo = new Echo({
-  broadcaster: "pusher",
-  key: reverbKey,
-  cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || "mt1",
-  wsHost,
-  wsPort,
-  wssPort: wsPort,
-  forceTLS: wsScheme === "https",
-  enabledTransports: ["ws", "wss"],
+      broadcaster: "pusher",
+      key: reverbKey,
+      cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || "mt1",
+      wsHost,
+      wsPort,
+      wssPort: wsPort,
+      forceTLS: wsScheme === "https",
+      enabledTransports: ["ws", "wss"],
 
   // HAPUS konfigurasi authEndpoint, withCredentials, dan auth.headers bawaan Pusher
 
   // TAMBAHKAN Custom Authorizer menggunakan Axios
-  authorizer: (channel, options) => {
-    return {
-      authorize: (socketId, callback) => {
+      authorizer: (channel, options) => {
+        return {
+          authorize: (socketId, callback) => {
         // Gunakan Axios agar X-XSRF-TOKEN dan laravel_session (cookie) otomatis terkirim
-        axios
-          .post(
+            axios
+              .post(
             `${import.meta.env.VITE_API_BASE_URL}/broadcasting/auth`,
-            {
-              socket_id: socketId,
-              channel_name: channel.name,
-            },
-            {
+                {
+                  socket_id: socketId,
+                  channel_name: channel.name,
+                },
+                {
               withCredentials: true, // WAJIB untuk mengirim cookie session lintas port
-              headers: {
+                  headers: {
                 Accept: "application/json", // WAJIB agar Laravel tahu ini SPA dan tidak me-redirect
-              },
-            },
-          )
-          .then((response) => {
+                  },
+                },
+              )
+              .then((response) => {
             // Jika sukses (status 200), izinkan websocket terkoneksi
-            callback(false, response.data);
-          })
-          .catch((error) => {
+                callback(false, response.data);
+              })
+              .catch((error) => {
             // Jika gagal (status 401/419/500), tolak koneksi websocket
-            callback(true, error);
-          });
+                callback(true, error);
+              });
+          },
+        };
       },
-    };
-  },
-});
+    });
 
 export default echo;

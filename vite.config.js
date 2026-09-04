@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     base: "/",
     plugins: [
       vue(),
-      VueDevTools(),
+      // VueDevTools(),
       tailwindcss(),
       VitePWA({
         // Normal PWA behavior enabled.

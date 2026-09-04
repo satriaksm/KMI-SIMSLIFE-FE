@@ -20,6 +20,7 @@ dev-dist/
 # Local Docker setup
 /.dockerignore
 /Dockerfile.frontend
+/Dockerfile
 
 # Local overrides
 *.local
