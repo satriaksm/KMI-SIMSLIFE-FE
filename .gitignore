@@ -34,3 +34,6 @@ Thumbs.db
 
 # Ignore specific file
 dev-dist/sw.js
+
+Dockerfile
+.dockerignore
