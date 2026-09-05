@@ -683,7 +683,7 @@
         v-if="cartCount > 0"
         class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger-foreground text-white text-[10px] font-bold flex items-center justify-center leading-none"
       >
-        {{ cartCount > 99 ? "99+" : cartCount }}
+        {{ cartCount > 9 ? "9+" : cartCount }}
       </span>
     </button>
 

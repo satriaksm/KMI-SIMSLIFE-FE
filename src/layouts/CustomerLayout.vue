@@ -381,10 +381,10 @@ watch(
                 class="relative p-2 px-3 transition rounded-full text-primary hover:bg-gray-100"
                 aria-label="Keranjang"
               >
-                <i class="pi pi-shopping-cart"></i>
+                <i class="pi pi-shopping-cart text-lg lg:text-xl"></i>
                 <span
                   v-if="cartItemsCount > 0"
-                  class="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
+                  class="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] lg:text-[10px] font-bold rounded-full flex items-center justify-center"
                 >
                   {{ cartItemsCount > 9 ? "9+" : cartItemsCount }}
                 </span>
@@ -395,7 +395,7 @@ watch(
                 class="p-2 px-3 transition rounded-full hover:bg-gray-100"
                 aria-label="Cari"
               >
-                <i class="pi pi-search"></i>
+                <i class="pi pi-search text-lg lg:text-xl"></i>
               </button>
             </div>
 
