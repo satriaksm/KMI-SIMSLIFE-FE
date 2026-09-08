@@ -31,7 +31,7 @@
             </div>
           </form>
           <button
-            v-if="!isAdmin"
+            v-if="isCustomer"
             @click="goToCart"
             class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
           >
@@ -672,7 +672,7 @@
     </template>
 <!-- Floating Cart Button (Mobile only) -->
     <button
-      v-if="isAuthenticated && !isAdmin && !showMobileStickySearch"
+      v-if="isCustomer && !showMobileStickySearch"
       type="button"
       @click="goToCart"
       aria-label="Keranjang"
@@ -760,6 +760,7 @@ const cartStore = useCartStore();
 
 const isAuthenticated = computed(() => authStore.isAuthenticated);
 const isAdmin = computed(() => authStore.isAdmin);
+const isCustomer = computed(() => authStore.isCustomer);
 const cartCount = computed(() => cartStore.totalItems);
 
 // Mobile sticky search
@@ -1707,7 +1708,7 @@ onMounted(async () => {
   window.addEventListener("resize", updateViewportWidth, { passive: true });
   updateViewportWidth();
 
-  if (isAuthenticated.value && !isAdmin.value) {
+  if (isCustomer.value) {
     cartStore.fetchCartCount();
   }
 
