@@ -103,7 +103,7 @@ const props = defineProps({
   max: { type: [String, Number], default: null }, // NEW: nilai maksimum untuk input number
   id: { type: String, default: "" },
 });
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "clamped"]);
 const instanceUid = getCurrentInstance()?.uid;
 const inputId = computed(() => props.id || `${props.name}-${instanceUid}`);
 
@@ -139,11 +139,13 @@ const setFieldFromDigits = (digits, field) => {
     return;
   }
 
-  const next = clampNumber(num);
-  if (next !== num) {
-    numberDisplay.value = String(next);
+  const clamped = clampNumber(num);
+  if (clamped !== num) {
+    // Value was clamped — update the display to reflect the corrected value
+    numberDisplay.value = normalizeDigits(String(clamped));
+    emit("clamped", { original: num, clamped });
   }
-  field.onChange(next);
+  field.onChange(clamped);
 };
 
 const handleNumberFocus = (field) => {

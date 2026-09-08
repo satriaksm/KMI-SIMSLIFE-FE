@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth";
 import Button from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 // =========================
 // STATE & REFS
@@ -22,6 +23,9 @@ const authStore = useAuthStore();
 
 const merchantsLoading = ref(false);
 const isLoggingOut = ref(false);
+const pushLoading = ref(false);
+const pushEnabled = ref(false);
+const pushPermission = ref("default");
 
 const imgLoaded = ref(!!userStore.user?.profile_picture);
 const imgError = ref(false);
@@ -102,24 +106,6 @@ watch(
 // =========================
 // METHODS
 // =========================
-const handleNavigateToMerchantRegister = () => {
-  console.log("🔍 DEBUG: handleNavigateToMerchantRegister clicked");
-  console.log("📦 Auth Store State:", {
-    isAuthenticated: authStore.isAuthenticated,
-    userRoles: authStore.userRoles,
-    isCustomer: authStore.isCustomer,
-    user: authStore.user,
-  });
-
-  try {
-    router.push("/merchant-register");
-    console.log("✅ Navigation initiated to /merchant-register");
-  } catch (error) {
-    console.error("❌ Navigation error:", error);
-    toast.error("Gagal navigasi ke halaman registrasi UMKM: " + error.message);
-  }
-};
-
 const handleLogout = async () => {
   isLoggingOut.value = true;
   try {
@@ -176,6 +162,12 @@ onMounted(async () => {
     // ignore: error state is handled elsewhere / via UI
   }
 
+  try {
+    await refreshPushStatus();
+  } catch {
+    // ignore: push state is optional
+  }
+
   // Admin tidak perlu memuat data merchant di halaman profil.
   if (authStore.isAdmin) return;
 });
@@ -201,12 +193,13 @@ onMounted(async () => {
                   "
                   class="w-40 h-40 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
                 />
-                <img
+                <ResponsiveImage
                   v-else-if="hasProfilePictureUrl && !imgError"
                   :src="user.profile_picture"
+                  :urls="user.profile_picture_urls"
                   :alt="user.name"
                   loading="lazy"
-                  class="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
+                  customClass="object-cover w-40 h-40 border-4 border-white rounded-full shadow-lg"
                   :class="imgLoaded ? '' : 'opacity-0'"
                   @load="imgLoaded = true"
                   @error="
@@ -512,7 +505,7 @@ onMounted(async () => {
                   </template>
                   <button
                     class="flex items-center w-full gap-3 px-4 py-3 mt-2 text-left transition-all bg-white rounded-lg hover:bg-primary/10 group hover:shadow"
-                    @click="handleNavigateToMerchantRegister"
+                    @click="router.push('/merchant-register')"
                   >
                     <svg
                       class="w-5 h-5 text-merchant-primary"
@@ -528,7 +521,7 @@ onMounted(async () => {
                       />
                     </svg>
                     <span class="flex-1 font-medium text-gray-700"
-                      >Buka Toko Baru</span
+                      >Buka UMKM Baru</span
                     >
                   </button>
                 </div>
@@ -550,12 +543,13 @@ onMounted(async () => {
                 "
                 class="w-32 h-32 bg-gray-200 border-4 border-white rounded-full shadow-lg animate-pulse"
               />
-              <img
+              <ResponsiveImage
                 v-else-if="hasProfilePictureUrl && !imgError"
                 :src="user.profile_picture"
+                :urls="user.profile_picture_urls"
                 :alt="user.name"
                 loading="lazy"
-                class="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
+                customClass="object-cover w-32 h-32 border-4 border-white rounded-full shadow-lg"
                 :class="imgLoaded ? '' : 'opacity-0'"
                 @load="imgLoaded = true"
                 @error="
@@ -744,6 +738,42 @@ onMounted(async () => {
               </svg>
             </button>
 
+            <div
+              v-if="pushSupported && pushPermission !== 'denied'"
+              class="flex items-center justify-between w-full p-4 transition-colors bg-gray-50 rounded-xl hover:bg-gray-100 group gap-3"
+            >
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="p-2 transition-colors bg-white rounded-lg group-hover:bg-primary/10 shrink-0">
+                  <svg class="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.157V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.157c0 .538-.214 1.055-.595 1.438L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
+                  </svg>
+                </div>
+                <div class="flex-1 min-w-0 pr-1">
+                  <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900 block truncate">Notifikasi PWA</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5 leading-tight">{{ pushStatusMessage }}</p>
+                </div>
+              </div>
+              <button
+                @click="togglePushNotifications"
+                :disabled="pushLoading"
+                class="relative inline-flex items-center h-6 transition-colors rounded-full w-11 shrink-0 focus:outline-none disabled:opacity-70 disabled:cursor-not-allowed"
+                :class="pushEnabled ? 'bg-merchant-primary' : 'bg-gray-300'"
+              >
+                <span
+                  class="inline-flex items-center justify-center w-4 h-4 transition-transform transform bg-white rounded-full"
+                  :class="pushEnabled ? 'translate-x-6' : 'translate-x-1'"
+                >
+                  <i v-if="pushLoading" class="pi pi-spin pi-spinner text-[10px]" :class="pushEnabled ? 'text-merchant-primary' : 'text-gray-400'"></i>
+                </span>
+              </button>
+            </div>
+<!-- <button
+                    v-if="pushEnabled"
+                    @click="testLocalNotification"
+                    class="px-3 py-1.5 text-xs font-semibold text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+                  >
+                    Test
+                  </button> -->
             <!-- Accordion for merchant access (mobile) -->
             <div
               v-if="authStore.isAdmin"
@@ -847,7 +877,7 @@ onMounted(async () => {
 
                 <button
                   class="flex items-center w-full gap-3 px-4 py-3 mt-2 text-left transition-all bg-white rounded-lg hover:bg-primary/10 group"
-                  @click="handleNavigateToMerchantRegister"
+                  @click="router.push('/merchant-register')"
                 >
                   <svg
                     class="w-5 h-5 text-merchant-primary"

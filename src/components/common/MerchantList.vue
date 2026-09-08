@@ -70,7 +70,7 @@ const onToggleSelect = () => {
 
 <template>
   <div
-    class="flex flex-col gap-2 p-4 bg-white shadow hover:shadow-md transition rounded-xl"
+    class="flex flex-col gap-2 p-4 bg-white shadow hover:shadow-md transition rounded-2xl"
   >
     <!-- Header -->
     <div class="flex gap-3 items-center">

@@ -10,6 +10,7 @@ import { useMerchants } from "@/composables/useMerchants";
 import AppButton from "@/components/common/Button.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import TextField from "@/components/forms/TextField.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -201,10 +202,13 @@ onMounted(async () => {
         typeof data?.logo_url === "string" && data.logo_url.trim()
           ? data.logo_url
           : "",
+      logo_urls: data?.logo_urls || null,
       coverImage:
         typeof data?.banner_url === "string" && data.banner_url.trim()
           ? data.banner_url
           : "",
+      banner_urls: data?.banner_urls || null,
+      NPWP: data.NPWP || "",
     };
 
     const hours = data.operational_hours ?? {};
@@ -256,7 +260,7 @@ const goToEdit = () => {
         <!-- Hamburger Button (Mobile) -->
         <button
           @click="$emit('toggle-sidebar')"
-          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background sm:hidden"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
         >
           <i class="pi pi-bars text-muted-foreground"></i>
         </button>
@@ -364,11 +368,12 @@ const goToEdit = () => {
         <div
           class="relative w-full overflow-hidden rounded-2xl aspect-24/9 lg:aspect-4/1"
         >
-          <img
+          <ResponsiveImage
             v-if="hasCover"
             :src="merchantInfo.coverImage"
+            :urls="merchantInfo.banner_urls"
             alt="Cover"
-            class="absolute inset-0 object-cover w-full h-full"
+            customClass="absolute inset-0 object-cover w-full h-full"
           />
           <div
             v-else
@@ -389,12 +394,13 @@ const goToEdit = () => {
           </div>
         </div>
 
-        <div class="absolute -bottom-10 sm:-bottom-12 left-10 sm:left-8">
-          <img
+        <div class="absolute -bottom-10 sm:-bottom-12 left-4 sm:left-8">
+          <ResponsiveImage
             v-if="hasLogo"
             :src="merchantInfo.logo"
+            :urls="merchantInfo.logo_urls"
             alt="Logo"
-            class="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
+            customClass="object-cover w-24 h-24 border-4 border-white shadow-lg rounded-2xl sm:w-32 sm:h-32"
           />
           <span v-else>
             <svg
@@ -523,23 +529,60 @@ const goToEdit = () => {
             <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
               Jam Operasional
             </h3>
+
             <div
-              class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4"
+              class="w-full overflow-hidden border border-gray-100 bg-gray-100 rounded-xl"
             >
               <div
-                v-for="day in operationalHours"
-                :key="day.name"
-                class="flex items-center justify-between p-3 bg-gray-50 rounded-xl sm:p-4"
+                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 grid-flow-row sm:grid-flow-col sm:grid-rows-4 lg:grid-rows-3 gap-[1px]"
               >
-                <span
-                  class="px-4 py-2 bg-merchant-primary text-white rounded-full text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[110px] text-center"
+                <template v-for="day in operationalHours" :key="day.name">
+                  <div class="flex items-center justify-between p-3 bg-white sm:p-4 h-full">
+                    <div class="flex items-center gap-3">
+                      <span
+                        class="inline-block text-sm font-medium w-28 text-merchant-primary"
+                      >
+                        {{ day.name }}
+                      </span>
+                    </div>
+
+                    <div class="ml-4">
+                      <span
+                        v-if="day.hours === 'Tutup'"
+                        class="inline-block px-3 py-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-full"
+                      >
+                        Tutup
+                      </span>
+
+                      <span
+                        v-else
+                        class="inline-block px-3 py-1 text-xs font-semibold rounded-full text-merchant-primary bg-merchant-primary/10"
+                      >
+                        {{ day.hours.replace(/\[|\]/g, "") }}
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Informasi Pajak -->
+          <div class="pt-4">
+            <h3 class="mb-4 text-lg font-bold sm:text-xl text-merchant-primary">
+              Informasi UMKM
+            </h3>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  class="block mb-2 text-sm font-medium text-merchant-primary"
+                  >NPWP</label
                 >
-                  {{ day.name }}
-                </span>
-                <span
-                  class="ml-3 text-sm font-medium text-gray-700 sm:text-base"
-                  >{{ day.hours }}</span
+                <div
+                  class="p-3 text-sm text-gray-700 bg-gray-100 rounded-xl sm:p-4 sm:text-base"
                 >
+                  {{ merchantInfo.NPWP || "-" }}
+                </div>
               </div>
             </div>
           </div>

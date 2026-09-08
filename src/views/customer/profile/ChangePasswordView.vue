@@ -89,18 +89,26 @@ const onSubmit = handleSubmit(async (formValues) => {
 });
 
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 </script>
 
 <template>
   <div class="">
     <!-- Header -->
-    <MobileHeader title="Ubah Kata Sandi" @back="goBack" />
+    <MobileHeader title="Ubah Kata Sandi" @back="goBack" variant="primary"/>
 
     <!-- Content -->
-    <div class="max-w-4xl px-4 py-4 pb-24 mx-auto">
-      <form @submit.prevent="onSubmit" class="space-y-6">
+    <div class="max-w-3xl px-4 py-6 mx-auto sm:px-6 lg:px-8">
+      <div class="sm:p-8 sm:bg-white sm:border sm:border-gray-100 sm:shadow-sm rounded-2xl">
+        <h3 class="mb-6 text-xl font-bold text-gray-900 hidden sm:block">
+          Ubah Kata Sandi
+        </h3>
+        <form @submit.prevent="onSubmit" class="space-y-6">
         <!-- Current Password -->
         <PasswordField
           name="current_password"
@@ -290,7 +298,8 @@ const goBack = () => {
 
         <!-- Submit Button -->
         <div class="flex gap-2">
-          <div class="hidden w-full sm:inline">
+          <!-- Desktop Buttons -->
+          <div class="hidden sm:flex w-full gap-2">
             <AppButton
               type="button"
               variant="muted-outline"
@@ -300,21 +309,37 @@ const goBack = () => {
             >
               Batal
             </AppButton>
+
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="loading"
+              :disabled="loading"
+              class="w-full"
+            >
+              {{ loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
           </div>
 
-          <AppButton
-            type="submit"
-            variant="primary"
-            size="md"
-            block
-            :loading="loading"
-            :disabled="loading"
-            class="w-full"
-          >
-            {{ loading ? "Menyimpan..." : "Simpan" }}
-          </AppButton>
+          <!-- Mobile Sticky Button -->
+          <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+            <AppButton
+              type="submit"
+              variant="primary"
+              size="md"
+              block
+              :loading="loading"
+              :disabled="loading"
+              class="w-full"
+            >
+              {{ loading ? "Menyimpan..." : "Simpan" }}
+            </AppButton>
+          </div>
         </div>
       </form>
+      </div>
     </div>
   </div>
 </template>

@@ -66,12 +66,15 @@ const resolveApiImageUrl = (imageIdOrPath) => {
   return `${apiBase}/api/images/${encodeURIComponent(imageIdOrPath)}`;
 };
 
-export const getImageUrl = (imageIdOrPath) => {
-  return resolveApiImageUrl(imageIdOrPath);
+export const getImageUrl = (imageIdOrPath, size = null) => {
+  const url = resolveApiImageUrl(imageIdOrPath);
+  if (!url || !size) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}size=${size}`;
 };
 
-export const getImageUrlJasa = (imageIdOrPath) => {
-  return resolveApiImageUrl(imageIdOrPath);
+export const getImageUrlJasa = (imageIdOrPath, size = null) => {
+  return getImageUrl(imageIdOrPath, size);
 };
 
 /**

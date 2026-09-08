@@ -63,7 +63,7 @@ export function useMerchants() {
     loading.value = true;
     try {
       await api.patch(`/api/admin/merchants/${id}/approve`);
-      toast.success("UMKM berhasil di-approve!");
+      toast.success("UMKM berhasil disetujui!");
     } catch (error) {
       console.error("[useMerchants] Approve failed:", error);
       toast.error(error.response?.data?.message || "Gagal approve UMKM");

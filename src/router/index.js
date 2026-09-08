@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import CommunityView from "@/views/CommunityView.vue";
 import CommunityDetailView from "@/views/CommunityDetailView.vue";
-import MyOrderLayout from "@/views/CustomerOrder/MyOrderLayout.vue";
 
 const adminGuard = (to, from, next) => {
   const authStore = useAuthStore();
@@ -15,7 +14,7 @@ const adminGuard = (to, from, next) => {
 
   if (!authStore.isAdmin) {
     toast.error("Anda tidak memiliki akses ke halaman admin");
-    next({ name: "Home" });
+    next({ name: "Beranda" });
     return;
   }
 
@@ -40,7 +39,7 @@ const routes = [
       {
         path: "",
         name: "Beranda",
-        component: () => import("@/views/customer/Home.vue"),
+        component: () => import("@/views/HomeView.vue"),
         meta: {
           title: "Marketplace UMKM Lokal Banyuanyar | SUMILIR",
           description:
@@ -48,31 +47,21 @@ const routes = [
         },
       },
       {
-        path: "explore",
-        name: "UMKM & Produk-Layanan Jasa",
-        component: () => import("@/views/customer/ExploreView.vue"),
-        meta: {
-          title: "Semua Produk & Layanan | SUMILIR",
-          description:
-            "Jelajahi semua produk dan layanan UMKM lokal Banyuanyar di Sumilir. Temukan kuliner, toko, dan jasa berkualitas dari pelaku UMKM setempat.",
-        },
-      },
-      {
         path: "products/:slug",
         name: "Product Detail",
-        component: () => import("@/views/customer/ProductDetailView.vue"),
+        component: () => import("@/views/ProductDetailView.vue"),
         meta: { title: "Product Detail | SUMILIR" },
       },
       {
         path: "merchant/:slug",
         name: "Merchant Detail",
-        component: () => import("@/views/customer/MerchantDetailView.vue"),
+        component: () => import("@/views/MerchantDetailView.vue"),
         meta: { title: "Detail Toko | SUMILIR" },
       },
       {
         path: "/map",
         name: "Peta UMKM",
-        component: () => import("@/views/customer/PetaUmkmView.vue"),
+        component: () => import("@/views/PetaUmkmView.vue"),
         meta: {
           title: "Peta UMKM Banyuanyar | SUMILIR",
           description:
@@ -138,7 +127,7 @@ const routes = [
       {
         path: "search:keyword?",
         name: "Search Page",
-        component: () => import("@/views/customer/SearchPageView.vue"),
+        component: () => import("@/views/SearchPageView.vue"),
         beforeEnter: (to, from, next) => {
           const paramKeyword =
             typeof to.params?.keyword === "string"
@@ -223,6 +212,7 @@ const routes = [
           title: "Keranjang Saya | SUMILIR",
         },
       },
+
       {
         path: "product-payment",
         name: "Pembayaran Produk",
@@ -294,11 +284,11 @@ const routes = [
   },
 
   // ===========================
-  // Grup halaman Auth pakai AuthLayout
+  // Grup halaman Auth pakai CustomerLayout
   // ===========================
   {
     path: "/",
-    component: () => import("@/layouts/AuthLayout.vue"),
+    component: () => import("@/layouts/CustomerLayout.vue"),
     meta: { guest: true },
     children: [
       {
@@ -541,6 +531,37 @@ const routes = [
           title: "Dashboard UMKM | SUMILIR",
         },
       },
+      {
+        path: "orders",
+        children: [
+          {
+            path: "",
+            name: "Merchant - Orders",
+            component: () => import("@/views/merchant/orders/Index.vue"),
+            meta: {
+              title: "Orders",
+            },
+          },
+          {
+            path: ":orderId",
+            name: "Merchant - Order Detail",
+            component: () => import("@/views/merchant/orders/Detail.vue"),
+            meta: {
+              title: "Order Detail",
+            },
+          },
+        ],
+      },
+
+      {
+        path: "reports",
+        name: "Merchant - Reports",
+        component: () => import("@/views/merchant/reports/Index.vue"),
+        meta: {
+          title: "Laporan UMKM | SUMILIR",
+        },
+      },
+      
 
       // ===========================
       // PRODUK UMKM TOKO/KULINER
@@ -694,24 +715,6 @@ const routes = [
         ],
       },
 
-      // {
-      //   path: "events",
-      //   name: "Merchant - Events",
-      //   component: () => import("@/views/merchant/events/Index.vue"),
-      //   meta: {
-      //     title: "Events",
-      //   },
-      // },
-
-      {
-        path: "orders",
-        name: "Merchant - Orders",
-        component: () => import("@/views/merchant/orders/Index.vue"),
-        meta: {
-          title: "Pesanan",
-        },
-      },
-
       // ===========================
       // Profil UMKM
       // ===========================
@@ -758,24 +761,6 @@ const routes = [
             },
           },
         ],
-      },
-    ],
-  },
-
-  // My Order History (dari kodemu)
-  {
-    path: "/my-order",
-    component: MyOrderLayout, // ← dari kodemu
-    meta: {
-      requiresAuth: true,
-      roles: ["customer"], // ← dari kodemu
-    },
-    children: [
-      {
-        path: "",
-        name: "MyOrder",
-        component: () => import("@/views/CustomerOrder/MyOrderView.vue"),
-        meta: { title: "My Order | SUMILIR" }, // ← dari kodemu
       },
     ],
   },

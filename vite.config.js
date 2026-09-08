@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import VueDevTools from "vite-plugin-vue-devtools";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -12,15 +13,19 @@ export default defineConfig(({ mode }) => {
     base: "/",
     plugins: [
       vue(),
+      VueDevTools(),
       tailwindcss(),
       VitePWA({
-        // Emergency recovery mode: generate a self-destroying SW so clients
-        // with a stale worker stop intercepting /backend verification URLs.
-        // Re-enable normal PWA behavior after affected clients have recovered.
-        selfDestroying: true,
+        // Normal PWA behavior enabled.
         registerType: "autoUpdate",
-        devOptions: { enabled: true },
-        manifestFilename: "manifest.json",
+        devOptions: { enabled: false },
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw.js",
+        injectManifest: {
+          globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        },
+        includeAssets: ["icon192.png", "icon512.png"],
         manifest: {
           name: "Sumilir",
           short_name: "Sumilir",
@@ -28,8 +33,8 @@ export default defineConfig(({ mode }) => {
           theme_color: "#ff9800",
           background_color: "#ffffff",
           display: "standalone",
-          start_url: "/", // ✅ Root
-          scope: "/", // ✅ Root
+          start_url: "/",
+          scope: "/",
           icons: [
             {
               src: "/icon192.png",
@@ -40,42 +45,6 @@ export default defineConfig(({ mode }) => {
               src: "/icon512.png",
               sizes: "512x512",
               type: "image/png",
-            },
-          ],
-        },
-        workbox: {
-          cleanupOutdatedCaches: true,
-          skipWaiting: true,
-          clientsClaim: true,
-          navigateFallback: "/index.html", // ✅ Root
-          navigateFallbackDenylist: [
-            /^\/api\//,
-            /^\/api$/,
-            /^\/backend\//,
-            /^\/backend$/,
-            /^\/sanctum\//,
-          ], // ✅ Exclude /api/ and /backend/ and /sanctum/
-          runtimeCaching: [
-            {
-              urlPattern: ({ request, sameOrigin }) =>
-                sameOrigin &&
-                ["style", "script", "image", "font"].includes(
-                  request.destination,
-                ),
-              handler: "StaleWhileRevalidate",
-              options: { cacheName: "assets-cache-v1" },
-            },
-            {
-              urlPattern: new RegExp(
-                `^${apiBase.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}/.*`,
-              ),
-              handler: "NetworkFirst",
-              method: "GET",
-              options: {
-                cacheName: "api-cache-v1",
-                cacheableResponse: { statuses: [0, 200] },
-                expiration: { maxEntries: 200, maxAgeSeconds: 3600 },
-              },
             },
           ],
         },

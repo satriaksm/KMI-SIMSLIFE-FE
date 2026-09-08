@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto pb-28 sm:pb-30 max-w-7xl">
+  <div class="mx-auto pb-12 sm:pb-30 max-w-7xl">
     <!-- Mobile Header -->
     <MobileHeader title="Checkout Pesanan" variant="primary" />
 
@@ -131,132 +131,130 @@
         </div>
       </section>
 
-      <!-- Metode Pengiriman -->
-      <section class="p-4 bg-white border border-gray-200 rounded-xl">
-        <h2 class="mb-3 font-semibold text-gray-800">Metode Pengiriman</h2>
-        <div class="flex items-center gap-4 text-sm">
-          <!-- <label
-            class="flex items-center gap-2"
-            :class="
-              isGuest ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-            "
-          >
-            <input
-              type="radio"
-              value="delivery"
-              v-model="form.metodePengiriman"
-              :disabled="isGuest"
-              class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <span>Diantar</span>
-          </label> -->
-
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              value="pickup"
-              v-model="form.metodePengiriman"
-              class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <span>Ambil Sendiri</span>
-          </label>
-        </div>
-      </section>
-
-      <!-- Detail Alamat - hanya tampil jika diantar -->
-      <section
-        v-if="form.metodePengiriman === 'delivery'"
-        class="p-4 bg-white border border-gray-200 rounded-xl"
-      >
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold text-gray-800">Alamat Pengiriman</h2>
-          <button
-            @click="showAlamatModal = true"
-            class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
-          >
-            {{ selectedAddress ? "Ganti Alamat" : "Pilih Alamat" }}
-          </button>
-        </div>
-
-        <div v-if="selectedAddress" class="space-y-3">
-          <div class="flex items-start gap-2 text-sm">
-            <i class="text-xl pi pi-map-marker text-primary"></i>
-            <div class="flex-1">
-              <div class="font-semibold text-gray-800">
-                {{ selectedAddress.label }}
-              </div>
-              <p class="mt-1 leading-snug text-gray-600">
-                {{ selectedAddress.fullAddress }}
-              </p>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ selectedAddress.penerima }} - {{ selectedAddress.telp }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="py-4 text-sm text-center text-gray-500">
-          Belum ada alamat dipilih
-        </div>
-      </section>
-
-      <!-- Alamat Toko - untuk pickup -->
-      <section
-        v-if="form.metodePengiriman === 'pickup'"
-        class="p-4 bg-white border border-gray-200 rounded-xl"
-      >
-        <h2 class="mb-3 font-semibold text-gray-800">Lokasi Toko</h2>
-        <div class="flex items-start gap-2 text-sm">
-          <i class="text-xl pi pi-map-marker text-merchant-primary"></i>
-
-          <div class="flex-1">
-            <div class="font-semibold text-gray-800">
-              {{ order.store?.name || "Toko" }}
-            </div>
-            <p class="mt-1 leading-snug text-gray-600">
-              {{
-                // ✅ Prioritas: merchant_address dari API product detail
-                order.store?.address || "Alamat toko belum tersedia"
-              }}
-            </p>
-          </div>
-        </div>
-      </section>
-
       <!-- Promo (hanya jika sudah login) -->
       <section
         v-if="!isGuest"
         class="overflow-hidden bg-white border border-gray-200 rounded-xl"
       >
-        <div class="flex items-center justify-between px-4 py-3 bg-lime-50">
-          <div class="text-sm font-semibold text-gray-800">
-            {{
-              selectedPromo ? selectedPromo.name : "Belum ada voucher dipilih"
-            }}
+        <!-- Header Section -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/70">
+          <div class="flex items-center gap-2">
+            <svg
+              class="w-5 h-5 text-[#FFA30E]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+              />
+            </svg>
+            <h2 class="text-sm font-semibold text-gray-800">Voucher Toko</h2>
           </div>
           <button
-            v-if="!selectedPromo"
-            class="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFA30E] text-white hover:bg-[#e5920d] transition"
+            type="button"
+            class="text-xs font-semibold text-[#FFA30E] hover:text-[#e5920d] hover:underline flex items-center gap-1 cursor-pointer transition"
             @click="openPromo = true"
           >
-            Pilih
-          </button>
-          <button
-            v-else
-            class="px-3 py-1 text-xs font-semibold text-red-700 transition bg-red-100 rounded-full hover:bg-red-200"
-            @click="clearPromo"
-          >
-            Batalkan
+            {{ selectedPromo ? "Ganti Voucher" : "Pilih Voucher" }}
+            <span>&rarr;</span>
           </button>
         </div>
 
-        <button
-          class="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
+        <!-- STATE 1: JIKA SUDAH ADA VOUCHER YANG DIPILIH -->
+        <div
+          v-if="selectedPromo"
+          class="p-4 bg-gradient-to-r from-amber-50/70 via-orange-50/30 to-white"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1.5 min-w-0">
+              <div class="flex items-center flex-wrap gap-2">
+                <!-- Kode Badge -->
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#FFA30E] text-white tracking-wide uppercase shadow-xs">
+                  {{ selectedPromo.code }}
+                </span>
+                <!-- Diskon Badge -->
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold"
+                  :class="selectedPromo.type === 'percent' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'"
+                >
+                  {{ selectedPromo.type === 'percent' ? `Diskon ${selectedPromo.value}%` : `Potongan Rp ${formatIDR(selectedPromo.value)}` }}
+                </span>
+              </div>
+
+              <!-- Nama Voucher -->
+              <h3 class="text-sm font-bold text-gray-900 pt-0.5">
+                {{ selectedPromo.name }}
+              </h3>
+
+              <!-- Deskripsi Voucher jika ada -->
+              <p v-if="selectedPromo.desc" class="text-xs text-gray-600">
+                {{ selectedPromo.desc }}
+              </p>
+
+              <!-- Detail Potongan & Ketentuan -->
+              <div class="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span class="text-green-700 font-semibold flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 inline text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                  </svg>
+                  Hemat Rp {{ formatIDR(amounts.diskon) }}
+                </span>
+                <span v-if="selectedPromo.min_purchase">
+                  Min. Belanja: Rp {{ formatIDR(selectedPromo.min_purchase) }}
+                </span>
+                <span v-if="selectedPromo.type === 'percent' && selectedPromo.max_discount">
+                  Maks. Potongan: Rp {{ formatIDR(selectedPromo.max_discount) }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Tombol Batalkan / Hapus -->
+            <button
+              type="button"
+              class="shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+              title="Batalkan Voucher"
+              @click="clearPromo"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- STATE 2: JIKA BELUM ADA VOUCHER YANG DIPILIH -->
+        <div
+          v-else
+          class="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50/80 transition"
           @click="openPromo = true"
         >
-          Lihat promo lainnya
-          <span>→</span>
-        </button>
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-amber-50 text-[#FFA30E] shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-gray-800">
+                Gunakan Voucher Promo
+              </p>
+              <p class="text-xs text-gray-500">
+                Makin hemat belanja dengan voucher diskon & potongan harga
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#FFA30E] text-white hover:bg-[#e5920d] transition shrink-0"
+            @click.stop="openPromo = true"
+          >
+            Pilih
+          </button>
+        </div>
       </section>
 
       <!-- Ringkasan Pembayaran -->
@@ -264,74 +262,13 @@
         <h2 class="mb-3 font-semibold text-gray-800">Ringkasan Pembayaran</h2>
 
         <div class="space-y-3">
-          <!-- Metode Pembayaran -->
-          <div>
-            <div class="mb-2 text-sm text-gray-600">Metode Pembayaran</div>
-            <div class="flex items-center gap-6 text-sm">
-              <label
-                class="flex items-center gap-2"
-                :class="
-                  form.metodePengiriman === 'delivery'
-                    ? 'cursor-not-allowed opacity-50'
-                    : 'cursor-pointer'
-                "
-              >
-                <input
-                  type="radio"
-                  value="COD"
-                  v-model="pay.method"
-                  :disabled="form.metodePengiriman === 'delivery'"
-                  class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E] disabled:cursor-not-allowed"
-                />
-                <span>COD (Cash)</span>
-              </label>
-              <!-- <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  value="QRIS"
-                  v-model="pay.method"
-                  class="w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-                />
-                <span>QRIS</span>
-              </label> -->
-            </div>
-
-            <!-- Info message untuk delivery -->
-            <p
-              v-if="form.metodePengiriman === 'delivery'"
-              class="flex items-start gap-1 mt-2 text-xs text-amber-600"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                class="w-4 h-4 shrink-0 mt-0.5"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-8 8a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>Untuk pengiriman, pembayaran wajib menggunakan QRIS</span>
-            </p>
-          </div>
-
           <!-- Rincian Harga -->
           <div
-            class="pt-3 space-y-2 text-sm text-gray-700 border-t border-gray-200"
+            class="space-y-2 text-sm text-gray-700"
           >
             <div class="flex justify-between">
               <span>Subtotal Produk </span>
               <span>Rp {{ formatIDR(amounts.product) }}</span>
-            </div>
-
-            <div
-              v-if="form.metodePengiriman === 'delivery'"
-              class="flex justify-between"
-            >
-              <span>Biaya Pengiriman</span>
-              <span>Rp {{ formatIDR(amounts.ongkir) }}</span>
             </div>
 
             <div
@@ -350,20 +287,22 @@
               <span>-Rp {{ formatIDR(amounts.diskon) }}</span>
             </div>
 
-            <div class="my-2 border-t border-gray-300"></div>
-
             <div class="flex justify-between text-base font-bold">
               <span>Total Pembayaran</span>
               <span class="text-[#FFA30E]">Rp {{ formatIDR(total) }}</span>
             </div>
           </div>
+
+          <p class="pt-2 text-xs text-gray-500 border-t border-gray-100">
+            *Metode pengiriman dan pembayaran akan disepakati langsung dengan penjual melalui WhatsApp.
+          </p>
         </div>
       </section>
     </main>
 
     <!-- Bottom bar (Total + Pesan button) -->
     <footer
-      class="fixed left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-lg bottom-16 sm:bottom-0"
+      class="fixed left-0 right-0 z-20 bg-white border-t border-gray-200 shadow-lg bottom-0"
     >
       <div class="px-4 py-3 mx-auto space-y-2 max-w-7xl">
         <div
@@ -393,64 +332,6 @@
       </div>
     </footer>
 
-    <!-- Modal Pilih Alamat -->
-    <ResponsiveModal
-      :show="showAlamatModal"
-      @close="showAlamatModal = false"
-      title="Pilih Alamat Pengiriman"
-      subtitle="Pilih alamat untuk pengiriman produk"
-    >
-      <div class="space-y-3">
-        <button
-          v-for="addr in addresses"
-          :key="addr.id"
-          @click="selectAddress(addr)"
-          class="w-full p-4 text-left transition border rounded-lg"
-          :class="
-            selectedAddress?.id === addr.id
-              ? 'border-[#FFA30E] bg-orange-50'
-              : 'border-gray-200 hover:border-gray-300'
-          "
-        >
-          <div class="flex items-start gap-3">
-            <input
-              type="radio"
-              :checked="selectedAddress?.id === addr.id"
-              class="mt-1 w-4 h-4 text-[#FFA30E] focus:ring-[#FFA30E]"
-            />
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="font-semibold text-gray-900">{{
-                  addr.label
-                }}</span>
-                <span
-                  v-if="addr.isDefault"
-                  class="px-2 py-0.5 text-xs font-medium bg-[#FFA30E] text-white rounded"
-                >
-                  Utama
-                </span>
-              </div>
-              <p class="text-sm leading-snug text-gray-600">
-                {{ addr.fullAddress }}
-              </p>
-              <p class="mt-1 text-xs text-gray-500">
-                {{ addr.penerima }} - {{ addr.telp }}
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      <template #footer>
-        <button
-          @click="showAlamatModal = false"
-          class="w-full px-4 py-3 font-semibold text-gray-700 transition bg-gray-100 rounded-xl hover:bg-gray-200"
-        >
-          Tutup
-        </button>
-      </template>
-    </ResponsiveModal>
-
     <!-- Modal Promo List (hanya jika sudah login) -->
     <ResponsiveModal
       v-if="!isGuest"
@@ -460,6 +341,25 @@
       subtitle="Gunakan promo untuk mendapat potongan harga"
     >
       <div class="space-y-3">
+        <!-- Manual Voucher Input -->
+        <div class="flex gap-2 pb-3 mb-3 border-b border-gray-200">
+          <input
+            v-model="voucherCodeInput"
+            type="text"
+            placeholder="Masukkan kode voucher"
+            class="flex-1 px-3 py-2 text-sm border border-gray-300 uppercase rounded-lg focus:ring-[#FFA30E] focus:border-[#FFA30E]"
+            @keydown.enter.prevent="applyManualVoucher"
+          />
+          <button
+            type="button"
+            @click="applyManualVoucher"
+            :disabled="!voucherCodeInput?.trim() || validatingVoucher"
+            class="px-4 py-2 text-sm font-semibold text-white transition rounded-lg bg-[#FFA30E] hover:bg-[#e5920d] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ validatingVoucher ? 'Memeriksa...' : 'Terapkan' }}
+          </button>
+        </div>
+
         <div
           v-if="voucherLoading"
           class="py-6 text-sm text-center text-gray-500"
@@ -517,6 +417,12 @@
             Maks. diskon: Rp {{ formatIDR(p.max_discount) }}
           </div>
 
+          <div v-if="p.restricted_product_ids && p.restricted_product_ids.length > 0" class="mt-1">
+            <span class="inline-flex items-center text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+              <i class="pi pi-box mr-1 text-[9px]"></i> Khusus {{ p.restricted_product_ids.length }} produk tertentu
+            </span>
+          </div>
+
           <div class="text-xs text-gray-500">Pemakaian: {{ p.usage }}</div>
 
           <button
@@ -529,7 +435,15 @@
             "
             @click="usePromo(p)"
           >
-            {{ p.is_expired ? "Tidak Berlaku" : "Gunakan Voucher" }}
+            {{
+              p.is_expired
+                ? "Tidak Berlaku"
+                : !isPromoEligible(p)
+                  ? getEligibleSubtotal(p) <= 0
+                    ? "Produk Tidak Cocok"
+                    : "Min. Belanja Belum Cukup"
+                  : "Gunakan Voucher"
+            }}
           </button>
         </div>
       </div>
@@ -579,24 +493,29 @@ const schema = yup.object({
     )
     .min(10, "No. Telepon minimal 10 digit"),
 
-  metodePengiriman: yup.string().required(),
   catatanProduk: yup.string(),
-  catatanAlamat: yup.string(),
 });
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 const checkout = useCheckoutStore();
+
+function resolveItemImage(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  if (typeof img === "object") {
+    return img.src || img.thumb_url || img.src_url || img.url || img.image_url || "";
+  }
+  return "";
+}
+
 const checkoutItems = computed(() => {
   if (checkout.from === "cart") {
     return checkout.cartItems.map((item) => ({
       id: item.id,
       name: item.name,
-      image:
-        typeof item.image === "string"
-          ? item.image
-          : (item.image?.src_url ?? item.image?.url ?? ""),
+      image: resolveItemImage(item.image),
       quantity: item.quantity,
       stock: Number(item.stock || 0),
       price: item.unitPrice,
@@ -610,7 +529,7 @@ const checkoutItems = computed(() => {
     {
       id: checkout.productSlug,
       name: checkout.productTitle,
-      image: checkout.productImage,
+      image: resolveItemImage(checkout.productImage),
       quantity: checkout.qty,
       stock: Number(checkout.combination?.stock || 0),
       price: checkout.unitPrice,
@@ -633,7 +552,7 @@ const order = computed(() => {
   return {
     slug: checkout.productSlug,
     title: checkout.productTitle,
-    image: checkout.productImage,
+    image: resolveItemImage(checkout.productImage),
     quantity: checkout.qty,
     stock: Number(checkout.combination?.stock || 0),
     size: checkout.selectedSizeName || "",
@@ -646,19 +565,16 @@ const order = computed(() => {
 // Nominal dari store
 const amounts = ref({
   product: 0, // akan diisi dari lineSubtotal
-  ongkir: 10000,
   diskon: 0,
 });
 
 // ✅ total addon per item (bukan dikali qty)
 const addonUnitTotal = computed(() => Number(checkout.addonTotal || 0));
-// ✅ Total akhir: harga produk + ongkir - diskon
-// amounts.product disinkronkan dari checkout.totalPrice (lihat watch di bawah)
+// ✅ Total akhir: harga produk - diskon
 const total = computed(() => {
   const product = Number(amounts.value.product || 0);
-  const ongkir = Number(amounts.value.ongkir || 0);
   const diskon = Number(amounts.value.diskon || 0);
-  return Math.max(0, product + ongkir - diskon);
+  return Math.max(0, product - diskon);
 });
 
 // sinkronisasi amounts.product
@@ -755,18 +671,23 @@ async function fetchMerchantPhoneBySlug() {
   }
 }
 
-// Tambah state alamat merchant dari product detail
-
 // Saat mounted, jika slug tersedia, fetch product untuk ambil merchant_address
 onMounted(async () => {
   if (checkout.from === "cart") {
-    if (!checkout.store?.id || checkout.cartItems.length === 0) {
+    if ((!checkout.store?.id && !checkout.store?.merchantId) || checkout.cartItems.length === 0) {
+      router.replace({ name: "Keranjang" });
+      return;
+    }
+  } else {
+    if (!checkout.productSlug && !checkout.productTitle) {
       router.replace({ name: "Beranda" });
+      return;
     }
   }
 
-  if (!isGuest.value && order.value.store?.slug) {
-    await fetchVouchersByMerchant(order.value.store.slug);
+  const storeSlug = order.value?.store?.slug || checkout.store?.slug;
+  if (!isGuest.value && storeSlug) {
+    await fetchVouchersByMerchant(storeSlug);
   }
 });
 const promos = computed(() =>
@@ -784,41 +705,120 @@ const promos = computed(() =>
     usage_limit_per_user: v.usage_limit_per_user === null || v.usage_limit_per_user === undefined ? null : Number(v.usage_limit_per_user),
     user_usages_count: Number(v.user_usages_count || 0),
     is_expired: v.is_expired,
+    restricted_product_ids: v.restricted_product_ids || [],
   })),
 );
 
-// Form & promo (tetap)
+// Form state
 const form = ref({
   nama: "",
   tel: "",
-  metodePengiriman: "pickup",
   catatanProduk: "",
-  catatanAlamat: "",
 });
-const pay = ref({ method: "COD" });
 
 // Promo state harus didefinisikan sebelum watcher (immediate)
 const selectedPromo = ref(null);
+const voucherCodeInput = ref("");
+const validatingVoucher = ref(false);
 
-watch(
-  () => form.value.metodePengiriman,
-  (v) => {
-    amounts.value.ongkir = v === "pickup" ? 0 : 10000;
-    if (v === "delivery") {
-      pay.value.method = "QRIS";
-    } else if (v === "pickup") {
-      pay.value.method = "COD";
+function getEligibleSubtotal(promo) {
+  if (!promo) return 0;
+  const restrictedIds = promo.restricted_product_ids || [];
+
+  // Jika tidak ada pembatasan produk, seluruh subtotal produk dihitung
+  if (!Array.isArray(restrictedIds) || restrictedIds.length === 0) {
+    return Number(amounts.value.product || 0);
+  }
+
+  let eligibleSum = 0;
+
+  if (checkout.from === "cart") {
+    (checkout.cartItems || []).forEach((it) => {
+      const pid = it.productId ?? it.id;
+      if (pid && restrictedIds.map(Number).includes(Number(pid))) {
+        const itemUnitPrice = Number(it.unitPrice || 0);
+        const itemAddonTotal = (it.addons || []).reduce((s, a) => s + Number(a.price || 0), 0);
+        const itemQty = Number(it.quantity || 1);
+        eligibleSum += (itemUnitPrice + itemAddonTotal) * itemQty;
+      }
+    });
+  } else {
+    // Single product mode
+    const pid = checkout.productId;
+    if (pid && restrictedIds.map(Number).includes(Number(pid))) {
+      eligibleSum = Number(amounts.value.product || 0);
     }
-  },
-  { immediate: true },
-);
+  }
+
+  return eligibleSum;
+}
+
+async function applyManualVoucher() {
+  const code = voucherCodeInput.value?.trim();
+  if (!code || validatingVoucher.value) return;
+
+  validatingVoucher.value = true;
+  try {
+    const merchantId = checkout.store?.id || order.value.store?.id;
+    if (!merchantId) {
+      toast.error("Gagal mendapatkan ID toko.");
+      return;
+    }
+
+    const payloadItems = checkout.from === 'cart'
+      ? (checkout.cartItems || []).map(it => ({
+          product_id: it.productId ?? it.id,
+          price: Number(it.unitPrice || 0),
+          quantity: Number(it.quantity || 1),
+          subtotal: (Number(it.unitPrice || 0) + (it.addons || []).reduce((s, a) => s + Number(a.price || 0), 0)) * Number(it.quantity || 1)
+        }))
+      : [{
+          product_id: checkout.productId,
+          price: Number(amounts.value.product || 0),
+          quantity: 1,
+          subtotal: Number(amounts.value.product || 0)
+        }];
+
+    const { data } = await api.post("/api/checkout/vouchers/validate", {
+      voucher_code: code.toUpperCase(),
+      order_amount: amounts.value.product,
+      merchant_id: merchantId,
+      items: payloadItems,
+      product_id: checkout.productId || undefined,
+    });
+    
+    const v = data.voucher;
+    const restrictedProds = v.restricted_products || v.restrictedProducts || [];
+    const p = {
+      code: v.voucher_code,
+      name: v.voucher_name,
+      desc: v.voucher_description,
+      type: v.voucher_type, // percent | fixed
+      value: Number(v.value),
+      max_discount: Number(v.max_discount_amount || 0),
+      min_purchase: Number(v.min_purchase_amount || 0),
+      usage: "0 / " + (v.usage_limit || "∞"),
+      usage_limit: v.usage_limit === null ? null : Number(v.usage_limit),
+      usages_count: Number(v.usages_count || 0),
+      is_expired: false,
+      restricted_product_ids: restrictedProds.map((x) => x.id),
+    };
+    
+    usePromo(p);
+    voucherCodeInput.value = "";
+    toast.success("Voucher berhasil diterapkan");
+  } catch (error) {
+    const message = error.response?.data?.message || "Voucher tidak valid";
+    toast.error(message);
+  } finally {
+    validatingVoucher.value = false;
+  }
+}
+
 watch(
   () => isGuest.value,
   (guest) => {
     if (guest) {
-      form.value.metodePengiriman = "pickup"; // 🔒 paksa pickup
-      pay.value.method = "COD"; // aman (atau COD kalau mau)
-      amounts.value.ongkir = 0;
       clearPromo();
       return;
     }
@@ -829,6 +829,7 @@ watch(
   },
   { immediate: true },
 );
+
 watch(
   () => amounts.value.product,
   () => {
@@ -844,22 +845,24 @@ watch(
 );
 
 function isPromoEligible(promo) {
-  const subtotal = Number(amounts.value.product || 0);
-  return !promo?.is_expired && subtotal >= Number(promo?.min_purchase || 0);
+  if (!promo || promo.is_expired) return false;
+  const eligibleSubtotal = getEligibleSubtotal(promo);
+  if (eligibleSubtotal <= 0) return false;
+  return eligibleSubtotal >= Number(promo?.min_purchase || 0);
 }
 
 function computeDiscount(promo) {
-  const subtotal = amounts.value.product;
-
-  if (promo.is_expired) return 0;
-  if (subtotal < promo.min_purchase) return 0;
+  if (!promo || promo.is_expired) return 0;
+  const eligibleSubtotal = getEligibleSubtotal(promo);
+  if (eligibleSubtotal <= 0) return 0;
+  if (eligibleSubtotal < promo.min_purchase) return 0;
 
   if (promo.type === "fixed") {
-    return Math.min(promo.value, subtotal);
+    return Math.min(promo.value, eligibleSubtotal);
   }
 
   if (promo.type === "percent") {
-    let discount = Math.floor((promo.value / 100) * subtotal);
+    let discount = Math.floor((promo.value / 100) * eligibleSubtotal);
 
     if (promo.max_discount && discount > promo.max_discount) {
       discount = promo.max_discount;
@@ -872,20 +875,25 @@ function computeDiscount(promo) {
 }
 
 function usePromo(p) {
-  const discount = computeDiscount(p);
-
   if (p.is_expired) {
     toast.warning("Voucher sudah tidak berlaku");
     return;
   }
 
-  if (amounts.value.product < p.min_purchase) {
+  const eligibleSubtotal = getEligibleSubtotal(p);
+  if (eligibleSubtotal <= 0) {
+    toast.warning("Voucher ini tidak berlaku untuk produk dalam pesanan Anda");
+    return;
+  }
+
+  if (eligibleSubtotal < p.min_purchase) {
     toast.warning(
-      `Minimal pembelian Rp ${formatIDR(p.min_purchase)} untuk voucher ini`,
+      `Minimal pembelian produk yang memenuhi syarat adalah Rp ${formatIDR(p.min_purchase)}`,
     );
     return;
   }
 
+  const discount = computeDiscount(p);
   selectedPromo.value = p;
   amounts.value.diskon = discount;
   openPromo.value = false;
@@ -896,40 +904,6 @@ function clearPromo() {
   amounts.value.diskon = 0;
 }
 
-function getItemStockSummary(item) {
-  const stock = Number(item?.stock || 0);
-  const quantity = Number(item?.quantity || 0);
-  const shortage = Math.max(0, quantity - stock);
-
-  return {
-    stock,
-    shortage,
-  };
-}
-
-function getPromoStockSummary(promo) {
-  if (!promo) return null;
-
-  const totalRemaining =
-    promo.usage_limit === null
-      ? null
-      : Math.max(0, Number(promo.usage_limit || 0) - Number(promo.usages_count || 0));
-
-  const userRemaining =
-    promo.usage_limit_per_user === null
-      ? null
-      : Math.max(
-          0,
-          Number(promo.usage_limit_per_user || 0) -
-            Number(promo.user_usages_count || 0),
-        );
-
-  return {
-    totalRemaining,
-    userRemaining,
-  };
-}
-
 // Nama/telp dari auth
 const customerName = computed(() => auth.user?.name || form.value.nama || "");
 const customerPhone = computed(() =>
@@ -937,151 +911,85 @@ const customerPhone = computed(() =>
 );
 
 // Validasi
-const showAlamatModal = ref(false);
 const openPromo = ref(false);
-useBodyScrollLock(showAlamatModal);
 useBodyScrollLock(openPromo);
-const selectedAddress = ref(null);
-const addresses = ref([
-  {
-    id: 1,
-    label: "Rumah",
-    penerima: "John Doe",
-    telp: "08123456789",
-    fullAddress:
-      "Jl. Cendrawasih No 5 Rt 1 Rw 1, Banyumanik, Semarang, Jawa Tengah 50268",
-    isDefault: true,
-  },
-]);
-if (!selectedAddress.value)
-  selectedAddress.value =
-    addresses.value.find((a) => a.isDefault) || addresses.value[0] || null;
+
 const isFormValid = computed(() => {
   if (isGuest.value) {
     if (!form.value.nama || !form.value.tel) return false;
   }
-
-  if (form.value.metodePengiriman === "delivery" && !selectedAddress.value) {
-    return false;
-  }
-
   return true;
 });
 
-// WhatsApp text: gunakan lineSubtotal untuk ringkasan harga
+// WhatsApp text
 const openWhatsapp = async () => {
   if (!isFormValid.value) {
-    alert("Mohon lengkapi data pemesan dan pilih alamat (jika diantar)");
+    toast.error("Mohon lengkapi data pemesan terlebih dahulu");
     return;
   }
 
-  let productDetails = "";
+  const storeName = checkout.store?.name || order.value?.store?.name || "";
+  const greeting = storeName
+    ? `Halo *${storeName}*, saya ingin memesan produk berikut:`
+    : "Halo, saya ingin memesan produk berikut:";
 
-  if (checkout.from === "cart") {
-    productDetails = checkout.cartItems
-      .map(
-        (i, idx) =>
-          (() => {
-            const stockInfo = getItemStockSummary(i);
-            return (
-          `${idx + 1}. ${i.name}\n` +
-          (i.variant ? `Varian: ${i.variant}\n` : "") +
-          (i.size ? `Ukuran: ${i.size}\n` : "") +
-          `Jumlah: ${i.quantity}x\n` +
-          `Stok tersedia: ${stockInfo.stock}\n` +
-          (stockInfo.shortage > 0
-            ? `Kurang stok: ${stockInfo.shortage}\n`
-            : "") +
-          `Harga: Rp ${formatIDR(
-            (i.unitPrice + i.addonTotalPrice) * i.quantity,
-          )}`
-            );
-          })(),
-      )
-      .join("\n\n");
-  } else {
-    const stockInfo = getItemStockSummary({
-      quantity: checkout.qty,
-      stock: checkout.combination?.stock || 0,
-    });
+  const productDetails = checkoutItems.value
+    .map((item, idx) => {
+      const prefix = checkoutItems.value.length > 1 ? `${idx + 1}. ` : "";
+      const lines = [`${prefix}*${item.name}*`];
 
-    productDetails = [
-      `Produk: ${order.value.title}`,
-      order.value.size ? `Ukuran: ${order.value.size}` : "",
-      order.value.variant ? `Varian: ${order.value.variant}` : "",
-      checkout.selectedAddons.length
-        ? `Tambahan: ${checkout.selectedAddons.map((a) => a.name).join(", ")}`
-        : "",
-      `Jumlah: ${checkout.qty}x`,
-      `Stok tersedia: ${stockInfo.stock}`,
-      stockInfo.shortage > 0 ? `Kurang stok: ${stockInfo.shortage}` : "",
-      `Subtotal: Rp ${formatIDR(total.value)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
+      if (item.variant) {
+        lines.push(`   • Varian: ${item.variant}`);
+      }
 
-  const promoStockInfo = getPromoStockSummary(selectedPromo.value);
-  const voucherInfo = selectedPromo.value
-    ? [
-        "\n*VOUCHER*",
-        `Voucher: ${selectedPromo.value.name} (${selectedPromo.value.code})`,
-        promoStockInfo?.totalRemaining === null
-          ? "Sisa voucher: unlimited"
-          : `Sisa voucher: ${promoStockInfo.totalRemaining}`,
-        promoStockInfo?.userRemaining === null
-          ? null
-          : `Sisa voucher per user: ${promoStockInfo.userRemaining}`,
-      ]
-        .filter(Boolean)
-        .join("\n")
+      const addonNames = (item.addons || [])
+        .map((a) => a.name || a.label)
+        .filter(Boolean);
+      if (addonNames.length > 0) {
+        lines.push(`   • Tambahan: ${addonNames.join(", ")}`);
+      }
+
+      const unitTotal = item.price + getAddonTotal(item);
+      lines.push(
+        `   • Jumlah: ${item.quantity}x (Rp ${formatIDR(unitTotal)})`,
+      );
+      lines.push(`   • Subtotal: Rp ${formatIDR(unitTotal * item.quantity)}`);
+
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const catatanText = form.value.catatanProduk?.trim()
+    ? `\n*Catatan Pesanan:*\n"${form.value.catatanProduk.trim()}"`
     : "";
 
-  const deliveryInfo =
-    form.value.metodePengiriman === "delivery"
-      ? [
-          "\n*PENGIRIMAN*",
-          "Metode: Diantar",
-          `Alamat: ${selectedAddress.value.fullAddress}`,
-          `Penerima: ${selectedAddress.value.penerima} (${selectedAddress.value.telp})`,
-          form.value.catatanAlamat
-            ? `Catatan Alamat: ${form.value.catatanAlamat}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : [
-          "\n*PENGIRIMAN*",
-          "Metode: Ambil Sendiri",
-          `Lokasi Toko: ${order.value.store.address}`,
-        ].join("\n");
-
-  const text = [
-    "*PESANAN BARU DARI SUMILIR*",
+  const textLines = [
+    "*PESANAN BARU - SUMILIR*",
+    greeting,
     "\n*DATA PEMESAN*",
-    `Nama: ${customerName.value}`,
-    `Telp: ${customerPhone.value}`,
+    `• Nama: ${customerName.value}`,
+    `• No. WhatsApp: ${customerPhone.value}`,
     "\n*DETAIL PESANAN*",
     productDetails,
-    form.value.catatanProduk ? `\nCatatan: ${form.value.catatanProduk}` : "",
-    deliveryInfo,
-    voucherInfo,
-    "\n*PEMBAYARAN*",
-    `Metode: ${pay.value.method}`,
-    "\n*RINCIAN HARGA*",
-    `Harga Produk: Rp ${formatIDR(amounts.value.product)}`,
-    form.value.metodePengiriman === "delivery"
-      ? `Ongkir: Rp ${formatIDR(amounts.value.ongkir)}`
-      : "",
-    amounts.value.diskon > 0
-      ? `Diskon (${selectedPromo.value?.code}): -Rp ${formatIDR(
-          amounts.value.diskon,
-        )}`
-      : "",
-    `*Total: Rp ${formatIDR(total.value)}*`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    catatanText,
+    "\n*RINCIAN PEMBAYARAN*",
+    `• Total Produk: Rp ${formatIDR(amounts.value.product)}`,
+  ];
+
+  if (amounts.value.diskon > 0 && selectedPromo.value) {
+    textLines.push(
+      `• Diskon Voucher (${selectedPromo.value.code}): -Rp ${formatIDR(
+        amounts.value.diskon,
+      )}`,
+    );
+  }
+
+  textLines.push(`• *Total Tagihan: Rp ${formatIDR(total.value)}*`);
+  textLines.push(
+    "\n_Mohon konfirmasi ketersediaan pesanan serta metode pengiriman dan pembayarannya. Terima kasih!_",
+  );
+
+  const text = textLines.filter(Boolean).join("\n");
 
   let phone = merchantPhoneNormalized.value;
 
@@ -1110,18 +1018,15 @@ const openWhatsapp = async () => {
       const checkoutPayload = {
         merchant_slug: checkout.store?.slug || order.value.store?.slug || "",
         mode: checkout.from,
-        shipping_method: form.value.metodePengiriman,
-        payment_method: pay.value.method,
+        shipping_method: "WhatsApp",
+        payment_method: "WhatsApp",
         customer_name: customerName.value,
         customer_phone: customerPhone.value,
-        delivery_address:
-          form.value.metodePengiriman === "delivery"
-            ? selectedAddress.value?.fullAddress || ""
-            : order.value.store?.address || "",
-        delivery_note: form.value.catatanAlamat || "",
+        delivery_address: "",
+        delivery_note: "",
         product_note: form.value.catatanProduk || "",
         voucher_code: selectedPromo.value?.code || "",
-        shipping_fee: Number(amounts.value.ongkir || 0),
+        shipping_fee: 0,
       };
 
       if (checkout.from === "cart") {
