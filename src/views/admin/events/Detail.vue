@@ -12,10 +12,13 @@ import { useEventVouchers } from "@/composables/useEventVouchers";
 import { useEventMerchants } from "@/composables/useEventMerchants";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 import api from "@/libs/axios";
+import LogoText from "@/assets/icons/LogoWithText.png";
+import AnalyticsTab from "./Analytics.vue";
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
+const activeTab = ref("info"); // "info" | "analytics"
 
 const { fetchEventDetail, deleteEvent, inviteMerchants, loading } = useEvents();
 const { 
@@ -50,11 +53,15 @@ const voucherToDelete = ref(null);
 // Removed merchants state
 const showRemoveMerchantModal = ref(false);
 const merchantToRemove = ref(null);
+const removalReason = ref("");
+const removedMerchants = ref([]);
+const showRemovedMerchantsModal = ref(false);
 const breadcrumbItems = computed(() => [
   { label: "Events", to: { name: "Admin - Events" } },
   { label: event.value?.event_name || "Detail Event" },
 ]);
 
+const postingToCommunity = ref(false);
 const showAllVouchers = ref(false);
 const displayedVouchers = computed(() => {
   if (!event.value?.vouchers) return [];
@@ -65,7 +72,7 @@ const displayedVouchers = computed(() => {
 
 const eventBannerUrl = computed(() => {
   if (!event.value?.id || !event.value?.banner_img_path) {
-    return "/placeholder.png";
+    return LogoText;
   }
   return getEventBannerUrl(event.value);
 });
@@ -235,6 +242,26 @@ function formatCurrency(value) {
 
 const goBack = () => router.push({ name: "Admin - Events" });
 
+const handlePostToCommunity = async () => {
+  if (postingToCommunity.value) return;
+  postingToCommunity.value = true;
+  try {
+    const response = await api.post(`/api/admin/events/${event.value.id}/post-to-community`);
+    if (response.data.success) {
+      toast.success(response.data.message);
+      // Optional: open the post in a new tab or navigate there
+      // window.open(`/community/post/${response.data.post_id}`, '_blank');
+    } else {
+      toast.error(response.data.message || 'Gagal memposting ke komunitas');
+    }
+  } catch (error) {
+    console.error('Post to community error:', error);
+    toast.error(error.response?.data?.message || 'Gagal memposting ke komunitas');
+  } finally {
+    postingToCommunity.value = false;
+  }
+};
+
 // Open modal and reset
 const openAddVoucherModal = async () => {
   try {
@@ -352,7 +379,7 @@ const filteredAvailableMerchants = computed(() => {
 
   // Segmentation filter
   if (filterSegmentation.value) {
-    filtered = filtered.filter(m => m.segmentation_id === parseInt(filterSegmentation.value));
+    filtered = filtered.filter(m => m.segmentation?.id === parseInt(filterSegmentation.value) || m.segmentation_id === parseInt(filterSegmentation.value));
   }
 
   return filtered;
@@ -414,6 +441,33 @@ const exportDetailPDF = async () => {
   }
 };
 
+// ✅ Export Excel method
+const exportExcelLoading = ref(false);
+const exportDetailExcel = async () => {
+  exportExcelLoading.value = true;
+  try {
+    const response = await api.get(`/api/admin/events/${event.value.id}/export-excel`, {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `event-analytics-${event.value.id}-${new Date().toISOString().split('T')[0]}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    toast.success("Laporan analitik event (Excel) berhasil diunduh");
+    showExportModal.value = false;
+  } catch (error) {
+    console.error("Export Excel failed:", error);
+    toast.error(error.response?.data?.message || "Gagal mengunduh laporan Excel");
+  } finally {
+    exportExcelLoading.value = false;
+  }
+};
+
 // ✅ Open export modal method
 const openExportModal = () => {
   console.log('openExportModal called in Detail.vue');
@@ -459,6 +513,10 @@ onMounted(async () => {
             Kembali
           </button>
           <div class="w-px h-6 bg-gray-200 mx-1"></div>
+          <Button @click="handlePostToCommunity" variant="primary-outline" size="sm" :disabled="postingToCommunity">
+            <i class="pi" :class="postingToCommunity ? 'pi-spinner pi-spin' : 'pi-share-alt'"></i>
+            <span class="ml-2">{{ postingToCommunity ? 'Memposting...' : 'Post Komunitas' }}</span>
+          </Button>
           <Button @click="goToEdit" variant="merchant-outline" size="sm">
             <i class="pi pi-pencil mr-2 text-xs"></i>
             Edit Event
@@ -471,8 +529,31 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event">
+    <!-- Tab Switcher -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-6" v-if="event">
+      <div class="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+        <button
+          @click="activeTab = 'info'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'info' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-info-circle mr-2"></i>Informasi Event
+        </button>
+        <button
+          @click="activeTab = 'analytics'"
+          :class="['px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200', activeTab === 'analytics' ? 'bg-white text-merchant-primary shadow-sm' : 'text-gray-500 hover:text-gray-700']"
+        >
+          <i class="pi pi-chart-bar mr-2"></i>Analisis Event
+        </button>
+      </div>
+    </div>
+
+    <!-- Analytics Tab -->
+    <div v-if="event && activeTab === 'analytics'" class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <AnalyticsTab :event-id="event.id" />
+    </div>
+
+    <!-- Main Content (Info Tab) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8" v-if="event && activeTab === 'info'">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Left Column: Banner & Info -->
         <div class="lg:col-span-2 space-y-8">
@@ -482,12 +563,10 @@ onMounted(async () => {
               <img
                 :src="eventBannerUrl"
                 alt="Event banner"
-                class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                @error="(e) => (e.target.src = '/placeholder.png')"
+                class="w-full h-full transition-transform duration-700 group-hover:scale-105"
+                :class="eventBannerUrl === LogoText ? 'object-contain p-4' : 'object-cover'"
+                @error="(e) => (e.target.src = LogoText)"
               />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
-                <p class="text-white text-sm font-medium">Banner Event KMI Simslife</p>
-              </div>
             </div>
             <div class="p-6 sm:p-8">
               <div class="flex items-center gap-4 mb-6">
@@ -572,7 +651,7 @@ onMounted(async () => {
                         :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
                         :alt="merchant.name" 
                         class="w-full h-full object-cover"
-                        @error="(e) => { e.target.src = '/placeholder.png' }"
+                        @error="merchant.logo_path = null"
                       />
                       <div v-else class="w-full h-full flex items-center justify-center bg-merchant-primary/10">
                         <span class="text-merchant-primary font-bold text-xl">{{ merchant.name?.charAt(0)?.toUpperCase() }}</span>
@@ -743,7 +822,7 @@ onMounted(async () => {
       size="xl"
     >
       <div class="p-1 space-y-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <TextField
             name="search_merchant_invite"
             v-model="searchMerchantQuery"
@@ -751,11 +830,12 @@ onMounted(async () => {
             variant="muted"
             :hide-label="true"
             icon="pi pi-search"
+            customClass="mb-0 h-full"
           />
-          <div class="relative">
+          <div class="relative h-[42px]">
             <select
               v-model="filterSegmentation"
-              class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
+              class="w-full h-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-merchant-primary focus:outline-none appearance-none"
             >
               <option value="">Semua Segmentasi</option>
               <option value="1">UMKM Toko</option>
@@ -764,24 +844,25 @@ onMounted(async () => {
             </select>
             <i class="pi pi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs"></i>
           </div>
-        </div>
 
-        <div v-if="filteredAvailableMerchants.length > 0" class="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl border border-gray-100">
-          <label class="flex items-center gap-3 cursor-pointer group">
-            <div class="relative w-5 h-5 flex items-center justify-center">
-              <input
-                type="checkbox"
-                :checked="selectedMerchantsCount === filteredAvailableMerchants.length && filteredAvailableMerchants.length > 0"
-                @change="selectAllMerchants"
-                class="peer absolute opacity-0 w-full h-full cursor-pointer"
-              />
-              <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
-                <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+          <!-- Select All -->
+          <div class="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 h-[42px]">
+            <label class="flex items-center gap-3 cursor-pointer group w-full">
+              <div class="relative w-5 h-5 flex items-center justify-center shrink-0">
+                <input
+                  type="checkbox"
+                  :checked="selectedMerchantsCount === filteredAvailableMerchants.length && filteredAvailableMerchants.length > 0"
+                  @change="selectAllMerchants"
+                  class="peer absolute opacity-0 w-full h-full cursor-pointer"
+                />
+                <div class="w-full h-full border-2 border-gray-300 rounded-md bg-white peer-checked:border-merchant-primary peer-checked:bg-merchant-primary transition-all flex items-center justify-center">
+                  <i class="pi pi-check text-[10px] text-white opacity-0 peer-checked:opacity-100"></i>
+                </div>
               </div>
-            </div>
-            <span class="text-sm font-bold text-gray-700">Pilih Semua Merchant</span>
-          </label>
-          <p class="text-xs font-bold text-merchant-primary" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Merchant Dipilih</p>
+              <span class="text-sm font-bold text-gray-700 truncate">Pilih Semua</span>
+            </label>
+            <span class="text-[10px] font-bold text-merchant-primary whitespace-nowrap ml-2" v-if="selectedMerchantsCount > 0">{{ selectedMerchantsCount }} Terpilih</span>
+          </div>
         </div>
 
         <div class="max-h-[400px] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
@@ -815,7 +896,7 @@ onMounted(async () => {
                 v-if="merchant.logo_path" 
                 :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
                 class="w-full h-full object-cover"
-                @error="(e) => (e.target.src = '/placeholder.png')"
+                @error="merchant.logo_path = null"
               />
               <div v-else class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 font-bold text-xs">
                 {{ merchant.name?.charAt(0) }}
@@ -1086,24 +1167,55 @@ onMounted(async () => {
             </div>
           </div>
           
-          <ul class="space-y-3">
+          <ul class="space-y-3 mb-6">
             <li v-for="(item, i) in ['Informasi fundamental event', 'Daftar merchant yang terdaftar', 'Rincian voucher dan periode', 'Status dan statistik partisipasi']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
               <i class="pi pi-check-circle text-merchant-primary text-xs shrink-0"></i>
               {{ item }}
             </li>
           </ul>
+
+          <Button
+            @click="exportDetailPDF"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportLoading"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Laporan PDF
+          </Button>
         </div>
 
-        <Button
-          @click="exportDetailPDF"
-          variant="merchant"
-          size="lg"
-          block
-          :loading="exportLoading"
-        >
-          <i class="pi pi-download mr-2"></i>
-          Download Laporan PDF
-        </Button>
+        <div class="bg-gradient-to-br from-green-50 to-green-100/50 border border-green-100 rounded-2xl p-6 mt-4">
+          <div class="flex items-center gap-4 mb-6">
+            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+              <i class="pi pi-file-excel text-2xl text-green-600"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-900">Format Laporan Excel</h4>
+              <p class="text-xs text-gray-500">Data analitik komprehensif KMI Simslife</p>
+            </div>
+          </div>
+          
+          <ul class="space-y-3 mb-6">
+            <li v-for="(item, i) in ['Statistik lengkap (rating, performa)', 'Ranking UMKM & Kategori Terlaris', 'Performa produk & metode pembayaran', 'Data multi-sheet yang mudah diolah']" :key="i" class="flex items-center gap-3 text-sm text-gray-700 font-medium">
+              <i class="pi pi-check-circle text-green-600 text-xs shrink-0"></i>
+              {{ item }}
+            </li>
+          </ul>
+
+          <Button
+            @click="exportDetailExcel"
+            variant="merchant"
+            size="lg"
+            block
+            :loading="exportExcelLoading"
+            class="!bg-green-600 hover:!bg-green-700 !border-green-600"
+          >
+            <i class="pi pi-download mr-2"></i>
+            Download Excel
+          </Button>
+        </div>
       </div>
     </ResponsiveModal>
   </div>

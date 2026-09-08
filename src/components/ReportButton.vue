@@ -13,7 +13,7 @@
     <div
       v-if="isMenuOpen"
       v-click-outside="closeMenu"
-      class="absolute right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 z-50"
+      class="absolute top-full right-0 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 z-50"
     >
       <button
         @click.stop="openReportModal"

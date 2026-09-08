@@ -50,6 +50,10 @@ export const formatDateID = (dateStr) => {
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 };
+export const formatIDR = (value) => {
+  return Number(value || 0).toLocaleString('id-ID');
+};
+
 export const formatDateLong = (dateString) => {
   if (!dateString) return '-';
   const date = new Date(dateString);

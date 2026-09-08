@@ -301,13 +301,13 @@ onMounted(() => {
                 <div class="w-24 h-14 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm group relative">
                   <img
                     v-if="item.banner_img_path"
-                    :src="getEventBannerUrl(item)"
+                    :src="getEventBannerUrl(item, 'thumb')"
                     :alt="item.event_name"
                     class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    @error="(e) => (e.target.src = '/placeholder.png')"
+                    @error="item.banner_img_path = null"
                   />
-                  <div v-else class="flex flex-col items-center justify-center gap-1">
-                    <i class="pi pi-image text-gray-300 text-lg"></i>
+                  <div v-else class="flex flex-col items-center justify-center gap-1 w-full h-full">
+                    <i class="pi pi-calendar text-gray-300 text-xl"></i>
                   </div>
                 </div>
               </div>
@@ -422,15 +422,15 @@ onMounted(() => {
           >
             <!-- Banner Section -->
             <div class="relative h-32 w-full bg-gray-100">
-              <img
-                v-if="event.banner_img_path"
-                :src="getEventBannerUrl(event)"
-                class="w-full h-full object-cover"
-                @error="(e) => (e.target.src = '/placeholder.png')"
-              />
-              <div v-else class="w-full h-full flex items-center justify-center">
-                <i class="pi pi-image text-gray-300 text-3xl"></i>
-              </div>
+                <img
+                  v-if="event.banner_img_path"
+                  :src="getEventBannerUrl(event, 'thumb')"
+                  class="w-full h-full object-cover"
+                  @error="event.banner_img_path = null"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <i class="pi pi-calendar text-gray-300 text-3xl"></i>
+                </div>
               <div class="absolute top-3 right-3">
                 <StatusLabel :status="event.status" variant="event" size="xs" />
               </div>

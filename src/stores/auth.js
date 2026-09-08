@@ -2,6 +2,10 @@ import { defineStore, getActivePinia } from "pinia";
 import { ref, computed } from "vue";
 import api from "@/libs/axios";
 import { useToast } from "vue-toastification";
+import {
+  syncPushSubscriptionForCurrentUser,
+  unsubscribePushNotifications,
+} from "@/services/api/push";
 
 export const useAuthStore = defineStore("auth", () => {
   const toast = useToast();
@@ -169,6 +173,12 @@ export const useAuthStore = defineStore("auth", () => {
       persistUser(data);
       loadSelectedMerchant();
 
+      try {
+        await syncPushSubscriptionForCurrentUser();
+      } catch {
+        // Notifikasi opsional — jangan gagalkan login
+      }
+
       toast.success("Login berhasil!", { timeout: 2500 });
       return data;
     } catch (error) {
@@ -202,6 +212,12 @@ export const useAuthStore = defineStore("auth", () => {
         toast.warning("Logout gagal, sesi dibersihkan");
       }
     } finally {
+      try {
+        await unsubscribePushNotifications();
+      } catch {
+        // Abaikan jika browser belum pernah subscribe
+      }
+
       resetOtherStores();
       clearUser();
     }

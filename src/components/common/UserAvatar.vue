@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { getUserProfileUrl } from '@/libs/getImageUrl';
+import ResponsiveImage from './ResponsiveImage.vue';
 
 const props = defineProps({
   user: {
@@ -39,6 +40,18 @@ const initials = computed(() => {
   return props.user.name.charAt(0).toUpperCase();
 });
 
+const imgSizes = computed(() => {
+  const map = {
+    xs: '24px',
+    sm: '32px',
+    md: '40px',
+    lg: '48px',
+    xl: '64px',
+    '2xl': '80px',
+  };
+  return map[props.size] || '40px';
+});
+
 const hasProfilePicture = computed(() => {
   return !!(props.user?.profile_picture_path || props.user?.profile_picture);
 });
@@ -70,11 +83,13 @@ const handleClick = () => {
     ]"
     @click="handleClick"
   >
-    <img 
+    <ResponsiveImage 
       v-if="hasProfilePicture"
-      :src="profileUrl" 
+      :src="profileUrl"
+      :urls="user?.profile_picture_urls"
+      :sizes="imgSizes"
       :alt="user?.name"
-      class="w-full h-full object-cover"
+      customClass="w-full h-full object-cover"
       @error="(e) => { 
         e.target.style.display = 'none'; 
         e.target.parentElement.classList.add('bg-merchant-primary/10');

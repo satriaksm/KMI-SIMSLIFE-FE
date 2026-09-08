@@ -261,6 +261,25 @@ const routes = [
           },
         ],
       },
+      {
+        path: "reports",
+        name: "MyReports",
+        component: () => import("@/views/reports/MyReports.vue"),
+        meta: {
+          requiresAuth: true,
+          denyRoles: ["admin"],
+          title: "Laporan Saya | SUMILIR",
+        },
+      },
+      {
+        path: "reports/:id",
+        name: "AppealReport",
+        component: () => import("@/views/reports/AppealView.vue"),
+        meta: {
+          requiresAuth: true,
+          title: "Sanggahan Laporan | SUMILIR",
+        },
+      },
     ],
   },
 
