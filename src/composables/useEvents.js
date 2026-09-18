@@ -70,7 +70,6 @@ export function useEvents() {
       const response = await api.post("/api/admin/events", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      toast.success("Event berhasil dibuat!");
       return response.data.data;
     } catch (error) {
       const message = error.response?.data?.message || "Gagal membuat event";
@@ -93,7 +92,6 @@ export function useEvents() {
         },
       });
 
-      toast.success("Event berhasil diupdate!");
 
       // ✅ Return full response data
       return response.data;

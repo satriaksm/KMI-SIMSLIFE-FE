@@ -94,6 +94,46 @@ export function useVouchers() {
     }
   };
 
+  /**
+   * Activate voucher (admin only)
+   */
+  const activateVoucher = async (id) => {
+    loading.value = true;
+    try {
+      await api.post(`/api/admin/vouchers/${id}/activate`);
+      toast.success("Voucher berhasil diaktifkan");
+      console.log("[useVouchers] Activated voucher:", id);
+    } catch (error) {
+      console.error("[useVouchers] Activate failed:", error);
+      const message =
+        error.response?.data?.message || "Gagal mengaktifkan voucher";
+      toast.error(message);
+      throw error;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  /**
+   * Deactivate voucher (admin only)
+   */
+  const deactivateVoucher = async (id) => {
+    loading.value = true;
+    try {
+      await api.post(`/api/admin/vouchers/${id}/deactivate`);
+      toast.success("Voucher berhasil dinonaktifkan");
+      console.log("[useVouchers] Deactivated voucher:", id);
+    } catch (error) {
+      console.error("[useVouchers] Deactivate failed:", error);
+      const message =
+        error.response?.data?.message || "Gagal menonaktifkan voucher";
+      toast.error(message);
+      throw error;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   /* =====================================================
    * Merchant VOUCHERS
    * ===================================================== */
@@ -365,6 +405,8 @@ export function useVouchers() {
     fetchVouchers,
     fetchVoucherDetail,
     deleteVoucher,
+    activateVoucher,
+    deactivateVoucher,
     fetchMerchantVouchers,
     fetchMerchantVoucherDetail,
     createMerchantVoucher,
