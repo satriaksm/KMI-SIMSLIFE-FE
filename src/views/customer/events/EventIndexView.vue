@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import api from "@/libs/axios";
 import { formatDateID } from "@/libs/format";
+import { getEventBannerUrl } from "@/libs/getImageUrl";
 
 const router = useRouter();
 const events = ref([]);
@@ -81,7 +82,7 @@ onMounted(() => {
           <!-- Banner Image Container -->
           <div class="aspect-[21/9] relative overflow-hidden bg-gray-100">
             <img 
-              :src="event.banner_url" 
+              :src="getEventBannerUrl(event, 'medium')" 
               :alt="event.event_name"
               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000"
             />

@@ -232,17 +232,15 @@ loadEvents();
 
         <!-- Voucher Type & Value -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-          <Field name="voucher_type" v-slot="{ field }">
-            <SelectField
-              v-bind="field"
-              :options="voucherTypeOptions"
-              label="Tipe Voucher"
-              variant="merchant"
-              required
-              :error="errors.voucher_type"
-              placeholder="Pilih Tipe"
-            />
-          </Field>
+          <SelectField
+            name="voucher_type"
+            :options="voucherTypeOptions"
+            label="Tipe Voucher"
+            variant="merchant"
+            required
+            :error="errors.voucher_type"
+            placeholder="Pilih Tipe"
+          />
 
           <Field name="value" v-slot="{ field }">
             <TextField
@@ -347,22 +345,21 @@ loadEvents();
 
         <!-- Status -->
         <div class="mb-6">
-          <Field name="voucher_status" v-slot="{ field }">
-            <SelectField
-              v-bind="field"
-              :options="statusOptions"
-              label="Status"
-              variant="merchant"
-              required
-              :error="errors.voucher_status"
-              placeholder="Pilih Status"
-            />
-          </Field>
+          <SelectField
+            name="voucher_status"
+            :options="statusOptions"
+            label="Status"
+            variant="merchant"
+            required
+            :error="errors.voucher_status"
+            placeholder="Pilih Status"
+          />
         </div>
 
         <!-- Event Selection (Optional) -->
         <div class="mb-6">
           <SelectField
+            name="event_id"
             v-model="selectedEventId"
             @change="loadMerchantsByEvent(selectedEventId)"
             :options="eventOptions"

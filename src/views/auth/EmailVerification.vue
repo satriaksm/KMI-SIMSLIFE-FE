@@ -1,10 +1,11 @@
 <template>
   <div
-    class="flex flex-col items-center justify-end sm:bg-gray-50 bg-primary sm:justify-center sm:pb-8"
+    class="relative flex flex-col items-center justify-start min-h-[calc(100vh-64px)] sm:min-h-screen sm:bg-gray-50 bg-white sm:justify-center sm:pb-8"
   >
+    <div class="absolute top-0 left-0 w-full h-[50vh] bg-primary sm:hidden"></div>
     <!-- Mobile header -->
     <div
-      class="flex flex-col justify-end px-4 py-2 pt-8 sm:hidden flex-1/3 sm:px-0 sm:pt-0"
+      class="relative z-10 flex flex-col justify-end w-full px-4 py-2 pt-8 sm:hidden shrink-0 sm:px-0 sm:pt-0"
     >
       <h2
         class="inline mb-2 text-2xl font-bold text-center text-white sm:hidden sm:text-3xl sm:text-left"
@@ -12,14 +13,14 @@
         Verifikasi Email
       </h2>
       <p
-        class="sm:hidden inline text-[10px] sm:text-sm text-center sm:text-left mb-6 text-white"
+        class="sm:hidden inline text-[12px] sm:text-sm text-center sm:text-left mb-6 text-white"
       >
         Cek inbox Anda dan verifikasi email untuk melanjutkan
       </p>
     </div>
 
     <div
-      class="flex flex-col justify-center w-full p-8 bg-white shadow-none sm:flex-0 flex-2/3 sm:p-12 sm:max-w-xl sm:rounded-4xl rounded-t-4xl sm:shadow-lg"
+      class="relative z-10 flex flex-col justify-start w-full p-8 bg-white shadow-none grow sm:flex-0 sm:p-12 sm:max-w-xl sm:rounded-4xl rounded-t-4xl sm:shadow-lg"
     >
       <!-- Desktop header -->
       <div class="items-center hidden gap-3 mb-2 sm:flex">
@@ -59,7 +60,43 @@
         verifikasi.
       </div>
 
-      <div class="flex flex-col gap-2 mt-6">
+      <!-- Desktop Buttons -->
+      <div class="hidden sm:flex flex-col gap-2 mt-6">
+        <AppButton
+          v-if="status === '' || status === 'invalid'"
+          type="button"
+          variant="primary"
+          size="md"
+          @click="resend"
+          :loading="sending"
+          block
+        >
+          Kirim Ulang Link Verifikasi
+        </AppButton>
+        <AppButton
+          type="button"
+          variant="primary-outline"
+          size="md"
+          @click="goToLogin"
+          block
+        >
+          Ke Halaman Login
+        </AppButton>
+      </div>
+
+      <!-- Mobile Sticky Buttons -->
+      <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe flex flex-col gap-2">
+        <AppButton
+          v-if="status === '' || status === 'invalid'"
+          type="button"
+          variant="primary"
+          size="md"
+          @click="resend"
+          :loading="sending"
+          block
+        >
+          Kirim Ulang Link Verifikasi
+        </AppButton>
         <AppButton
           type="button"
           variant="primary-outline"

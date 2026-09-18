@@ -112,7 +112,11 @@ const handleBack = () => {
     props.onBack();
   } else {
     emit("back");
-    router.back();
+    if (window.history.state?.back) {
+      router.back();
+    } else {
+      router.push({ name: "Beranda" });
+    }
   }
 };
 </script>

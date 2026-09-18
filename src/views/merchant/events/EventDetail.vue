@@ -8,7 +8,7 @@ import StatusLabel from '@/components/common/StatusLabel.vue';
 import Button from '@/components/common/Button.vue';
 import ResponsiveModal from '@/components/common/ResponsiveModal.vue';
 import TextField from '@/components/forms/TextField.vue';
-
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
 import { getEventBannerUrl } from "@/libs/getImageUrl";
 
@@ -36,7 +36,7 @@ const currentMerchant = computed(() => authStore.getMerchantBySlug(currentMercha
 const breadcrumbItems = computed(() => [
   { 
     label: "Daftar Event", 
-    route: { name: 'Merchant - Event Index', params: { merchantSlug: currentMerchantSlug.value } } 
+    path: `/merchant-center/${currentMerchantSlug.value}/events`,
   },
   { label: "Detail Event" },
 ]);
@@ -254,33 +254,31 @@ onMounted(() => {
 
 <template>
   <div class="pb-20">
-    <!-- Header Section - CONSISTENT WITH PRODUCTS -->
-    <div class="px-4 py-6 bg-white sm:px-6 mb-6">
-      <div class="flex items-center gap-3">
-        <div>
-          <div class="hidden sm:block">
-            <Breadcrumb
-              :items="breadcrumbItems"
-              :merchantId="currentMerchantSlug"
-            />
-            <p class="mt-1 text-xs sm:text-sm text-muted-foreground">
-              Pengaturan produk untuk event
-            </p>
-          </div>
+    <!-- Mobile Header -->
+    <MerchantMobileHeader title="Detail Event" />
 
-          <div class="sm:hidden">
-            <h1 class="text-base font-semibold text-merchant-primary">
-              Detail Event
-            </h1>
-            <p class="text-xs text-muted-foreground">
-              {{ currentMerchantName }}
-            </p>
-          </div>
+    <!-- Desktop Header -->
+    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
+      <div
+        class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
+      >
+        <div>
+          <!-- ✅ Use Breadcrumb Component -->
+          <Breadcrumb
+            :items="breadcrumbItems"
+            :merchantId="currentMerchantSlug"
+          />
+          <p class="text-xs text-muted-foreground lg:text-sm">
+            Pengaturan produk untuk event
+          </p>
         </div>
       </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+    <!-- Spacer for Mobile -->
+    <div class="h-[72px] sm:h-0"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 space-y-10 py-4">
       <!-- Main Content Skeleton -->
       <div v-if="loading" class="space-y-8">
          <div class="h-48 bg-gray-50 rounded-[3rem] animate-pulse"></div>

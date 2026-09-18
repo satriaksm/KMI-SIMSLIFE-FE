@@ -90,15 +90,18 @@ export function useCart() {
 
       cartStores.value = (data.data || []).map((cart) => ({
         id: cart.cart_id,
+        cart_id: cart.cart_id,
         cartId: cart.cart_id,
-        merchantId: cart.merchant?.id ?? null,
-        name: cart.merchant.name,
-        slug: cart.merchant.slug,
-        phone: cart.merchant.phone,
-        address: cart.merchant.address,
+        merchantId: cart.merchant?.id ?? cart.merchant_id ?? null,
+        merchant: cart.merchant,
+        name: cart.merchant?.name,
+        slug: cart.merchant?.slug,
+        phone: cart.merchant?.phone,
+        address: cart.merchant?.address,
 
         items: (cart.items || []).map((item) => ({
           id: item.cart_item_id,
+          productId: item.product_details?.id ?? item.product_id ?? null,
           quantity: item.quantity,
           stock: item.live.max_stock,
 
@@ -106,13 +109,19 @@ export function useCart() {
           name: item.snapshot.name,
 
           image:
+            item.product_details?.cover_image?.thumb_url ||
+            item.product_details?.cover_image?.urls?.thumb ||
             item.product_details?.cover_image?.src_url ||
+            item.snapshot.image?.thumb_url ||
             item.snapshot.image?.src_url ||
             item.snapshot.image ||
             "",
-          image_urls:
-            item.product_details?.cover_image?.src_urls ||
-            item.snapshot.image?.src_urls ||
+
+          image_urls: item.product_details?.cover_image?.urls || item.snapshot.image?.urls || null,
+          thumb_url:
+            item.product_details?.cover_image?.thumb_url ||
+            item.product_details?.cover_image?.urls?.thumb ||
+            item.snapshot.image?.thumb_url ||
             null,
 
           unitPrice: item.changes?.price_changed

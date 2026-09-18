@@ -20,6 +20,7 @@ import {
   getVillages,
 } from "@/services/api/location";
 import { getMyAddress, upsertMyAddress } from "@/services/api/address";
+import { useAddressMapSync } from "@/composables/useAddressMapSync";
 
 // =========================
 // STATE
@@ -32,6 +33,9 @@ const userStore = useUserStore();
 const loading = ref(true);
 const saving = ref(false);
 const prefilling = ref(false);
+
+const { syncMapToAddress, syncAddressToMap, isSyncing } = useAddressMapSync();
+const mapRef = ref(null);
 
 const loadingProvinces = ref(false);
 const loadingCities = ref(false);
@@ -49,9 +53,17 @@ const schema = yup.object({
   district_id: yup.string().required("Pilih kecamatan."),
   village_id: yup.string().required("Pilih desa/kelurahan."),
   detail: yup.string().nullable(),
+  latitude: yup
+    .number()
+    .typeError("Tentukan lokasi Anda di peta.")
+    .required("Tentukan lokasi Anda di peta."),
+  longitude: yup
+    .number()
+    .typeError("Tentukan lokasi Anda di peta.")
+    .required("Tentukan lokasi Anda di peta."),
 });
 
-const { values, setFieldValue } = useForm({
+const { values, setFieldValue, setFieldError, errors } = useForm({
   validationSchema: schema,
   initialValues: {
     province_id: "",
@@ -59,11 +71,23 @@ const { values, setFieldValue } = useForm({
     district_id: "",
     village_id: "",
     detail: "",
+    latitude: null,
+    longitude: null,
   },
 });
 
 const lat = ref(null);
 const lng = ref(null);
+
+// Sync lat/lng ref → vee-validate field
+watch(lat, (val) => {
+  setFieldValue("latitude", val ?? null);
+  if (val !== null) setFieldError("latitude", undefined);
+});
+watch(lng, (val) => {
+  setFieldValue("longitude", val ?? null);
+  if (val !== null) setFieldError("longitude", undefined);
+});
 
 // =========================
 // COMPUTED
@@ -85,7 +109,11 @@ const villageOptions = computed(() =>
 // METHODS
 // =========================
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 async function loadProvinces() {
@@ -140,6 +168,24 @@ async function loadVillages(districtId) {
   }
 }
 
+const handleManualLocationChange = async ({ lat, lng }) => {
+  prefilling.value = true;
+  try {
+    await syncMapToAddress(lat, lng, {
+      provinces: provinces.value,
+      setProvince: (id) => setFieldValue("province_id", id),
+      loadCities: async (id) => { await loadCities(id); return cities.value; },
+      setCity: (id) => setFieldValue("city_id", id),
+      loadDistricts: async (id) => { await loadDistricts(id); return districts.value; },
+      setDistrict: (id) => setFieldValue("district_id", id),
+      loadVillages: async (id) => { await loadVillages(id); return villages.value; },
+      setVillage: (id) => setFieldValue("village_id", id)
+    });
+  } finally {
+    prefilling.value = false;
+  }
+};
+
 async function prefillFromApi() {
   const res = await getMyAddress();
   const address = res?.data ?? null;
@@ -164,12 +210,18 @@ async function prefillFromApi() {
 
     lat.value = address.latitude ?? null;
     lng.value = address.longitude ?? null;
+    setFieldValue("latitude", lat.value);
+    setFieldValue("longitude", lng.value);
   } finally {
     prefilling.value = false;
   }
 }
 
 async function handleSave(formValues) {
+  if (lat.value === null || lng.value === null) {
+    toast.error("Tentukan lokasi Anda di peta terlebih dahulu.");
+    return;
+  }
   saving.value = true;
   try {
     await upsertMyAddress({
@@ -236,6 +288,21 @@ watch(
   },
 );
 
+watch(
+  () => values.village_id,
+  (val) => {
+    if (prefilling.value) return;
+    if (val) {
+      const provName = provinceOptions.value.find((p) => p.value == values.province_id)?.label;
+      const cityName = cityOptions.value.find((c) => c.value == values.city_id)?.label;
+      const distName = districtOptions.value.find((d) => d.value == values.district_id)?.label;
+      const villName = villageOptions.value.find((v) => v.value == val)?.label;
+      
+      syncAddressToMap([villName, distName, cityName, provName], mapRef);
+    }
+  }
+);
+
 // =========================
 // LIFECYCLE
 // =========================
@@ -256,10 +323,10 @@ onMounted(async () => {
 
 <template>
   <div class="">
-    <MobileHeader title="Alamat Utama" @back="goBack" />
+    <MobileHeader title="Alamat Utama" @back="goBack" variant="primary"/>
 
-    <div class="px-4 py-4 mx-auto max-w-7xl">
-      <div class="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
+    <div class="px-0 py-0 mx-auto max-w-7xl sm:px-4 sm:py-4">
+      <div class="p-4 sm:bg-white sm:p-6 sm:border sm:border-gray-100 sm:shadow-sm sm:rounded-2xl">
         <div v-if="loading" class="space-y-6 animate-pulse">
           <!-- Select Fields Skeleton -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -350,6 +417,33 @@ onMounted(async () => {
             />
           </div>
 
+
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-semibold text-gray-700">
+                Lokasi di Peta
+                <span class="text-red-500">*</span>
+              </label>
+              <span v-if="isSyncing" class="text-xs text-gray-500 animate-pulse">Menyesuaikan...</span>
+            </div>
+            <MapPicker
+              ref="mapRef"
+              v-model:lat="lat"
+              v-model:lng="lng"
+              @manual-change="handleManualLocationChange"
+              height="320px"
+              variant="user"
+            />
+            <p
+              v-if="errors.latitude || errors.longitude"
+              class="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-500"
+            >
+              <i class="pi pi-exclamation-circle"></i>
+              Tentukan lokasi Anda di peta.
+            </p>
+          </div>
+
+
           <TextField
             name="detail"
             label="Detail Alamat"
@@ -360,39 +454,40 @@ onMounted(async () => {
             @update:modelValue="(v) => setFieldValue('detail', v)"
           />
 
-          <div>
-            <label class="block mb-2 text-sm font-semibold text-gray-700">
-              Lokasi di Peta
-            </label>
-            <MapPicker
-              v-model:lat="lat"
-              v-model:lng="lng"
-              height="320px"
-              variant="user"
-            />
-          </div>
-
           <div class="flex gap-4">
-            <div class="hidden w-full sm:inline">
+            <!-- Desktop Buttons -->
+            <div class="hidden sm:flex w-full gap-4">
               <AppButton
                 type="button"
                 variant="muted-outline"
                 class="w-full"
-                @click="router.back()"
+                @click="goBack"
               >
                 Batal
               </AppButton>
+              <AppButton
+                type="submit"
+                variant="primary"
+                class="w-full"
+                :loading="saving"
+                :disabled="saving"
+              >
+                {{ saving ? "Menyimpan..." : "Simpan" }}
+              </AppButton>
             </div>
 
-            <AppButton
-              type="submit"
-              variant="primary"
-              class="w-full"
-              :loading="saving"
-              :disabled="saving"
-            >
-              {{ saving ? "Menyimpan..." : "Simpan" }}
-            </AppButton>
+            <!-- Mobile Sticky Button -->
+            <div class="fixed bottom-0 left-0 right-0 z-50 p-4 bg-white border-t border-gray-200 sm:hidden pb-safe">
+              <AppButton
+                type="submit"
+                variant="primary"
+                class="w-full"
+                :loading="saving"
+                :disabled="saving"
+              >
+                {{ saving ? "Menyimpan..." : "Simpan" }}
+              </AppButton>
+            </div>
           </div>
         </Form>
       </div>

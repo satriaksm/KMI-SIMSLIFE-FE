@@ -91,6 +91,14 @@ const logout = async () => {
   }
 };
 
+const isRefreshing = ref(false);
+const refreshPage = () => {
+  isRefreshing.value = true;
+  setTimeout(() => {
+    window.location.reload();
+  }, 300);
+};
+
 defineExpose({
   toggleSidebar,
 });
@@ -367,6 +375,16 @@ defineExpose({
         </div>
       </template>
     </ResponsiveModal>
+
+    <!-- Global Floating Refresh Button -->
+    <button
+      @click="refreshPage"
+      class="fixed z-50 flex items-center justify-center transition duration-200 bg-white border-2 rounded-full shadow-sm cursor-pointer border-merchant-primary/20 hover:shadow-lg bottom-6 right-6 sm:bottom-8 sm:right-8 w-12 h-12 hover:bg-merchant-primary/5 hover:text-merchant-primary text-gray-600 active:scale-95"
+      aria-label="Segarkan Halaman"
+      title="Segarkan Halaman"
+    >
+      <i class="text-xl pi pi-refresh" :class="{ 'animate-spin': isRefreshing }"></i>
+    </button>
   </div>
 </template>
 

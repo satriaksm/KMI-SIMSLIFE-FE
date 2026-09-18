@@ -326,10 +326,11 @@
               <div v-if="post.images && post.images.length" class="w-full">
                 <!-- Single image -->
                 <div v-if="post.images.length === 1">
-                  <img
-                    :src="post.images[0]"
+                  <ResponsiveImage
+                    :src="post.images[0].src"
+                    :urls="post.images[0].urls"
                     alt=""
-                    class="object-cover w-full h-48 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
+                    customClass="object-cover w-full h-48 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
                     @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -338,11 +339,12 @@
 
                 <!-- Two images -->
                 <div v-else-if="post.images.length === 2" class="grid grid-cols-2 gap-2">
-                  <img
-                    v-for="(imgUrl, i) in post.images.slice(0, 2)"
+                  <ResponsiveImage
+                    v-for="(imgObj, i) in post.images.slice(0, 2)"
                     :key="i"
-                    :src="imgUrl"
-                    class="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-48 md:h-56"
+                    :src="imgObj.src"
+                    :urls="imgObj.urls"
+                    customClass="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-48 md:h-56"
                     loading="lazy"
                     @click="openLightbox(post.images, i)"
                     @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -351,20 +353,22 @@
 
                 <!-- Three images -->
                 <div v-else-if="post.images.length === 3">
-                  <img
-                    :src="post.images[0]"
+                  <ResponsiveImage
+                    :src="post.images[0].src"
+                    :urls="post.images[0].urls"
                     alt="hero"
-                    class="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
+                    customClass="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
                     @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
                   <div class="grid grid-cols-2 gap-2">
-                    <img
-                      v-for="(imgUrl, i) in post.images.slice(1, 3)"
+                    <ResponsiveImage
+                      v-for="(imgObj, i) in post.images.slice(1, 3)"
                       :key="i"
-                      :src="imgUrl"
-                      class="object-cover w-full h-32 rounded-md cursor-pointer sm:h-40 md:h-44"
+                      :src="imgObj.src"
+                      :urls="imgObj.urls"
+                      customClass="object-cover w-full h-32 rounded-md cursor-pointer sm:h-40 md:h-44"
                       loading="lazy"
                       @click="openLightbox(post.images, i + 1)"
                       @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -374,10 +378,11 @@
 
                 <!-- 4+ images -->
                 <div v-else>
-                  <img
-                    :src="post.images[0]"
+                  <ResponsiveImage
+                    :src="post.images[0].src"
+                    :urls="post.images[0].urls"
                     alt="hero"
-                    class="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
+                    customClass="object-cover w-full h-48 mb-2 rounded-lg cursor-pointer sm:h-56 md:h-72 lg:h-80"
                     loading="lazy"
                     @click="openLightbox(post.images, 0)"
                     @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -385,13 +390,14 @@
                   <div class="gap-2">
                     <div class="grid grid-cols-3 gap-2 md:hidden">
                       <div
-                        v-for="(imgUrl, i) in post.images.slice(1, 4)"
+                        v-for="(imgObj, i) in post.images.slice(1, 4)"
                         :key="i"
                         class="relative"
                       >
-                        <img
-                          :src="imgUrl"
-                          class="object-cover w-full h-24 rounded-md cursor-pointer"
+                        <ResponsiveImage
+                          :src="imgObj.src"
+                          :urls="imgObj.urls"
+                          customClass="object-cover w-full h-24 rounded-md cursor-pointer"
                           loading="lazy"
                           @click="openLightbox(post.images, i + 1)"
                           @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -408,13 +414,14 @@
 
                     <div class="hidden gap-2 md:grid md:grid-cols-3">
                       <div
-                        v-for="(imgUrl, i) in post.images.slice(1, 4)"
+                        v-for="(imgObj, i) in post.images.slice(1, 4)"
                         :key="i"
                         class="relative"
                       >
-                        <img
-                          :src="imgUrl"
-                          class="object-cover w-full h-40 rounded-md cursor-pointer md:h-44 lg:h-48"
+                        <ResponsiveImage
+                          :src="imgObj.src"
+                          :urls="imgObj.urls"
+                          customClass="object-cover w-full h-40 rounded-md cursor-pointer md:h-44 lg:h-48"
                           loading="lazy"
                           @click="openLightbox(post.images, i + 1)"
                           @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -615,9 +622,10 @@
         </button>
 
         <div class="flex items-center justify-center">
-          <img
-            :src="lightbox.images[lightbox.index]"
-            class="max-h-[80vh] object-contain rounded-md"
+          <ResponsiveImage
+            :src="lightbox.images[lightbox.index]?.src || lightbox.images[lightbox.index]"
+            :urls="lightbox.images[lightbox.index]?.urls"
+            customClass="max-h-[80vh] object-contain rounded-md"
             @touchstart="onTouchStart"
             @touchend="onTouchEnd"
             @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -647,6 +655,7 @@ import bannerImg from "@/assets/banner-community.png";
 import { setMeta } from "@/router/seo";
 import { getCommunityImageUrl } from '@/libs/getImageUrl'; // ✅ ADD
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ReportButton from "@/components/ReportButton.vue";
 
 /* STATE */
@@ -811,26 +820,29 @@ function normalizeImages(arr) {
       
       // ✅ Gunakan streaming API endpoint
       if (typeof item === "object" && item.id) {
-        return getCommunityImageUrl(item.id);
+        return {
+          src: getCommunityImageUrl(item.id),
+          urls: item.image_urls || item.urls || null
+        };
       }
       
       // Fallback untuk backward compatibility
       if (typeof item === "string") {
-        if (item.startsWith('http')) return item;
+        if (item.startsWith('http')) return { src: item, urls: null };
         
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
         const backendUrl = apiBaseUrl.replace(/\/api$/, '');
         
         if (item.startsWith('/storage/')) {
-          return `${backendUrl}${item}`;
+          return { src: `${backendUrl}${item}`, urls: null };
         }
         
-        return `${backendUrl}/storage/${item}`;
+        return { src: `${backendUrl}/storage/${item}`, urls: null };
       }
       
       return null;
     })
-    .filter(Boolean);
+    .filter((img) => img && img.src);
 }
 
 // ✅ ADD: extractHashtags function

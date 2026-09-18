@@ -72,9 +72,10 @@
           <div v-if="post.images && post.images.length">
             <!-- Single image -->
             <div v-if="post.images.length === 1">
-              <img
-                :src="post.images[0]"
-                class="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
+              <ResponsiveImage
+                :src="post.images[0].src"
+                :urls="post.images[0].urls"
+                customClass="object-cover w-full h-40 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
                 @click="openLightbox(post.images, 0)"
                 @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
@@ -82,11 +83,12 @@
 
             <!-- Two images -->
             <div v-else-if="post.images.length === 2" class="grid grid-cols-2 gap-2">
-              <img
-                v-for="(imgUrl, i) in post.images.slice(0, 2)"
+              <ResponsiveImage
+                v-for="(imgObj, i) in post.images.slice(0, 2)"
                 :key="i"
-                :src="imgUrl"
-                class="object-cover w-full h-32 rounded-lg cursor-pointer sm:h-40 md:h-56"
+                :src="imgObj.src"
+                :urls="imgObj.urls"
+                customClass="object-cover w-full h-32 rounded-lg cursor-pointer sm:h-40 md:h-56"
                 @click="openLightbox(post.images, i)"
                 @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
@@ -94,22 +96,24 @@
 
             <!-- 3+ images: hero + thumbnails -->
             <div v-else>
-              <img
-                :src="post.images[0]"
-                class="object-cover w-full h-40 mb-2 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
+              <ResponsiveImage
+                :src="post.images[0].src"
+                :urls="post.images[0].urls"
+                customClass="object-cover w-full h-40 mb-2 rounded-lg cursor-pointer sm:h-52 md:h-72 lg:h-96"
                 @click="openLightbox(post.images, 0)"
                 @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
               />
 
               <div class="grid grid-cols-3 gap-2">
                 <div
-                  v-for="(imgUrl, i) in post.images.slice(1, 4)"
+                  v-for="(imgObj, i) in post.images.slice(1, 4)"
                   :key="i"
                   class="relative"
                 >
-                  <img
-                    :src="imgUrl"
-                    class="object-cover w-full rounded-md cursor-pointer h-18 sm:h-24 md:h-32"
+                  <ResponsiveImage
+                    :src="imgObj.src"
+                    :urls="imgObj.urls"
+                    customClass="object-cover w-full rounded-md cursor-pointer h-18 sm:h-24 md:h-32"
                     @click="openLightbox(post.images, i + 1)"
                     @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
                   />
@@ -317,9 +321,10 @@
         </button>
 
         <div class="flex items-center justify-center">
-          <img
-            :src="lightbox.images[lightbox.index]"
-            class="max-h-[65vh] sm:max-h-[75vh] object-contain rounded-md"
+          <ResponsiveImage
+            :src="lightbox.images[lightbox.index]?.src || lightbox.images[lightbox.index]"
+            :urls="lightbox.images[lightbox.index]?.urls"
+            customClass="max-h-[65vh] sm:max-h-[75vh] object-contain rounded-md"
             @touchstart="onTouchStart"
             @touchend="onTouchEnd"
             @error="(e) => { if(!e.target.dataset.errored) { e.target.dataset.errored='true'; e.target.src='/placeholder.png'; } }"
@@ -340,8 +345,10 @@ import { useRoute } from "vue-router";
 import api from "@/libs/axios";
 import CommentForm from "@/components/community/CommentForm.vue";
 import CommentThread from "@/components/community/CommentThread.vue";
-import { getCommunityImageUrl } from '@/libs/getImageUrl'; // ✅ ADD
+import { useToast } from "vue-toastification";
+import { getCommunityImageUrl } from '@/libs/getImageUrl';
 import UserAvatar from "@/components/common/UserAvatar.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import ReportButton from "@/components/ReportButton.vue";
 
 const route = useRoute();
@@ -521,26 +528,29 @@ function normalizeImages(arr) {
       
       // ✅ Gunakan streaming API endpoint
       if (typeof item === "object" && item.id) {
-        return getCommunityImageUrl(item.id);
+        return {
+          src: getCommunityImageUrl(item.id),
+          urls: item.image_urls || item.urls || null
+        };
       }
       
       // Fallback untuk backward compatibility
       if (typeof item === "string") {
-        if (item.startsWith('http')) return item;
+        if (item.startsWith('http')) return { src: item, urls: null };
         
         const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
         const backendUrl = apiBaseUrl.replace(/\/api$/, '');
         
         if (item.startsWith('/storage/')) {
-          return `${backendUrl}${item}`;
+          return { src: `${backendUrl}${item}`, urls: null };
         }
         
-        return `${backendUrl}/storage/${item}`;
+        return { src: `${backendUrl}/storage/${item}`, urls: null };
       }
       
       return null;
     })
-    .filter(Boolean);
+    .filter((img) => img && img.src);
 }
 
 // ==================== API ====================

@@ -24,6 +24,10 @@ const props = defineProps({
     type: String,
     default: "max-w-xs",
   },
+  imageSize: {
+    type: String,
+    default: "medium",
+  },
 });
 
 // Format harga ke Rupiah
@@ -64,9 +68,55 @@ const formattedPrice = computed(() => {
 const productImageUrl = computed(() => {
   if (imageError.value) return null;
 
-  if (props.product.cover_image) {
-    return props.product.cover_image.src_url || props.product.cover_image;
+  const cover = props.product.cover_image || props.product.cover_img;
+  if (!cover) return null;
+
+  const size = props.imageSize || "medium";
+
+  if (typeof cover === "object") {
+    if (size === "medium") {
+      if (cover.medium_url) return cover.medium_url;
+      if (cover.urls?.medium) return cover.urls.medium;
+      if (cover.src_urls?.medium) return cover.src_urls.medium;
+    }
+
+    if (cover[`${size}_url`]) return cover[`${size}_url`];
+    if (cover.urls?.[size]) return cover.urls[size];
+    if (cover.src_urls?.[size]) return cover.src_urls[size];
+
+    const rawSrc = cover.src_url || cover.url;
+    if (typeof rawSrc === "string" && rawSrc.trim()) {
+      if (rawSrc.includes("/api/images/")) {
+        if (rawSrc.includes("size=")) {
+          return rawSrc.replace(/size=[a-zA-Z0-9_-]+/, `size=${size}`);
+        }
+        const sep = rawSrc.includes("?") ? "&" : "?";
+        return `${rawSrc}${sep}size=${size}`;
+      }
+      return rawSrc;
+    }
+
+    return (
+      cover.thumb_url ||
+      cover.urls?.thumb ||
+      cover.src_urls?.thumb ||
+      cover.original_url ||
+      cover.urls?.original ||
+      null
+    );
   }
+
+  if (typeof cover === "string") {
+    if (cover.includes("/api/images/")) {
+      if (cover.includes("size=")) {
+        return cover.replace(/size=[a-zA-Z0-9_-]+/, `size=${size}`);
+      }
+      const sep = cover.includes("?") ? "&" : "?";
+      return `${cover}${sep}size=${size}`;
+    }
+    return cover;
+  }
+
   return null;
 });
 

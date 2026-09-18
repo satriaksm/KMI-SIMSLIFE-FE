@@ -651,7 +651,7 @@ onMounted(async () => {
                         :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
                         :alt="merchant.name" 
                         class="w-full h-full object-cover"
-                        @error="(e) => { e.target.src = '/placeholder.png' }"
+                        @error="merchant.logo_path = null"
                       />
                       <div v-else class="w-full h-full flex items-center justify-center bg-merchant-primary/10">
                         <span class="text-merchant-primary font-bold text-xl">{{ merchant.name?.charAt(0)?.toUpperCase() }}</span>
@@ -896,7 +896,7 @@ onMounted(async () => {
                 v-if="merchant.logo_path" 
                 :src="api.defaults.baseURL + '/api/merchant-logo/' + merchant.id" 
                 class="w-full h-full object-cover"
-                @error="(e) => (e.target.src = '/placeholder.png')"
+                @error="merchant.logo_path = null"
               />
               <div v-else class="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 font-bold text-xs">
                 {{ merchant.name?.charAt(0) }}

@@ -19,7 +19,11 @@ import { useCategories } from "@/composables/useCategories";
 import { useSegmentations } from "@/composables/useSegmentations";
 import api from "@/libs/axios";
 import { useToast } from "vue-toastification";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
+const cartStore = useCartStore();
 
+const authStore = useAuthStore();
 const isLoadingMoreProducts = ref(false);
 const isLoadingMoreMerchants = ref(false);
 const loadMoreRef = ref(null); // elemen sentinel
@@ -39,6 +43,16 @@ const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
+const searchInput = ref(route.query.q || "");
+watch(
+  () => route.query.q,
+  (newQ) => {
+    if (newQ !== searchInput.value) {
+      searchInput.value = newQ || "";
+    }
+  },
+);
+
 const myLatitude = ref(null);
 const myLongitude = ref(null);
 
@@ -49,6 +63,9 @@ const profileAddressUnauthorized = ref(false);
 const profileCoordsLoaded = ref(false);
 let profileCoordsPromise = null;
 
+const cartItemsCount = computed(() => {
+  return cartStore.totalItems || 0;
+});
 const hasMyCoordinates = computed(() => {
   return (
     Number.isFinite(myLatitude.value) && Number.isFinite(myLongitude.value)
@@ -82,7 +99,7 @@ function setMyCoordinates(lat, lng) {
 }
 
 async function loadMyCoordinatesInternal(
-  { allowDevice } = { allowDevice: false }
+  { allowDevice } = { allowDevice: false },
 ) {
   // 1) Prefer saved address (if logged in)
   if (!profileAddressUnauthorized.value) {
@@ -117,7 +134,7 @@ async function loadMyCoordinatesInternal(
         }
       },
       () => resolve(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   });
 
@@ -161,7 +178,11 @@ const {
 const hasFetchedProductsOnce = ref(false);
 const hasFetchedMerchantsOnce = ref(false);
 function goBack() {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 }
 const goToProductDetail = (product) => {
   const slug = product?.slug;
@@ -252,6 +273,18 @@ const combinedResults = computed(() => {
   // always appear after products.
   const list = [...(products.value ?? []), ...(jasas.value ?? [])];
 
+  if (activeInstantSorts.value.length === 0) {
+    return list.sort((a, b) => {
+      const aRel = a?.relevance_score ?? 0;
+      const bRel = b?.relevance_score ?? 0;
+      if (aRel !== bRel) return bRel - aRel;
+      // Fallback to latest if relevance is the same
+      const aTime = toTimeOrNull(a?.created_at ?? a?.createdAt);
+      const bTime = toTimeOrNull(b?.created_at ?? b?.createdAt);
+      return compareTimeDesc(aTime, bTime);
+    });
+  }
+
   const hasNearest = activeInstantSorts.value.includes("nearest");
   const primarySort = hasNearest
     ? "nearest"
@@ -260,7 +293,11 @@ const combinedResults = computed(() => {
         "oldest",
         "cheapest",
         "expensive",
-      ]) || "latest";
+      ]);
+
+  if (!primarySort) {
+    return list;
+  }
 
   if (primarySort !== "nearest") {
     return list.sort((a, b) => compareBySortKey(a, b, primarySort));
@@ -287,6 +324,7 @@ const combinedResults = computed(() => {
     return compareBySortKey(a, b, "latest");
   });
 });
+
 
 function handleResultClick(item) {
   const isJasa =
@@ -368,7 +406,7 @@ const availableCategories = computed(() =>
     key: cat.slug, // dipakai untuk filter & API
     label: cat.name, // teks di UI
     id: cat.id,
-  }))
+  })),
 );
 const availableSubCategories = computed(() => {
   return Object.values(categoriesLevel2Map.value)
@@ -386,7 +424,7 @@ const availableSegments = computed(() =>
     key: seg.key, // dikirim ke API search
     label: seg.label, // teks UI
     id: seg.id,
-  }))
+  })),
 );
 
 const activeFilterCount = computed(() => {
@@ -455,8 +493,8 @@ function pickNearestTieBreakersForProducts() {
   const priceSort = hasCheapest
     ? "cheapest"
     : hasExpensive
-    ? "expensive"
-    : undefined;
+      ? "expensive"
+      : undefined;
   const dateSort = hasLatest ? "latest" : hasOldest ? "oldest" : undefined;
 
   return {
@@ -467,8 +505,8 @@ function pickNearestTieBreakersForProducts() {
 
 const filteredInstantSorts = computed(() =>
   instantSortOptions.filter(
-    (i) => !i.productOnly || activeTab.value === "products"
-  )
+    (i) => !i.productOnly || activeTab.value === "products",
+  ),
 );
 
 async function fetchMerchants(reset = false) {
@@ -492,7 +530,7 @@ async function fetchMerchants(reset = false) {
       const ok = await ensureMyCoordinates({ allowDevice: true });
       if (!ok) {
         toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat)."
+          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
         );
         return;
       }
@@ -538,7 +576,7 @@ async function fetchProducts(reset = false) {
       const ok = await ensureMyCoordinates({ allowDevice: true });
       if (!ok) {
         toast.error(
-          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat)."
+          "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
         );
         return;
       }
@@ -588,7 +626,7 @@ function setupObserver() {
       root: null,
       rootMargin: "200px", // preload sebelum mentok
       threshold: 0,
-    }
+    },
   );
 
   if (loadMoreRef.value) {
@@ -598,7 +636,7 @@ function setupObserver() {
 
 function buildMerchantQuery() {
   const sort = activeInstantSorts.value.find((s) =>
-    ["latest", "oldest", "nearest"].includes(s)
+    ["latest", "oldest", "nearest"].includes(s),
   );
 
   const sortKey = activeInstantSorts.value.includes("nearest")
@@ -621,8 +659,8 @@ function buildMerchantQuery() {
     categories: detailFilters.value.subCategories.length
       ? detailFilters.value.subCategories
       : detailFilters.value.categories.length
-      ? detailFilters.value.categories
-      : undefined,
+        ? detailFilters.value.categories
+        : undefined,
 
     min_price: detailFilters.value.minPrice ?? undefined,
     max_price: detailFilters.value.maxPrice ?? undefined,
@@ -670,8 +708,8 @@ function buildProductQuery() {
     categories: detailFilters.value.subCategories.length
       ? detailFilters.value.subCategories.map(String)
       : detailFilters.value.categories.length
-      ? detailFilters.value.categories.map(String)
-      : undefined,
+        ? detailFilters.value.categories.map(String)
+        : undefined,
 
     segments: detailFilters.value.segments.length
       ? detailFilters.value.segments.map(String)
@@ -689,14 +727,30 @@ function buildProductQuery() {
 }
 
 function submitSearch() {
-  const q = route.query.q;
-  if (!q) return;
+  if (!searchInput.value.trim()) return;
 
-  router.push({
+  router.replace({
     name: "Search Page",
-    query: { q },
+    query: { q: searchInput.value },
   });
 }
+const goToCart = () => {
+  if (authStore.isAdmin) {
+    toast.warning("Admin tidak dapat mengakses keranjang.");
+    return;
+  }
+
+  if (!authStore.isAuthenticated) {
+    toast.info("Silakan login terlebih dahulu untuk mengakses keranjang.");
+    router.push({
+      name: "Login",
+      query: { redirect: route.fullPath },
+    });
+    return;
+  } else {
+    router.push({ name: "Keranjang" });
+  }
+};
 
 function applyDetailFilter() {
   detailFilters.value = {
@@ -738,7 +792,7 @@ watch(
       hasFetchedMerchantsOnce.value = false;
       fetchMerchants(true);
     }
-  }
+  },
 );
 
 watch(
@@ -758,7 +812,7 @@ watch(
       // nextTick(() => setupMerchantObserver());
     }
   },
-  { immediate: false }
+  { immediate: false },
 );
 
 watch(
@@ -771,7 +825,7 @@ watch(
     ) {
       tempDetailFilters.value.minPrice = 0;
     }
-  }
+  },
 );
 
 watch(
@@ -793,7 +847,7 @@ watch(
       fetchMerchants(true);
     }
   },
-  { immediate: false }
+  { immediate: false },
 );
 
 watch(
@@ -822,12 +876,12 @@ watch(
           tempDetailFilters.value.subCategories.filter(
             (sub) =>
               !availableSubCategories.value.some(
-                (s) => s.key === sub && s.id === category.id
-              )
+                (s) => s.key === sub && s.id === category.id,
+              ),
           );
       }
     }
-  }
+  },
 );
 
 /* ================= INSTANT SORT HANDLER ================= */
@@ -839,7 +893,7 @@ async function toggleInstantSort(key) {
     const ok = await ensureMyCoordinates({ allowDevice: true });
     if (!ok) {
       toast.error(
-        "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat)."
+        "Tidak bisa mengambil lokasi. Aktifkan izin lokasi atau lengkapi alamat (koordinat).",
       );
       return;
     }
@@ -847,13 +901,13 @@ async function toggleInstantSort(key) {
 
   if (option.conflict) {
     activeInstantSorts.value = activeInstantSorts.value.filter(
-      (k) => !option.conflict.includes(k)
+      (k) => !option.conflict.includes(k),
     );
   }
 
   if (activeInstantSorts.value.includes(key)) {
     activeInstantSorts.value = activeInstantSorts.value.filter(
-      (k) => k !== key
+      (k) => k !== key,
     );
   } else {
     activeInstantSorts.value.push(key);
@@ -917,19 +971,19 @@ function applyFilters(list) {
 
   if (detailFilters.value.minPrice !== null) {
     filtered = filtered.filter(
-      (i) => i.min_price >= detailFilters.value.minPrice
+      (i) => i.min_price >= detailFilters.value.minPrice,
     );
   }
 
   if (detailFilters.value.maxPrice !== null) {
     filtered = filtered.filter(
-      (i) => i.max_price <= detailFilters.value.maxPrice
+      (i) => i.max_price <= detailFilters.value.maxPrice,
     );
   }
 
   if (detailFilters.value.categories.length) {
     filtered = filtered.filter((i) =>
-      detailFilters.value.categories.includes(i.category)
+      detailFilters.value.categories.includes(i.category),
     );
   }
   if (detailFilters.value.segments.length) {
@@ -1007,6 +1061,9 @@ onMounted(async () => {
     hasFetchedMerchantsOnce.value = false;
     fetchMerchants(true);
   }
+  if (authStore.isAuthenticated) {
+    await cartStore.fetchCartCount(true);
+  }
 });
 
 onBeforeUnmount(() => {
@@ -1034,14 +1091,27 @@ onBeforeUnmount(() => {
         <form @submit.prevent="submitSearch" class="flex-1">
           <div class="relative">
             <TextField
-              :modelValue="route.query.q || ''"
-              @update:modelValue="(v) => router.replace({ query: { q: v } })"
+              v-model="searchInput"
               name="search"
               placeholder="Cari produk atau UMKM…"
               variant="primary"
             />
           </div>
         </form>
+        <button
+          v-if="!isAdmin"
+          @click="goToCart"
+          class="relative w-10 h-10 transition rounded-full hover:bg-gray-100 active:scale-95"
+        >
+          <i class="text-lg pi pi-shopping-cart"></i>
+
+          <span
+            v-if="cartItemsCount > 0"
+            class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+          >
+            {{ cartItemsCount > 9 ? "9+" : cartItemsCount }}
+          </span>
+        </button>
       </div>
     </div>
     <div class="px-4 py-4 mx-auto space-y-5 max-w-7xl">
@@ -1051,7 +1121,7 @@ onBeforeUnmount(() => {
           <span class="text-primary">"{{ route.query.q }}"</span>
         </h1>
         <p class="mt-1 text-sm text-muted-foreground">
-          Menampilkan produk dan UMKM terkait
+          Menampilkan produk/jasa dan UMKM terkait
         </p>
       </div>
 
@@ -1142,6 +1212,7 @@ onBeforeUnmount(() => {
                 (item.jasa_id ?? item.id)
               "
               :product="item"
+              imageSize="medium"
               @click="handleResultClick(item)"
             />
 
@@ -1188,6 +1259,7 @@ onBeforeUnmount(() => {
             v-for="merchant in merchants"
             :key="merchant.id"
             :merchant="merchant"
+            imageSize="medium"
           />
 
           <!-- skeleton append -->

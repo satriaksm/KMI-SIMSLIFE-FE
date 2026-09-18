@@ -9,8 +9,10 @@ import StatusLabel from "@/components/common/StatusLabel.vue";
 import MobilePagination from "@/components/common/MobilePagination.vue";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import api from "@/libs/axios";
+import { useToast } from "vue-toastification";
 
 const router = useRouter();
+const toast = useToast();
 const {
   vouchers,
   loading,

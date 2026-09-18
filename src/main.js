@@ -9,31 +9,20 @@ import "./style.css";
 import { useAuthStore } from "@/stores/auth";
 import ProductCard from "@/components/Card/ProductCard.vue";
 import EventCard from "@/components/Card/EventCard.vue";
-import PromoCard from "@/components/Card/PromoCard.vue";
 import "leaflet/dist/leaflet.css";
+import { registerSW } from "virtual:pwa-register";
 
-if (import.meta.env.DEV && "serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(
-      registrations.map((registration) => registration.unregister()),
-    );
-    if (window.caches) {
-      const cacheKeys = await caches.keys();
-      await Promise.all(cacheKeys.map((cacheKey) => caches.delete(cacheKey)));
-    }
-  });
-}
-
-if (import.meta.env.PROD && "serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(
-        registrations.map((registration) => registration.update()),
-      );
-    } catch (err) {
-      console.warn("[PWA] Failed to update service worker registrations:", err);
+// Clean up any stale service workers (e.g. from previous dev-sw.js or selfDestroying ones)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    const expectedSw = import.meta.env.DEV ? "push-sw.js" : "sw.js";
+    
+    for (const registration of registrations) {
+      const swUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL;
+      if (swUrl && !swUrl.includes(expectedSw)) {
+        console.log(`Unregistering stale service worker: ${swUrl} (expected ${expectedSw})`);
+        registration.unregister();
+      }
     }
   });
 }
@@ -58,7 +47,12 @@ app.use(router);
 
 app.component("ProductCard", ProductCard);
 app.component("EventCard", EventCard);
-app.component("PromoCard", PromoCard);
+
+if (!import.meta.env.DEV) {
+  registerSW({
+    immediate: true,
+  });
+}
 
 // ✅ Auth initialization moved to App.vue (synchronous from localStorage)
 // Removed async initAuth() to prevent race condition that clears user on page refresh

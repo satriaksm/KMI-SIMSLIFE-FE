@@ -60,10 +60,11 @@ const filteredOptions = computed(() => {
   return props.options.filter((opt) => opt.label.toLowerCase().includes(q));
 });
 
-const selectedLabel = computed(() => {
-  const opt = props.options.find((o) => o.value == props.modelValue);
+const getSelectedLabel = (fieldValue) => {
+  const val = fieldValue !== undefined && fieldValue !== "" ? fieldValue : props.modelValue;
+  const opt = props.options.find((o) => o.value == val);
   return opt ? opt.label : "";
-});
+};
 
 const focusRingClass = computed(() => {
   return props.variant === "merchant"
@@ -153,11 +154,11 @@ onUnmounted(() => {
         >
           <span
             :class="[
-              !selectedLabel ? 'text-gray-400' : 'text-gray-900',
+              !getSelectedLabel(field.value) ? 'text-gray-400' : 'text-gray-900',
               'truncate block max-w-full',
             ]"
           >
-            {{ selectedLabel || placeholder }}
+            {{ getSelectedLabel(field.value) || placeholder }}
           </span>
 
           <!-- Spinner indikator loading -->
@@ -240,7 +241,7 @@ onUnmounted(() => {
               @click="selectOption(opt, field)"
               class="px-3 py-2.5 text-sm rounded-lg cursor-pointer transition-colors flex items-center justify-between"
               :class="[
-                modelValue === opt.value
+                (field.value === opt.value || modelValue === opt.value)
                   ? variant === 'merchant'
                     ? 'bg-merchant-primary/10 text-merchant-primary font-medium'
                     : 'bg-primary/10 text-primary font-medium'
@@ -249,7 +250,7 @@ onUnmounted(() => {
             >
               <span>{{ opt.label }}</span>
               <i
-                v-if="modelValue === opt.value"
+                v-if="field.value === opt.value || modelValue === opt.value"
                 class="text-xs pi pi-check"
               ></i>
             </li>

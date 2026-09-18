@@ -1,7 +1,7 @@
 <template>
   <div class="bg-gray-100">
     <!-- Mobile Header -->
-    <MobileHeader title="Keranjang" @back="goBack" />
+    <MobileHeader title="Keranjang" @back="goBack" variant="primary" />
 
     <!-- Skeleton Loading -->
     <div v-if="loading" class="px-4 py-4 mx-auto space-y-4 max-w-7xl">
@@ -86,12 +86,20 @@
           class="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50"
         >
           <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              :checked="isStoreSelected(store.id)"
-              @change="toggleStoreSelection(store.id)"
-              class="w-4 h-4 text-[#FFA30E] border-gray-300 rounded focus:ring-[#FFA30E]"
-            />
+            <!-- Store Checkbox -->
+            <label class="relative flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                :checked="isStoreSelected(store.id)"
+                @change="toggleStoreSelection(store.id)"
+                class="sr-only peer"
+              />
+              <div
+                class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md peer-checked:bg-primary peer-checked:border-primary"
+              >
+                <i class="text-[10px] text-white pi pi-check"></i>
+              </div>
+            </label>
             <div class="flex items-center gap-2">
               <div
                 class="w-6 h-6 rounded-full bg-[#FFA30E] flex items-center justify-center"
@@ -138,29 +146,40 @@
             :class="item.isUnavailable ? 'opacity-60 ' : ''"
           >
             <!-- Checkbox -->
-            <input
-              type="checkbox"
-              :checked="isItemSelected(item.id)"
-              @change="toggleItemSelection(item.id, store.id)"
-              class="mt-1 w-4 h-4 text-[#FFA30E] border-gray-300 rounded focus:ring-[#FFA30E]"
-              :class="{
-                'cursor-not-allowed':
-                  item.isUnavailable ||
-                  item.isOverStock ||
-                  hasConfigurationIssue(item),
-              }"
-              :disabled="item.isUnavailable || item.isOverStock"
-            />
+            <label
+              class="relative flex items-center mt-1 shrink-0"
+              :class="
+                item.isUnavailable ||
+                item.isOverStock ||
+                hasConfigurationIssue(item)
+                  ? 'cursor-not-allowed'
+                  : 'cursor-pointer'
+              "
+            >
+              <input
+                type="checkbox"
+                :checked="isItemSelected(item.id)"
+                @change="toggleItemSelection(item.id, store.id)"
+                class="sr-only peer"
+                :disabled="item.isUnavailable || item.isOverStock"
+              />
+              <div
+                class="flex items-center justify-center w-5 h-5 transition-all bg-white border-2 border-gray-300 rounded-md peer-checked:bg-primary peer-checked:border-primary peer-disabled:opacity-40"
+              >
+                <i class="text-[10px] text-white pi pi-check"></i>
+              </div>
+            </label>
 
             <!-- Product Image -->
             <div
-              class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 group-hover:-translate-y-0.5 duration-200 transition-transform relative"
+              class="w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 group-hover:-translate-y-0.5 duration-200 transition-transform relative cursor-pointer"
               @click="goToProductPage(item)"
             >
               <img
-                :src="item.image"
+                :src="getItemThumbUrl(item)"
                 :alt="item.name"
                 class="object-cover w-full h-full"
+                loading="lazy"
               />
               <div
                 v-if="item.isUnavailable"
@@ -227,6 +246,7 @@
 
               <!-- Edit Variant/Addon Button -->
               <button
+                v-if="showEditButton(item)"
                 @click="editItemVariant(item.id, store.id)"
                 class="cursor-pointer text-xs text-[#FFA30E] hover:text-[#e5920d] font-semibold mb-2 flex items-center gap-1"
                 :class="[
@@ -247,7 +267,7 @@
                     d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z"
                   />
                 </svg>
-                Ubah Varian
+                {{ getEditButtonText(item) }}
               </button>
 
               <!-- Price & Quantity -->
@@ -410,8 +430,10 @@
               <!-- IMAGE OPTION -->
               <img
                 v-if="opt.uses_image && val.image_url"
-                :src="val.image_url"
+                :src="val.image_urls?.thumb || getThumbImageUrl(val.image_url)"
                 class="object-cover w-8 h-8 rounded"
+                loading="lazy"
+                :alt="val.value"
               />
 
               <div class="flex flex-col items-start">
@@ -463,55 +485,32 @@
               v-if="group.max_selection === 1 && group.min_selection === 1"
               class="space-y-2"
             >
-              <label
-                v-for="addon in group.options"
-                :key="addon.addon_id"
-                class="flex items-center gap-3 p-3 text-sm border rounded-lg cursor-pointer"
-                :class="
-                  isAddonSelected(addon)
-                    ? 'border-[#FFA30E] bg-orange-50'
-                    : 'border-gray-200'
-                "
-              >
-                <input
-                  type="radio"
-                  :name="`addon-group-${group.id}`"
-                  :checked="isAddonSelected(addon)"
-                  @change="selectSingleAddon(addon, group)"
-                  class="w-4 h-4 text-[#FFA30E]"
-                />
-
-                <span class="flex-1">{{ addon.name }}</span>
-                <span class="font-semibold">
-                  +Rp {{ formatIDR(addon.price) }}
-                </span>
-              </label>
+              <RadioGroupPills
+                :name="'addon_group_' + group.id"
+                :options="group.options.map(addon => ({
+                  value: addon.addon_id,
+                  label: addon.name,
+                  suffix: '+Rp ' + formatIDR(addon.price)
+                }))"
+                layout="grid"
+                :modelValue="getSelectedSingleAddon(group.id)"
+                @update:modelValue="val => setSelectedSingleAddon(val, group)"
+              />
             </div>
 
             <!-- MULTIPLE (CHECKBOX) -->
             <div v-else class="space-y-2">
-              <label
-                v-for="addon in group.options"
-                :key="addon.addon_id"
-                class="flex items-center gap-3 p-3 text-sm border rounded-lg cursor-pointer"
-                :class="
-                  isAddonSelected(addon)
-                    ? 'border-[#FFA30E] bg-orange-50'
-                    : 'border-gray-200'
-                "
-              >
-                <input
-                  type="checkbox"
-                  :checked="isAddonSelected(addon)"
-                  @change="toggleAddon(addon, group)"
-                  class="w-4 h-4 text-[#FFA30E]"
-                />
-
-                <span class="flex-1">{{ addon.name }}</span>
-                <span class="font-semibold">
-                  +Rp {{ formatIDR(addon.price) }}
-                </span>
-              </label>
+              <CheckboxGroupPills
+                :name="'addon_group_' + group.id"
+                :options="group.options.map(addon => ({
+                  value: addon.addon_id,
+                  label: addon.name,
+                  suffix: '+Rp ' + formatIDR(addon.price)
+                }))"
+                layout="grid"
+                :modelValue="getSelectedMultipleAddons(group.id)"
+                @update:modelValue="vals => setSelectedMultipleAddons(vals, group)"
+              />
             </div>
           </div>
         </div>
@@ -586,7 +585,7 @@
 // =========================
 // IMPORTS
 // =========================
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import ResponsiveModal from "@/components/common/ResponsiveModal.vue";
 import Button from "@/components/common/Button.vue";
@@ -597,6 +596,33 @@ import { useCheckoutStore } from "@/stores/checkout";
 import debounce from "lodash/debounce";
 import { useCart } from "@/composables/useCart";
 import { useCartStore } from "@/stores/cart";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
+import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
+
+const getThumbImageUrl = (url) => {
+  if (!url) return "";
+  const imgUrl =
+    typeof url === "object"
+      ? url.src || url.thumb_url || url.src_url || url.url || ""
+      : String(url);
+  if (!imgUrl) return "";
+  if (imgUrl.includes("/api/images/") || imgUrl.includes("/api/cart/")) {
+    if (!imgUrl.includes("size=")) {
+      const sep = imgUrl.includes("?") ? "&" : "?";
+      return `${imgUrl}${sep}size=thumb`;
+    }
+    return imgUrl;
+  }
+  return imgUrl;
+};
+
+const getItemThumbUrl = (item) => {
+  if (!item) return "/placeholder.png";
+  if (item.thumb_url) return item.thumb_url;
+  if (item.image_urls?.thumb) return item.image_urls.thumb;
+  return getThumbImageUrl(item.image);
+};
 
 // =========================
 // STATE & COMPOSABLES
@@ -632,7 +658,12 @@ const {
   updateItemVariant,
   removeItem,
   clearCartByStore,
+  totalItems,
 } = useCart();
+
+watch(totalItems, (newTotal) => {
+  cartStore.setTotal(newTotal);
+});
 const addonGroups = ref([]);
 
 const quantityDrafts = ref({}); // simpan nilai ketikan sementara
@@ -709,6 +740,29 @@ const getVariantLabel = (item) => {
 
   // contoh hasil: "Ukuran: Large, Level: Pedas"
   return variant.option_values.map((ov) => ov.option_value).join(" - ");
+};
+
+const hasVariants = (item) => {
+  const product = item.productDetails;
+  return product && product.variants && product.variants.length > 1;
+};
+
+const hasAddons = (item) => {
+  const product = item.productDetails;
+  return product && product.addon_groups && product.addon_groups.length > 0;
+};
+
+const getEditButtonText = (item) => {
+  const v = hasVariants(item);
+  const a = hasAddons(item);
+  if (v && a) return "Ubah Varian dan Addon";
+  if (v) return "Ubah Varian";
+  if (a) return "Ubah Addon";
+  return "";
+};
+
+const showEditButton = (item) => {
+  return hasVariants(item) || hasAddons(item);
 };
 
 const initRequiredAddons = () => {
@@ -1010,6 +1064,33 @@ const toggleAddon = (addon, group) => {
   }
 };
 
+const getSelectedSingleAddon = (groupId) => {
+  const found = tempAddons.value.find((a) => toNumberOrNull(a?.addon_group_id) === toNumberOrNull(groupId));
+  return found ? toNumberOrNull(found.addon_id) : null;
+};
+const setSelectedSingleAddon = (val, group) => {
+  const addon = group.options.find((a) => toNumberOrNull(a?.addon_id) === toNumberOrNull(val));
+  if (addon) selectSingleAddon(addon, group);
+};
+const getSelectedMultipleAddons = (groupId) => {
+  return tempAddons.value
+    .filter((a) => toNumberOrNull(a?.addon_group_id) === toNumberOrNull(groupId))
+    .map((a) => toNumberOrNull(a?.addon_id));
+};
+const setSelectedMultipleAddons = (vals, group) => {
+  if (!Array.isArray(vals)) return;
+  tempAddons.value = tempAddons.value.filter((a) => toNumberOrNull(a?.addon_group_id) !== toNumberOrNull(group.id));
+  vals.forEach((val) => {
+    const addon = group.options.find((a) => toNumberOrNull(a?.addon_id) === toNumberOrNull(val));
+    if (addon) {
+      tempAddons.value.push({
+        addon_group_id: toNumberOrNull(group?.id),
+        addon_id: toNumberOrNull(addon?.addon_id),
+      });
+    }
+  });
+};
+
 // Calculate store subtotal
 const calculateStoreSubtotal = (storeId) => {
   const store = cartStores.value.find((s) => s.id === storeId);
@@ -1030,7 +1111,6 @@ const increaseQuantity = async (itemId) => {
     if (!item || item.quantity >= item.stock) continue;
 
     onQuantityInput(itemId, item.quantity + 1);
-    await cartStore.fetchCartCount(true);
 
     break;
   }
@@ -1042,7 +1122,6 @@ const decreaseQuantity = async (itemId) => {
     if (!item || item.quantity <= 1) continue;
 
     onQuantityInput(itemId, item.quantity - 1);
-    await cartStore.fetchCartCount(true);
 
     break;
   }
@@ -1192,6 +1271,7 @@ const editItemVariant = (itemId, storeId) => {
     values: opt.values.map((v) => ({
       value: v.option_value,
       image_url: v.src_url,
+      image_urls: v.src_urls || v.image_urls || null,
       available: true, // nanti bisa dikunci via stok
     })),
   }));
@@ -1309,7 +1389,11 @@ const formatIDR = (value) => {
 
 // Navigation
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 const goToHome = () => {
@@ -1317,7 +1401,7 @@ const goToHome = () => {
 };
 
 const checkoutFromCart = (storeId) => {
-  const store = cartStores.value.find((s) => s.id === storeId);
+  const store = cartStores.value.find((s) => s.id === storeId || s.cartId === storeId);
   if (!store) return;
 
   const selectedStoreItems = store.items.filter((item) =>
@@ -1329,14 +1413,19 @@ const checkoutFromCart = (storeId) => {
     return;
   }
 
+  const merchantId = store.merchantId ?? store.merchant?.id ?? store.id;
+
   checkoutStore.setFromCart({
     store: {
-      id: store.id,
-      slug: store.slug || store.merchant_slug || store.store_slug || null,
-      name: store.name,
-      address: store.address,
+      id: merchantId,
+      merchantId: merchantId,
+      cartId: store.cartId ?? store.id ?? null,
+      slug: store.slug ?? store.merchant?.slug ?? null,
+      name: store.name ?? store.merchant?.name ?? "",
+      address: store.address ?? store.merchant?.address ?? "",
       phone:
         store.phone ||
+        store.merchant?.phone ||
         store.phone_number ||
         store.whatsapp ||
         store.whatsapp_number ||
@@ -1344,6 +1433,7 @@ const checkoutFromCart = (storeId) => {
     },
     items: selectedStoreItems.map((item) => ({
       id: item.id,
+      productId: item.productId ?? item.productDetails?.id ?? item.product_id ?? item.id,
       name: item.name,
       image: item.image,
       quantity: item.quantity,

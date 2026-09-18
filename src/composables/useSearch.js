@@ -12,7 +12,7 @@ const normalizeJasaImagePayload = (jasa) => {
   const normalized = { ...jasa };
   if (normalized.cover_img && typeof normalized.cover_img === "object") {
     const srcUrl = normalized.cover_img.src_url || normalized.cover_img.url || normalized.cover_img.id
-      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id))
+      ? getImageUrl(normalized.cover_img.src_url || normalized.cover_img.url || String(normalized.cover_img.id), "medium")
       : "";
     normalized.cover_img = { id: normalized.cover_img.id ?? null, url: srcUrl, src_url: srcUrl };
   }
@@ -20,12 +20,12 @@ const normalizeJasaImagePayload = (jasa) => {
     normalized.images = normalized.images.map((image) => {
       if (!image || typeof image !== "object") return image;
       const srcUrl = image.src_url || image.url || image.image_path || image.id
-        ? getImageUrl(image.src_url || image.url || image.image_path || String(image.id))
+        ? getImageUrl(image.src_url || image.url || image.image_path || String(image.id), "medium")
         : "";
       return { ...image, url: srcUrl, src_url: srcUrl };
     });
   }
-  if (normalized.image) normalized.image = getImageUrl(normalized.image);
+  if (normalized.image) normalized.image = getImageUrl(normalized.image, "medium");
   return normalized;
 };
 

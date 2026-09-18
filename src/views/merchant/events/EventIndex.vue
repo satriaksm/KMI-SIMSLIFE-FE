@@ -13,6 +13,7 @@ import { getEventBannerUrl } from "@/libs/getImageUrl";
 
 const route = useRoute();
 const router = useRouter();
+const emit = defineEmits(['toggle-sidebar']);
 const authStore = useAuthStore();
 const toast = useToast();
 
@@ -129,9 +130,18 @@ const tableColumns = [
 
 <template>
   <div class="pb-20">
-    <!-- Header Section -->
-    <div class="px-4 py-6 bg-white sm:px-6 mb-6">
+    <!-- Header - FIXED -->
+    <div
+      class="fixed top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-6 bg-white sm:sticky sm:bg-gray-50 sm:z-30 sm:px-6"
+    >
       <div class="flex items-center gap-3">
+        <!-- Hamburger Button (Mobile) -->
+        <button
+          @click="emit('toggle-sidebar')"
+          class="flex items-center justify-center w-10 h-10 transition bg-white rounded-full hover:bg-muted-background lg:hidden"
+        >
+          <i class="pi pi-bars text-muted-foreground"></i>
+        </button>
         <div>
           <div class="hidden sm:block">
             <Breadcrumb
@@ -155,7 +165,7 @@ const tableColumns = [
       </div>
     </div>
 
-    <div class="px-4 sm:px-6 space-y-8">
+    <div class="px-4 mt-24 sm:px-6 space-y-8 sm:mt-0">
       <!-- Filters Section -->
       <div class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
         <div class="flex-1">

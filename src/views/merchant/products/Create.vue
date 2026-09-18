@@ -5,6 +5,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth"; // ✅ ADD: Import auth store
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue";
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import { Form, Field, useForm } from "vee-validate";
 import * as yup from "yup";
 import TextField from "@/components/forms/TextField.vue";
@@ -180,38 +181,76 @@ useBodyScrollLock(showCombinationsModal);
 // ============================================================
 // VALIDATION SCHEMA
 // ============================================================
-const schema = yup.object({
-  name: yup.string().required("Nama produk wajib diisi"),
-  description: yup.string().required("Deskripsi wajib diisi"),
-  category_id: yup.number().required("Kategori utama wajib dipilih"),
-  sku: yup
-    .string()
-    .max(100, "SKU maksimal 100 karakter")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.nullable(),
-    }),
-  price: yup
-    .number()
-    .min(0, "Harga minimal 0")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.required("Harga wajib diisi"),
-    }),
-  stock: yup
-    .number()
-    .integer("Stok harus bilangan bulat")
-    .min(0, "Stok tidak boleh negatif")
-    .max(9999, "Stok maksimal 9999")
-    .when([], {
-      is: () => !useVariants.value,
-      then: (schema) => schema.required("Stok wajib diisi"),
-    }),
-  min_purchase: yup
-    .number()
-    .integer("Minimal pembelian harus bilangan bulat")
-    .min(1, "Minimal pembelian minimal 1")
-    .required("Minimal pembelian wajib diisi"),
+const schema = computed(() => {
+  const baseSchema = {
+    name: yup.string().required("Nama produk wajib diisi"),
+    description: yup.string().required("Deskripsi wajib diisi"),
+    category_id: yup.number().required("Kategori utama wajib dipilih"),
+    sku: useVariants.value
+      ? yup.string().max(100, "SKU maksimal 100 karakter").nullable()
+      : yup.string().max(100, "SKU maksimal 100 karakter"),
+    price: useVariants.value
+      ? yup.number().min(0, "Harga minimal 0").nullable()
+      : yup.number().min(0, "Harga minimal 0").required("Harga wajib diisi"),
+    stock: useVariants.value
+      ? yup
+          .number()
+          .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+          .nullable()
+          .typeError("Stok harus berupa angka")
+          .integer("Stok harus bilangan bulat")
+          .min(0, "Stok tidak boleh negatif")
+          .max(9999, "Stok maksimal 9999")
+      : yup
+          .number()
+          .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+          .nullable()
+          .typeError("Stok wajib diisi")
+          .integer("Stok harus bilangan bulat")
+          .min(0, "Stok tidak boleh negatif")
+          .max(9999, "Stok maksimal 9999")
+          .required("Stok wajib diisi"),
+    min_purchase: yup
+      .number()
+      .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+      .nullable()
+      .typeError("Minimal pembelian wajib diisi")
+      .integer("Minimal pembelian harus bilangan bulat")
+      .min(1, "Minimal pembelian tidak boleh 0")
+      .required("Minimal pembelian wajib diisi"),
+    bulkStock: yup
+      .number()
+      .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+      .nullable()
+      .typeError("Stok harus berupa angka")
+      .integer("Stok harus bilangan bulat")
+      .min(0, "Stok tidak boleh negatif")
+      .max(9999, "Stok maksimal 9999"),
+  };
+
+  if (useVariants.value && combinations.value && combinations.value.length > 0) {
+    combinations.value.forEach((_, index) => {
+      baseSchema[`combination_${index}_price`] = yup
+        .number()
+        .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+        .nullable()
+        .typeError("Harga wajib diisi")
+        .min(0, "Harga minimal 0")
+        .required("Harga wajib diisi");
+
+      baseSchema[`combination_${index}_stock`] = yup
+        .number()
+        .transform((v) => (v === "" || Number.isNaN(Number(v)) ? null : Number(v)))
+        .nullable()
+        .typeError("Stok wajib diisi")
+        .integer("Stok harus bilangan bulat")
+        .min(0, "Stok tidak boleh negatif")
+        .max(9999, "Stok maksimal 9999")
+        .required("Stok wajib diisi");
+    });
+  }
+
+  return yup.object(baseSchema);
 });
 
 // ============================================================
@@ -225,6 +264,7 @@ const {
   validate,
 } = useForm({
   validationSchema: schema,
+  keepValuesOnUnmount: true,
   initialValues: {
     name: "",
     description: "",
@@ -233,6 +273,7 @@ const {
     sku: "",
     price: 0,
     stock: 0,
+    bulkStock: null,
   },
 });
 
@@ -312,21 +353,21 @@ watch(
 watch(
   () => values.price,
   (newVal) => {
-    formPrice.value = newVal || 0;
+    formPrice.value = newVal ?? "";
   },
 );
 
 watch(
   () => values.stock,
   (newVal) => {
-    formStock.value = newVal || 0;
+    formStock.value = newVal ?? "";
   },
 );
 
 watch(
   () => values.min_purchase,
   (newVal) => {
-    formMinPurchase.value = newVal || 1;
+    formMinPurchase.value = newVal ?? "";
   },
 );
 
@@ -349,9 +390,31 @@ watch(formMinPurchase, (newVal) => {
 // ============================================================
 // COMPUTED PROPERTIES
 // ============================================================
+// Sync Combinations to Vee-Validate
+// ============================================================
+watch(
+  combinations,
+  (newCombos) => {
+    newCombos.forEach((combo, index) => {
+      setFieldValue(`combination_${index}_price`, combo.price);
+      setFieldValue(`combination_${index}_stock`, combo.stock);
+      setFieldValue(`combination_${index}_sku`, combo.sku);
+    });
+  },
+  { deep: true }
+);
+
 const canAddSubCategory = computed(
   () => selectedSubCategories.value.length < 4,
 );
+
+const getAvailableSubCategories = (currentIndex) => {
+  return categoriesLevel2.value.filter(cat => {
+    return !selectedSubCategories.value.some((selectedVal, idx) => {
+      return idx !== currentIndex && selectedVal === cat.value;
+    });
+  });
+};
 const canAddAddOnGroup = computed(
   () => addOnGroups.value.length < maxAddOnGroups,
 );
@@ -400,8 +463,16 @@ const onSubmit = veeHandleSubmit(
     }
 
     if (!useVariants.value && values.stock > 9999) {
-      toast.error("Stok maksimal 9999");
+      toast.error("Stok tidak boleh melebihi 9999");
       return;
+    }
+
+    if (useVariants.value) {
+      const invalidStockCombo = combinations.value.find((c) => c.stock > 9999);
+      if (invalidStockCombo) {
+        toast.error("Stok variasi tidak boleh melebihi 9999");
+        return;
+      }
     }
 
     // Kombinasi
@@ -427,7 +498,7 @@ const onSubmit = veeHandleSubmit(
 
     // === 1) Validasi dengan Yup ===
     try {
-      await schema.validate(values, { abortEarly: false });
+      await schema.value.validate(values, { abortEarly: false });
     } catch (yupError) {
       const messages = (yupError.inner || [])
         .map((e) => e.message)
@@ -735,21 +806,13 @@ const onSubmit = veeHandleSubmit(
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <!-- ✅ FIXED: Back button dengan dynamic route -->
-      <button
-        @click="router.push(`/merchant-center/${currentMerchantSlug}/products`)"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Tambah Produk</h1>
-    </div>
+    <MerchantMobileHeader
+      title="Tambah Produk"
+      :backRoute="`/merchant-center/${currentMerchantSlug}/products`"
+    />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-50 hidden py-6 sm:block bg-gray-50">
       <div
         class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
       >
@@ -846,7 +909,7 @@ const onSubmit = veeHandleSubmit(
         </div>
       </div>
       <!-- ✅ FIXED: Remove ref, use @submit -->
-      <Form @submit="onSubmit">
+      <Form :validation-schema="schema" @submit="onSubmit">
         <!-- Foto Produk -->
         <div
           class="p-4 mb-2 bg-white sm:mb-4 sm:p-6 sm:rounded-xl sm:shadow-sm"
@@ -1026,20 +1089,15 @@ const onSubmit = veeHandleSubmit(
                   :key="index"
                   class="flex items-center gap-2"
                 >
-                  <select
-                    v-model="selectedSubCategories[index]"
-                    class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-merchant-primary focus:border-transparent"
-                  >
-                    <option value="" disabled>Pilih sub kategori</option>
-                    <option
-                      v-for="cat in categoriesLevel2"
-                      :key="cat.value"
-                      :value="cat.value"
-                      :disabled="selectedSubCategories.includes(cat.value)"
-                    >
-                      {{ cat.label }}
-                    </option>
-                  </select>
+                  <div class="flex-1">
+                    <SelectField
+                      :name="`sub_category_${index}`"
+                      :options="getAvailableSubCategories(index)"
+                      v-model="selectedSubCategories[index]"
+                      placeholder="Pilih sub kategori"
+                      variant="merchant"
+                    />
+                  </div>
                   <button
                     @click="selectedSubCategories.splice(index, 1)"
                     type="button"
@@ -1462,7 +1520,6 @@ const onSubmit = veeHandleSubmit(
                 placeholder="0"
                 v-model.number="formStock"
                 min="0"
-                max="9999"
                 required
               />
             </div>

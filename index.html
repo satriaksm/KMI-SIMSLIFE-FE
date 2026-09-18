@@ -11,31 +11,54 @@
     -->
     <script>
       (function () {
-        if (location.pathname.indexOf("/backend/") !== 0) return;
+        var isBackendPath = location.pathname.indexOf("/backend/") === 0;
 
-        // Signal to Vue Router: do NOT redirect this path.
-        window.__BACKEND_REDIRECT = true;
-
-        // Unregister all Service Workers, then hard-navigate to the real server URL.
-        function hardNav() {
-          location.replace(location.href);
+        if (isBackendPath) {
+          // Signal to Vue Router: do NOT redirect this path.
+          window.__BACKEND_REDIRECT = true;
         }
 
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker
-            .getRegistrations()
-            .then(function (r) {
-              return Promise.all(
-                r.map(function (sw) {
-                  return sw.unregister();
-                }),
-              );
-            })
-            .then(hardNav)
-            .catch(hardNav);
-        } else {
-          hardNav();
+        if (!("serviceWorker" in navigator)) {
+          if (isBackendPath) location.replace(location.href);
+          return;
         }
+
+        function clearCaches() {
+          if (!("caches" in window)) return Promise.resolve();
+          return caches.keys().then(function (keys) {
+            return Promise.all(
+              keys.map(function (key) {
+                return caches.delete(key);
+              }),
+            );
+          });
+        }
+
+        function unregisterAll() {
+          return navigator.serviceWorker.getRegistrations().then(function (regs) {
+            return Promise.all(
+              regs.map(function (sw) {
+                return sw.unregister();
+              }),
+            );
+          });
+        }
+
+        function cleanup() {
+          return unregisterAll().then(clearCaches, clearCaches);
+        }
+
+        if (isBackendPath) {
+          cleanup().finally(function () {
+            location.replace(location.href);
+          });
+          return;
+        }
+
+        // Temporary recovery mode: clear lingering SW on all normal page loads too.
+        window.addEventListener("load", function () {
+          cleanup().catch(function () {});
+        });
       })();
     </script>
 

@@ -94,6 +94,46 @@ export function useVouchers() {
     }
   };
 
+  /**
+   * Activate voucher (admin only)
+   */
+  const activateVoucher = async (id) => {
+    loading.value = true;
+    try {
+      await api.post(`/api/admin/vouchers/${id}/activate`);
+      toast.success("Voucher berhasil diaktifkan");
+      console.log("[useVouchers] Activated voucher:", id);
+    } catch (error) {
+      console.error("[useVouchers] Activate failed:", error);
+      const message =
+        error.response?.data?.message || "Gagal mengaktifkan voucher";
+      toast.error(message);
+      throw error;
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  /**
+   * Deactivate voucher (admin only)
+   */
+  const deactivateVoucher = async (id) => {
+    loading.value = true;
+    try {
+      await api.post(`/api/admin/vouchers/${id}/deactivate`);
+      toast.success("Voucher berhasil dinonaktifkan");
+      console.log("[useVouchers] Deactivated voucher:", id);
+    } catch (error) {
+      console.error("[useVouchers] Deactivate failed:", error);
+      const message =
+        error.response?.data?.message || "Gagal menonaktifkan voucher";
+      toast.error(message);
+      throw error;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   /* =====================================================
    * Merchant VOUCHERS
    * ===================================================== */
@@ -164,6 +204,7 @@ export function useVouchers() {
   };
 
   const createMerchantVoucher = async (merchantSlug, payload) => {
+    loading.value = true;
     try {
       const voucher = await voucherApi.createMerchantVoucher(
         merchantSlug,
@@ -181,10 +222,13 @@ export function useVouchers() {
       const message = error.response?.data?.message || "Gagal membuat voucher";
       toast.error(message);
       throw error;
+    } finally {
+      loading.value = false;
     }
   };
 
   const editMerchantVoucher = async (merchantSlug, voucherId, payload) => {
+    loading.value = true;
     try {
       const voucher = await voucherApi.editMerchantVoucher(
         merchantSlug,
@@ -204,6 +248,8 @@ export function useVouchers() {
         error.response?.data?.message || "Gagal memperbarui voucher";
       toast.error(message);
       throw error;
+    } finally {
+      loading.value = false;
     }
   };
 
@@ -359,6 +405,8 @@ export function useVouchers() {
     fetchVouchers,
     fetchVoucherDetail,
     deleteVoucher,
+    activateVoucher,
+    deactivateVoucher,
     fetchMerchantVouchers,
     fetchMerchantVoucherDetail,
     createMerchantVoucher,

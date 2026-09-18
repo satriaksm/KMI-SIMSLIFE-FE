@@ -1,5 +1,5 @@
 <template>
-  <div class="pb-16 bg-gray-50 sm:pb-24">
+  <div class="pb-16 bg-gray-50 sm:pb-20">
     <!-- Header dengan tombol close (Hidden - replaced by floating button) -->
     <div
       class="sticky top-0 z-50 hidden bg-white border-b border-gray-200 sm:hidden"
@@ -257,12 +257,12 @@
               @touchmove="handleTouchMove"
               @touchend="handleTouchEnd"
             >
-              <img
+              <ResponsiveImage
                 v-if="selectedImage"
-                :src="selectedImage"
+                :src="selectedImage.src"
+                :urls="selectedImage.urls"
                 :alt="product?.name"
-                class="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
-                draggable="false"
+                customClass="object-contain w-full h-full transition-transform duration-300 select-none sm:rounded-2xl group-hover:scale-105"
               />
               <div v-else class="text-gray-400">No Image</div>
 
@@ -350,10 +350,11 @@
                   class="thumb-item"
                   :class="currentImageIndex === index ? 'active' : ''"
                 >
-                  <img
-                    :src="image"
+                  <ResponsiveImage
+                    :src="image.src"
+                    :urls="image.urls"
                     :alt="`${product?.name} - ${index + 1}`"
-                    class="object-cover w-full h-full"
+                    customClass="object-cover w-full h-full"
                   />
                 </button>
               </div>
@@ -362,8 +363,19 @@
 
           <!-- Kolom Kanan: Info Produk -->
           <div class="px-4 py-4 sm:px-0 sm:py-0">
-            <!-- Nama & Harga -->
+            <!-- Nama, Kategori & Harga -->
             <div class="pb-4 border-b border-gray-200">
+              <!-- Kategori -->
+              <div v-if="product?.categories?.length" class="flex flex-wrap gap-2 mb-3">
+                <span 
+                  v-for="cat in product.categories" 
+                  :key="cat.id" 
+                  class="px-2.5 py-1 text-xs font-semibold rounded-full"
+                  :class="cat.parent_id === null ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-700'"
+                >
+                  {{ cat.name }}
+                </span>
+              </div>
               <h1 class="mb-2 text-xl font-bold text-gray-900 sm:text-3xl">
                 {{ product?.name || "Nama Produk" }}
               </h1>
@@ -430,13 +442,14 @@
                   <div class="flex flex-col items-center">
                     <!-- 🖼️ Image jika ada -->
                     <div
-                      v-if="getOptionValueSrcUrl(1, size.id)"
+                      v-if="getOptionValueImage(1, size.id)"
                       class="flex items-center justify-center w-12 h-12 overflow-hidden bg-gray-100 rounded-md"
                     >
-                      <img
-                        :src="getOptionValueSrcUrl(1, size.id)"
+                      <ResponsiveImage
+                        :src="getOptionValueImage(1, size.id).src"
+                        :urls="getOptionValueImage(1, size.id).urls"
                         :alt="size.name"
-                        class="object-cover w-full h-full"
+                        customClass="object-cover w-full h-full"
                       />
                     </div>
 
@@ -661,10 +674,11 @@
                     class="flex-shrink-0 w-12 h-12 overflow-hidden bg-gray-200 rounded-full"
                   >
                     <img
-                      v-if="product?.merchant?.logo_url"
-                      :src="product.merchant.logo_url"
-                      alt="UMKM logo"
+                      v-if="merchantLogoThumbUrl"
+                      :src="merchantLogoThumbUrl"
+                      :alt="product?.merchant?.name || 'UMKM logo'"
                       class="object-cover w-full h-full"
+                      loading="lazy"
                     />
                     <span v-else>
                       <svg
@@ -722,7 +736,7 @@
               </h3>
               <div
                 v-if="relatedProducts.length > 0"
-                class="flex gap-3 pb-2 overflow-x-auto no-scrollbar"
+                class="flex gap-3 py-2 -mt-2 overflow-x-auto no-scrollbar"
               >
                 <ProductCard
                   v-for="item in relatedProducts"
@@ -747,7 +761,7 @@
 
   <!-- Bottom Action Bar (Mobile) -->
   <div
-    class="fixed left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 sm:hidden bottom-16"
+    class="fixed left-0 right-0 z-40 px-4 py-3 bg-white border-t border-gray-200 sm:hidden bottom-0"
   >
     <div v-if="loading" class="flex items-center gap-3">
       <div class="w-12 h-12 bg-gray-200 rounded-xl animate-pulse"></div>
@@ -759,8 +773,11 @@
         v-if="!isAdmin"
         @click="addToCart"
         class="w-12 h-12 rounded-xl border-2 border-[#FFA30E] text-[#FFA30E] hover:bg-orange-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:-translate-y-0.5 active:scale-95"
-        :disabled="getCurrentStock() === 0 || isArchived"
-        :title="getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'"
+        :disabled="getCurrentStock() === 0 || isArchived || isOwnProduct"
+        :title="
+          isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
+          getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'
+        "
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -783,10 +800,13 @@
         @click="buyNow"
         variant="primary"
         customClass="w-full"
-        :disabled="getCurrentStock() === 0 || isArchived || isAdmin"
-        :title="isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined"
+        :disabled="getCurrentStock() === 0 || isArchived || isAdmin || isOwnProduct"
+        :title="
+          isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
+          isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined
+        "
       >
-        {{ getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
+        {{ isOwnProduct ? "Toko Anda Sendiri" : getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
       </Button>
     </div>
   </div>
@@ -843,8 +863,9 @@
             v-if="!isAdmin"
             @click="addToCart"
             variant="primary-outline"
-            :disabled="getCurrentStock() === 0 || isArchived"
+            :disabled="getCurrentStock() === 0 || isArchived || isOwnProduct"
             :title="
+              isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
               getCurrentStock() === 0 ? 'Stok Habis' : 'Tambah ke Keranjang'
             "
           >
@@ -868,13 +889,14 @@
           <!-- Tombol Beli Sekarang -->
           <Button
             @click="buyNow"
-            :disabled="getCurrentStock() === 0 || isArchived || isAdmin"
+            :disabled="getCurrentStock() === 0 || isArchived || isAdmin || isOwnProduct"
             variant="primary"
             :title="
+              isOwnProduct ? 'Tidak dapat membeli produk dari toko sendiri' :
               isAdmin ? 'Admin tidak dapat melakukan pembelian' : undefined
             "
           >
-            {{ getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
+            {{ isOwnProduct ? "Toko Anda Sendiri" : getCurrentStock() === 0 ? "Stok Habis" : "Beli Sekarang" }}
           </Button>
         </div>
       </div>
@@ -920,121 +942,34 @@
         <!-- Group Items -->
         <div class="space-y-2">
           <div v-if="isSingleRequired(group)" class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- RADIO -->
-                <input
-                  type="radio"
-                  :name="'group-' + group.id"
-                  :checked="isAddonSelected(addon)"
-                  @change="selectSingleAddon(addon, group)"
-                  :disabled="!addon.available"
-                  class="mt-0.5 w-4 h-4 text-primary border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <RadioGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available
+              }))"
+              layout="grid"
+              :modelValue="getSelectedSingleAddon(group.id)"
+              @update:modelValue="val => setSelectedSingleAddon(val, group)"
+            />
           </div>
           <div v-else class="space-y-2">
-            <label
-              v-for="addon in group.items"
-              :key="addon.id"
-              class="flex items-start justify-between gap-3 p-3 transition border rounded-lg cursor-pointer"
-              :class="
-                isAddonSelected(addon)
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              "
-            >
-              <div class="flex items-start flex-1 gap-3">
-                <!-- CHECKBOX -->
-                <input
-                  type="checkbox"
-                  :checked="isAddonSelected(addon)"
-                  @change="toggleAddon(addon, group)"
-                  :disabled="!addon.available || isGroupMaxed(group, addon)"
-                  class="mt-0.5 w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
-                />
-
-                <!-- INFO -->
-                <div
-                  class="flex items-start justify-between w-full gap-2"
-                  :class="{ 'opacity-50 cursor-not-allowed': !addon.available }"
-                >
-                  <div class="flex-1 min-w-0">
-                    <p
-                      class="text-sm font-medium text-gray-900 capitalize"
-                      :class="{
-                        'line-through text-gray-400': !addon.available,
-                      }"
-                    >
-                      {{ addon.name }}
-                    </p>
-                    <p
-                      v-if="addon.description"
-                      class="text-xs text-gray-600 mt-0.5"
-                    >
-                      {{ addon.description }}
-                    </p>
-                    <p
-                      v-if="!addon.available"
-                      class="text-xs text-red-500 mt-0.5"
-                    >
-                      Tidak tersedia
-                    </p>
-                  </div>
-
-                  <span
-                    class="text-sm font-semibold text-gray-900 whitespace-nowrap"
-                  >
-                    +Rp {{ formatIDR(addon.price) }}
-                  </span>
-                </div>
-              </div>
-            </label>
+            <CheckboxGroupPills
+              :name="'addon_group_' + group.id"
+              :options="group.items.map(addon => ({
+                value: addon.addon_id ?? addon.id,
+                label: addon.name,
+                description: addon.description,
+                suffix: '+Rp ' + formatIDR(addon.price),
+                disabled: !addon.available || isGroupMaxed(group, addon)
+              }))"
+              layout="grid"
+              :modelValue="getSelectedMultipleAddons(group.id)"
+              @update:modelValue="vals => setSelectedMultipleAddons(vals, group)"
+            />
           </div>
         </div>
       </div>
@@ -1194,6 +1129,7 @@
       </button>
     </template>
   </ResponsiveModal>
+
 </template>
 
 <script setup>
@@ -1212,7 +1148,10 @@ import { useBodyScrollLock } from "@/composables/useBodyScrollLock.js";
 import Button from "@/components/common/Button.vue";
 import { useCheckoutStore } from "@/stores/checkout";
 import ProductCard from "@/components/Card/ProductCard.vue";
+import ResponsiveImage from "@/components/common/ResponsiveImage.vue";
 import Textfield from "@/components/forms/TextField.vue";
+import RadioGroupPills from "@/components/forms/RadioGroupPills.vue";
+import CheckboxGroupPills from "@/components/forms/CheckboxGroupPills.vue";
 import { useProducts } from "@/composables/useProducts.js";
 import { useToast } from "vue-toastification";
 import { useCartStore } from "@/stores/cart";
@@ -1221,6 +1160,13 @@ import { useCart } from "@/composables/useCart";
 const { addToCart: addCart, loading: loadingCart, fetchCartCount } = useCart();
 const authStore = useAuthStore();
 const isAdmin = computed(() => authStore.isAdmin);
+
+const isOwnProduct = computed(() => {
+  if (!authStore.isAuthenticated) return false;
+  const merchantId = product.value?.merchant?.id || product.value?.merchant_id;
+  if (!merchantId) return false;
+  return !!authStore.getMerchantById(merchantId);
+});
 const cartStore = useCartStore();
 const toast = useToast();
 const showFullDescription = ref(false);
@@ -1262,6 +1208,32 @@ const displayedDescription = computed(() => {
   return desc.slice(0, DESCRIPTION_LIMIT) + "...";
 });
 
+const merchantLogoThumbUrl = computed(() => {
+  const merchant = product.value?.merchant;
+  if (!merchant) return null;
+
+  if (merchant.logo_urls?.thumb) {
+    return merchant.logo_urls.thumb;
+  }
+
+  if (merchant.logo_url) {
+    const raw = merchant.logo_url;
+    if (typeof raw === "string" && !raw.includes("size=")) {
+      const sep = raw.includes("?") ? "&" : "?";
+      return `${raw}${sep}size=thumb`;
+    }
+    return raw;
+  }
+
+  if (merchant.logo_path) {
+    return `${
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+    }/storage/${merchant.logo_path}`;
+  }
+
+  return null;
+});
+
 function handleTouchStart(e) {
   if (!e.touches || e.touches.length === 0) return;
   touchStartX.value = e.touches[0].clientX;
@@ -1290,12 +1262,16 @@ function handleTouchEnd() {
   touchEndX.value = 0;
 }
 
-function getOptionValueSrcUrl(optionIndex, valueId) {
+function getOptionValueImage(optionIndex, valueId) {
   // optionIndex: 1 untuk option pertama, 2 untuk kedua
   const option = product.value?.options?.[optionIndex - 1];
   if (!option || !option.values) return null;
   const value = option.values.find((v) => Number(v.id) === Number(valueId));
-  return value?.src_url || null;
+  if (!value?.src_url && !value?.image_url && !value?.thumb_url && !value?.urls) return null;
+  return {
+    src: value.thumb_url || value.urls?.thumb || value.src_url || value.image_url,
+    urls: value.urls || null
+  };
 }
 
 async function addToCart() {
@@ -1376,6 +1352,7 @@ const isMouseDown = ref(false);
 const mouseStartX = ref(0);
 const mouseDeltaX = ref(0);
 const swipeThreshold = 50;
+let inventoryChannel = null;
 
 let abortController = null;
 
@@ -1480,7 +1457,11 @@ const goToCart = () => {
 };
 useBodyScrollLock(isAnyModalOpen);
 const goBack = () => {
-  router.back();
+  if (window.history.state?.back) {
+    router.back();
+  } else {
+    router.push({ name: "Beranda" });
+  }
 };
 
 // -------------- stock/price helpers (kept dari kode Anda, sedikit disesuaikan) --------------
@@ -1672,21 +1653,34 @@ async function doFetchProduct(slug) {
     return images
       .map((img) => {
         if (!img) return null;
-        if (typeof img === "string") return img;
+        if (typeof img === "string") return { src: img, urls: null };
         if (typeof img === "object") {
+          let src = null;
           // jika sudah berupa absolute url
-          if (img.image_url) return img.image_url;
+          if (img.image_url) src = img.image_url;
           // jika id tersedia — gunakan getImageUrl helper (yang kamu import)
-          if (img.src_url) return img.src_url;
+          else if (img.src_url) src = img.src_url;
           // jika image_path tersedia, coba resolve
-          if (img.image_path) {
-            return typeof absoluteImagePath === "function"
+          else if (img.image_path) {
+            src = typeof absoluteImagePath === "function"
               ? absoluteImagePath(img.image_path)
               : _absoluteImagePath
                 ? _absoluteImagePath(img.image_path)
                 : `${
                     import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
                   }/storage/${img.image_path}`;
+          }
+          
+          if (src) {
+            const urls = img.image_urls || img.urls || img.src_urls || {
+              original: img.original_url || img.src_url || src,
+              medium: img.medium_url || (src.includes('/api/images/') ? `${src}${src.includes('?') ? '&' : '?'}size=medium` : src),
+              thumb: img.thumb_url || (src.includes('/api/images/') ? `${src}${src.includes('?') ? '&' : '?'}size=thumb` : src),
+            };
+            return {
+              src,
+              urls
+            };
           }
         }
         return null;
@@ -1887,6 +1881,11 @@ onMounted(async () => {
     await cartStore.fetchCartCount(true);
   }
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", handleScroll);
+});
+
 watch(product, (p) => {
   if (!p) return;
 
@@ -2063,11 +2062,13 @@ function buyNow() {
   const productVariantId = matchedCombo.product_variant_id;
 
   checkout.setFromProductDetail({
+    productId: product.value?.id ?? null,
     slug: product.value?.slug,
     title: product.value?.name,
-    image: selectedImage.value || productImages.value?.[0] || "",
+    image: selectedImage.value?.src || selectedImage.value || productImages.value?.[0]?.src || productImages.value?.[0] || "",
     store: {
       id: store.id ?? null,
+      merchantId: store.id ?? null,
       slug: store.slug ?? null,
       name: store.name ?? "",
       address: merchantAddress,
@@ -2119,6 +2120,39 @@ function toggleAddon(addon, group) {
     });
   }
 }
+
+// Helpers untuk komponen Radio/CheckboxGroupPills
+const getSelectedSingleAddon = (groupId) => {
+  const found = tempSelectedAddons.value.find((a) => Number(a.addon_group_id) === Number(groupId));
+  return found ? found.addon_id : null;
+};
+
+const setSelectedSingleAddon = (val, group) => {
+  const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+  if (addon) selectSingleAddon(addon, group);
+};
+
+const getSelectedMultipleAddons = (groupId) => {
+  return tempSelectedAddons.value
+    .filter((a) => Number(a.addon_group_id) === Number(groupId))
+    .map((a) => a.addon_id);
+};
+
+const setSelectedMultipleAddons = (vals, group) => {
+  if (!Array.isArray(vals)) return;
+  tempSelectedAddons.value = tempSelectedAddons.value.filter((a) => Number(a.addon_group_id) !== Number(group.id));
+  vals.forEach((val) => {
+    const addon = group.items.find((a) => (a.addon_id ?? a.id) === val);
+    if (addon) {
+      tempSelectedAddons.value.push({
+        addon_group_id: group.id,
+        addon_id: addon.addon_id ?? addon.id,
+        name: addon.name,
+        price: Number(addon.price || 0),
+      });
+    }
+  });
+};
 
 // Pilih single untuk group maxSelection === 1 (radio)
 function selectSingleAddon(addon, group) {
@@ -2401,5 +2435,22 @@ function viewProduct(slug) {
   border-color: var(--color-primary, #ffa30e);
   box-shadow: 0 0 0 4px rgba(255, 163, 14, 0.15);
   transform: scale(1.05);
+}
+
+.empty-review-state {
+  padding: 32px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empty-review-state i {
+  font-size: 32px;
+  margin-bottom: 12px;
+  color: #d1d5db;
+}
+
+.empty-review-state p {
+  margin: 0;
+  font-size: 14px;
 }
 </style>

@@ -6,6 +6,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "@/stores/auth";
 import Breadcrumb from "@/components/merchant/Breadcrumb.vue"; // ✅ ADD
+import MerchantMobileHeader from "@/components/merchant/MerchantMobileHeader.vue";
 import Button from "@/components/common/Button.vue";
 import StatusLabel from "@/components/common/StatusLabel.vue";
 import { useBodyScrollLock } from "@/composables/useBodyScrollLock";
@@ -226,11 +227,10 @@ const transformedOptions = computed(() => {
     option_name: option.option_name,
     uses_image: option.uses_image,
     values: (option.values || []).map((value) => {
-      // Prioritas:
-      // 1) value.src_url dari API (langsung pakai jika ada)
-      // 2) fallback value.image_url (absolute dari backend)
-      // 3) fallback getVariantImageUrl(value.id) — uses product_option_value.id
-      const imageSrc = value.src_url || null;
+      // 1) value.thumb_url dari API (thumbnail)
+      // 2) fallback value.src_url (langsung pakai jika ada)
+      // 3) fallback value.image_url (absolute dari backend)
+      const imageSrc = value.thumb_url || value.src_url || null;
 
       return {
         id: value.id,
@@ -382,22 +382,12 @@ onMounted(() => {
 <template>
   <div class="min-h-screen pb-20 bg-gray-50 sm:pb-0">
     <!-- Mobile Header -->
-    <div
-      class="fixed top-0 left-0 right-0 z-50 flex items-center justify-center px-4 py-6 text-white shadow-lg sm:hidden bg-merchant-primary rounded-b-2xl"
-    >
-      <button
-        @click="router.back()"
-        class="absolute flex items-center justify-center w-10 h-10 transition rounded-full left-4 hover:bg-white/10"
-      >
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <h1 class="text-lg font-semibold">Detail Produk</h1>
-    </div>
+    <MerchantMobileHeader title="Detail Produk" />
 
     <!-- Desktop Header -->
-    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 sm:block">
+    <div class="sticky top-0 left-0 right-0 z-30 hidden py-6 bg-gray-50 sm:block">
       <div
-        class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 lg:px-8 gap-y-2 gap-x-4"
+        class="flex flex-wrap items-center justify-between px-4 mx-auto sm:px-6 gap-y-2 gap-x-4"
       >
         <div>
           <!-- ✅ Use Breadcrumb Component -->

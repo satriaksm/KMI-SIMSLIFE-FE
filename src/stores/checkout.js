@@ -100,9 +100,17 @@ export const useCheckoutStore = defineStore("checkout", {
    * ===================================================== */
   actions: {
     _resolveImageUrl(image) {
+      if (!image) return "";
       if (typeof image === "string") return image;
-      if (image && typeof image === "object") {
-        return image.src ?? image.src_url ?? image.url ?? "";
+      if (typeof image === "object") {
+        return (
+          image.src ??
+          image.thumb_url ??
+          image.src_url ??
+          image.url ??
+          image.image_url ??
+          ""
+        );
       }
       return "";
     },
@@ -110,15 +118,15 @@ export const useCheckoutStore = defineStore("checkout", {
     setFromProductDetail(payload) {
       this.from = "product";
 
+      this.productId = payload.productId ?? payload.id ?? null;
       this.productSlug = payload.slug ?? null;
       this.productId = payload.productId ?? null;
       this.productTitle = payload.title ?? null;
       this.productImage = this._resolveImageUrl(payload.image);
 
       this.store = {
-        id: payload.store?.id ?? null,
+        id: payload.store?.id ?? payload.store?.merchantId ?? null,
         merchantId: payload.store?.merchantId ?? payload.store?.id ?? null,
-        cartId: payload.store?.cartId ?? null,
         slug: payload.store?.slug ?? null,
         name: payload.store?.name ?? null,
         address: payload.store?.address ?? null,
@@ -165,9 +173,9 @@ export const useCheckoutStore = defineStore("checkout", {
       this.from = "cart";
 
       this.store = {
-        id: payload.store?.merchantId ?? null,
-        merchantId: payload.store?.merchantId ?? null,
-        cartId: payload.store?.cartId ?? null,
+        id: payload.store?.id ?? payload.store?.merchantId ?? payload.store?.cartId ?? null,
+        merchantId: payload.store?.merchantId ?? payload.store?.id ?? null,
+        cartId: payload.store?.cartId ?? payload.store?.id ?? null,
         slug: payload.store?.slug ?? null,
         name: payload.store?.name ?? null,
         address: payload.store?.address ?? null,
@@ -176,6 +184,7 @@ export const useCheckoutStore = defineStore("checkout", {
 
       this.cartItems = payload.items.map((item) => ({
         id: item.id,
+        productId: item.productId ?? item.product_id ?? item.id,
         name: item.name,
         image: this._resolveImageUrl(item.image),
         quantity: Number(item.quantity || 1),
@@ -193,6 +202,7 @@ export const useCheckoutStore = defineStore("checkout", {
       }));
 
       // reset single product state
+      this.productId = null;
       this.productSlug = null;
       this.productId = null;
       this.productTitle = null;

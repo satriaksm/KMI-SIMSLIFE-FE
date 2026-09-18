@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex items-center justify-center p-4 bg-white sm:bg-gray-50 min-h-svh sm:min-h-0 sm:items-stretch sm:p-8"
+    class="flex items-center justify-center p-4 bg-white sm:bg-gray-50 min-h-[calc(100vh-64px)] sm:min-h-screen sm:p-8"
   >
     <div
       class="w-full max-w-5xl overflow-hidden bg-white shadow-none rounded-2xl sm:shadow-lg"
@@ -10,22 +10,26 @@
         <div
           class="hidden sm:flex items-center justify-center bg-gradient-to-br from-primary to-[#FFA30E] p-12"
         >
-          <img
-            :src="WhiteWithText"
-            alt="Ilustration Login"
-            class="w-full max-w-md"
-          />
+          <router-link to="/">
+            <img
+              :src="WhiteWithText"
+              alt="Ilustration Login"
+              class="w-full max-w-md transition-transform hover:scale-105"
+            />
+          </router-link>
         </div>
 
         <!-- Right Side - Form -->
         <div class="flex flex-col justify-center p-4 sm:p-12">
           <!-- Mobile Illustration -->
-          <div class="items-center justify-center py-4 sm:hidden">
-            <img
-              :src="LogoWithText"
-              alt="Ilustration Login"
-              class="w-full mx-auto max-w-52"
-            />
+          <div class="items-center justify-center py-4 sm:hidden flex">
+            <router-link to="/">
+              <img
+                :src="LogoWithText"
+                alt="Ilustration Login"
+                class="w-full mx-auto max-w-52 transition-transform active:scale-95"
+              />
+            </router-link>
           </div>
 
           <h2
@@ -101,13 +105,13 @@
           </Form>
 
           <!-- Debug Info (Development Only) -->
-          <div
+          <!-- <div
             v-if="isDev"
             class="p-4 mt-6 text-xs border border-gray-200 bg-gray-50 rounded-xl"
           >
             <p class="mb-2 font-semibold text-gray-700">Debug Info:</p>
             <p class="text-gray-600"><strong>API URL:</strong> {{ apiUrl }}</p>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>
@@ -116,7 +120,7 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { Form } from "vee-validate";
 import * as yup from "yup";
@@ -130,6 +134,7 @@ import ErrorAlert from "@/components/forms/ErrorAlert.vue";
 import AppButton from "@/components/common/Button.vue";
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const isLoading = ref(false);
@@ -146,6 +151,12 @@ const schema = yup.object({
 const handleLogin = async (values) => {
   isLoading.value = true;
   errorMessage.value = "";
+
+  if (!values.email || !values.password) {
+    errorMessage.value = "Email atau password harus diisi";
+    isLoading.value = false;
+    return;
+  }
 
   try {
     // 1. Login via authStore
@@ -172,20 +183,28 @@ const handleLogin = async (values) => {
     }
 
     if (userRoles.includes("umkm-owner") || userRoles.includes("customer")) {
+      const redirectPath = route.query.redirect || "/";
       if (isDev) {
-        console.log("Redirecting to /");
+        console.log("Redirecting to", redirectPath);
       }
-      await router.replace("/");
+      await router.replace(redirectPath);
     } else {
+      const redirectPath = route.query.redirect || "/admin/dashboard";
       if (isDev) {
-        console.log("Redirecting to /dashboard (default)");
+        console.log("Redirecting to", redirectPath);
       }
-      await router.replace("/admin/dashboard");
+      await router.replace(redirectPath);
     }
   } catch (error) {
     if (isDev) {
       console.error("Login error:", error);
     }
+    
+    if (error.response?.data?.need_verify) {
+      router.push({ path: "/verify-email", query: { email: values.email } });
+      return;
+    }
+
     errorMessage.value =
       error.response?.data?.message || "Login gagal. Silakan coba lagi.";
   } finally {
